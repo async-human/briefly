@@ -1869,6 +1869,11 @@ footer {
   border-radius: 100px;
   border: 1px solid rgba(106,171,138,0.2);
 }
+.onboard-account-meta-warn {
+  font-size: 11px;
+  color: #c8a84b;
+  line-height: 1.5;
+}
 .onboard-account-action {
   display: flex;
   flex-direction: column;

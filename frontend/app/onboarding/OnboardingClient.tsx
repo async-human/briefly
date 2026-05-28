@@ -415,8 +415,15 @@ export default function OnboardingPage() {
                     <p className="onboard-account-sub">All channels you subscribe to</p>
                     {status?.youtube_connected ? (
                       <div className="onboard-account-meta">
-                        {status.youtube_channel_count != null && (
+                        {status.youtube_channel_count != null && status.youtube_channel_count > 0 ? (
                           <span className="onboard-account-meta-stat">{status.youtube_channel_count} channels</span>
+                        ) : (
+                          <span className="onboard-account-meta-warn">
+                            No channels found — your YouTube subscriptions may be set to private.{" "}
+                            <a href="https://www.youtube.com/account_privacy" target="_blank" rel="noreferrer" style={{ color: "inherit", textDecoration: "underline" }}>
+                              Check privacy settings ↗
+                            </a>
+                          </span>
                         )}
                       </div>
                     ) : (

@@ -300,6 +300,10 @@ def _fetch_subscriptions_sync(
     Call YouTube Data API v3 to get all channels the user is subscribed to.
     Paginates until max_channels is reached.
     Returns list of {"channel_id": ..., "channel_name": ...}.
+
+    Common failure modes (both logged explicitly):
+      - 403 PERMISSION_DENIED: YouTube Data API v3 not enabled in Google Cloud project.
+      - 200 with empty items: User's subscriptions are set to private in YouTube settings.
     """
     channels: list[dict] = []
     page_token: str | None = None
@@ -318,10 +322,33 @@ def _fetch_subscriptions_sync(
                     "User-Agent": user_agent,
                 },
             )
-            resp.raise_for_status()
-            data = resp.json()
 
-            for item in data.get("items", []):
+            if not resp.is_success:
+                body = resp.text[:500]
+                log.error(
+                    "YouTube subscriptions API error: HTTP %d — %s\n"
+                    "Common causes:\n"
+                    "  • YouTube Data API v3 not enabled → https://console.cloud.google.com/apis/library/youtube.googleapis.com\n"
+                    "  • Access token missing youtube.readonly scope\n"
+                    "Response: %s",
+                    resp.status_code, resp.reason_phrase, body,
+                )
+                resp.raise_for_status()
+
+            data = resp.json()
+            items = data.get("items", [])
+
+            if not items and not channels:
+                # First page returned empty — subscriptions are likely private
+                log.warning(
+                    "YouTube subscriptions API returned 0 items. "
+                    "The user's subscriptions may be set to private in YouTube settings "
+                    "(youtube.com → Settings → Privacy → 'Keep all my subscriptions private'). "
+                    "Total results reported by API: %s",
+                    data.get("pageInfo", {}).get("totalResults", "unknown"),
+                )
+
+            for item in items:
                 snippet = item.get("snippet", {})
                 resource = snippet.get("resourceId", {})
                 channel_id = resource.get("channelId")
@@ -390,6 +417,8 @@ async def count_subscriptions(access_token: str, user_agent: str) -> int:
     """Count subscribed channels — used at OAuth callback for the onboarding banner."""
     try:
         channels = await asyncio.to_thread(_fetch_subscriptions_sync, access_token, user_agent, 50)
+        log.info("YouTube subscription count: %d channels found", len(channels))
         return len(channels)
-    except Exception:
+    except Exception as exc:
+        log.warning("YouTube subscription count failed: %s", exc)
         return 0
