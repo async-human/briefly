@@ -14,6 +14,16 @@ from briefly_api.services.users import get_or_create_google_user
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+@router.get("/oauth-config")
+async def oauth_config(settings: Settings = Depends(get_settings)) -> dict:
+    """Return redirect URIs to register in Google Cloud Console (helps fix redirect_uri_mismatch)."""
+    return {
+        "backend_url": settings.backend_url.rstrip("/"),
+        "google_sign_in_redirect_uri": settings.google_redirect_uri,
+        "gmail_connect_redirect_uri": settings.gmail_redirect_uri,
+    }
+
+
 def _encode_state(settings: Settings) -> str:
     return jwt.encode({"nonce": generate_oauth_state()}, settings.secret_key, algorithm=settings.jwt_algorithm)
 
