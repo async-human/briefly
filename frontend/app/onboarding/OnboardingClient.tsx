@@ -332,113 +332,100 @@ export default function OnboardingPage() {
               )}
 
               {/* Gmail */}
-              <article className={`onboard-gmail-feature ${status?.gmail_connected ? "connected" : ""}`}>
-                <div className="onboard-gmail-top">
-                  <div className="onboard-gmail-brand">
-                    <span className="onboard-gmail-icon-wrap"><GmailIcon /></span>
-                    <div>
-                      <h2 className="onboard-gmail-title">Gmail</h2>
-                      <p className="onboard-gmail-sub">All your newsletters, automatically</p>
-                    </div>
+              <article className={`onboard-account-card ${status?.gmail_connected ? "connected" : ""}`}>
+                <div className="onboard-account-left">
+                  <span className="onboard-account-icon"><GmailIcon /></span>
+                  <div className="onboard-account-info">
+                    <p className="onboard-account-title">Gmail</p>
+                    <p className="onboard-account-sub">Newsletters found automatically</p>
+                    {status?.gmail_connected ? (
+                      <div className="onboard-account-meta">
+                        {status.gmail_email && <span className="onboard-account-meta-email">{status.gmail_email}</span>}
+                        {status.newsletter_count != null && (
+                          <span className="onboard-account-meta-stat">{status.newsletter_count}+ newsletters</span>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="onboard-account-hint">Only newsletter-like emails — never personal mail.</p>
+                    )}
                   </div>
-                  {status?.gmail_connected && (
-                    <span className="onboard-badge-connected"><CheckIcon /> Connected</span>
+                </div>
+                <div className="onboard-account-action">
+                  {status?.gmail_connected ? (
+                    <div className="onboard-connected-actions">
+                      <span className="onboard-badge-connected"><CheckIcon /> Connected</span>
+                      <button type="button" className="onboard-disconnect-btn" onClick={handleDisconnectGmail}>Disconnect</button>
+                    </div>
+                  ) : (
+                    <button type="button" className="onboard-connect-sm" onClick={handleConnectGmail} disabled={gmailLoading}>
+                      {gmailLoading ? <><span className="btn-spinner btn-spinner-dark" />Redirecting…</> : <><GmailIcon />Connect Gmail</>}
+                    </button>
                   )}
                 </div>
-                <p className="onboard-disclaimer">
-                  We only read newsletter-like emails — never personal or work mail. Disconnect anytime.
-                </p>
-                {status?.gmail_connected ? (
-                  <div className="onboard-gmail-result">
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                      <span className="onboard-gmail-email">{status.gmail_email}</span>
-                      {status.newsletter_count != null && (
-                        <span className="onboard-gmail-stat">{status.newsletter_count}+ newsletters found</span>
-                      )}
-                    </div>
-                    <button type="button" className="onboard-disconnect-btn" onClick={handleDisconnectGmail}>
-                      Disconnect
-                    </button>
-                  </div>
-                ) : (
-                  <button type="button" className="onboard-gmail-connect" onClick={handleConnectGmail} disabled={gmailLoading}>
-                    {gmailLoading ? <><span className="btn-spinner btn-spinner-dark" />Redirecting…</> : <><GmailIcon />Connect Gmail</>}
-                  </button>
-                )}
               </article>
 
               {/* YouTube */}
-              <article className={`onboard-gmail-feature ${status?.youtube_connected ? "connected" : ""}`} style={{ marginTop: "16px" }}>
-                <div className="onboard-gmail-top">
-                  <div className="onboard-gmail-brand">
-                    <span className="onboard-gmail-icon-wrap"><YouTubeIcon /></span>
-                    <div>
-                      <h2 className="onboard-gmail-title">YouTube</h2>
-                      <p className="onboard-gmail-sub">
-                        {status?.youtube_connected && status.youtube_channel_count
-                          ? `${status.youtube_channel_count} subscribed channels`
-                          : "All channels you subscribe to"}
-                      </p>
-                    </div>
+              <article className={`onboard-account-card ${status?.youtube_connected ? "connected" : ""}`}>
+                <div className="onboard-account-left">
+                  <span className="onboard-account-icon"><YouTubeIcon /></span>
+                  <div className="onboard-account-info">
+                    <p className="onboard-account-title">YouTube</p>
+                    <p className="onboard-account-sub">All channels you subscribe to</p>
+                    {status?.youtube_connected ? (
+                      <div className="onboard-account-meta">
+                        {status.youtube_channel_count != null && (
+                          <span className="onboard-account-meta-stat">{status.youtube_channel_count} channels</span>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="onboard-account-hint">Recent videos from your subscriptions, ranked by relevance.</p>
+                    )}
                   </div>
-                  {status?.youtube_connected && (
-                    <span className="onboard-badge-connected"><CheckIcon /> Connected</span>
+                </div>
+                <div className="onboard-account-action">
+                  {status?.youtube_connected ? (
+                    <div className="onboard-connected-actions">
+                      <span className="onboard-badge-connected"><CheckIcon /> Connected</span>
+                      <button type="button" className="onboard-disconnect-btn" onClick={handleDisconnectYouTube}>Disconnect</button>
+                    </div>
+                  ) : (
+                    <button type="button" className="onboard-connect-sm" onClick={handleConnectYouTube} disabled={youtubeLoading}>
+                      {youtubeLoading ? <><span className="btn-spinner btn-spinner-dark" />Redirecting…</> : <><YouTubeIcon />Connect YouTube</>}
+                    </button>
                   )}
                 </div>
-                <p className="onboard-disclaimer">
-                  We fetch recent videos from your subscriptions and surface the most relevant ones in your digest.
-                </p>
-                {status?.youtube_connected ? (
-                  <div className="onboard-gmail-result">
-                    {status.youtube_channel_count != null && (
-                      <span className="onboard-gmail-stat">{status.youtube_channel_count} channels tracked</span>
-                    )}
-                    <button type="button" className="onboard-disconnect-btn" onClick={handleDisconnectYouTube}>
-                      Disconnect
-                    </button>
-                  </div>
-                ) : (
-                  <button type="button" className="onboard-gmail-connect" onClick={handleConnectYouTube} disabled={youtubeLoading}>
-                    {youtubeLoading ? <><span className="btn-spinner btn-spinner-dark" />Redirecting…</> : <><YouTubeIcon />Connect YouTube</>}
-                  </button>
-                )}
               </article>
 
               {/* Reddit */}
-              <article className={`onboard-gmail-feature ${status?.reddit_connected ? "connected" : ""}`} style={{ marginTop: "16px" }}>
-                <div className="onboard-gmail-top">
-                  <div className="onboard-gmail-brand">
-                    <span className="onboard-gmail-icon-wrap"><RedditIcon /></span>
-                    <div>
-                      <h2 className="onboard-gmail-title">Reddit</h2>
-                      <p className="onboard-gmail-sub">
-                        {status?.reddit_connected && status.reddit_subreddit_count
-                          ? `${status.reddit_subreddit_count} subscribed subreddits`
-                          : "All subreddits you subscribe to"}
-                      </p>
-                    </div>
+              <article className={`onboard-account-card ${status?.reddit_connected ? "connected" : ""}`}>
+                <div className="onboard-account-left">
+                  <span className="onboard-account-icon"><RedditIcon /></span>
+                  <div className="onboard-account-info">
+                    <p className="onboard-account-title">Reddit</p>
+                    <p className="onboard-account-sub">All subreddits you subscribe to</p>
+                    {status?.reddit_connected ? (
+                      <div className="onboard-account-meta">
+                        {status.reddit_subreddit_count != null && (
+                          <span className="onboard-account-meta-stat">{status.reddit_subreddit_count} subreddits</span>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="onboard-account-hint">Hot posts from your subscriptions — no manual entry needed.</p>
+                    )}
                   </div>
-                  {status?.reddit_connected && (
-                    <span className="onboard-badge-connected"><CheckIcon /> Connected</span>
+                </div>
+                <div className="onboard-account-action">
+                  {status?.reddit_connected ? (
+                    <div className="onboard-connected-actions">
+                      <span className="onboard-badge-connected"><CheckIcon /> Connected</span>
+                      <button type="button" className="onboard-disconnect-btn" onClick={handleDisconnectReddit}>Disconnect</button>
+                    </div>
+                  ) : (
+                    <button type="button" className="onboard-connect-sm" onClick={handleConnectReddit} disabled={redditLoading}>
+                      {redditLoading ? <><span className="btn-spinner btn-spinner-dark" />Redirecting…</> : <><RedditIcon />Connect Reddit</>}
+                    </button>
                   )}
                 </div>
-                <p className="onboard-disclaimer">
-                  We pull hot posts from your subscribed subreddits — no manual subreddit entry needed.
-                </p>
-                {status?.reddit_connected ? (
-                  <div className="onboard-gmail-result">
-                    {status.reddit_subreddit_count != null && (
-                      <span className="onboard-gmail-stat">{status.reddit_subreddit_count} subreddits tracked</span>
-                    )}
-                    <button type="button" className="onboard-disconnect-btn" onClick={handleDisconnectReddit}>
-                      Disconnect
-                    </button>
-                  </div>
-                ) : (
-                  <button type="button" className="onboard-gmail-connect" onClick={handleConnectReddit} disabled={redditLoading}>
-                    {redditLoading ? <><span className="btn-spinner btn-spinner-dark" />Redirecting…</> : <><RedditIcon />Connect Reddit</>}
-                  </button>
-                )}
               </article>
 
               {/* RSS / URL fallback */}
