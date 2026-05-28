@@ -1692,11 +1692,28 @@ footer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 12px 20px;
   padding: 14px 16px;
   border-radius: 10px;
   background: rgba(106,171,138,0.06);
   border: 1px solid rgba(106,171,138,0.15);
+}
+.onboard-disconnect-btn {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted, #888);
+  background: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.onboard-disconnect-btn:hover {
+  color: #e05c5c;
+  border-color: rgba(224,92,92,0.3);
 }
 .onboard-gmail-email {
   font-size: 14px;

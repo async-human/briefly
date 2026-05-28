@@ -129,6 +129,17 @@ export default function OnboardingPage() {
     }
   }
 
+  async function handleDisconnectGmail() {
+    setError("");
+    try {
+      await api.disconnectGmail();
+      const updated = await api.getOnboardingStatus();
+      setStatus(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not disconnect Gmail");
+    }
+  }
+
   async function handleConnectYouTube() {
     setYoutubeLoading(true);
     setError("");
@@ -141,6 +152,17 @@ export default function OnboardingPage() {
     }
   }
 
+  async function handleDisconnectYouTube() {
+    setError("");
+    try {
+      await api.disconnectYouTube();
+      const updated = await api.getOnboardingStatus();
+      setStatus(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not disconnect YouTube");
+    }
+  }
+
   async function handleConnectReddit() {
     setRedditLoading(true);
     setError("");
@@ -150,6 +172,17 @@ export default function OnboardingPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start Reddit connection");
       setRedditLoading(false);
+    }
+  }
+
+  async function handleDisconnectReddit() {
+    setError("");
+    try {
+      await api.disconnectReddit();
+      const updated = await api.getOnboardingStatus();
+      setStatus(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not disconnect Reddit");
     }
   }
 
@@ -319,10 +352,15 @@ export default function OnboardingPage() {
                 </p>
                 {status?.gmail_connected ? (
                   <div className="onboard-gmail-result">
-                    <span className="onboard-gmail-email">{status.gmail_email}</span>
-                    {status.newsletter_count != null && (
-                      <span className="onboard-gmail-stat">{status.newsletter_count}+ newsletters found</span>
-                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                      <span className="onboard-gmail-email">{status.gmail_email}</span>
+                      {status.newsletter_count != null && (
+                        <span className="onboard-gmail-stat">{status.newsletter_count}+ newsletters found</span>
+                      )}
+                    </div>
+                    <button type="button" className="onboard-disconnect-btn" onClick={handleDisconnectGmail}>
+                      Disconnect
+                    </button>
                   </div>
                 ) : (
                   <button type="button" className="onboard-gmail-connect" onClick={handleConnectGmail} disabled={gmailLoading}>
@@ -357,6 +395,9 @@ export default function OnboardingPage() {
                     {status.youtube_channel_count != null && (
                       <span className="onboard-gmail-stat">{status.youtube_channel_count} channels tracked</span>
                     )}
+                    <button type="button" className="onboard-disconnect-btn" onClick={handleDisconnectYouTube}>
+                      Disconnect
+                    </button>
                   </div>
                 ) : (
                   <button type="button" className="onboard-gmail-connect" onClick={handleConnectYouTube} disabled={youtubeLoading}>
@@ -391,6 +432,9 @@ export default function OnboardingPage() {
                     {status.reddit_subreddit_count != null && (
                       <span className="onboard-gmail-stat">{status.reddit_subreddit_count} subreddits tracked</span>
                     )}
+                    <button type="button" className="onboard-disconnect-btn" onClick={handleDisconnectReddit}>
+                      Disconnect
+                    </button>
                   </div>
                 ) : (
                   <button type="button" className="onboard-gmail-connect" onClick={handleConnectReddit} disabled={redditLoading}>
