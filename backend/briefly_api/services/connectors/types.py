@@ -4,8 +4,10 @@ EMAIL = "email"
 GMAIL = "gmail"
 RSS = "rss"
 YOUTUBE = "youtube"
+YOUTUBE_ACCOUNT = "youtube_account"   # OAuth-connected — fetches all subscriptions
 REDDIT = "reddit"
+REDDIT_ACCOUNT = "reddit_account"     # OAuth-connected — fetches all subscribed subreddits
 URL = "url"
 
-ALL_SOURCE_TYPES = frozenset({EMAIL, GMAIL, RSS, YOUTUBE, REDDIT, URL})
-FETCHABLE_SOURCE_TYPES = frozenset({GMAIL, RSS, YOUTUBE, REDDIT, URL})
+ALL_SOURCE_TYPES = frozenset({EMAIL, GMAIL, RSS, YOUTUBE, YOUTUBE_ACCOUNT, REDDIT, REDDIT_ACCOUNT, URL})
+FETCHABLE_SOURCE_TYPES = frozenset({GMAIL, RSS, YOUTUBE, YOUTUBE_ACCOUNT, REDDIT, REDDIT_ACCOUNT, URL})

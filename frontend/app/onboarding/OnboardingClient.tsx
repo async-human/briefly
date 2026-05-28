@@ -25,6 +25,24 @@ function GmailIcon() {
   );
 }
 
+function YouTubeIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden fill="none">
+      <rect width="24" height="24" rx="5" fill="#FF0000" />
+      <polygon points="9.5,7.5 16.5,12 9.5,16.5" fill="#fff" />
+    </svg>
+  );
+}
+
+function RedditIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
+      <circle cx="12" cy="12" r="12" fill="#FF4500" />
+      <path fill="#fff" d="M20 12a2 2 0 0 0-2-2 2 2 0 0 0-1.3.5C15.4 9.7 14 9.2 12.4 9l.8-3.6 2.4.5a1.4 1.4 0 1 0 .1-.7l-2.7-.6L12 8.9c-1.7.1-3.2.6-4.4 1.5A2 2 0 0 0 4 12a2 2 0 0 0 1 1.7 3.5 3.5 0 0 0 0 .5c0 2.5 2.7 4.5 6 4.5s6-2 6-4.5a3.5 3.5 0 0 0 0-.5A2 2 0 0 0 20 12zm-10 2a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm4.5 2.5c-.7.7-2 .7-2.5.7s-1.8 0-2.5-.7a.3.3 0 0 1 .4-.4c.5.5 1.5.6 2.1.6s1.6-.1 2.1-.6a.3.3 0 0 1 .4.4zm-.5-1.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
+    </svg>
+  );
+}
+
 function CheckIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
@@ -44,9 +62,11 @@ export default function OnboardingPage() {
   const [digestTime, setDigestTime] = useState("07:00");
   const [loading, setLoading] = useState(true);
   const [gmailLoading, setGmailLoading] = useState(false);
+  const [youtubeLoading, setYoutubeLoading] = useState(false);
+  const [redditLoading, setRedditLoading] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState("");
-  const [gmailBanner, setGmailBanner] = useState("");
+  const [banner, setBanner] = useState("");
 
   useEffect(() => {
     api.getOnboardingStatus()
@@ -64,18 +84,36 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     const gmail = searchParams.get("gmail");
+    const youtube = searchParams.get("youtube");
+    const reddit = searchParams.get("reddit");
+
     if (gmail === "connected") {
-      setGmailBanner("Gmail connected — scanning your newsletters…");
+      setBanner("Gmail connected — your newsletters are now in the pipeline.");
       api.getOnboardingStatus().then(setStatus);
-    }
-    if (gmail === "denied") {
-      setError(
-        "Google blocked Gmail access. Add your email as a test user in Google Cloud Console " +
-          "(OAuth consent screen → Test users), then try again with the same Google account.",
-      );
-    }
-    if (gmail === "error") {
+    } else if (gmail === "denied") {
+      setError("Google blocked Gmail access. Add your email as a test user in Google Cloud Console (OAuth consent screen → Test users), then try again.");
+    } else if (gmail === "error") {
       setError("Gmail connection was cancelled or failed. Please try again.");
+    }
+
+    if (youtube === "connected") {
+      const channels = searchParams.get("channels");
+      setBanner(channels ? `YouTube connected — found ${channels} subscribed channels.` : "YouTube connected.");
+      api.getOnboardingStatus().then(setStatus);
+    } else if (youtube === "denied") {
+      setError("YouTube access was denied. Please try again.");
+    } else if (youtube === "error") {
+      setError("YouTube connection failed. Please try again.");
+    }
+
+    if (reddit === "connected") {
+      const subs = searchParams.get("subreddits");
+      setBanner(subs ? `Reddit connected — found ${subs} subscribed subreddits.` : "Reddit connected.");
+      api.getOnboardingStatus().then(setStatus);
+    } else if (reddit === "denied") {
+      setError("Reddit access was denied. Please try again.");
+    } else if (reddit === "error") {
+      setError("Reddit connection failed. Please try again.");
     }
   }, [searchParams]);
 
@@ -88,6 +126,30 @@ export default function OnboardingPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start Gmail connection");
       setGmailLoading(false);
+    }
+  }
+
+  async function handleConnectYouTube() {
+    setYoutubeLoading(true);
+    setError("");
+    try {
+      const { url } = await api.startYouTubeConnect("/onboarding");
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start YouTube connection");
+      setYoutubeLoading(false);
+    }
+  }
+
+  async function handleConnectReddit() {
+    setRedditLoading(true);
+    setError("");
+    try {
+      const { url } = await api.startRedditConnect("/onboarding");
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start Reddit connection");
+      setRedditLoading(false);
     }
   }
 
@@ -133,7 +195,10 @@ export default function OnboardingPage() {
   }
 
   const canContinueStep2 =
-    status?.gmail_connected || (status?.sources_count ?? 0) > 0;
+    status?.gmail_connected ||
+    status?.youtube_connected ||
+    status?.reddit_connected ||
+    (status?.sources_count ?? 0) > 0;
 
   if (loading) {
     return (
@@ -225,76 +290,123 @@ export default function OnboardingPage() {
             <section className="onboard-panel onboard-panel-wide">
               <header className="onboard-panel-head">
                 <p className="onboard-eyebrow">Step 2 of 3</p>
-                <h1 className="onboard-title">Connect your sources</h1>
+                <h1 className="onboard-title">Connect your accounts</h1>
                 <p className="onboard-desc">
-                  One click for Gmail. Paste a URL for anything else.
+                  Connect once — Briefly reads everything you already follow so you don&apos;t have to rebuild your reading list.
                 </p>
               </header>
 
-              {gmailBanner && (
-                <div className="onboard-banner onboard-banner-success">{gmailBanner}</div>
+              {banner && (
+                <div className="onboard-banner onboard-banner-success">{banner}</div>
               )}
 
+              {/* Gmail */}
               <article className={`onboard-gmail-feature ${status?.gmail_connected ? "connected" : ""}`}>
                 <div className="onboard-gmail-top">
                   <div className="onboard-gmail-brand">
                     <span className="onboard-gmail-icon-wrap"><GmailIcon /></span>
                     <div>
                       <h2 className="onboard-gmail-title">Gmail</h2>
-                      <p className="onboard-gmail-sub">Newsletters found automatically</p>
+                      <p className="onboard-gmail-sub">All your newsletters, automatically</p>
                     </div>
                   </div>
                   {status?.gmail_connected && (
-                    <span className="onboard-badge-connected">
-                      <CheckIcon /> Connected
-                    </span>
+                    <span className="onboard-badge-connected"><CheckIcon /> Connected</span>
                   )}
                 </div>
-
                 <p className="onboard-disclaimer">
-                  We only read newsletter-like emails from Substack, Beehiiv, and similar
-                  senders — never personal or work mail. Content is extracted, not stored.
-                  Disconnect anytime.
+                  We only read newsletter-like emails — never personal or work mail. Disconnect anytime.
                 </p>
-
                 {status?.gmail_connected ? (
                   <div className="onboard-gmail-result">
                     <span className="onboard-gmail-email">{status.gmail_email}</span>
                     {status.newsletter_count != null && (
-                      <span className="onboard-gmail-stat">
-                        {status.newsletter_count}+ newsletters found
-                      </span>
+                      <span className="onboard-gmail-stat">{status.newsletter_count}+ newsletters found</span>
                     )}
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    className="onboard-gmail-connect"
-                    onClick={handleConnectGmail}
-                    disabled={gmailLoading}
-                  >
-                    {gmailLoading ? (
-                      <>
-                        <span className="btn-spinner btn-spinner-dark" />
-                        Redirecting to Google…
-                      </>
-                    ) : (
-                      <>
-                        <GmailIcon />
-                        Connect Gmail
-                      </>
-                    )}
+                  <button type="button" className="onboard-gmail-connect" onClick={handleConnectGmail} disabled={gmailLoading}>
+                    {gmailLoading ? <><span className="btn-spinner btn-spinner-dark" />Redirecting…</> : <><GmailIcon />Connect Gmail</>}
                   </button>
                 )}
               </article>
 
-              <div className="onboard-secondary">
+              {/* YouTube */}
+              <article className={`onboard-gmail-feature ${status?.youtube_connected ? "connected" : ""}`} style={{ marginTop: "16px" }}>
+                <div className="onboard-gmail-top">
+                  <div className="onboard-gmail-brand">
+                    <span className="onboard-gmail-icon-wrap"><YouTubeIcon /></span>
+                    <div>
+                      <h2 className="onboard-gmail-title">YouTube</h2>
+                      <p className="onboard-gmail-sub">
+                        {status?.youtube_connected && status.youtube_channel_count
+                          ? `${status.youtube_channel_count} subscribed channels`
+                          : "All channels you subscribe to"}
+                      </p>
+                    </div>
+                  </div>
+                  {status?.youtube_connected && (
+                    <span className="onboard-badge-connected"><CheckIcon /> Connected</span>
+                  )}
+                </div>
+                <p className="onboard-disclaimer">
+                  We fetch recent videos from your subscriptions and surface the most relevant ones in your digest.
+                </p>
+                {status?.youtube_connected ? (
+                  <div className="onboard-gmail-result">
+                    {status.youtube_channel_count != null && (
+                      <span className="onboard-gmail-stat">{status.youtube_channel_count} channels tracked</span>
+                    )}
+                  </div>
+                ) : (
+                  <button type="button" className="onboard-gmail-connect" onClick={handleConnectYouTube} disabled={youtubeLoading}>
+                    {youtubeLoading ? <><span className="btn-spinner btn-spinner-dark" />Redirecting…</> : <><YouTubeIcon />Connect YouTube</>}
+                  </button>
+                )}
+              </article>
+
+              {/* Reddit */}
+              <article className={`onboard-gmail-feature ${status?.reddit_connected ? "connected" : ""}`} style={{ marginTop: "16px" }}>
+                <div className="onboard-gmail-top">
+                  <div className="onboard-gmail-brand">
+                    <span className="onboard-gmail-icon-wrap"><RedditIcon /></span>
+                    <div>
+                      <h2 className="onboard-gmail-title">Reddit</h2>
+                      <p className="onboard-gmail-sub">
+                        {status?.reddit_connected && status.reddit_subreddit_count
+                          ? `${status.reddit_subreddit_count} subscribed subreddits`
+                          : "All subreddits you subscribe to"}
+                      </p>
+                    </div>
+                  </div>
+                  {status?.reddit_connected && (
+                    <span className="onboard-badge-connected"><CheckIcon /> Connected</span>
+                  )}
+                </div>
+                <p className="onboard-disclaimer">
+                  We pull hot posts from your subscribed subreddits — no manual subreddit entry needed.
+                </p>
+                {status?.reddit_connected ? (
+                  <div className="onboard-gmail-result">
+                    {status.reddit_subreddit_count != null && (
+                      <span className="onboard-gmail-stat">{status.reddit_subreddit_count} subreddits tracked</span>
+                    )}
+                  </div>
+                ) : (
+                  <button type="button" className="onboard-gmail-connect" onClick={handleConnectReddit} disabled={redditLoading}>
+                    {redditLoading ? <><span className="btn-spinner btn-spinner-dark" />Redirecting…</> : <><RedditIcon />Connect Reddit</>}
+                  </button>
+                )}
+              </article>
+
+              {/* RSS / URL fallback */}
+              <div className="onboard-secondary" style={{ marginTop: "24px" }}>
                 <div className="onboard-secondary-card">
                   <div className="onboard-secondary-head">
-                    <span className="onboard-secondary-icon">URL</span>
+                    <span className="onboard-secondary-icon">RSS</span>
                     <div>
-                      <h3>Paste a URL</h3>
-                      <p>RSS, YouTube, Reddit, or any site</p>
+                      <h3>Add any URL</h3>
+                      <p>Blogs, news sites, RSS feeds, or any website</p>
                     </div>
                   </div>
                   <div className="onboard-add-form">
@@ -331,7 +443,7 @@ export default function OnboardingPage() {
                   Continue
                 </button>
                 {!canContinueStep2 && (
-                  <p className="onboard-hint">Connect Gmail or add at least one source.</p>
+                  <p className="onboard-hint">Connect at least one account or add a source.</p>
                 )}
               </div>
             </section>

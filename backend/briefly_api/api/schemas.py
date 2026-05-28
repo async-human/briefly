@@ -41,6 +41,10 @@ class OnboardingStatusOut(BaseModel):
     gmail_connected: bool
     gmail_email: str | None = None
     newsletter_count: int | None = None
+    youtube_connected: bool = False
+    youtube_channel_count: int | None = None
+    reddit_connected: bool = False
+    reddit_subreddit_count: int | None = None
     sources_count: int
 
 
@@ -58,12 +62,34 @@ class GmailStatusOut(BaseModel):
     newsletter_count: int | None = None
 
 
+class YouTubeConnectOut(BaseModel):
+    url: str
+
+
+class YouTubeStatusOut(BaseModel):
+    connected: bool
+    email: str | None = None
+    channel_count: int | None = None
+
+
+class RedditConnectOut(BaseModel):
+    url: str
+
+
+class RedditStatusOut(BaseModel):
+    connected: bool
+    username: str | None = None
+    subreddit_count: int | None = None
+
+
 class MeOut(BaseModel):
     user: UserOut
     profile: ProfileOut | None
     ingestion_email: str
     onboarding_completed: bool = False
     gmail_connected: bool = False
+    youtube_connected: bool = False
+    reddit_connected: bool = False
 
 
 class DigestItemOut(BaseModel):

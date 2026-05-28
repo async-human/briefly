@@ -177,3 +177,106 @@ async def fetch_youtube_articles(
     source_name: str | None = None,
 ) -> list[FetchedArticle]:
     return await asyncio.to_thread(_fetch_youtube_sync, identifier, limit, settings, source_name)
+
+
+# ── OAuth subscription-based fetching ─────────────────────────────────────────
+
+def _fetch_subscriptions_sync(
+    access_token: str,
+    user_agent: str,
+    max_channels: int = 150,
+) -> list[dict]:
+    """
+    Call YouTube Data API v3 to get all channels the user is subscribed to.
+    Paginates until max_channels is reached.
+    Returns list of {"channel_id": ..., "channel_name": ...}.
+    """
+    channels: list[dict] = []
+    page_token: str | None = None
+
+    with httpx.Client(timeout=20.0) as client:
+        while len(channels) < max_channels:
+            params: dict = {
+                "part": "snippet",
+                "mine": "true",
+                "maxResults": 50,
+            }
+            if page_token:
+                params["pageToken"] = page_token
+
+            resp = client.get(
+                "https://www.googleapis.com/youtube/v3/subscriptions",
+                params=params,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "User-Agent": user_agent,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+            for item in data.get("items", []):
+                snippet = item.get("snippet", {})
+                resource = snippet.get("resourceId", {})
+                channel_id = resource.get("channelId")
+                channel_name = snippet.get("title", "")
+                if channel_id:
+                    channels.append({"channel_id": channel_id, "channel_name": channel_name})
+
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+
+    return channels[:max_channels]
+
+
+def _fetch_subscription_videos_sync(
+    channels: list[dict],
+    videos_per_channel: int = 3,
+) -> list[FetchedArticle]:
+    """
+    Fetch recent videos from a list of subscribed channels via their RSS feeds.
+    Each channel's RSS feed is public — no auth needed here.
+    """
+    articles: list[FetchedArticle] = []
+    for ch in channels:
+        channel_id = ch["channel_id"]
+        channel_name = ch.get("channel_name", f"YouTube · {channel_id}")
+        feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+        try:
+            items = _fetch_rss_sync(feed_url, limit=videos_per_channel, source_name=channel_name)
+            for item in items:
+                item.source_type = "youtube"
+                item.section = "YouTube"
+            articles.extend(items)
+        except Exception:
+            continue  # skip channels with unavailable feeds
+    return articles
+
+
+async def fetch_subscription_videos(
+    access_token: str,
+    user_agent: str,
+    max_channels: int = 150,
+    videos_per_channel: int = 3,
+) -> tuple[list[FetchedArticle], int]:
+    """
+    Fetch videos from all channels the user is subscribed to.
+    Returns (articles, channel_count).
+    """
+    channels = await asyncio.to_thread(
+        _fetch_subscriptions_sync, access_token, user_agent, max_channels
+    )
+    articles = await asyncio.to_thread(
+        _fetch_subscription_videos_sync, channels, videos_per_channel
+    )
+    return articles, len(channels)
+
+
+async def count_subscriptions(access_token: str, user_agent: str) -> int:
+    """Count subscribed channels — used at OAuth callback time for the onboarding banner."""
+    try:
+        channels = await asyncio.to_thread(_fetch_subscriptions_sync, access_token, user_agent, 50)
+        return len(channels)
+    except Exception:
+        return 0

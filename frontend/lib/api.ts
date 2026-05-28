@@ -61,6 +61,8 @@ export type MeResponse = {
   ingestion_email: string;
   onboarding_completed: boolean;
   gmail_connected: boolean;
+  youtube_connected: boolean;
+  reddit_connected: boolean;
 };
 
 export type OnboardingStatus = {
@@ -69,6 +71,10 @@ export type OnboardingStatus = {
   gmail_connected: boolean;
   gmail_email: string | null;
   newsletter_count: number | null;
+  youtube_connected: boolean;
+  youtube_channel_count: number | null;
+  reddit_connected: boolean;
+  reddit_subreddit_count: number | null;
   sources_count: number;
 };
 
@@ -164,4 +170,27 @@ export const api = {
     request<{ connected: boolean; email: string | null; newsletter_count: number | null }>(
       "/api/v1/auth/gmail/status",
     ),
+  disconnectGmail: () => request<void>("/api/v1/auth/gmail", { method: "DELETE" }),
+
+  startYouTubeConnect: (redirectPath = "/onboarding") =>
+    request<{ url: string }>(
+      `/api/v1/auth/youtube/start?redirect_path=${encodeURIComponent(redirectPath)}`,
+      { method: "POST" },
+    ),
+  getYouTubeStatus: () =>
+    request<{ connected: boolean; email: string | null; channel_count: number | null }>(
+      "/api/v1/auth/youtube/status",
+    ),
+  disconnectYouTube: () => request<void>("/api/v1/auth/youtube", { method: "DELETE" }),
+
+  startRedditConnect: (redirectPath = "/onboarding") =>
+    request<{ url: string }>(
+      `/api/v1/auth/reddit/start?redirect_path=${encodeURIComponent(redirectPath)}`,
+      { method: "POST" },
+    ),
+  getRedditStatus: () =>
+    request<{ connected: boolean; username: string | null; subreddit_count: number | null }>(
+      "/api/v1/auth/reddit/status",
+    ),
+  disconnectReddit: () => request<void>("/api/v1/auth/reddit", { method: "DELETE" }),
 };

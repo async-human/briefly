@@ -18,6 +18,8 @@ from briefly_api.api.schemas import (
     UserOut,
 )
 from briefly_api.auth.gmail import get_gmail_connection
+from briefly_api.auth.youtube import get_youtube_connection
+from briefly_api.auth.reddit import get_reddit_connection
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
@@ -64,12 +66,16 @@ async def get_me(
     ingestion_email = f"{user.email_token}@{settings.email_ingestion_domain}"
     profile = ProfileOut.model_validate(user.profile) if user.profile else None
     gmail = await get_gmail_connection(db, user.id)
+    youtube = await get_youtube_connection(db, user.id)
+    reddit = await get_reddit_connection(db, user.id)
     return MeOut(
         user=UserOut.model_validate(user),
         profile=profile,
         ingestion_email=ingestion_email,
         onboarding_completed=bool(user.profile and user.profile.onboarding_completed),
         gmail_connected=gmail is not None,
+        youtube_connected=youtube is not None,
+        reddit_connected=reddit is not None,
     )
 
 
