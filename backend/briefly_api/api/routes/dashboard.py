@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -204,12 +205,12 @@ async def create_source(
     return SourceOut.model_validate(source)
 
 
-@router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def delete_source(
     source_id: str,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> None:
+) -> Response:
     result = await db.execute(
         select(Source).where(Source.id == source_id, Source.user_id == user.id)
     )
@@ -218,6 +219,7 @@ async def delete_source(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source not found.")
     await db.delete(source)
     await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/digests/generate", response_model=DigestOut)
