@@ -133,6 +133,7 @@ export default function OnboardingPage() {
       await api.disconnectGmail();
       const updated = await api.getOnboardingStatus();
       setStatus(updated);
+      setBanner("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not disconnect Gmail");
     }
@@ -156,6 +157,7 @@ export default function OnboardingPage() {
       await api.disconnectYouTube();
       const updated = await api.getOnboardingStatus();
       setStatus(updated);
+      setBanner("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not disconnect YouTube");
     }
@@ -179,6 +181,7 @@ export default function OnboardingPage() {
       await api.disconnectReddit();
       const updated = await api.getOnboardingStatus();
       setStatus(updated);
+      setBanner("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not disconnect Reddit");
     }
