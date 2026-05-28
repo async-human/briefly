@@ -34,7 +34,12 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
       setName("");
       onAdded(source);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add source");
+      const message = err instanceof Error ? err.message : "Failed to add source";
+      setError(
+        message.includes("already connected")
+          ? "Already connected — use a different URL to add another source."
+          : message,
+      );
     } finally {
       setLoading(false);
     }

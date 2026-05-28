@@ -36,9 +36,8 @@ export function SourcesSidebar({
           </div>
           <span className="source-count">{sources.length}</span>
         </div>
-        <AddSourceForm onAdded={onSourceAdded} />
         {sources.length > 0 && (
-          <ul className="source-list">
+          <ul className="source-list source-list-connected">
             {sources.map((source) => (
               <li key={source.id} className="source-list-item">
                 <span className="source-type">{source.source_type}</span>
@@ -52,6 +51,12 @@ export function SourcesSidebar({
             ))}
           </ul>
         )}
+        <p className="source-add-hint">
+          {sources.length === 0
+            ? "Add your first source below."
+            : "Add another source — each URL or channel counts separately."}
+        </p>
+        <AddSourceForm onAdded={onSourceAdded} />
       </div>
     </aside>
   );
