@@ -37,9 +37,19 @@ export default function OnboardingPage() {
   }, [router]);
 
   useEffect(() => {
-    if (searchParams.get("gmail") === "connected") {
+    const gmail = searchParams.get("gmail");
+    if (gmail === "connected") {
       setGmailBanner("Gmail connected — scanning your newsletters…");
       api.getOnboardingStatus().then(setStatus);
+    }
+    if (gmail === "denied") {
+      setError(
+        "Google blocked Gmail access. Add your email as a test user in Google Cloud Console " +
+          "(OAuth consent screen → Test users), then try again with the same Google account.",
+      );
+    }
+    if (gmail === "error") {
+      setError("Gmail connection was cancelled or failed. Please try again.");
     }
   }, [searchParams]);
 

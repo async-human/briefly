@@ -94,11 +94,20 @@ async def start_gmail_connect(
 
 @router.get("/auth/gmail/callback")
 async def gmail_callback(
-    code: str = Query(...),
-    state: str = Query(...),
-    db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    code: str | None = Query(None),
+    state: str | None = Query(None),
+    error: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
+    base = settings.frontend_url.rstrip("/")
+
+    if error:
+        return RedirectResponse(f"{base}/onboarding?gmail=denied")
+
+    if not code or not state:
+        return RedirectResponse(f"{base}/onboarding?gmail=error")
+
     try:
         payload = decode_gmail_state(state, settings)
     except Exception as exc:
@@ -124,7 +133,6 @@ async def gmail_callback(
 
     await db.commit()
 
-    base = settings.frontend_url.rstrip("/")
     return RedirectResponse(f"{base}{redirect_path}?gmail=connected")
 
 
