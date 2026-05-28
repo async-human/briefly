@@ -5,6 +5,8 @@ import { api, type Digest, type MeResponse, type Source } from "@/lib/api";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { BriefingPanel, SourcesSidebar } from "@/components/dashboard/BriefingPanel";
 
+const FETCHABLE_SOURCE_TYPES = new Set(["rss", "youtube", "reddit"]);
+
 export default function DashboardPage() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [digest, setDigest] = useState<Digest | null>(null);
@@ -38,6 +40,9 @@ export default function DashboardPage() {
     }
   }
 
+  const fetchableSources = sources.filter((s) =>
+    FETCHABLE_SOURCE_TYPES.has(s.source_type),
+  );
   const greeting = me?.user.name?.split(" ")[0] ?? "there";
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -80,7 +85,7 @@ export default function DashboardPage() {
             <div className="dash-grid">
               <BriefingPanel
                 digest={digest}
-                sourcesCount={sources.length}
+                sourcesCount={fetchableSources.length}
                 generating={generating}
                 generateError={generateError}
                 onGenerate={handleGenerate}

@@ -11,9 +11,12 @@ from sqlalchemy.orm import selectinload
 from briefly_api.config import Settings
 from briefly_api.db.models import Digest, DigestItem, DigestStatus, Source, SourceType, User
 from briefly_api.llm.adapter import Message, get_llm_adapter
-from briefly_api.services.rss import FetchedArticle, fetch_rss_articles
+from briefly_api.services.articles import FetchedArticle
+from briefly_api.services.collector import collect_from_sources
 
 log = logging.getLogger(__name__)
+
+_SUPPORTED = {SourceType.rss, SourceType.youtube, SourceType.reddit}
 
 
 def _llm_available(settings: Settings) -> bool:
@@ -24,27 +27,6 @@ def _llm_available(settings: Settings) -> bool:
     if settings.llm_provider == "groq":
         return bool(settings.groq_api_key)
     return False
-
-
-async def _collect_articles(sources: list[Source], max_items: int) -> list[FetchedArticle]:
-    articles: list[FetchedArticle] = []
-    rss_sources = [s for s in sources if s.source_type == SourceType.rss]
-
-    if not rss_sources:
-        return articles
-
-    per_source = max(2, max_items // len(rss_sources))
-    for source in rss_sources:
-        try:
-            fetched = await fetch_rss_articles(source.identifier, limit=per_source)
-            for item in fetched:
-                if source.name:
-                    item.source_name = source.name
-            articles.extend(fetched)
-        except Exception:
-            log.exception("Failed to fetch RSS: %s", source.identifier)
-
-    return articles[:max_items]
 
 
 def _fallback_items(articles: list[FetchedArticle]) -> list[dict]:
@@ -58,7 +40,7 @@ def _fallback_items(articles: list[FetchedArticle]) -> list[dict]:
             ),
             "source_name": a.source_name,
             "source_url": a.url,
-            "section": "Your feeds",
+            "section": a.section,
         }
         for a in articles
     ]
@@ -78,6 +60,7 @@ async def _personalize_items(
             "summary": a.summary[:300],
             "source": a.source_name,
             "url": a.url,
+            "type": a.source_type,
         }
         for a in articles
     ]
@@ -89,7 +72,7 @@ async def _personalize_items(
 For each article below, return JSON array with objects:
 - headline (sharp, specific)
 - summary (max 2 sentences, factual)
-- why_it_matters (1-2 sentences, why THIS person should care — reference their interests if plausible)
+- why_it_matters (1-2 sentences, why THIS person should care)
 - source_name
 - source_url
 - section (short topic label)
@@ -134,13 +117,18 @@ async def generate_briefing_now(
     )
     sources = list(result.scalars().all())
 
-    rss_sources = [s for s in sources if s.source_type == SourceType.rss]
-    if not rss_sources:
-        raise ValueError("Add at least one RSS feed source to generate a briefing.")
+    fetchable = [s for s in sources if s.source_type in _SUPPORTED]
+    if not fetchable:
+        raise ValueError(
+            "Add at least one RSS feed, YouTube channel, or subreddit to generate a briefing."
+        )
 
-    articles = await _collect_articles(sources, max_items)
+    articles, warnings = await collect_from_sources(sources, settings, max_items=max_items)
     if not articles:
-        raise ValueError("Could not fetch any articles from your RSS feeds. Check the URLs.")
+        detail = "Could not fetch content from your sources. Check URLs and try again."
+        if warnings:
+            detail += " " + " ".join(warnings)
+        raise ValueError(detail)
 
     items_data = await _personalize_items(articles, user, settings)
     today = date.today().isoformat()
@@ -153,12 +141,16 @@ async def generate_briefing_now(
         await db.delete(old_digest)
         await db.flush()
 
+    preview = items_data[0]["headline"] if items_data else "Your briefing is ready"
+    if warnings:
+        preview = f"{preview} ({len(warnings)} source note(s))"
+
     digest = Digest(
         user_id=user.id,
         digest_date=today,
         status=DigestStatus.ready,
         subject_line=f"Your briefing — {today}",
-        preview_text=items_data[0]["headline"] if items_data else "Your briefing is ready",
+        preview_text=preview,
         total_items_ingested=len(articles),
         total_items_scored=len(articles),
         total_items_shown=len(items_data),

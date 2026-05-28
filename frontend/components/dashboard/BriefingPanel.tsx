@@ -9,6 +9,13 @@ type SourcesSidebarProps = {
   onSourceAdded: (source: Source) => void;
 };
 
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  rss: "RSS",
+  youtube: "YouTube",
+  reddit: "Reddit",
+  email: "Email",
+};
+
 export function SourcesSidebar({
   ingestionEmail,
   sources,
@@ -40,7 +47,7 @@ export function SourcesSidebar({
           <ul className="source-list source-list-connected">
             {sources.map((source) => (
               <li key={source.id} className="source-list-item">
-                <span className="source-type">{source.source_type}</span>
+                <span className="source-type">{SOURCE_TYPE_LABELS[source.source_type] ?? source.source_type}</span>
                 <div className="source-info">
                   <span className="source-name">{source.name ?? source.identifier}</span>
                   {source.name && (
@@ -91,7 +98,7 @@ export function BriefingPanel({
         <ol className="briefing-steps">
           <li className={sourcesCount > 0 ? "done" : ""}>
             <span className="step-num">1</span>
-            <span>Add an RSS feed in the panel →</span>
+            <span>Add RSS, YouTube, or Reddit in the panel →</span>
           </li>
           <li>
             <span className="step-num">2</span>
@@ -116,7 +123,9 @@ export function BriefingPanel({
         </button>
 
         {sourcesCount === 0 && (
-          <p className="briefing-empty-hint">Add at least one RSS source to continue.</p>
+          <p className="briefing-empty-hint">
+            Add at least one RSS feed, YouTube channel, or subreddit to continue.
+          </p>
         )}
         {generateError && <p className="form-error">{generateError}</p>}
       </div>

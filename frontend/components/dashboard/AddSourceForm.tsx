@@ -4,10 +4,30 @@ import { useState } from "react";
 import { api, type Source } from "@/lib/api";
 
 const SOURCE_TYPES = [
-  { value: "rss", label: "RSS feed", placeholder: "https://feeds.example.com/rss" },
-  { value: "youtube", label: "YouTube", placeholder: "Channel URL or ID" },
-  { value: "reddit", label: "Subreddit", placeholder: "e.g. technology" },
-  { value: "email", label: "Email sender", placeholder: "newsletter@example.com" },
+  {
+    value: "rss",
+    label: "RSS feed",
+    placeholder: "https://feeds.arstechnica.com/arstechnica/index",
+    hint: "Any blog or news RSS/Atom URL.",
+  },
+  {
+    value: "youtube",
+    label: "YouTube channel",
+    placeholder: "https://www.youtube.com/@mkbhd",
+    hint: "Channel URL, @handle, or channel ID (UC…).",
+  },
+  {
+    value: "reddit",
+    label: "Subreddit",
+    placeholder: "technology",
+    hint: "Subreddit name without r/ — e.g. MachineLearning",
+  },
+  {
+    value: "email",
+    label: "Email sender",
+    placeholder: "newsletter@example.com",
+    hint: "Or forward mail to your ingestion address below.",
+  },
 ];
 
 export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }) {
@@ -69,6 +89,7 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
           className="field-input"
         />
       </label>
+      <p className="field-hint">{current.hint}</p>
       <label className="field-label">
         <span>Display name <span className="field-optional">optional</span></span>
         <input
