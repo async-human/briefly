@@ -105,4 +105,6 @@ export const api = {
   getSources: () => request<Source[]>("/api/v1/sources"),
   addSource: (body: { source_type: string; identifier: string; name?: string }) =>
     request<Source>("/api/v1/sources", { method: "POST", body: JSON.stringify(body) }),
+  generateDigest: () =>
+    request<Digest>("/api/v1/digests/generate", { method: "POST" }),
 };

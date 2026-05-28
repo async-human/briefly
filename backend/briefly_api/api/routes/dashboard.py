@@ -114,3 +114,23 @@ async def create_source(
     await db.commit()
     await db.refresh(source)
     return SourceOut.model_validate(source)
+
+
+@router.post("/digests/generate", response_model=DigestOut)
+async def generate_digest_now(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> DigestOut:
+    from briefly_api.services.briefing import generate_briefing_now
+
+    try:
+        digest = await generate_briefing_now(user, db, settings)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Briefing generation failed: {exc}",
+        ) from exc
+    return DigestOut.model_validate(digest)

@@ -4,9 +4,9 @@ import { useState } from "react";
 import { api, type Source } from "@/lib/api";
 
 const SOURCE_TYPES = [
-  { value: "rss", label: "RSS feed", placeholder: "https://example.com/feed.xml" },
-  { value: "youtube", label: "YouTube channel", placeholder: "Channel ID or URL" },
-  { value: "reddit", label: "Subreddit", placeholder: "MachineLearning" },
+  { value: "rss", label: "RSS feed", placeholder: "https://feeds.example.com/rss" },
+  { value: "youtube", label: "YouTube", placeholder: "Channel URL or ID" },
+  { value: "reddit", label: "Subreddit", placeholder: "e.g. technology" },
   { value: "email", label: "Email sender", placeholder: "newsletter@example.com" },
 ];
 
@@ -42,35 +42,58 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
 
   return (
     <form className="source-form" onSubmit={handleSubmit}>
-      <div className="source-form-row">
+      <label className="field-label">
+        Type
         <select
           value={sourceType}
           onChange={(e) => setSourceType(e.target.value)}
-          className="source-select"
+          className="field-input"
         >
           {SOURCE_TYPES.map((t) => (
             <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
+      </label>
+      <label className="field-label">
+        URL or identifier
         <input
           type="text"
           placeholder={current.placeholder}
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
-          className="source-input"
+          className="field-input"
         />
-        <button type="submit" className="btn-primary" disabled={loading}>
-          {loading ? "Adding…" : "Add"}
-        </button>
-      </div>
-      <input
-        type="text"
-        placeholder="Display name (optional)"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="source-input source-input-full"
-      />
+      </label>
+      <label className="field-label">
+        <span>Display name <span className="field-optional">optional</span></span>
+        <input
+          type="text"
+          placeholder="My favourite newsletter"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="field-input"
+        />
+      </label>
+      <button type="submit" className="btn-primary source-submit" disabled={loading}>
+        {loading ? "Adding…" : "Add source"}
+      </button>
       {error && <p className="form-error">{error}</p>}
     </form>
+  );
+}
+
+export function CopyEmailButton({ email }: { email: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(email);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <button type="button" className="copy-email-btn" onClick={handleCopy}>
+      {copied ? "Copied" : "Copy address"}
+    </button>
   );
 }
