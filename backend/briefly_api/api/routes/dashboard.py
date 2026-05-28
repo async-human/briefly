@@ -17,6 +17,7 @@ from briefly_api.api.schemas import (
     SourceOut,
     UserOut,
 )
+from briefly_api.auth.gmail import get_gmail_connection
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
@@ -46,6 +47,11 @@ async def _resolve_source(body: SourceCreate, settings: Settings) -> tuple[str, 
         return source_type, normalized
 
     detected = await detect_source(identifier, settings)
+    connector = get_connector(detected.source_type)
+    if connector:
+        validation = await connector.validate(detected.identifier, settings)
+        if not validation.valid:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=validation.message)
     return detected.source_type, detected.identifier
 
 
@@ -53,13 +59,17 @@ async def _resolve_source(body: SourceCreate, settings: Settings) -> tuple[str, 
 async def get_me(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db),
 ) -> MeOut:
     ingestion_email = f"{user.email_token}@{settings.email_ingestion_domain}"
     profile = ProfileOut.model_validate(user.profile) if user.profile else None
+    gmail = await get_gmail_connection(db, user.id)
     return MeOut(
         user=UserOut.model_validate(user),
         profile=profile,
         ingestion_email=ingestion_email,
+        onboarding_completed=bool(user.profile and user.profile.onboarding_completed),
+        gmail_connected=gmail is not None,
     )
 
 

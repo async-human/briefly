@@ -32,6 +32,7 @@ class BaseConnector(ABC):
         limit: int = 8,
         source_name: str | None = None,
         meta: dict | None = None,
+        db: object | None = None,
     ) -> list[NormalizedContent]:
         raise NotImplementedError
 

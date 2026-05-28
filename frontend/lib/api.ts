@@ -59,6 +59,17 @@ export type MeResponse = {
   user: User;
   profile: Profile | null;
   ingestion_email: string;
+  onboarding_completed: boolean;
+  gmail_connected: boolean;
+};
+
+export type OnboardingStatus = {
+  onboarding_completed: boolean;
+  profile_started: boolean;
+  gmail_connected: boolean;
+  gmail_email: string | null;
+  newsletter_count: number | null;
+  sources_count: number;
 };
 
 export type DigestItem = {
@@ -129,4 +140,28 @@ export const api = {
     request<void>(`/api/v1/sources/${id}`, { method: "DELETE" }),
   generateDigest: () =>
     request<Digest>("/api/v1/digests/generate", { method: "POST" }),
+  getOnboardingStatus: () => request<OnboardingStatus>("/api/v1/onboarding/status"),
+  updateOnboardingProfile: (body: {
+    role?: string;
+    goal?: string;
+    digest_time?: string;
+    digest_timezone?: string;
+  }) =>
+    request<OnboardingStatus>("/api/v1/onboarding/profile", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  completeOnboarding: () =>
+    request<{ onboarding_completed: boolean }>("/api/v1/onboarding/complete", {
+      method: "POST",
+    }),
+  startGmailConnect: (redirectPath = "/onboarding") =>
+    request<{ url: string }>(
+      `/api/v1/auth/gmail/start?redirect_path=${encodeURIComponent(redirectPath)}`,
+      { method: "POST" },
+    ),
+  getGmailStatus: () =>
+    request<{ connected: boolean; email: string | null; newsletter_count: number | null }>(
+      "/api/v1/auth/gmail/status",
+    ),
 };

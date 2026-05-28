@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from briefly_api.config import Settings
 from briefly_api.services.connectors.base import BaseConnector
 from briefly_api.services.connectors.email import EmailConnector
+from briefly_api.services.connectors.gmail import GmailConnector
 from briefly_api.services.connectors.reddit import RedditConnector
 from briefly_api.services.connectors.rss import RssConnector
 from briefly_api.services.connectors.url import UrlConnector
@@ -14,6 +15,7 @@ from briefly_api.services.url_scraper import discover_rss_feed
 # Order matters for detection — most specific first.
 CONNECTORS: list[BaseConnector] = [
     EmailConnector(),
+    GmailConnector(),
     YoutubeConnector(),
     RedditConnector(),
     RssConnector(),

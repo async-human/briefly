@@ -6,7 +6,7 @@ from briefly_api.config import Settings
 from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.connectors.base import BaseConnector, ConnectorValidation
 from briefly_api.services.connectors.types import URL
-from briefly_api.services.url_scraper import scrape_url
+from briefly_api.services.url_scraper import UrlFetchError, probe_url, scrape_url
 
 
 class UrlConnector(BaseConnector):
@@ -22,7 +22,9 @@ class UrlConnector(BaseConnector):
 
     def can_handle(self, identifier: str) -> bool:
         value = identifier.strip().lower()
-        return value.startswith(("http://", "https://")) or bool(re.fullmatch(r"[\w.-]+\.\w{2,}(/.*)?", value))
+        return value.startswith(("http://", "https://")) or bool(
+            re.fullmatch(r"[\w.-]+\.\w{2,}(/.*)?", value)
+        )
 
     async def fetch(
         self,
@@ -43,4 +45,8 @@ class UrlConnector(BaseConnector):
         normalized = self.normalize_identifier(identifier)
         if not normalized.startswith(("http://", "https://")):
             return ConnectorValidation(valid=False, message="Enter a valid website URL.")
+        try:
+            await probe_url(normalized)
+        except UrlFetchError as exc:
+            return ConnectorValidation(valid=False, message=str(exc))
         return ConnectorValidation(valid=True)

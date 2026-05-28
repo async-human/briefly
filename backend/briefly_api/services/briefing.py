@@ -122,11 +122,15 @@ async def generate_briefing_now(
             "Add at least one source (RSS, YouTube, Reddit, or website URL) to generate a briefing."
         )
 
-    articles, warnings = await collect_from_sources(sources, settings, max_items=max_items)
+    articles, warnings = await collect_from_sources(
+        sources, settings, db, user_id=user.id, max_items=max_items
+    )
     if not articles:
-        detail = "Could not fetch content from your sources. Check URLs and try again."
+        detail = "Could not fetch content from your sources."
         if warnings:
-            detail += " " + " ".join(warnings)
+            detail = warnings[0] if len(warnings) == 1 else " ".join(warnings)
+        else:
+            detail += " Check URLs and try again."
         raise ValueError(detail)
 
     items_data = await _personalize_items(articles, user, settings)

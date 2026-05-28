@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from briefly_api.config import Settings
 from briefly_api.db.models import Source
 from briefly_api.services.articles import NormalizedContent
@@ -14,7 +16,9 @@ log = logging.getLogger(__name__)
 async def collect_from_sources(
     sources: list[Source],
     settings: Settings,
+    db: AsyncSession,
     *,
+    user_id: str,
     max_items: int = 8,
 ) -> tuple[list[NormalizedContent], list[str]]:
     """Fetch content from all supported sources via connector registry."""
@@ -39,7 +43,8 @@ async def collect_from_sources(
                 settings,
                 limit=per_source,
                 source_name=display_name,
-                meta=source.meta or {},
+                meta={**(source.meta or {}), "user_id": user_id},
+                db=db,
             )
             for item in fetched:
                 if display_name:
@@ -53,7 +58,7 @@ async def collect_from_sources(
     email_sources = [s for s in sources if s.source_type == EMAIL]
     if email_sources:
         warnings.append(
-            f"{len(email_sources)} email source(s) skipped — forward newsletters to your ingestion address."
+            f"{len(email_sources)} email-forward source(s) skipped — connect Gmail instead."
         )
 
     return articles[:max_items], warnings

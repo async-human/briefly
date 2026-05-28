@@ -85,6 +85,9 @@ class User(Base):
 
     profile: Mapped["UserProfile"] = relationship(back_populates="user", uselist=False, cascade="all, delete-orphan")
     sources: Mapped[list["Source"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    oauth_connections: Mapped[list["OAuthConnection"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
     digests: Mapped[list["Digest"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     memory: Mapped[list["UserMemory"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     signals: Mapped[list["BehavioralSignal"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -125,6 +128,8 @@ class UserProfile(Base):
     digest_timezone: Mapped[str] = mapped_column(String(50), default="Asia/Kolkata")
     digest_length: Mapped[str] = mapped_column(String(20), default="standard")  # brief|standard|comprehensive
     digest_format: Mapped[str] = mapped_column(String(20), default="sections")  # sections|flat
+
+    onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Learning signals — updated automatically
     avg_open_rate: Mapped[float] = mapped_column(Float, default=0.0)
@@ -183,6 +188,31 @@ class Source(Base):
 
     user: Mapped["User"] = relationship(back_populates="sources")
     raw_contents: Mapped[list["RawContent"]] = relationship(back_populates="source", cascade="all, delete-orphan")
+
+
+# ── OAuth connections (Gmail, etc.) ───────────────────────────────────────────
+
+class OAuthConnection(Base):
+    """Stored OAuth tokens for third-party integrations (Gmail inbox, etc.)."""
+
+    __tablename__ = "oauth_connections"
+    __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_oauth_provider"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)  # gmail
+    account_email: Mapped[str | None] = mapped_column(String(255))
+    access_token: Mapped[str] = mapped_column(Text, nullable=False)
+    refresh_token: Mapped[str | None] = mapped_column(Text)
+    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    scopes: Mapped[str] = mapped_column(String(512), default="")
+    meta: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped["User"] = relationship(back_populates="oauth_connections")
 
 
 # ── Raw Content ───────────────────────────────────────────────────────────────

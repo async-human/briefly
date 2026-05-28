@@ -100,6 +100,12 @@ class Settings(BaseSettings):
     def google_redirect_uri(self) -> str:
         return f"{self.backend_url.rstrip('/')}/api/v1/auth/google/callback"
 
+    @property
+    def gmail_redirect_uri(self) -> str:
+        return f"{self.backend_url.rstrip('/')}/api/v1/auth/gmail/callback"
+
+    gmail_scopes: str = "https://www.googleapis.com/auth/gmail.readonly openid email"
+
     # ── Admin ────────────────────────────────────────────────────────────────
     admin_key: str = "change-me-admin-key"
 

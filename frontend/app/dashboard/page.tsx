@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api, type Digest, type MeResponse, type Source } from "@/lib/api";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { BriefingPanel, SourcesSidebar } from "@/components/dashboard/BriefingPanel";
 
-const FETCHABLE_SOURCE_TYPES = new Set(["rss", "youtube", "reddit", "url"]);
+const FETCHABLE_SOURCE_TYPES = new Set(["rss", "youtube", "reddit", "url", "gmail"]);
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [digest, setDigest] = useState<Digest | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
@@ -19,13 +21,17 @@ export default function DashboardPage() {
   useEffect(() => {
     Promise.all([api.getMe(), api.getLatestDigest(), api.getSources()])
       .then(([meData, digestData, sourcesData]) => {
+        if (!meData.onboarding_completed) {
+          router.replace("/onboarding");
+          return;
+        }
         setMe(meData);
         setDigest(digestData);
         setSources(sourcesData);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load dashboard"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [router]);
 
   async function handleGenerate() {
     setGenerating(true);

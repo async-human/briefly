@@ -57,6 +57,15 @@ async def init_db() -> None:
             )
         except Exception as exc:
             logger.warning("source_type migration: %s", exc)
+        try:
+            await conn.execute(
+                text("""
+                    ALTER TABLE user_profiles
+                    ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE
+                """)
+            )
+        except Exception as exc:
+            logger.warning("onboarding_completed migration: %s", exc)
     logger.info("Database initialized")
 
 

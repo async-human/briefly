@@ -17,6 +17,7 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   reddit: "Reddit",
   email: "Email",
   url: "Web",
+  gmail: "Gmail",
 };
 
 export function SourcesSidebar({

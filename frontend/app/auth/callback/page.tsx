@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { setToken } from "@/lib/auth";
+import { api } from "@/lib/api";
 
 function CallbackHandler() {
   const router = useRouter();
@@ -10,13 +11,21 @@ function CallbackHandler() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const token = searchParams.get("token");
-    if (!token) {
-      setError("No authentication token received.");
-      return;
+    async function finishLogin() {
+      const token = searchParams.get("token");
+      if (!token) {
+        setError("No authentication token received.");
+        return;
+      }
+      setToken(token);
+      try {
+        const me = await api.getMe();
+        router.replace(me.onboarding_completed ? "/dashboard" : "/onboarding");
+      } catch {
+        router.replace("/onboarding");
+      }
     }
-    setToken(token);
-    router.replace("/dashboard");
+    void finishLogin();
   }, [router, searchParams]);
 
   if (error) {

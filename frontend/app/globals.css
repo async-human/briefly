@@ -1396,6 +1396,159 @@ footer {
   margin-top: 8px;
 }
 
+/* ── ONBOARDING ── */
+.onboard-shell {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+}
+.onboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 48px;
+  border-bottom: 1px solid var(--border);
+}
+.onboard-logo {
+  font-family: var(--serif);
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+.onboard-steps {
+  display: flex;
+  gap: 8px;
+}
+.onboard-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.onboard-step-dot.active { background: var(--text); }
+.onboard-main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+.onboard-panel-wide { max-width: 900px; }
+.onboard-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.onboard-title {
+  font-family: var(--serif);
+  font-size: 36px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  margin-bottom: 10px;
+}
+.onboard-desc {
+  font-size: 15px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 32px;
+}
+.onboard-textarea { resize: vertical; min-height: 88px; }
+.onboard-cta { width: 100%; margin-top: 8px; }
+.onboard-skip {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.onboard-skip:hover { color: var(--text-secondary); }
+.onboard-gmail-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  background: var(--surface);
+}
+.onboard-gmail-head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.onboard-gmail-icon { font-size: 28px; line-height: 1; }
+.onboard-gmail-title {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.onboard-gmail-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.onboard-disclaimer {
+  margin: 0 0 20px;
+  padding: 12px 16px;
+  border-left: 2px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+.onboard-gmail-btn { width: 100%; }
+.onboard-gmail-connected {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.onboard-gmail-connected strong { color: var(--text); }
+.onboard-source-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.onboard-source-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+.onboard-source-card h3 {
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+.onboard-source-card p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+.onboard-quick-btn {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.onboard-quick-btn:hover { border-color: var(--text-muted); }
+.onboard-success {
+  font-size: 13px;
+  color: #6aab8a;
+  margin-bottom: 16px;
+}
+.onboard-error { text-align: center; margin-top: 16px; }
+
+@media (max-width: 700px) {
+  .onboard-header { padding: 20px; }
+  .onboard-source-grid { grid-template-columns: 1fr; }
+  .onboard-title { font-size: 28px; }
+}
+
 @media (max-width: 900px) {
   .dash-nav-inner { padding: 16px 20px; }
   .dash-main { padding: 28px 20px 60px; }

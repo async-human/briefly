@@ -23,14 +23,47 @@ class ProfileOut(BaseModel):
     digest_time: str = "07:00"
     digest_timezone: str = "Asia/Kolkata"
     interests: list[dict] = Field(default_factory=list)
+    onboarding_completed: bool = False
 
     model_config = {"from_attributes": True}
+
+
+class ProfileUpdate(BaseModel):
+    role: str | None = None
+    goal: str | None = None
+    digest_time: str | None = None
+    digest_timezone: str | None = None
+
+
+class OnboardingStatusOut(BaseModel):
+    onboarding_completed: bool
+    profile_started: bool
+    gmail_connected: bool
+    gmail_email: str | None = None
+    newsletter_count: int | None = None
+    sources_count: int
+
+
+class OnboardingCompleteOut(BaseModel):
+    onboarding_completed: bool
+
+
+class GmailConnectOut(BaseModel):
+    url: str
+
+
+class GmailStatusOut(BaseModel):
+    connected: bool
+    email: str | None = None
+    newsletter_count: int | None = None
 
 
 class MeOut(BaseModel):
     user: UserOut
     profile: ProfileOut | None
     ingestion_email: str
+    onboarding_completed: bool = False
+    gmail_connected: bool = False
 
 
 class DigestItemOut(BaseModel):
