@@ -72,11 +72,9 @@ export default function OnboardingPage() {
     api.getOnboardingStatus()
       .then((s) => {
         setStatus(s);
-        if (s.onboarding_completed) {
-          router.replace("/dashboard");
-          return;
-        }
-        if (s.profile_started) setStep(2);
+        // Returning users land on step 2 (connection management) so they
+        // can review/update connected accounts before heading to dashboard.
+        if (s.onboarding_completed || s.profile_started) setStep(2);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load onboarding"))
       .finally(() => setLoading(false));
@@ -481,10 +479,10 @@ export default function OnboardingPage() {
                 <button
                   type="button"
                   className="btn-primary onboard-cta"
-                  onClick={() => setStep(3)}
+                  onClick={() => status?.onboarding_completed ? router.replace("/dashboard") : setStep(3)}
                   disabled={!canContinueStep2}
                 >
-                  Continue
+                  {status?.onboarding_completed ? "Go to dashboard" : "Continue"}
                 </button>
                 {!canContinueStep2 && (
                   <p className="onboard-hint">Connect at least one account or add a source.</p>

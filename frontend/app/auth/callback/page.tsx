@@ -18,12 +18,9 @@ function CallbackHandler() {
         return;
       }
       setToken(token);
-      try {
-        const me = await api.getMe();
-        router.replace(me.onboarding_completed ? "/dashboard" : "/onboarding");
-      } catch {
-        router.replace("/onboarding");
-      }
+      // Always land on onboarding after login — returning users see step 2
+      // (connection management) and continue to dashboard from there.
+      router.replace("/onboarding");
     }
     void finishLogin();
   }, [router, searchParams]);
