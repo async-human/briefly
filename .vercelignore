@@ -1,0 +1,10 @@
+# Backend runs on Railway — not deployed to Vercel
+backend/
+
+# Reference / legacy files
+reference/
+
+# Python artifacts (if Vercel scans parent dirs)
+**/__pycache__/
+**/.venv/
+**/*.pyc
