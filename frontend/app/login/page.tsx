@@ -1,7 +1,42 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { googleLoginUrl } from "@/lib/auth";
+import { getToken, googleLoginUrl } from "@/lib/auth";
+import { api } from "@/lib/api";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    // If the user already has a valid token, skip the login screen entirely.
+    const token = getToken();
+    if (!token) {
+      setChecking(false);
+      return;
+    }
+    api.getMe()
+      .then((me) => {
+        router.replace(me.onboarding_completed ? "/dashboard" : "/onboarding");
+      })
+      .catch(() => {
+        // Token is stale or invalid — show the login form.
+        setChecking(false);
+      });
+  }, [router]);
+
+  if (checking) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <p className="auth-loading">Signing you in…</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="auth-page">
       <div className="auth-card">
