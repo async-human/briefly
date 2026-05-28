@@ -8,6 +8,32 @@ import { AddSourceForm } from "@/components/dashboard/AddSourceForm";
 
 const ROLES = ["Founder", "Product manager", "Engineer", "Investor", "Researcher", "Other"];
 
+const STEPS = [
+  { n: 1, label: "About you" },
+  { n: 2, label: "Sources" },
+  { n: 3, label: "Delivery" },
+];
+
+function GmailIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
+      <path fill="#EA4335" d="M24 5.5v13c0 .85-.65 1.5-1.5 1.5H1.5C.65 20 0 19.35 0 18.5v-13C0 4.65.65 4 1.5 4h21c.85 0 1.5.65 1.5 1.5z" />
+      <path fill="#FBBC05" d="M0 4l12 9.5L24 4" />
+      <path fill="#34A853" d="M0 18.5V4l12 9.5L0 18.5z" opacity="0.8" />
+      <path fill="#4285F4" d="M24 4v14.5L12 13.5 24 4z" opacity="0.9" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <circle cx="8" cy="8" r="8" fill="rgba(106,171,138,0.15)" />
+      <path d="M5 8l2 2 4-4" stroke="#6aab8a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -80,6 +106,7 @@ export default function OnboardingPage() {
   }
 
   async function handleAddHackerNews() {
+    setError("");
     try {
       await api.addSource({ identifier: "https://hnrss.org/frontpage", name: "Hacker News" });
       const updated = await api.getOnboardingStatus();
@@ -105,165 +132,259 @@ export default function OnboardingPage() {
     }
   }
 
+  const canContinueStep2 =
+    status?.gmail_connected || (status?.sources_count ?? 0) > 0;
+
   if (loading) {
     return (
       <div className="onboard-shell">
-        <p className="auth-loading">Loading…</p>
+        <div className="onboard-loading">
+          <span className="btn-spinner" />
+          <p>Setting up your briefing…</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="onboard-shell">
+      <div className="onboard-glow" aria-hidden />
+
       <header className="onboard-header">
         <Link href="/" className="onboard-logo">Briefly</Link>
-        <div className="onboard-steps">
-          {[1, 2, 3].map((n) => (
-            <span key={n} className={`onboard-step-dot ${step >= n ? "active" : ""}`} />
+        <nav className="onboard-progress" aria-label="Onboarding progress">
+          {STEPS.map(({ n, label }, i) => (
+            <div key={n} className="onboard-progress-item">
+              <button
+                type="button"
+                className={`onboard-progress-step ${step >= n ? "active" : ""} ${step === n ? "current" : ""}`}
+                onClick={() => n < step && setStep(n)}
+                disabled={n > step}
+              >
+                <span className="onboard-progress-num">{n}</span>
+                <span className="onboard-progress-label">{label}</span>
+              </button>
+              {i < STEPS.length - 1 && (
+                <span className={`onboard-progress-line ${step > n ? "done" : ""}`} />
+              )}
+            </div>
           ))}
-        </div>
+        </nav>
       </header>
 
       <main className="onboard-main">
-        {step === 1 && (
-          <section className="onboard-panel">
-            <p className="onboard-label">Step 1 of 3</p>
-            <h1 className="onboard-title">Tell us about yourself</h1>
-            <p className="onboard-desc">This helps Briefly personalize what matters to you.</p>
+        <div key={step} className="onboard-panel-wrap">
+          {step === 1 && (
+            <section className="onboard-panel">
+              <header className="onboard-panel-head">
+                <p className="onboard-eyebrow">Step 1 of 3</p>
+                <h1 className="onboard-title">Tell us about yourself</h1>
+                <p className="onboard-desc">
+                  Briefly uses this to decide what&apos;s worth your attention each morning.
+                </p>
+              </header>
 
-            <label className="field-label">
-              What best describes you?
-              <select className="field-input" value={role} onChange={(e) => setRole(e.target.value)}>
-                <option value="">Select one</option>
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field-label">
-              What are you trying to stay on top of?
-              <textarea
-                className="field-input onboard-textarea"
-                placeholder="e.g. AI agents, startup funding, product design"
-                value={goal}
-                onChange={(e) => setGoal(e.target.value)}
-                rows={3}
-              />
-            </label>
-
-            <button type="button" className="btn-primary onboard-cta" onClick={handleSaveProfile}>
-              Continue
-            </button>
-            <button type="button" className="onboard-skip" onClick={() => setStep(2)}>
-              Skip for now
-            </button>
-          </section>
-        )}
-
-        {step === 2 && (
-          <section className="onboard-panel onboard-panel-wide">
-            <p className="onboard-label">Step 2 of 3</p>
-            <h1 className="onboard-title">Connect your sources</h1>
-            <p className="onboard-desc">One click for Gmail. Paste anything else.</p>
-
-            {gmailBanner && <p className="onboard-success">{gmailBanner}</p>}
-
-            <div className="onboard-gmail-card">
-              <div className="onboard-gmail-head">
-                <span className="onboard-gmail-icon">📧</span>
-                <div>
-                  <h2 className="onboard-gmail-title">Gmail</h2>
-                  <p className="onboard-gmail-sub">Find newsletters automatically — no forwarding setup</p>
+              <div className="onboard-fields">
+                <div className="onboard-field">
+                  <span className="onboard-field-label">What best describes you?</span>
+                  <div className="onboard-role-grid">
+                    {ROLES.map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        className={`onboard-role-pill ${role === r ? "selected" : ""}`}
+                        onClick={() => setRole(r)}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                <label className="onboard-field">
+                  <span className="onboard-field-label">What are you trying to stay on top of?</span>
+                  <textarea
+                    className="onboard-input onboard-textarea"
+                    placeholder="e.g. AI agents, startup funding, product design"
+                    value={goal}
+                    onChange={(e) => setGoal(e.target.value)}
+                    rows={3}
+                  />
+                </label>
               </div>
 
-              <blockquote className="onboard-disclaimer">
-                Briefly connects to Gmail to find your newsletters — emails from Substack,
-                Beehiiv, and similar platforms. We only read newsletter-like emails, never
-                personal messages or work mail. We extract content and don&apos;t store raw
-                emails. Disconnect anytime to delete access.
-              </blockquote>
+              <div className="onboard-actions">
+                <button type="button" className="btn-primary onboard-cta" onClick={handleSaveProfile}>
+                  Continue
+                </button>
+                <button type="button" className="onboard-ghost" onClick={() => setStep(2)}>
+                  Skip for now
+                </button>
+              </div>
+            </section>
+          )}
 
-              {status?.gmail_connected ? (
-                <div className="onboard-gmail-connected">
-                  <span>Connected as {status.gmail_email}</span>
-                  {status.newsletter_count != null && (
-                    <strong>Found {status.newsletter_count}+ newsletters</strong>
+          {step === 2 && (
+            <section className="onboard-panel onboard-panel-wide">
+              <header className="onboard-panel-head">
+                <p className="onboard-eyebrow">Step 2 of 3</p>
+                <h1 className="onboard-title">Connect your sources</h1>
+                <p className="onboard-desc">
+                  One click for Gmail. Paste a URL for anything else.
+                </p>
+              </header>
+
+              {gmailBanner && (
+                <div className="onboard-banner onboard-banner-success">{gmailBanner}</div>
+              )}
+
+              <article className={`onboard-gmail-feature ${status?.gmail_connected ? "connected" : ""}`}>
+                <div className="onboard-gmail-top">
+                  <div className="onboard-gmail-brand">
+                    <span className="onboard-gmail-icon-wrap"><GmailIcon /></span>
+                    <div>
+                      <h2 className="onboard-gmail-title">Gmail</h2>
+                      <p className="onboard-gmail-sub">Newsletters found automatically</p>
+                    </div>
+                  </div>
+                  {status?.gmail_connected && (
+                    <span className="onboard-badge-connected">
+                      <CheckIcon /> Connected
+                    </span>
                   )}
                 </div>
-              ) : (
+
+                <p className="onboard-disclaimer">
+                  We only read newsletter-like emails from Substack, Beehiiv, and similar
+                  senders — never personal or work mail. Content is extracted, not stored.
+                  Disconnect anytime.
+                </p>
+
+                {status?.gmail_connected ? (
+                  <div className="onboard-gmail-result">
+                    <span className="onboard-gmail-email">{status.gmail_email}</span>
+                    {status.newsletter_count != null && (
+                      <span className="onboard-gmail-stat">
+                        {status.newsletter_count}+ newsletters found
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="onboard-gmail-connect"
+                    onClick={handleConnectGmail}
+                    disabled={gmailLoading}
+                  >
+                    {gmailLoading ? (
+                      <>
+                        <span className="btn-spinner btn-spinner-dark" />
+                        Redirecting to Google…
+                      </>
+                    ) : (
+                      <>
+                        <GmailIcon />
+                        Connect Gmail
+                      </>
+                    )}
+                  </button>
+                )}
+              </article>
+
+              <div className="onboard-secondary">
+                <div className="onboard-secondary-card">
+                  <div className="onboard-secondary-head">
+                    <span className="onboard-secondary-icon">URL</span>
+                    <div>
+                      <h3>Paste a URL</h3>
+                      <p>RSS, YouTube, Reddit, or any site</p>
+                    </div>
+                  </div>
+                  <div className="onboard-add-form">
+                    <AddSourceForm onAdded={() => api.getOnboardingStatus().then(setStatus)} />
+                  </div>
+                </div>
+
+                <div className="onboard-secondary-card">
+                  <div className="onboard-secondary-head">
+                    <span className="onboard-secondary-icon">HN</span>
+                    <div>
+                      <h3>Quick add</h3>
+                      <p>Popular sources, one tap</p>
+                    </div>
+                  </div>
+                  <button type="button" className="onboard-chip-btn" onClick={handleAddHackerNews}>
+                    Hacker News
+                  </button>
+                  {(status?.sources_count ?? 0) > 0 && (
+                    <p className="onboard-source-count">
+                      {status?.sources_count} source{(status?.sources_count ?? 0) === 1 ? "" : "s"} connected
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="onboard-actions">
                 <button
                   type="button"
-                  className="btn-primary onboard-gmail-btn"
-                  onClick={handleConnectGmail}
-                  disabled={gmailLoading}
+                  className="btn-primary onboard-cta"
+                  onClick={() => setStep(3)}
+                  disabled={!canContinueStep2}
                 >
-                  {gmailLoading ? "Redirecting to Google…" : "Connect Gmail"}
+                  Continue
                 </button>
-              )}
-            </div>
-
-            <div className="onboard-source-grid">
-              <div className="onboard-source-card">
-                <h3>RSS / Blogs / Substack</h3>
-                <p>Paste any feed or site URL</p>
-                <AddSourceForm onAdded={() => api.getOnboardingStatus().then(setStatus)} />
+                {!canContinueStep2 && (
+                  <p className="onboard-hint">Connect Gmail or add at least one source.</p>
+                )}
               </div>
-              <div className="onboard-source-card">
-                <h3>Quick adds</h3>
-                <p>Popular sources in one click</p>
-                <button type="button" className="onboard-quick-btn" onClick={handleAddHackerNews}>
-                  + Hacker News
+            </section>
+          )}
+
+          {step === 3 && (
+            <section className="onboard-panel">
+              <header className="onboard-panel-head">
+                <p className="onboard-eyebrow">Step 3 of 3</p>
+                <h1 className="onboard-title">When should we deliver?</h1>
+                <p className="onboard-desc">
+                  Your first briefing is ready to generate from the dashboard.
+                  Automatic morning delivery comes with the nightly pipeline.
+                </p>
+              </header>
+
+              <div className="onboard-time-card">
+                <label className="onboard-field">
+                  <span className="onboard-field-label">Local delivery time</span>
+                  <input
+                    type="time"
+                    className="onboard-input onboard-time-input"
+                    value={digestTime}
+                    onChange={(e) => setDigestTime(e.target.value)}
+                  />
+                </label>
+                <p className="onboard-time-note">
+                  Timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                </p>
+              </div>
+
+              <div className="onboard-actions">
+                <button
+                  type="button"
+                  className="btn-primary onboard-cta"
+                  onClick={handleFinish}
+                  disabled={finishing}
+                >
+                  {finishing ? "Finishing…" : "Go to dashboard"}
                 </button>
               </div>
-            </div>
+            </section>
+          )}
+        </div>
 
-            <button
-              type="button"
-              className="btn-primary onboard-cta"
-              onClick={() => setStep(3)}
-              disabled={!status?.gmail_connected && (status?.sources_count ?? 0) === 0}
-            >
-              Continue
-            </button>
-            {(status?.sources_count ?? 0) === 0 && !status?.gmail_connected && (
-              <p className="field-hint">Connect Gmail or add at least one source to continue.</p>
-            )}
-          </section>
+        {error && (
+          <div className="onboard-banner onboard-banner-error" role="alert">
+            {error}
+          </div>
         )}
-
-        {step === 3 && (
-          <section className="onboard-panel">
-            <p className="onboard-label">Step 3 of 3</p>
-            <h1 className="onboard-title">When should we deliver?</h1>
-            <p className="onboard-desc">
-              Your first briefing is ready — generate it from the dashboard, or we&apos;ll
-              deliver automatically once the nightly pipeline is live.
-            </p>
-
-            <label className="field-label">
-              Delivery time
-              <input
-                type="time"
-                className="field-input"
-                value={digestTime}
-                onChange={(e) => setDigestTime(e.target.value)}
-              />
-            </label>
-
-            <button
-              type="button"
-              className="btn-primary onboard-cta"
-              onClick={handleFinish}
-              disabled={finishing}
-            >
-              {finishing ? "Finishing…" : "Go to dashboard"}
-            </button>
-          </section>
-        )}
-
-        {error && <p className="form-error onboard-error">{error}</p>}
       </main>
     </div>
   );
