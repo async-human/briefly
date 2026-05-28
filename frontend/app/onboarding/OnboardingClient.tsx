@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { api, type OnboardingStatus } from "@/lib/api";
+import { api, type OnboardingStatus, type MeResponse } from "@/lib/api";
+import { clearToken } from "@/lib/auth";
 import { AddSourceForm } from "@/components/dashboard/AddSourceForm";
 
 const ROLES = ["Founder", "Product manager", "Engineer", "Investor", "Researcher", "Other"];
@@ -67,18 +68,24 @@ export default function OnboardingPage() {
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState("");
   const [banner, setBanner] = useState("");
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   useEffect(() => {
-    api.getOnboardingStatus()
-      .then((s) => {
+    Promise.all([api.getOnboardingStatus(), api.getMe()])
+      .then(([s, meData]) => {
         setStatus(s);
-        // Returning users land on step 2 (connection management) so they
-        // can review/update connected accounts before heading to dashboard.
+        setMe(meData);
         if (s.onboarding_completed || s.profile_started) setStep(2);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load onboarding"))
       .finally(() => setLoading(false));
   }, [router]);
+
+  function handleSignOut() {
+    clearToken();
+    router.replace("/login");
+  }
 
   useEffect(() => {
     const gmail = searchParams.get("gmail");
@@ -251,7 +258,39 @@ export default function OnboardingPage() {
 
       <header className="onboard-header">
         <Link href="/" className="onboard-logo">Briefly</Link>
-        <span className="onboard-step-counter">{step} / {STEPS.length}</span>
+        <div className="onboard-header-right">
+          <span className="onboard-step-counter">{step} / {STEPS.length}</span>
+          <div className="onboard-profile-wrap">
+            <button
+              type="button"
+              className="onboard-avatar-btn"
+              onClick={() => setProfileMenuOpen((o) => !o)}
+              aria-label="Account menu"
+            >
+              {me?.user.avatar_url ? (
+                <img src={me.user.avatar_url} alt="" className="onboard-avatar-img" />
+              ) : (
+                <span className="onboard-avatar-initials">
+                  {(me?.user.name ?? me?.user.email ?? "U").charAt(0).toUpperCase()}
+                </span>
+              )}
+            </button>
+            {profileMenuOpen && (
+              <>
+                <div className="onboard-profile-backdrop" onClick={() => setProfileMenuOpen(false)} />
+                <div className="onboard-profile-menu">
+                  <div className="onboard-profile-info">
+                    <p className="onboard-profile-name">{me?.user.name ?? "Account"}</p>
+                    <p className="onboard-profile-email">{me?.user.email}</p>
+                  </div>
+                  <button type="button" className="onboard-signout-btn" onClick={handleSignOut}>
+                    Sign out
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </header>
 
       <div className="onboard-progress-bar" aria-label={`Step ${step} of ${STEPS.length}`}>

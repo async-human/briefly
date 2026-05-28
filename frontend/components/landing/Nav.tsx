@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { googleLoginUrl } from "@/lib/auth";
 
 export function Nav() {
   const [scrolled, setScrolled] = useState(false);
+  const loginUrl = googleLoginUrl();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -19,8 +21,8 @@ export function Nav() {
         <li><a href="#how">How it works</a></li>
         <li><a href="#features">Features</a></li>
         <li><a href="#pricing">Pricing</a></li>
-        <li><a href="/login">Sign in</a></li>
-        <li><a href="/login" className="nav-cta">Get early access</a></li>
+        <li><a href={loginUrl}>Sign in</a></li>
+        <li><a href={loginUrl} className="nav-cta">Get early access</a></li>
       </ul>
     </nav>
   );
