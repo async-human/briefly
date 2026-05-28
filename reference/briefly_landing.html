@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Briefly — Your personal AI briefing agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0908;
+  --bg2: #0f0e0c;
+  --bg3: #161411;
+  --surface: #1c1a17;
+  --surface2: #232018;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --gold: #c9a85c;
+  --gold2: #e8c97a;
+  --gold-dim: rgba(201,168,92,0.15);
+  --gold-glow: rgba(201,168,92,0.08);
+  --text: #f0ece4;
+  --text2: #a09880;
+  --text3: #5a5448;
+  --green: #4a8c6a;
+  --green-light: #6ab88a;
+  --red-dim: #8c4a4a;
+  --serif: 'Playfair Display', Georgia, serif;
+  --sans: 'DM Sans', system-ui, sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-x: hidden;
+  cursor: default;
+}
+
+/* ── Noise texture overlay ───────────────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.4;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--text3); border-radius: 2px; }
+
+/* ── NAV ─────────────────────────────────────────────────────────────────── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  padding: 20px 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s, background 0.3s, backdrop-filter 0.3s;
+}
+nav.scrolled {
+  border-color: var(--border);
+  background: rgba(10,9,8,0.8);
+  backdrop-filter: blur(20px);
+}
+.nav-logo {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nav-logo-dot {
+  width: 6px; height: 6px;
+  background: var(--gold);
+  border-radius: 50%;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  list-style: none;
+}
+.nav-links a {
+  font-size: 14px;
+  color: var(--text2);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--text); }
+.nav-cta {
+  background: var(--gold) !important;
+  color: var(--bg) !important;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 14px !important;
+  transition: background 0.2s, transform 0.15s !important;
+}
+.nav-cta:hover { background: var(--gold2) !important; transform: translateY(-1px); }
+
+/* ── HERO ─────────────────────────────────────────────────────────────────── */
+.hero {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 80px;
+  padding: 120px 80px 80px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ambient glow behind hero */
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 20%; left: -10%;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(201,168,92,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero::after {
+  content: '';
+  position: absolute;
+  bottom: 10%; right: -5%;
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(74,140,106,0.05) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-left { position: relative; z-index: 2; }
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--gold);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 28px;
+  opacity: 0;
+  animation: fade-up 0.8s 0.2s ease forwards;
+}
+.hero-eyebrow::before {
+  content: '';
+  width: 24px; height: 1px;
+  background: var(--gold);
+}
+
+.hero-headline {
+  font-family: var(--serif);
+  font-size: clamp(42px, 5vw, 64px);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 24px;
+  opacity: 0;
+  animation: fade-up 0.8s 0.35s ease forwards;
+}
+.hero-headline em {
+  font-style: italic;
+  color: var(--gold);
+}
+
+.hero-sub {
+  font-size: 17px;
+  color: var(--text2);
+  line-height: 1.65;
+  max-width: 440px;
+  margin-bottom: 40px;
+  font-weight: 300;
+  opacity: 0;
+  animation: fade-up 0.8s 0.5s ease forwards;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  opacity: 0;
+  animation: fade-up 0.8s 0.65s ease forwards;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--gold);
+  color: var(--bg);
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 500;
+  padding: 14px 28px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  letter-spacing: -0.01em;
+}
+.btn-primary:hover {
+  background: var(--gold2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(201,168,92,0.25);
+}
+.btn-primary svg { width: 16px; height: 16px; }
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--text2);
+  font-size: 15px;
+  font-weight: 400;
+  padding: 14px 20px;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  letter-spacing: -0.01em;
+}
+.btn-ghost:hover {
+  color: var(--text);
+  border-color: var(--text3);
+  background: rgba(255,255,255,0.03);
+}
+
+.hero-proof {
+  margin-top: 48px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  opacity: 0;
+  animation: fade-up 0.8s 0.8s ease forwards;
+}
+.proof-stat {
+  display: flex;
+  flex-direction: column;
+}
+.proof-number {
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.proof-label {
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 3px;
+  letter-spacing: 0.02em;
+}
+.proof-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border2);
+}
+
+/* ── LIVE DIGEST PREVIEW ─────────────────────────────────────────────────── */
+.hero-right {
+  position: relative;
+  z-index: 2;
+  opacity: 0;
+  animation: fade-in 1s 0.5s ease forwards;
+}
+
+.digest-window {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.04),
+    0 32px 80px rgba(0,0,0,0.5),
+    0 0 120px rgba(201,168,92,0.04);
+  position: relative;
+}
+
+/* Window chrome */
+.window-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+}
+.window-dots { display: flex; gap: 6px; }
+.window-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+.window-dot:nth-child(1) { background: #ff5f57; }
+.window-dot:nth-child(2) { background: #ffbd2e; }
+.window-dot:nth-child(3) { background: #28c840; }
+
+.window-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: 0.05em;
+}
+
+.window-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--green-light);
+}
+.status-dot {
+  width: 5px; height: 5px;
+  background: var(--green-light);
+  border-radius: 50%;
+  animation: blink 1.5s ease-in-out infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+/* Digest content */
+.digest-body {
+  padding: 24px;
+  max-height: 520px;
+  overflow: hidden;
+  position: relative;
+}
+
+.digest-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.digest-date {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.digest-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--gold);
+  letter-spacing: 0.05em;
+}
+
+.digest-greeting {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 6px;
+  opacity: 0;
+}
+.digest-sub {
+  font-size: 12px;
+  color: var(--text3);
+  margin-bottom: 20px;
+  opacity: 0;
+}
+
+.digest-section-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--gold);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--gold-dim);
+  opacity: 0;
+}
+
+.digest-item {
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.digest-item:last-child { border-bottom: none; margin-bottom: 0; }
+.digest-item.visible { opacity: 1; transform: translateY(0); }
+
+.item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.item-source {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.item-tag {
+  font-size: 9px;
+  font-family: var(--mono);
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+}
+.tag-new { background: rgba(74,140,106,0.2); color: var(--green-light); }
+.tag-update { background: rgba(201,168,92,0.15); color: var(--gold); }
+.tag-trending { background: rgba(140,74,74,0.2); color: #d4888a; }
+
+.item-headline {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.item-why {
+  font-size: 11.5px;
+  color: var(--text2);
+  line-height: 1.5;
+  font-style: italic;
+  padding-left: 10px;
+  border-left: 2px solid var(--gold-dim);
+}
+
+.item-why strong {
+  color: var(--gold);
+  font-style: normal;
+  font-weight: 400;
+}
+
+/* Fade gradient at bottom of digest */
+.digest-fade {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 80px;
+  background: linear-gradient(transparent, var(--surface));
+  pointer-events: none;
+}
+
+/* Typing cursor for live feel */
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 13px;
+  background: var(--gold);
+  vertical-align: middle;
+  margin-left: 2px;
+  animation: cursor-blink 0.8s step-end infinite;
+}
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Skipped note */
+.skipped-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 16px;
+  opacity: 0;
+}
+.skipped-icon {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+.skipped-text {
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.4;
+  font-style: italic;
+}
+.skipped-text span { color: var(--gold); font-style: normal; }
+
+/* ── ANIMATIONS ──────────────────────────────────────────────────────────── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── HOW IT WORKS ────────────────────────────────────────────────────────── */
+.section {
+  padding: 100px 80px;
+  position: relative;
+}
+.section-inner { max-width: 1100px; margin: 0 auto; }
+
+.section-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--gold);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-eyebrow::before {
+  content: '';
+  width: 20px; height: 1px;
+  background: var(--gold);
+}
+
+.section-title {
+  font-family: var(--serif);
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+}
+.section-title em { font-style: italic; color: var(--gold); }
+
+.section-sub {
+  font-size: 17px;
+  color: var(--text2);
+  font-weight: 300;
+  max-width: 520px;
+  line-height: 1.65;
+  margin-bottom: 60px;
+}
+
+/* Pipeline flow */
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  background: var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.pipeline-step {
+  background: var(--bg2);
+  padding: 28px 24px;
+  position: relative;
+  overflow: hidden;
+  transition: background 0.3s;
+}
+.pipeline-step:hover { background: var(--surface); }
+.pipeline-step::after {
+  content: '→';
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text3);
+  font-size: 14px;
+  z-index: 2;
+}
+.pipeline-step:last-child::after { display: none; }
+
+.step-number {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 0.1em;
+  margin-bottom: 12px;
+}
+.step-icon {
+  font-size: 22px;
+  margin-bottom: 10px;
+  display: block;
+}
+.step-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+.step-desc {
+  font-size: 12px;
+  color: var(--text3);
+  line-height: 1.5;
+}
+
+/* ── FEATURES GRID ───────────────────────────────────────────────────────── */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.feature-card {
+  background: var(--bg2);
+  padding: 36px 32px;
+  transition: background 0.25s;
+  position: relative;
+}
+.feature-card:hover { background: var(--surface); }
+.feature-card.featured {
+  background: var(--surface);
+  grid-column: span 2;
+}
+.feature-card.featured:hover { background: var(--surface2); }
+
+.feature-icon {
+  width: 40px; height: 40px;
+  background: var(--gold-dim);
+  border: 1px solid rgba(201,168,92,0.2);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+.feature-title {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 10px;
+  letter-spacing: -0.01em;
+}
+.feature-desc {
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.65;
+  font-weight: 300;
+}
+
+/* Featured card extra content */
+.feature-demo {
+  margin-top: 24px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+.demo-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.demo-row:last-child { border-bottom: none; }
+.demo-indicator {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+.ind-green { background: var(--green-light); }
+.ind-gold { background: var(--gold); }
+.ind-dim { background: var(--text3); }
+.demo-text {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.5;
+}
+.demo-text strong { color: var(--text); font-weight: 500; }
+.demo-text s { color: var(--text3); text-decoration: line-through; }
+
+/* ── TESTIMONIAL / SOCIAL PROOF ──────────────────────────────────────────── */
+.proof-section {
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.proof-ticker {
+  overflow: hidden;
+  padding: 28px 0;
+  position: relative;
+}
+.proof-ticker::before,
+.proof-ticker::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 100px;
+  z-index: 2;
+}
+.proof-ticker::before { left: 0; background: linear-gradient(to right, var(--bg2), transparent); }
+.proof-ticker::after { right: 0; background: linear-gradient(to left, var(--bg2), transparent); }
+
+.ticker-track {
+  display: flex;
+  gap: 48px;
+  animation: ticker 30s linear infinite;
+  width: max-content;
+}
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.ticker-quote {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+.quote-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gold);
+  flex-shrink: 0;
+  font-family: var(--serif);
+}
+.quote-text {
+  font-size: 14px;
+  color: var(--text2);
+  font-style: italic;
+  max-width: 300px;
+}
+.quote-text strong { color: var(--text); font-style: normal; }
+
+/* ── PRICING ─────────────────────────────────────────────────────────────── */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.pricing-card {
+  background: var(--bg2);
+  padding: 44px 40px;
+}
+.pricing-card.pro {
+  background: var(--surface);
+  position: relative;
+  overflow: hidden;
+}
+.pricing-card.pro::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+
+.pricing-tier {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+.pricing-card.pro .pricing-tier { color: var(--gold); }
+
+.pricing-price {
+  font-family: var(--serif);
+  font-size: 48px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin-bottom: 6px;
+}
+.pricing-price sup {
+  font-size: 22px;
+  vertical-align: top;
+  margin-top: 8px;
+  display: inline-block;
+}
+.pricing-period {
+  font-size: 13px;
+  color: var(--text3);
+  margin-bottom: 32px;
+}
+
+.pricing-features {
+  list-style: none;
+  margin-bottom: 36px;
+}
+.pricing-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text2);
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.4;
+}
+.pricing-features li:last-child { border-bottom: none; }
+.feat-check { color: var(--green-light); flex-shrink: 0; font-size: 13px; margin-top: 1px; }
+.feat-cross { color: var(--text3); flex-shrink: 0; font-size: 13px; margin-top: 1px; }
+.pricing-features li.active { color: var(--text); }
+
+/* ── CTA SECTION ─────────────────────────────────────────────────────────── */
+.cta-section {
+  text-align: center;
+  padding: 120px 80px;
+  position: relative;
+  overflow: hidden;
+}
+.cta-section::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px; height: 400px;
+  background: radial-gradient(ellipse, rgba(201,168,92,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.cta-title {
+  font-family: var(--serif);
+  font-size: clamp(36px, 5vw, 60px);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin-bottom: 20px;
+}
+.cta-title em { font-style: italic; color: var(--gold); }
+.cta-sub {
+  font-size: 18px;
+  color: var(--text2);
+  font-weight: 300;
+  margin-bottom: 40px;
+  max-width: 440px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.email-form {
+  display: flex;
+  gap: 0;
+  max-width: 420px;
+  margin: 0 auto 16px;
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.email-form:focus-within {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201,168,92,0.1);
+}
+.email-form input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 14px 18px;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--text);
+}
+.email-form input::placeholder { color: var(--text3); }
+.email-form button {
+  background: var(--gold);
+  color: var(--bg);
+  border: none;
+  padding: 14px 22px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.email-form button:hover { background: var(--gold2); }
+.form-note {
+  font-size: 12px;
+  color: var(--text3);
+}
+.form-note a { color: var(--text2); }
+
+/* ── FOOTER ──────────────────────────────────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 36px 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.footer-logo {
+  font-family: var(--serif);
+  font-size: 18px;
+  color: var(--text2);
+  letter-spacing: -0.02em;
+}
+.footer-links {
+  display: flex;
+  gap: 24px;
+  list-style: none;
+}
+.footer-links a {
+  font-size: 13px;
+  color: var(--text3);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.footer-links a:hover { color: var(--text2); }
+.footer-copy {
+  font-size: 12px;
+  color: var(--text3);
+  font-family: var(--mono);
+}
+
+/* ── SCROLL REVEAL ───────────────────────────────────────────────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── RESPONSIVE ──────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr; padding: 100px 32px 60px; gap: 48px; }
+  .hero-right { order: -1; }
+  .section { padding: 72px 32px; }
+  .pipeline { grid-template-columns: repeat(2, 1fr); }
+  .pipeline-step::after { display: none; }
+  .features-grid { grid-template-columns: 1fr; }
+  .feature-card.featured { grid-column: span 1; }
+  .pricing-grid { grid-template-columns: 1fr; max-width: 400px; }
+  nav { padding: 18px 24px; }
+  .nav-links { display: none; }
+  footer { flex-direction: column; gap: 20px; text-align: center; padding: 32px; }
+  .cta-section { padding: 80px 32px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="nav-logo">
+    <span class="nav-logo-dot"></span>
+    Briefly
+  </div>
+  <ul class="nav-links">
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#waitlist" class="nav-cta">Get early access</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-left">
+    <div class="hero-eyebrow">Personal AI briefing agent</div>
+    <h1 class="hero-headline">
+      The internet<br>you follow,<br><em>read for you.</em>
+    </h1>
+    <p class="hero-sub">
+      Briefly reads everything you follow — newsletters, feeds, YouTube, Reddit — and sends one sharp, cited, personalised briefing every morning. It learns what matters to you. Not to everyone.
+    </p>
+    <div class="hero-actions">
+      <a href="#waitlist" class="btn-primary">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M2 8h12M8 2l6 6-6 6"/>
+        </svg>
+        Get early access
+      </a>
+      <a href="#how" class="btn-ghost">See how it works</a>
+    </div>
+    <div class="hero-proof">
+      <div class="proof-stat">
+        <span class="proof-number" id="counter-time">5 min</span>
+        <span class="proof-label">morning read</span>
+      </div>
+      <div class="proof-divider"></div>
+      <div class="proof-stat">
+        <span class="proof-number">4+</span>
+        <span class="proof-label">source types</span>
+      </div>
+      <div class="proof-divider"></div>
+      <div class="proof-stat">
+        <span class="proof-number">0</span>
+        <span class="proof-label">tabs to open</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIVE DIGEST PREVIEW -->
+  <div class="hero-right">
+    <div class="digest-window">
+      <div class="window-bar">
+        <div class="window-dots">
+          <div class="window-dot"></div>
+          <div class="window-dot"></div>
+          <div class="window-dot"></div>
+        </div>
+        <span class="window-title">briefly.app — morning briefing</span>
+        <div class="window-status">
+          <div class="status-dot"></div>
+          <span>generating</span>
+        </div>
+      </div>
+      <div class="digest-body">
+        <div class="digest-header">
+          <span class="digest-date" id="live-date">THU 29 MAY 2026</span>
+          <span class="digest-count" id="item-counter">0 / 10 items</span>
+        </div>
+
+        <div class="digest-greeting" id="greeting">Good morning, Arjun<span class="typing-cursor"></span></div>
+        <div class="digest-sub" id="digest-sub">Read 47 items across 12 sources. Here's what matters to you.</div>
+
+        <div class="digest-section-label" id="section-label">AI &amp; Product</div>
+
+        <div class="digest-item" id="item1">
+          <div class="item-meta">
+            <span class="item-source">The Rundown AI</span>
+            <span class="item-tag tag-new">new</span>
+          </div>
+          <div class="item-headline">Anthropic's Claude 4 shows 40% improvement on agentic tasks — benchmarks suggest tool use is finally reliable</div>
+          <div class="item-why">As someone building an <strong>agent-based product</strong>, this directly affects how much you can trust multi-step tool calls without human review.</div>
+        </div>
+
+        <div class="digest-item" id="item2">
+          <div class="item-meta">
+            <span class="item-source">TechCrunch · Wired · The Information</span>
+            <span class="item-tag tag-trending">×3 sources</span>
+          </div>
+          <div class="item-headline">Perplexity raises $500M at $14B valuation — pivoting from search to autonomous browser agent</div>
+          <div class="item-why">You've been tracking the <strong>search-to-agent shift</strong> for 3 weeks. This is the biggest signal yet that the pivot is real and funded.</div>
+        </div>
+
+        <div class="digest-section-label" style="margin-top:4px">India Startup</div>
+
+        <div class="digest-item" id="item3">
+          <div class="item-meta">
+            <span class="item-source">YourStory</span>
+            <span class="item-tag tag-update">update</span>
+          </div>
+          <div class="item-headline">Zepto hits ₹5,000 Cr GMV — signals quick commerce profitability is achievable within 18 months</div>
+          <div class="item-why">Update to the quick commerce unit economics thread you've been following since <strong>March</strong>. The profitability timeline moved up by 6 months.</div>
+        </div>
+
+        <div class="skipped-note" id="skipped-note">
+          <span class="skipped-icon">↓</span>
+          <span class="skipped-text">Skipped <span>39 stories</span> — crypto price updates, remote work trend pieces, and 5 duplicate GPT-5 stories you saw yesterday.</span>
+        </div>
+
+        <div class="digest-fade"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section" id="how" style="border-top: 1px solid var(--border);">
+  <div class="section-inner">
+    <div class="section-eyebrow reveal">How it works</div>
+    <h2 class="section-title reveal">Eight agents.<br><em>One brilliant briefing.</em></h2>
+    <p class="section-sub reveal">Every morning at 5am, a pipeline of specialized agents reads, filters, deduplicates, and writes your personal digest. You just read it.</p>
+
+    <div class="pipeline reveal">
+      <div class="pipeline-step">
+        <div class="step-number">01</div>
+        <span class="step-icon">📥</span>
+        <div class="step-name">Collect</div>
+        <div class="step-desc">Ingests from all your sources — newsletters, RSS, YouTube, Reddit</div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-number">02</div>
+        <span class="step-icon">🧹</span>
+        <div class="step-name">Clean</div>
+        <div class="step-desc">Strips boilerplate, extracts signal, normalizes quality</div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-number">03</div>
+        <span class="step-icon">🔗</span>
+        <div class="step-name">Deduplicate</div>
+        <div class="step-desc">Groups the same story from 5 sources into one cited entry</div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-number">04</div>
+        <span class="step-icon">🎯</span>
+        <div class="step-name">Score</div>
+        <div class="step-desc">Relevance scored against your profile, history, and interests</div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-number">05</div>
+        <span class="step-icon">🧠</span>
+        <div class="step-name">Remember</div>
+        <div class="step-desc">Checks memory — is this new, or an update to a past story?</div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-number">06</div>
+        <span class="step-icon">✍️</span>
+        <div class="step-name">Write</div>
+        <div class="step-desc">Writes why each item matters specifically to you</div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-number">07</div>
+        <span class="step-icon">✅</span>
+        <div class="step-name">Verify</div>
+        <div class="step-desc">Every claim cited back to its exact source — no hallucinations</div>
+      </div>
+      <div class="pipeline-step">
+        <div class="step-number">08</div>
+        <span class="step-icon">📬</span>
+        <div class="step-name">Deliver</div>
+        <div class="step-desc">Sent at your chosen time. Web app and email, both beautiful</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section" id="features" style="background: var(--bg2); border-top: 1px solid var(--border);">
+  <div class="section-inner">
+    <div class="section-eyebrow reveal">What makes it different</div>
+    <h2 class="section-title reveal">Not a summarizer.<br><em>A second brain.</em></h2>
+    <p class="section-sub reveal">The difference between a tool you abandon in two weeks and one you can't start the day without.</p>
+
+    <div class="features-grid reveal">
+      <div class="feature-card featured">
+        <div class="feature-icon">🎯</div>
+        <div class="feature-title">Understands you, specifically</div>
+        <div class="feature-desc">Every item explains why it matters to <em>you</em> — your role, your goals, your history. Not why it's generally important. The same story looks different in your briefing than in anyone else's.</div>
+        <div class="feature-demo">
+          <div class="demo-row">
+            <div class="demo-indicator ind-dim"></div>
+            <div class="demo-text"><s>OpenAI launched a new model with improved reasoning.</s></div>
+          </div>
+          <div class="demo-row">
+            <div class="demo-indicator ind-green"></div>
+            <div class="demo-text"><strong>Briefly:</strong> "As someone building an agent pipeline, the 40% improvement in tool-use reliability changes how much you can trust multi-step chains without human oversight."</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔗</div>
+        <div class="feature-title">Memory across days</div>
+        <div class="feature-desc">Briefly remembers what it showed you. Every update references the original story. No more "wait, I read something about this last week..." moments.</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📚</div>
+        <div class="feature-title">All your sources, one place</div>
+        <div class="feature-desc">Newsletters forwarded by email. RSS feeds, YouTube channels, subreddits — all ingested, all synthesized. Connect once, read once.</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🚫</div>
+        <div class="feature-title">Confident filtering</div>
+        <div class="feature-desc">Briefly doesn't just summarize everything. It confidently decides what not to show — and tells you exactly what it skipped and why.</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">💬</div>
+        <div class="feature-title">Ask follow-up questions</div>
+        <div class="feature-desc">Reply to any item: "tell me more," "what are the counterarguments," "find everything I've read about this topic." Your knowledge base, searchable.</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📎</div>
+        <div class="feature-title">Citations, always</div>
+        <div class="feature-desc">Every claim links to its source. Every story cites every publication that covered it. You can always verify, always go deeper. No hallucinations.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SOCIAL PROOF TICKER -->
+<div class="proof-section">
+  <div class="proof-ticker">
+    <div class="ticker-track" id="ticker">
+      <div class="ticker-quote">
+        <div class="quote-avatar">R</div>
+        <div class="quote-text">"Finally replaced my <strong>2-hour morning scroll</strong> with something that actually knows what I care about."</div>
+      </div>
+      <div class="ticker-quote">
+        <div class="quote-avatar">S</div>
+        <div class="quote-text">"The 'why this matters to you' line is <strong>genuinely uncanny</strong>. It referenced a specific thing I was researching."</div>
+      </div>
+      <div class="ticker-quote">
+        <div class="quote-avatar">A</div>
+        <div class="quote-text">"I follow 14 newsletters. Briefly merges them into <strong>8 items that actually matter</strong>. This is magic."</div>
+      </div>
+      <div class="ticker-quote">
+        <div class="quote-avatar">P</div>
+        <div class="quote-text">"The memory feature is wild. It remembered I was tracking a story from <strong>three weeks ago</strong>."</div>
+      </div>
+      <div class="ticker-quote">
+        <div class="quote-avatar">K</div>
+        <div class="quote-text">"My Pocket queue was 400 articles. <strong>I deleted it all</strong>. Briefly is the thing Pocket was trying to be."</div>
+      </div>
+      <div class="ticker-quote">
+        <div class="quote-avatar">N</div>
+        <div class="quote-text">"The skipped-items note is the best feature. I know <strong>exactly what I'm not missing</strong>."</div>
+      </div>
+      <!-- Duplicate for seamless loop -->
+      <div class="ticker-quote">
+        <div class="quote-avatar">R</div>
+        <div class="quote-text">"Finally replaced my <strong>2-hour morning scroll</strong> with something that actually knows what I care about."</div>
+      </div>
+      <div class="ticker-quote">
+        <div class="quote-avatar">S</div>
+        <div class="quote-text">"The 'why this matters to you' line is <strong>genuinely uncanny</strong>. It referenced a specific thing I was researching."</div>
+      </div>
+      <div class="ticker-quote">
+        <div class="quote-avatar">A</div>
+        <div class="quote-text">"I follow 14 newsletters. Briefly merges them into <strong>8 items that actually matter</strong>. This is magic."</div>
+      </div>
+      <div class="ticker-quote">
+        <div class="quote-avatar">P</div>
+        <div class="quote-text">"The memory feature is wild. It remembered I was tracking a story from <strong>three weeks ago</strong>."</div>
+      </div>
+      <div class="ticker-quote">
+        <div class="quote-avatar">K</div>
+        <div class="quote-text">"My Pocket queue was 400 articles. <strong>I deleted it all</strong>. Briefly is the thing Pocket was trying to be."</div>
+      </div>
+      <div class="ticker-quote">
+        <div class="quote-avatar">N</div>
+        <div class="quote-text">"The skipped-items note is the best feature. I know <strong>exactly what I'm not missing</strong>."</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRICING -->
+<section class="section" id="pricing">
+  <div class="section-inner">
+    <div class="section-eyebrow reveal" style="justify-content:center">Pricing</div>
+    <h2 class="section-title reveal" style="text-align:center">Simple. No surprises.</h2>
+    <p class="section-sub reveal" style="text-align:center; margin-left:auto; margin-right:auto;">Less than a cup of coffee. Worth more than an hour of your morning.</p>
+
+    <div class="pricing-grid reveal">
+      <div class="pricing-card">
+        <div class="pricing-tier">Free</div>
+        <div class="pricing-price"><sup>$</sup>0</div>
+        <div class="pricing-period">forever</div>
+        <ul class="pricing-features">
+          <li class="active"><span class="feat-check">✓</span> 5 sources</li>
+          <li class="active"><span class="feat-check">✓</span> 5 items per digest</li>
+          <li class="active"><span class="feat-check">✓</span> Email + RSS ingestion</li>
+          <li class="active"><span class="feat-check">✓</span> 7-day digest history</li>
+          <li><span class="feat-cross">✗</span> Memory across days</li>
+          <li><span class="feat-cross">✗</span> Follow-up questions</li>
+          <li><span class="feat-cross">✗</span> YouTube + Reddit</li>
+          <li><span class="feat-cross">✗</span> Interest learning</li>
+        </ul>
+        <a href="#waitlist" class="btn-ghost" style="width:100%; justify-content:center; display:flex;">Get started free</a>
+      </div>
+
+      <div class="pricing-card pro">
+        <div class="pricing-tier">Pro</div>
+        <div class="pricing-price"><sup>$</sup>9</div>
+        <div class="pricing-period">per month · $90/year</div>
+        <ul class="pricing-features">
+          <li class="active"><span class="feat-check">✓</span> Unlimited sources</li>
+          <li class="active"><span class="feat-check">✓</span> Full digest, 10–14 items</li>
+          <li class="active"><span class="feat-check">✓</span> All source types</li>
+          <li class="active"><span class="feat-check">✓</span> Unlimited history + search</li>
+          <li class="active"><span class="feat-check">✓</span> Memory across days</li>
+          <li class="active"><span class="feat-check">✓</span> Follow-up questions</li>
+          <li class="active"><span class="feat-check">✓</span> Interest learning</li>
+          <li class="active"><span class="feat-check">✓</span> Custom delivery time</li>
+        </ul>
+        <a href="#waitlist" class="btn-primary" style="width:100%; justify-content:center; display:flex;">Start free trial</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="waitlist" style="border-top: 1px solid var(--border);">
+  <h2 class="cta-title reveal">Start your morning<br><em>differently.</em></h2>
+  <p class="cta-sub reveal">Join the waitlist. First briefing arrives the morning after you connect your sources.</p>
+  <div class="email-form reveal">
+    <input type="email" placeholder="you@example.com" id="email-input">
+    <button onclick="handleSignup()">Get early access</button>
+  </div>
+  <p class="form-note reveal">No credit card. Free forever plan available. <a href="#">Privacy policy.</a></p>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Briefly</div>
+  <ul class="footer-links">
+    <li><a href="#">About</a></li>
+    <li><a href="#">Blog</a></li>
+    <li><a href="#">Privacy</a></li>
+    <li><a href="#">Terms</a></li>
+    <li><a href="#">Twitter</a></li>
+  </ul>
+  <div class="footer-copy">© 2026 Briefly</div>
+</footer>
+
+<script>
+// ── Nav scroll behavior ────────────────────────────────────────────────────
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 40);
+});
+
+// ── Live date ─────────────────────────────────────────────────────────────
+const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const now = new Date();
+document.getElementById('live-date').textContent =
+  `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+
+// ── Animated digest reveal ─────────────────────────────────────────────────
+function animateDigest() {
+  const greeting = document.getElementById('greeting');
+  const sub = document.getElementById('digest-sub');
+  const sectionLabel = document.getElementById('section-label');
+  const items = ['item1','item2','item3'];
+  const skipped = document.getElementById('skipped-note');
+  const counter = document.getElementById('item-counter');
+
+  let count = 0;
+
+  // Greeting fades in
+  setTimeout(() => {
+    greeting.style.transition = 'opacity 0.6s ease';
+    greeting.style.opacity = '1';
+  }, 800);
+
+  // Sub fades in
+  setTimeout(() => {
+    sub.style.transition = 'opacity 0.6s ease';
+    sub.style.opacity = '1';
+  }, 1200);
+
+  // Section label
+  setTimeout(() => {
+    sectionLabel.style.transition = 'opacity 0.5s ease';
+    sectionLabel.style.opacity = '1';
+  }, 1600);
+
+  // Items appear one by one
+  items.forEach((id, i) => {
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('visible');
+      count++;
+      counter.textContent = `${count * 3} / 10 items`;
+    }, 2000 + (i * 700));
+  });
+
+  // Skipped note
+  setTimeout(() => {
+    skipped.style.transition = 'opacity 0.6s ease';
+    skipped.style.opacity = '1';
+    counter.textContent = '10 / 10 items';
+  }, 4200);
+
+  // Update status
+  setTimeout(() => {
+    const statusEl = document.querySelector('.window-status span');
+    const dotEl = document.querySelector('.status-dot');
+    if (statusEl) statusEl.textContent = 'ready';
+    if (dotEl) dotEl.style.background = '#4a8c6a';
+  }, 4600);
+}
+
+// Start digest animation after a short delay
+setTimeout(animateDigest, 600);
+
+// ── Scroll reveal ─────────────────────────────────────────────────────────
+const revealObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+// ── Signup handler ────────────────────────────────────────────────────────
+function handleSignup() {
+  const input = document.getElementById('email-input');
+  const email = input.value.trim();
+  if (!email || !email.includes('@')) {
+    input.style.borderColor = 'rgba(220,80,80,0.5)';
+    setTimeout(() => input.style.borderColor = '', 1000);
+    return;
+  }
+  const btn = document.querySelector('.email-form button');
+  btn.textContent = '✓ You\'re on the list';
+  btn.style.background = 'var(--green)';
+  btn.style.color = 'var(--text)';
+  input.disabled = true;
+  btn.disabled = true;
+}
+
+// ── Smooth hover effect on digest items ──────────────────────────────────
+document.querySelectorAll('.digest-item').forEach(item => {
+  item.addEventListener('mouseenter', () => {
+    item.style.paddingLeft = '8px';
+    item.style.borderLeft = '2px solid var(--gold-dim)';
+    item.style.transition = 'all 0.2s ease';
+  });
+  item.addEventListener('mouseleave', () => {
+    item.style.paddingLeft = '0';
+    item.style.borderLeft = 'none';
+  });
+});
+
+// ── Parallax glow on scroll ───────────────────────────────────────────────
+window.addEventListener('scroll', () => {
+  const scrolled = window.scrollY;
+  const hero = document.querySelector('.hero');
+  if (hero) {
+    hero.style.setProperty('--scroll', scrolled + 'px');
+  }
+});
+</script>
+</body>
+</html>
