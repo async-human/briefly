@@ -86,6 +86,15 @@ class SourceOut(BaseModel):
 
 
 class SourceCreate(BaseModel):
+    identifier: str
+    source_type: str | None = None
+    name: str | None = None
+
+
+class SourceDetectOut(BaseModel):
     source_type: str
     identifier: str
-    name: str | None = None
+    label: str
+    hint: str
+    confidence: str
+

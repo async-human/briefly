@@ -1,43 +1,53 @@
 "use client";
 
-import { useState } from "react";
-import { api, type Source } from "@/lib/api";
+import { useCallback, useEffect, useState } from "react";
+import { api, type Source, type SourceDetection } from "@/lib/api";
 
-const SOURCE_TYPES = [
-  {
-    value: "rss",
-    label: "RSS feed",
-    placeholder: "https://feeds.arstechnica.com/arstechnica/index",
-    hint: "Any blog or news RSS/Atom URL.",
-  },
-  {
-    value: "youtube",
-    label: "YouTube channel",
-    placeholder: "https://www.youtube.com/@mkbhd",
-    hint: "Channel URL, @handle, or channel ID (UC…).",
-  },
-  {
-    value: "reddit",
-    label: "Subreddit",
-    placeholder: "technology",
-    hint: "Subreddit name without r/ — e.g. MachineLearning",
-  },
-  {
-    value: "email",
-    label: "Email sender",
-    placeholder: "newsletter@example.com",
-    hint: "Or forward mail to your ingestion address below.",
-  },
+const TYPE_OVERRIDES = [
+  { value: "", label: "Auto-detect" },
+  { value: "rss", label: "RSS feed" },
+  { value: "youtube", label: "YouTube channel" },
+  { value: "reddit", label: "Subreddit" },
+  { value: "url", label: "Website" },
+  { value: "email", label: "Email sender" },
 ];
 
 export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }) {
-  const [sourceType, setSourceType] = useState("rss");
   const [identifier, setIdentifier] = useState("");
   const [name, setName] = useState("");
+  const [typeOverride, setTypeOverride] = useState("");
+  const [detection, setDetection] = useState<SourceDetection | null>(null);
+  const [detecting, setDetecting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const current = SOURCE_TYPES.find((t) => t.value === sourceType)!;
+  const runDetect = useCallback(async (value: string, override: string) => {
+    const trimmed = value.trim();
+    if (trimmed.length < 3) {
+      setDetection(null);
+      return;
+    }
+    setDetecting(true);
+    try {
+      const result = await api.detectSource({
+        identifier: trimmed,
+        source_type: override || undefined,
+      });
+      setDetection(result);
+      setError("");
+    } catch {
+      setDetection(null);
+    } finally {
+      setDetecting(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void runDetect(identifier, typeOverride);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [identifier, typeOverride, runDetect]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,12 +56,13 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
     setError("");
     try {
       const source = await api.addSource({
-        source_type: sourceType,
         identifier: identifier.trim(),
+        source_type: typeOverride || undefined,
         name: name.trim() || undefined,
       });
       setIdentifier("");
       setName("");
+      setDetection(null);
       onAdded(source);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to add source";
@@ -68,28 +79,40 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
   return (
     <form className="source-form" onSubmit={handleSubmit}>
       <label className="field-label">
-        Type
-        <select
-          value={sourceType}
-          onChange={(e) => setSourceType(e.target.value)}
-          className="field-input"
-        >
-          {SOURCE_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>{t.label}</option>
-          ))}
-        </select>
-      </label>
-      <label className="field-label">
-        URL or identifier
+        Paste anything
         <input
           type="text"
-          placeholder={current.placeholder}
+          placeholder="URL, @channel, subreddit, or email"
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
           className="field-input"
         />
       </label>
-      <p className="field-hint">{current.hint}</p>
+
+      {detecting && <p className="field-hint">Detecting source type…</p>}
+      {!detecting && detection && (
+        <div className="source-detect-pill">
+          <span className="source-detect-type">{detection.label}</span>
+          <span className="source-detect-hint">{detection.hint}</span>
+        </div>
+      )}
+
+      <details className="source-advanced">
+        <summary>Override type</summary>
+        <label className="field-label">
+          Source type
+          <select
+            value={typeOverride}
+            onChange={(e) => setTypeOverride(e.target.value)}
+            className="field-input"
+          >
+            {TYPE_OVERRIDES.map((t) => (
+              <option key={t.value || "auto"} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </label>
+      </details>
+
       <label className="field-label">
         <span>Display name <span className="field-optional">optional</span></span>
         <input
@@ -100,7 +123,7 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
           className="field-input"
         />
       </label>
-      <button type="submit" className="btn-primary source-submit" disabled={loading}>
+      <button type="submit" className="btn-primary source-submit" disabled={loading || !identifier.trim()}>
         {loading ? "Adding…" : "Add source"}
       </button>
       {error && <p className="form-error">{error}</p>}

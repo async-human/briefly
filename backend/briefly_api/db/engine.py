@@ -35,6 +35,28 @@ async def init_db() -> None:
         except Exception as exc:
             logger.warning("vector extension: %s (enable it in Supabase SQL Editor if missing)", exc)
         await conn.run_sync(Base.metadata.create_all)
+        # Migrate source_type from Postgres enum to varchar (existing deployments).
+        try:
+            await conn.execute(
+                text("""
+                    DO $$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_schema = 'public'
+                              AND table_name = 'sources'
+                              AND column_name = 'source_type'
+                              AND udt_name = 'sourcetype'
+                        ) THEN
+                            ALTER TABLE sources
+                                ALTER COLUMN source_type TYPE VARCHAR(50)
+                                USING source_type::text;
+                        END IF;
+                    END $$;
+                """)
+            )
+        except Exception as exc:
+            logger.warning("source_type migration: %s", exc)
     logger.info("Database initialized")
 
 

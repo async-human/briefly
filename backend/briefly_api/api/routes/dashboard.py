@@ -6,22 +6,46 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from briefly_api.api.schemas import DigestOut, DigestSummaryOut, MeOut, ProfileOut, SourceCreate, SourceOut, UserOut
+from briefly_api.api.schemas import (
+    DigestOut,
+    DigestSummaryOut,
+    MeOut,
+    ProfileOut,
+    SourceCreate,
+    SourceDetectOut,
+    SourceOut,
+    UserOut,
+)
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
-from briefly_api.db.models import Digest, Source, SourceType, User
+from briefly_api.db.models import Digest, Source, User
+from briefly_api.services.connectors.registry import detect_source, get_connector
+from briefly_api.services.connectors.types import ALL_SOURCE_TYPES
 
 router = APIRouter(tags=["dashboard"])
 
 
-def _normalize_identifier(source_type: SourceType, identifier: str) -> str:
-    value = identifier.strip()
-    if source_type == SourceType.rss:
-        return value.rstrip("/")
-    if source_type == SourceType.reddit:
-        return value.removeprefix("r/").removeprefix("/r/").strip().lower()
-    return value
+async def _resolve_source(body: SourceCreate, settings: Settings) -> tuple[str, str]:
+    identifier = body.identifier.strip()
+    if not identifier:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required.")
+
+    if body.source_type:
+        source_type = body.source_type.strip().lower()
+        if source_type not in ALL_SOURCE_TYPES:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid source type.")
+        connector = get_connector(source_type)
+        if not connector:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid source type.")
+        normalized = connector.normalize_identifier(identifier)
+        validation = await connector.validate(normalized, settings)
+        if not validation.valid:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=validation.message)
+        return source_type, normalized
+
+    detected = await detect_source(identifier, settings)
+    return detected.source_type, detected.identifier
 
 
 @router.get("/me", response_model=MeOut)
@@ -103,18 +127,50 @@ async def list_sources(
     return [SourceOut.model_validate(s) for s in sources]
 
 
+@router.post("/sources/detect", response_model=SourceDetectOut)
+async def detect_source_type(
+    body: SourceCreate,
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> SourceDetectOut:
+    try:
+        if body.source_type:
+            connector = get_connector(body.source_type.strip().lower())
+            if not connector:
+                raise ValueError("Invalid source type.")
+            normalized = connector.normalize_identifier(body.identifier)
+            return SourceDetectOut(
+                source_type=connector.source_type,
+                identifier=normalized,
+                label=connector.label,
+                hint=connector.detect_hint,
+                confidence="high",
+            )
+        detected = await detect_source(body.identifier, settings)
+        return SourceDetectOut(
+            source_type=detected.source_type,
+            identifier=detected.identifier,
+            label=detected.label,
+            hint=detected.hint,
+            confidence=detected.confidence,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
 @router.post("/sources", response_model=SourceOut, status_code=status.HTTP_201_CREATED)
 async def create_source(
     body: SourceCreate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> SourceOut:
     try:
-        source_type = SourceType(body.source_type)
+        source_type, identifier = await _resolve_source(body, settings)
+    except HTTPException:
+        raise
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid source type") from exc
-
-    identifier = _normalize_identifier(source_type, body.identifier)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     existing = await db.execute(
         select(Source).where(
@@ -146,6 +202,22 @@ async def create_source(
         ) from exc
     await db.refresh(source)
     return SourceOut.model_validate(source)
+
+
+@router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_source(
+    source_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    result = await db.execute(
+        select(Source).where(Source.id == source_id, Source.user_id == user.id)
+    )
+    source = result.scalar_one_or_none()
+    if not source:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source not found.")
+    await db.delete(source)
+    await db.commit()
 
 
 @router.post("/digests/generate", response_model=DigestOut)

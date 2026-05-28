@@ -1312,6 +1312,7 @@ footer {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1;
 }
 .source-name {
   font-size: 13px;
@@ -1328,6 +1329,53 @@ footer {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.source-delete-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.source-delete-btn:hover:not(:disabled) {
+  color: #c47070;
+  border-color: rgba(196, 112, 112, 0.4);
+}
+.source-delete-btn:disabled { opacity: 0.5; cursor: default; }
+.source-detect-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.source-detect-type {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+.source-detect-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.source-advanced {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.source-advanced summary {
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 8px;
+}
+.source-advanced[open] summary { margin-bottom: 10px; }
 
 .btn-spinner {
   width: 14px;

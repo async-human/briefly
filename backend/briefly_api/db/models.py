@@ -31,11 +31,13 @@ class Base(DeclarativeBase):
 
 # ── Enums ─────────────────────────────────────────────────────────────────────
 
-class SourceType(str, enum.Enum):
-    email    = "email"
-    rss      = "rss"
-    youtube  = "youtube"
-    reddit   = "reddit"
+class SourceType:
+    """String constants — not a DB enum. New connectors need no migration."""
+    email = "email"
+    rss = "rss"
+    youtube = "youtube"
+    reddit = "reddit"
+    url = "url"
 
 class SourceStatus(str, enum.Enum):
     active   = "active"
@@ -154,17 +156,18 @@ class Source(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    source_type: Mapped[SourceType] = mapped_column(Enum(SourceType), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[SourceStatus] = mapped_column(Enum(SourceStatus), default=SourceStatus.active)
 
     # Human-readable name (auto-detected or user-set)
     name: Mapped[str | None] = mapped_column(String(255))
 
     # Type-specific identifier:
-    # email: sender domain or "all" for catch-all
+    # email: sender address
     # rss: feed URL
-    # youtube: channel ID
+    # youtube: channel URL, @handle, or channel ID
     # reddit: subreddit name (without r/)
+    # url: any webpage URL
     identifier: Mapped[str] = mapped_column(String(1024), nullable=False)
 
     # Ingestion state

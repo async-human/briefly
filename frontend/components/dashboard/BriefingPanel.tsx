@@ -1,12 +1,14 @@
 "use client";
 
-import type { Digest, Source } from "@/lib/api";
+import { useState } from "react";
+import { api, type Digest, type Source } from "@/lib/api";
 import { AddSourceForm, CopyEmailButton } from "./AddSourceForm";
 
 type SourcesSidebarProps = {
   ingestionEmail: string;
   sources: Source[];
   onSourceAdded: (source: Source) => void;
+  onSourceRemoved: (sourceId: string) => void;
 };
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
@@ -14,13 +16,28 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   youtube: "YouTube",
   reddit: "Reddit",
   email: "Email",
+  url: "Web",
 };
 
 export function SourcesSidebar({
   ingestionEmail,
   sources,
   onSourceAdded,
+  onSourceRemoved,
 }: SourcesSidebarProps) {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleDelete(sourceId: string) {
+    setDeletingId(sourceId);
+    try {
+      await api.deleteSource(sourceId);
+      onSourceRemoved(sourceId);
+    } catch {
+      // keep in list on failure
+    } finally {
+      setDeletingId(null);
+    }
+  }
   return (
     <aside className="dash-sidebar">
       <div className="dash-card">
@@ -54,14 +71,23 @@ export function SourcesSidebar({
                     <span className="source-id">{source.identifier}</span>
                   )}
                 </div>
+                <button
+                  type="button"
+                  className="source-delete-btn"
+                  onClick={() => handleDelete(source.id)}
+                  disabled={deletingId === source.id}
+                  aria-label={`Remove ${source.name ?? source.identifier}`}
+                >
+                  {deletingId === source.id ? "…" : "×"}
+                </button>
               </li>
             ))}
           </ul>
         )}
         <p className="source-add-hint">
           {sources.length === 0
-            ? "Add your first source below."
-            : "Add another source — each URL or channel counts separately."}
+            ? "Paste any URL, channel, or subreddit below."
+            : "Add another source — paste anything, we'll detect the type."}
         </p>
         <AddSourceForm onAdded={onSourceAdded} />
       </div>
@@ -98,7 +124,7 @@ export function BriefingPanel({
         <ol className="briefing-steps">
           <li className={sourcesCount > 0 ? "done" : ""}>
             <span className="step-num">1</span>
-            <span>Add RSS, YouTube, or Reddit in the panel →</span>
+            <span>Add any source in the panel →</span>
           </li>
           <li>
             <span className="step-num">2</span>
@@ -124,7 +150,7 @@ export function BriefingPanel({
 
         {sourcesCount === 0 && (
           <p className="briefing-empty-hint">
-            Add at least one RSS feed, YouTube channel, or subreddit to continue.
+            Add at least one source (RSS, YouTube, Reddit, or website) to continue.
           </p>
         )}
         {generateError && <p className="form-error">{generateError}</p>}

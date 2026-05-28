@@ -28,4 +28,4 @@ email-validator==2.2.0
 aiosmtpd==1.4.6
 mail-parser==3.15.0
 chardet==5.2.0
-APScheduler==3.10.4
+trafilatura==2.0.0

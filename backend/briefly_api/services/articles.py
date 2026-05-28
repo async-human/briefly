@@ -1,13 +1,29 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 
 
 @dataclass
-class FetchedArticle:
+class NormalizedContent:
+    """Normalized output every source connector must produce."""
+
     title: str
-    summary: str
     url: str | None
     source_name: str
     source_type: str = "rss"
     section: str = "Your feeds"
+    author: str | None = None
+    published_at: datetime | None = None
+    clean_text: str = ""
+    summary: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.summary and self.clean_text:
+            self.summary = self.clean_text[:400]
+        elif self.clean_text == "" and self.summary:
+            self.clean_text = self.summary
+
+
+# Backward-compatible alias used by existing services
+FetchedArticle = NormalizedContent

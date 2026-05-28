@@ -5,7 +5,7 @@ import { api, type Digest, type MeResponse, type Source } from "@/lib/api";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { BriefingPanel, SourcesSidebar } from "@/components/dashboard/BriefingPanel";
 
-const FETCHABLE_SOURCE_TYPES = new Set(["rss", "youtube", "reddit"]);
+const FETCHABLE_SOURCE_TYPES = new Set(["rss", "youtube", "reddit", "url"]);
 
 export default function DashboardPage() {
   const [me, setMe] = useState<MeResponse | null>(null);
@@ -94,6 +94,7 @@ export default function DashboardPage() {
                 ingestionEmail={me.ingestion_email}
                 sources={sources}
                 onSourceAdded={(s) => setSources((prev) => [s, ...prev])}
+                onSourceRemoved={(id) => setSources((prev) => prev.filter((s) => s.id !== id))}
               />
             </div>
           </>

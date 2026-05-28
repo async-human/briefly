@@ -9,14 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from briefly_api.config import Settings
-from briefly_api.db.models import Digest, DigestItem, DigestStatus, Source, SourceType, User
+from briefly_api.db.models import Digest, DigestItem, DigestStatus, Source, User
 from briefly_api.llm.adapter import Message, get_llm_adapter
-from briefly_api.services.articles import FetchedArticle
+from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.collector import collect_from_sources
+from briefly_api.services.connectors.types import FETCHABLE_SOURCE_TYPES
 
 log = logging.getLogger(__name__)
-
-_SUPPORTED = {SourceType.rss, SourceType.youtube, SourceType.reddit}
 
 
 def _llm_available(settings: Settings) -> bool:
@@ -29,7 +28,7 @@ def _llm_available(settings: Settings) -> bool:
     return False
 
 
-def _fallback_items(articles: list[FetchedArticle]) -> list[dict]:
+def _fallback_items(articles: list[NormalizedContent]) -> list[dict]:
     return [
         {
             "headline": a.title,
@@ -47,7 +46,7 @@ def _fallback_items(articles: list[FetchedArticle]) -> list[dict]:
 
 
 async def _personalize_items(
-    articles: list[FetchedArticle],
+    articles: list[NormalizedContent],
     user: User,
     settings: Settings,
 ) -> list[dict]:
@@ -117,10 +116,10 @@ async def generate_briefing_now(
     )
     sources = list(result.scalars().all())
 
-    fetchable = [s for s in sources if s.source_type in _SUPPORTED]
+    fetchable = [s for s in sources if s.source_type in FETCHABLE_SOURCE_TYPES]
     if not fetchable:
         raise ValueError(
-            "Add at least one RSS feed, YouTube channel, or subreddit to generate a briefing."
+            "Add at least one source (RSS, YouTube, Reddit, or website URL) to generate a briefing."
         )
 
     articles, warnings = await collect_from_sources(sources, settings, max_items=max_items)

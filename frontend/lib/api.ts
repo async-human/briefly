@@ -95,6 +95,14 @@ export type DigestSummary = {
   created_at: string;
 };
 
+export type SourceDetection = {
+  source_type: string;
+  identifier: string;
+  label: string;
+  hint: string;
+  confidence: string;
+};
+
 export type Source = {
   id: string;
   source_type: string;
@@ -110,8 +118,15 @@ export const api = {
   getLatestDigest: () => request<Digest | null>("/api/v1/digests/latest"),
   getDigests: () => request<DigestSummary[]>("/api/v1/digests"),
   getSources: () => request<Source[]>("/api/v1/sources"),
-  addSource: (body: { source_type: string; identifier: string; name?: string }) =>
+  detectSource: (body: { identifier: string; source_type?: string }) =>
+    request<SourceDetection>("/api/v1/sources/detect", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  addSource: (body: { identifier: string; source_type?: string; name?: string }) =>
     request<Source>("/api/v1/sources", { method: "POST", body: JSON.stringify(body) }),
+  deleteSource: (id: string) =>
+    request<void>(`/api/v1/sources/${id}`, { method: "DELETE" }),
   generateDigest: () =>
     request<Digest>("/api/v1/digests/generate", { method: "POST" }),
 };

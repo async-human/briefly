@@ -3,15 +3,12 @@ from __future__ import annotations
 import logging
 
 from briefly_api.config import Settings
-from briefly_api.db.models import Source, SourceType
-from briefly_api.services.articles import FetchedArticle
-from briefly_api.services.reddit import fetch_reddit_posts
-from briefly_api.services.rss import fetch_rss_articles
-from briefly_api.services.youtube import fetch_youtube_articles
+from briefly_api.db.models import Source
+from briefly_api.services.articles import NormalizedContent
+from briefly_api.services.connectors.registry import get_connector
+from briefly_api.services.connectors.types import EMAIL, FETCHABLE_SOURCE_TYPES
 
 log = logging.getLogger(__name__)
-
-_FETCHABLE = {SourceType.rss, SourceType.youtube, SourceType.reddit}
 
 
 async def collect_from_sources(
@@ -19,34 +16,31 @@ async def collect_from_sources(
     settings: Settings,
     *,
     max_items: int = 8,
-) -> tuple[list[FetchedArticle], list[str]]:
-    """Fetch articles from all supported sources. Returns (articles, warnings)."""
-    active = [s for s in sources if s.source_type in _FETCHABLE]
+) -> tuple[list[NormalizedContent], list[str]]:
+    """Fetch content from all supported sources via connector registry."""
+    active = [s for s in sources if s.source_type in FETCHABLE_SOURCE_TYPES]
     if not active:
         return [], []
 
     per_source = max(2, max_items // len(active))
-    articles: list[FetchedArticle] = []
+    articles: list[NormalizedContent] = []
     warnings: list[str] = []
 
     for source in active:
+        connector = get_connector(source.source_type)
+        if not connector:
+            warnings.append(f"Unsupported source type: {source.source_type}")
+            continue
+
         display_name = source.name
         try:
-            if source.source_type == SourceType.rss:
-                fetched = await fetch_rss_articles(
-                    source.identifier, limit=per_source, source_name=display_name
-                )
-            elif source.source_type == SourceType.youtube:
-                fetched = await fetch_youtube_articles(
-                    source.identifier, limit=per_source, settings=settings, source_name=display_name
-                )
-            elif source.source_type == SourceType.reddit:
-                fetched = await fetch_reddit_posts(
-                    source.identifier, limit=per_source, settings=settings, source_name=display_name
-                )
-            else:
-                continue
-
+            fetched = await connector.fetch(
+                source.identifier,
+                settings,
+                limit=per_source,
+                source_name=display_name,
+                meta=source.meta or {},
+            )
             for item in fetched:
                 if display_name:
                     item.source_name = display_name
@@ -56,11 +50,10 @@ async def collect_from_sources(
             label = display_name or source.identifier
             warnings.append(f"Could not fetch {label}: {exc}")
 
-    email_sources = [s for s in sources if s.source_type == SourceType.email]
+    email_sources = [s for s in sources if s.source_type == EMAIL]
     if email_sources:
         warnings.append(
-            f"{len(email_sources)} email source(s) skipped — forward newsletters to your ingestion address; "
-            "they'll appear once email ingestion is processed."
+            f"{len(email_sources)} email source(s) skipped — forward newsletters to your ingestion address."
         )
 
     return articles[:max_items], warnings
