@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 
 import pytz
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from briefly_api.agents.pipeline import run_for_user
 from briefly_api.db.engine import SessionLocal
@@ -24,53 +25,47 @@ from briefly_api.db.models import Digest, UserProfile
 
 log = logging.getLogger(__name__)
 
-_POLL_INTERVAL_SECONDS = 60   # check every minute
+_POLL_INTERVAL_SECONDS = 60
 
 
 async def _get_due_users(now_utc: datetime) -> list[dict]:
     """
-    Return users whose digest_time matches the current HH:MM in their timezone
-    and who haven't already received a digest today.
+    Single DB round-trip: load all onboarded profiles + their today digest
+    in one query, then filter by timezone-local digest_time in Python.
     """
-    async with SessionLocal() as session:
-        result = await session.execute(
-            select(UserProfile).where(UserProfile.onboarding_completed == True)
-        )
-        profiles = result.scalars().all()
-
-    due = []
     today_utc = now_utc.strftime("%Y-%m-%d")
 
-    for profile in profiles:
+    async with SessionLocal() as session:
+        # LEFT JOIN digests for today so we can skip already-sent users
+        # without a second query per user.
+        result = await session.execute(
+            select(UserProfile, Digest)
+            .outerjoin(
+                Digest,
+                (Digest.user_id == UserProfile.user_id) & (Digest.digest_date == today_utc),
+            )
+            .where(UserProfile.onboarding_completed == True)
+        )
+        rows = result.all()
+
+    due = []
+    for profile, existing_digest in rows:
+        if existing_digest is not None:
+            log.debug("Scheduler: digest already exists today for user %s", profile.user_id)
+            continue
+
         tz_name = profile.digest_timezone or "UTC"
         digest_time = profile.digest_time or "07:00"
 
         try:
             tz = pytz.timezone(tz_name)
-            local_now = now_utc.astimezone(tz)
-            local_hhmm = local_now.strftime("%H:%M")
+            local_hhmm = now_utc.astimezone(tz).strftime("%H:%M")
         except Exception:
             log.warning("Scheduler: unknown timezone '%s' for user %s", tz_name, profile.user_id)
             continue
 
-        if local_hhmm != digest_time:
-            continue
-
-        # Check if a digest already exists for today
-        async with SessionLocal() as session:
-            result = await session.execute(
-                select(Digest).where(
-                    Digest.user_id == profile.user_id,
-                    Digest.digest_date == today_utc,
-                )
-            )
-            existing = result.scalar_one_or_none()
-
-        if existing:
-            log.debug("Scheduler: digest already sent today for user %s", profile.user_id)
-            continue
-
-        due.append({"user_id": profile.user_id, "digest_time": digest_time, "tz": tz_name})
+        if local_hhmm == digest_time:
+            due.append({"user_id": profile.user_id, "digest_time": digest_time, "tz": tz_name})
 
     return due
 
@@ -91,8 +86,8 @@ async def _run_pipeline_for_user(user_id: str) -> None:
 
 async def digest_scheduler_loop() -> None:
     """
-    Main scheduler loop — runs forever, called as a background task from
-    the FastAPI lifespan.
+    Main scheduler loop — runs forever, started as a background asyncio task
+    from the FastAPI lifespan in main.py.
     """
     log.info("Digest scheduler started (polling every %ds)", _POLL_INTERVAL_SECONDS)
 
@@ -102,8 +97,10 @@ async def digest_scheduler_loop() -> None:
             due_users = await _get_due_users(now_utc)
 
             if due_users:
-                log.info("Scheduler: %d user(s) due for digest at %s UTC", len(due_users), now_utc.strftime("%H:%M"))
-                # Run pipelines concurrently (each user is independent)
+                log.info(
+                    "Scheduler: %d user(s) due for digest at %s UTC",
+                    len(due_users), now_utc.strftime("%H:%M"),
+                )
                 await asyncio.gather(
                     *[_run_pipeline_for_user(u["user_id"]) for u in due_users],
                     return_exceptions=True,
