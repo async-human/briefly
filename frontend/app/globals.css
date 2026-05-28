@@ -1428,10 +1428,10 @@ footer {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 28px 48px;
+  padding: 24px 48px;
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(12px);
-  background: rgba(8,8,8,0.7);
+  background: rgba(8,8,8,0.85);
 }
 .onboard-logo {
   font-family: var(--serif);
@@ -1441,70 +1441,39 @@ footer {
   text-decoration: none;
   flex-shrink: 0;
 }
-.onboard-progress {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-.onboard-progress-item {
-  display: flex;
-  align-items: center;
-}
-.onboard-progress-step {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: none;
-  border: none;
-  padding: 6px 10px;
-  border-radius: 100px;
-  cursor: default;
-  color: var(--text-muted);
-  transition: color 0.2s, background 0.2s;
-}
-.onboard-progress-step:not(:disabled) { cursor: pointer; }
-.onboard-progress-step.active { color: var(--text-secondary); }
-.onboard-progress-step.current {
-  color: var(--text);
-  background: var(--accent-dim);
-}
-.onboard-progress-num {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid var(--border-strong);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.onboard-step-counter {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
-.onboard-progress-step.active .onboard-progress-num {
-  border-color: var(--accent-line);
-  color: var(--accent);
+.onboard-progress-bar {
+  display: flex;
+  gap: 6px;
+  max-width: 200px;
+  margin: 0 auto;
+  padding: 16px 24px 0;
 }
-.onboard-progress-step.current .onboard-progress-num {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--bg);
-}
-.onboard-progress-label {
-  font-size: 12px;
-  letter-spacing: 0.01em;
-}
-.onboard-progress-line {
-  width: 32px;
-  height: 1px;
+.onboard-progress-segment {
+  flex: 1;
+  height: 3px;
+  border: none;
+  border-radius: 100px;
   background: var(--border);
-  margin: 0 4px;
+  padding: 0;
+  cursor: default;
+  transition: background 0.25s ease;
 }
-.onboard-progress-line.done { background: var(--accent-line); }
+.onboard-progress-segment.done { background: var(--accent-line); }
+.onboard-progress-segment.current { background: var(--accent); }
+.onboard-progress-segment:not(:disabled) { cursor: pointer; }
 .onboard-main {
   position: relative;
   z-index: 1;
   max-width: 680px;
   margin: 0 auto;
-  padding: 56px 24px 96px;
+  padding: 40px 24px 96px;
 }
 .onboard-panel-wrap {
   animation: onboardFade 0.35s ease-out;
@@ -1841,14 +1810,8 @@ footer {
 }
 
 @media (max-width: 768px) {
-  .onboard-header {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 20px;
-  }
-  .onboard-progress-label { display: none; }
-  .onboard-progress-line { width: 20px; }
-  .onboard-main { padding: 36px 20px 72px; }
+  .onboard-header { padding: 20px 24px; }
+  .onboard-main { padding: 32px 20px 72px; }
   .onboard-secondary { grid-template-columns: 1fr; }
   .onboard-gmail-top { flex-direction: column; }
 }

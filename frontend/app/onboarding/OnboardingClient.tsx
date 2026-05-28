@@ -152,25 +152,22 @@ export default function OnboardingPage() {
 
       <header className="onboard-header">
         <Link href="/" className="onboard-logo">Briefly</Link>
-        <nav className="onboard-progress" aria-label="Onboarding progress">
-          {STEPS.map(({ n, label }, i) => (
-            <div key={n} className="onboard-progress-item">
-              <button
-                type="button"
-                className={`onboard-progress-step ${step >= n ? "active" : ""} ${step === n ? "current" : ""}`}
-                onClick={() => n < step && setStep(n)}
-                disabled={n > step}
-              >
-                <span className="onboard-progress-num">{n}</span>
-                <span className="onboard-progress-label">{label}</span>
-              </button>
-              {i < STEPS.length - 1 && (
-                <span className={`onboard-progress-line ${step > n ? "done" : ""}`} />
-              )}
-            </div>
-          ))}
-        </nav>
+        <span className="onboard-step-counter">{step} / {STEPS.length}</span>
       </header>
+
+      <div className="onboard-progress-bar" aria-label={`Step ${step} of ${STEPS.length}`}>
+        {STEPS.map(({ n, label }) => (
+          <button
+            key={n}
+            type="button"
+            className={`onboard-progress-segment ${step >= n ? "done" : ""} ${step === n ? "current" : ""}`}
+            onClick={() => n < step && setStep(n)}
+            disabled={n > step}
+            aria-label={label}
+            aria-current={step === n ? "step" : undefined}
+          />
+        ))}
+      </div>
 
       <main className="onboard-main">
         <div key={step} className="onboard-panel-wrap">
