@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -9,10 +10,17 @@ from briefly_api.api.router import api_router
 from briefly_api.config import get_settings
 from briefly_api.db.engine import init_db
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    await init_db()
+    try:
+        await init_db()
+    except Exception:
+        logger.exception("Database startup failed — check DATABASE_URL and Supabase SSL/password")
+        raise
     yield
 
 
