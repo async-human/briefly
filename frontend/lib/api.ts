@@ -23,7 +23,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(body.detail ?? res.statusText, res.status);
+    const detail = body.detail;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join(", ")
+          : res.statusText;
+    throw new ApiError(message || res.statusText, res.status);
   }
 
   if (res.status === 204) return undefined as T;

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -12,6 +13,15 @@ from briefly_api.db.engine import get_db
 from briefly_api.db.models import Digest, Source, SourceType, User
 
 router = APIRouter(tags=["dashboard"])
+
+
+def _normalize_identifier(source_type: SourceType, identifier: str) -> str:
+    value = identifier.strip()
+    if source_type == SourceType.rss:
+        return value.rstrip("/")
+    if source_type == SourceType.reddit:
+        return value.removeprefix("r/").removeprefix("/r/").strip().lower()
+    return value
 
 
 @router.get("/me", response_model=MeOut)
@@ -104,14 +114,36 @@ async def create_source(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid source type") from exc
 
+    identifier = _normalize_identifier(source_type, body.identifier)
+
+    existing = await db.execute(
+        select(Source).where(
+            Source.user_id == user.id,
+            Source.source_type == source_type,
+            Source.identifier == identifier,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This source is already connected.",
+        )
+
     source = Source(
         user_id=user.id,
         source_type=source_type,
-        identifier=body.identifier.strip(),
-        name=body.name,
+        identifier=identifier,
+        name=body.name.strip() if body.name else None,
     )
     db.add(source)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This source is already connected.",
+        ) from exc
     await db.refresh(source)
     return SourceOut.model_validate(source)
 
