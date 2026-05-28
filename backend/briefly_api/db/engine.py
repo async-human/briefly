@@ -72,3 +72,8 @@ async def init_db() -> None:
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with SessionLocal() as session:
         yield session
+
+
+def get_session_factory():
+    """Return the async session factory (used by the pipeline orchestrator)."""
+    return SessionLocal

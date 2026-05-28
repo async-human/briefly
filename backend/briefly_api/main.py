@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -9,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from briefly_api.api.router import api_router
 from briefly_api.config import get_settings
 from briefly_api.db.engine import init_db
+from briefly_api.workers.scheduler import digest_scheduler_loop
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,7 +23,18 @@ async def lifespan(_app: FastAPI):
     except Exception:
         logger.exception("Database startup failed — check DATABASE_URL and Supabase SSL/password")
         raise
+
+    scheduler_task = asyncio.create_task(digest_scheduler_loop())
+    logger.info("Digest scheduler started")
+
     yield
+
+    scheduler_task.cancel()
+    try:
+        await scheduler_task
+    except asyncio.CancelledError:
+        pass
+    logger.info("Digest scheduler stopped")
 
 
 def create_app() -> FastAPI:

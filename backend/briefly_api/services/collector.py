@@ -49,6 +49,7 @@ async def collect_from_sources(
             for item in fetched:
                 if display_name:
                     item.source_name = display_name
+                item.source_id = source.id
             articles.extend(fetched)
         except Exception as exc:
             log.exception("Failed to fetch source %s (%s)", source.identifier, source.source_type)

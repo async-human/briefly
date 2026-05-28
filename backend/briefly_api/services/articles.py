@@ -17,6 +17,7 @@ class NormalizedContent:
     published_at: datetime | None = None
     clean_text: str = ""
     summary: str = ""
+    source_id: str = ""  # DB Source.id — injected by collector after fetch
 
     def __post_init__(self) -> None:
         if not self.summary and self.clean_text:

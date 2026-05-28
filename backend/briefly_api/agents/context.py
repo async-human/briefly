@@ -14,7 +14,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from briefly_api.db.models import Source
 
 
 @dataclass
@@ -72,6 +75,7 @@ class UserContext:
     seen_content_hashes: set[str]    # all content hashes shown in last 30 days
     active_story_threads: list[dict] # ongoing stories being tracked
     topic_clusters: list[dict]       # inferred topic interests with weights
+    sources: list[Any] = field(default_factory=list)  # active Source ORM objects
 
 
 @dataclass
@@ -124,6 +128,9 @@ class PipelineContext:
     total_after_relevance: int = 0
     total_shown: int = 0
     pipeline_errors: list[dict] = field(default_factory=list)
+
+    # Shared DB session — set by pipeline orchestrator, used by agents that need DB
+    db_session: Any | None = field(default=None, repr=False)
 
     def log_error(self, agent: str, error: str, item_id: str | None = None) -> None:
         self.pipeline_errors.append({

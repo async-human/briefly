@@ -29,7 +29,7 @@ from briefly_api.agents import (
 from briefly_api.agents.context import PipelineContext, UserContext
 from briefly_api.config import get_settings
 from briefly_api.db.engine import get_session_factory
-from briefly_api.db.models import Digest, DigestItem, DigestStatus, UserMemory
+from briefly_api.db.models import Digest, DigestItem, DigestStatus
 from briefly_api.db.queries import (
     get_user_with_profile,
     get_active_sources,
@@ -66,6 +66,7 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
         recent_items   = await get_recent_digest_items(session, user_id, days=7)
         seen_hashes    = await get_seen_content_hashes(session, user_id, days=30)
         story_threads  = await get_active_story_threads(session, user_id)
+        sources        = await get_active_sources(session, user_id)
 
         user_ctx = UserContext(
             user_id=user_id,
@@ -76,9 +77,11 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
             seen_content_hashes=seen_hashes,
             active_story_threads=story_threads,
             topic_clusters=user_data.get("profile", {}).get("topic_clusters", []),
+            sources=sources,
         )
 
         ctx = PipelineContext(user=user_ctx, run_date=run_date)
+        ctx.db_session = session
 
         # ── Run agents in sequence ────────────────────────────────────────────
         # Each agent is wrapped in try/except — pipeline degrades gracefully
@@ -142,14 +145,14 @@ async def _run_agent(name: str, fn, ctx: PipelineContext) -> PipelineContext:
 
 async def _persist_digest(session, ctx: PipelineContext) -> str:
     """Save the generated digest to the database."""
-    from briefly_api.db.models import Digest, DigestItem, DigestStatus
     import uuid
 
     digest_id = str(uuid.uuid4())
+    resend_message_id = ctx.__dict__.get("resend_message_id")
     digest = Digest(
         id=digest_id,
         user_id=ctx.user.user_id,
-        status=DigestStatus.sent if ctx.html_body else DigestStatus.failed,
+        status=DigestStatus.sent if resend_message_id else (DigestStatus.ready if ctx.html_body else DigestStatus.failed),
         digest_date=ctx.run_date,
         subject_line=ctx.subject_line,
         preview_text=ctx.preview_text,
@@ -159,6 +162,7 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
         total_items_scored=ctx.total_after_relevance,
         total_items_shown=ctx.total_shown,
         pipeline_duration_ms=ctx.pipeline_duration_ms,
+        resend_message_id=resend_message_id,
     )
     session.add(digest)
 
