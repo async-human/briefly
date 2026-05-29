@@ -1,6 +1,7 @@
 import { Nav } from "@/components/landing/Nav";
 import { Hero } from "@/components/landing/Hero";
 import { ProofTicker } from "@/components/landing/ProofTicker";
+import { SourcesStrip } from "@/components/landing/SourcesStrip";
 import { WorkflowDemo } from "@/components/landing/WorkflowDemo";
 import { CompareSection } from "@/components/landing/CompareSection";
 import { Features } from "@/components/landing/Features";
@@ -15,6 +16,7 @@ export default function Home() {
       <Nav />
       <Hero />
       <ProofTicker />
+      <SourcesStrip />
       <WorkflowDemo />
       <CompareSection />
       <Features />

@@ -82,7 +82,7 @@ export function Hero() {
             Self-building second brain
           </motion.div>
 
-          <motion.h1 className="hero-v2-headline" {...fadeUp(0.2)}>
+          <motion.h1 className="hero-v2-headline hero-headline-xl" {...fadeUp(0.2)}>
             The second brain
             <br />
             <span className="hero-gradient-text">that builds itself</span>
@@ -97,16 +97,12 @@ export function Hero() {
           <motion.div className="hero-actions-row" {...fadeUp(0.48)}>
             <motion.a
               href="/login"
-              className="btn-hero-primary"
-              whileHover={{ scale: 1.03, boxShadow: "0 12px 40px rgba(201,184,150,0.25)" }}
-              whileTap={{ scale: 0.98 }}
+              className="btn-hero-primary btn-glow-border"
+              whileHover={{ scale: 1.03, boxShadow: "0 12px 40px rgba(201,184,150,0.3)" }}
+              whileTap={{ scale: 0.97 }}
             >
               Start building yours free
-              <motion.span
-                className="btn-arrow"
-                initial={{ x: 0 }}
-                whileHover={{ x: 4 }}
-              >→</motion.span>
+              <span className="btn-arrow">→</span>
             </motion.a>
             <a href="#how" className="btn-hero-ghost">
               See how it works
