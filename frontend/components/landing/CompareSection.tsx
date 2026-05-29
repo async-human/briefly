@@ -38,10 +38,10 @@ export function CompareSection() {
     <section className="compare-section" id="compare">
       <div className="compare-inner">
         <Reveal>
-          <div className="features-header">
-            <p className="section-label">The honest comparison</p>
-            <h2 className="section-title">You&apos;ve tried the others</h2>
-            <p className="section-desc">
+          <div className="section-header-centered">
+            <p className="section-eyebrow">The honest comparison</p>
+            <h2 className="section-heading">You&apos;ve tried the others</h2>
+            <p className="section-body">
               Every tool either requires your constant attention or shows you everything and lets you drown.
               Briefly is the first one that works without you.
             </p>

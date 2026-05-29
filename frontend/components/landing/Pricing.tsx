@@ -1,92 +1,134 @@
+"use client";
+
+import { motion } from "framer-motion";
 import { Reveal } from "./Reveal";
 
 const freeFeatures = [
-  "3 source connections",
-  "5 items per briefing",
-  "Gmail, YouTube, Reddit, RSS",
-  "7-day history",
-  "Email delivery",
+  { text: "3 source connections", included: true },
+  { text: "5 items per briefing", included: true },
+  { text: "Gmail, YouTube, Reddit, RSS", included: true },
+  { text: "7-day history", included: true },
+  { text: "Email delivery", included: true },
+  { text: "Manual capture", included: false },
+  { text: "Interest learning", included: false },
+  { text: "Ask Briefly (V3)", included: false },
 ];
 
 const proFeatures = [
-  "Unlimited source connections",
-  "Full briefing, 8–14 items",
-  "All source types incl. Readwise",
-  "Unlimited history",
-  "Interest learning — gets smarter daily",
-  "Manual capture: links, notes, docs (V2)",
-  "Ask Briefly — search your knowledge base (V3)",
+  { text: "Unlimited source connections", included: true },
+  { text: "Full briefing, 8–14 items", included: true },
+  { text: "All source types + Readwise", included: true },
+  { text: "Unlimited history", included: true },
+  { text: "Interest learning — gets smarter daily", included: true },
+  { text: "Manual capture: links, notes, docs", included: true, soon: true },
+  { text: "Ask Briefly — search your knowledge base", included: true, soon: true },
+  { text: "Priority support", included: true },
 ];
+
+function Check({ dim }: { dim?: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+      <circle cx="7" cy="7" r="6.5" stroke={dim ? "rgba(255,255,255,0.12)" : "rgba(201,184,150,0.4)"} />
+      {!dim && <path d="M4 7l2 2 4-4" stroke="#c9b896" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />}
+      {dim && <path d="M5 7h4" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" strokeLinecap="round" />}
+    </svg>
+  );
+}
 
 export function Pricing() {
   return (
-    <section className="pricing-section" id="pricing">
-      <div className="pricing-inner">
+    <section className="pricing-v2" id="pricing">
+      <div className="pricing-v2-inner">
         <Reveal>
-          <div className="pricing-header">
-            <p className="section-label">Pricing</p>
-            <h2 className="section-title">Start free. Upgrade when it&apos;s indispensable.</h2>
-            <p className="section-desc" style={{ margin: "0 auto" }}>
-              Free is enough to feel the value. Pro is what it becomes when you can&apos;t live without it.
+          <div className="section-header-centered">
+            <p className="section-eyebrow">Pricing</p>
+            <h2 className="section-heading">
+              Start free.<br />Upgrade when it&apos;s indispensable.
+            </h2>
+            <p className="section-body">
+              Free is enough to feel the value. Pro is what it becomes when you
+              can&apos;t live without it.
             </p>
           </div>
         </Reveal>
 
         <Reveal delay={0.1}>
-          <div className="pricing-cards">
-            <div className="pricing-card">
-              <p className="pricing-name">Free</p>
-              <p className="pricing-amount">$0</p>
-              <p className="pricing-period">forever</p>
-              <ul className="pricing-features">
+          <div className="pricing-v2-cards">
+            {/* Free card */}
+            <motion.div
+              className="pricing-v2-card"
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
+            >
+              <div className="pricing-card-header">
+                <p className="pricing-v2-name">Free</p>
+                <div className="pricing-v2-price-row">
+                  <span className="pricing-v2-amount">$0</span>
+                  <span className="pricing-v2-period">forever</span>
+                </div>
+                <p className="pricing-v2-tagline">
+                  Everything you need to feel the value
+                </p>
+              </div>
+              <ul className="pricing-v2-features">
                 {freeFeatures.map((f) => (
-                  <li key={f}>{f}</li>
+                  <li key={f.text} className={`pricing-v2-feature${f.included ? "" : " dim"}`}>
+                    <Check dim={!f.included} />
+                    <span>{f.text}</span>
+                  </li>
                 ))}
-                <li className="disabled">Manual capture</li>
-                <li className="disabled">Ask Briefly</li>
-                <li className="disabled">Interest learning</li>
               </ul>
-              <a href="/login" className="btn-ghost" style={{ display: "flex" }}>
+              <a href="/login" className="pricing-v2-btn pricing-v2-btn-ghost">
                 Get started free
               </a>
-            </div>
+            </motion.div>
 
-            <div className="pricing-card featured">
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
-                <p className="pricing-name" style={{ margin: 0 }}>Pro</p>
-                <span style={{
-                  fontSize: 10,
-                  fontFamily: "var(--mono)",
-                  color: "var(--accent)",
-                  border: "1px solid var(--accent-line)",
-                  padding: "3px 8px",
-                  borderRadius: 100,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                }}>
-                  Save 17%
-                </span>
+            {/* Pro card */}
+            <motion.div
+              className="pricing-v2-card pricing-v2-card-pro"
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
+            >
+              <div className="pricing-pro-glow" aria-hidden />
+              <div className="pricing-card-header">
+                <div className="pricing-pro-top">
+                  <p className="pricing-v2-name">Pro</p>
+                  <span className="pricing-pro-badge">Most popular</span>
+                </div>
+                <div className="pricing-v2-price-row">
+                  <span className="pricing-v2-amount">$9</span>
+                  <div className="pricing-v2-period-stack">
+                    <span className="pricing-v2-period">/ month</span>
+                    <span className="pricing-v2-annual">or $90/year · save 17%</span>
+                  </div>
+                </div>
+                <p className="pricing-v2-tagline">
+                  The full second brain experience
+                </p>
               </div>
-              <p className="pricing-amount">$9</p>
-              <p className="pricing-period">per month · or $90/year</p>
-              <ul className="pricing-features">
+              <ul className="pricing-v2-features">
                 {proFeatures.map((f) => (
-                  <li key={f}>{f}</li>
+                  <li key={f.text} className="pricing-v2-feature">
+                    <Check />
+                    <span>
+                      {f.text}
+                      {f.soon && (
+                        <span className="pricing-soon-badge">Soon</span>
+                      )}
+                    </span>
+                  </li>
                 ))}
               </ul>
-              <a href="/login" className="btn-primary" style={{ display: "flex" }}>
+              <a href="/login" className="pricing-v2-btn pricing-v2-btn-pro">
                 Start free trial
               </a>
-              <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 12, textAlign: "center" }}>
-                No credit card required
-              </p>
-            </div>
+              <p className="pricing-no-card">No credit card required</p>
+            </motion.div>
           </div>
         </Reveal>
 
         <Reveal delay={0.2}>
-          <p style={{ textAlign: "center", fontSize: 12, color: "var(--text-muted)", marginTop: 32 }}>
-            LLM costs ~$0.20/user/day at scale. Break-even at 400 paying users. Every dollar above that goes into making Briefly smarter.
+          <p className="pricing-footnote">
+            LLM pipeline costs ~$0.20/user/day. Break-even at 400 paying users.
+            Every dollar above that goes into making Briefly smarter.
           </p>
         </Reveal>
       </div>
