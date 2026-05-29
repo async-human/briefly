@@ -3,18 +3,23 @@ import { Reveal } from "./Reveal";
 const features = [
   {
     num: "01",
-    title: "Written for you",
-    desc: "Every item explains why it matters to your work and interests — not why it's generally important.",
+    title: "Builds itself while you sleep",
+    desc: "Connect Gmail, YouTube, Reddit, and any RSS feed once. Every night, Briefly fetches everything automatically. No saving, tagging, or organising — ever.",
   },
   {
     num: "02",
-    title: "Memory across days",
-    desc: "Updates reference stories from weeks ago. You never lose the thread.",
+    title: "Remembers what you read",
+    desc: "Today's story gets connected to what you read last week. \"Update to the thread you've been following since March.\" The reading finally compounds.",
   },
   {
     num: "03",
-    title: "Shows its work",
-    desc: "Sources cited on every claim. Skipped items listed at the bottom so you know what you missed.",
+    title: "Written specifically for you",
+    desc: "Every item explains why it matters to your role, goals, and history — not why it's generally important. Your briefing reads nothing like anyone else's.",
+  },
+  {
+    num: "04",
+    title: "Confident, not comprehensive",
+    desc: "Briefly reads 50 items and shows you 10. Then tells you exactly what it skipped and why. You know what you're missing. That's the point.",
   },
 ];
 
@@ -25,9 +30,10 @@ export function Features() {
         <Reveal>
           <div className="features-header">
             <p className="section-label">Why Briefly</p>
-            <h2 className="section-title">Not another summary tool</h2>
+            <h2 className="section-title">Not another tool to maintain</h2>
             <p className="section-desc">
-              Most tools compress content. Briefly selects, contextualizes, and writes for one reader — you.
+              Notion dies when you stop feeding it. Feedly is a firehose. Readwise needs you to highlight first.
+              Briefly needs nothing from you except the accounts you already have.
             </p>
           </div>
         </Reveal>

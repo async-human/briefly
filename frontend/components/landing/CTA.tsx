@@ -1,52 +1,44 @@
 "use client";
 
-import { useState } from "react";
 import { Reveal } from "./Reveal";
 
 export function CTA() {
-  const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState(false);
-
-  function handleSignup() {
-    const trimmed = email.trim();
-    if (!trimmed || !trimmed.includes("@")) {
-      setError(true);
-      setTimeout(() => setError(false), 1000);
-      return;
-    }
-    setSubmitted(true);
-  }
-
   return (
-    <section className="cta-section" id="waitlist">
+    <section className="cta-section" id="start">
       <div className="cta-inner">
         <Reveal>
-          <h2 className="cta-title">Start tomorrow morning</h2>
+          <h2 className="cta-title">Your second brain starts tonight</h2>
         </Reveal>
         <Reveal delay={0.1}>
           <p className="cta-sub">
-            Join the waitlist. Connect your sources tonight, read your first briefing tomorrow.
+            Connect your accounts in 3 minutes. Briefly runs tonight. Your first personalised briefing lands tomorrow morning at 7am.
           </p>
         </Reveal>
         <Reveal delay={0.15}>
-          <div className="email-form">
-            <input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={submitted}
-              style={error ? { color: "#c44" } : undefined}
-              onKeyDown={(e) => e.key === "Enter" && handleSignup()}
-            />
-            <button onClick={handleSignup} disabled={submitted}>
-              {submitted ? "You're on the list" : "Join waitlist"}
-            </button>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+            <a href="/login" className="btn-primary" style={{ fontSize: 15, padding: "14px 32px" }}>
+              Start building yours free
+            </a>
+            <p style={{ fontSize: 12, color: "var(--text-muted)" }}>
+              Free to start · No credit card · First briefing tomorrow
+            </p>
           </div>
         </Reveal>
-        <Reveal delay={0.2}>
-          <p className="form-note">No credit card required</p>
+        <Reveal delay={0.25}>
+          <div className="cta-loop">
+            {[
+              "Connect sources",
+              "Briefly reads overnight",
+              "Briefing in your inbox",
+              "Gets smarter every day",
+            ].map((step, i) => (
+              <div key={step} className="cta-loop-step">
+                <span className="cta-loop-num">{String(i + 1).padStart(2, "0")}</span>
+                <span className="cta-loop-label">{step}</span>
+                {i < 3 && <span className="cta-loop-arrow">→</span>}
+              </div>
+            ))}
+          </div>
         </Reveal>
       </div>
     </section>

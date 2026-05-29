@@ -19,10 +19,10 @@ export function Nav() {
       <a href="#" className="nav-logo">Briefly</a>
       <ul className="nav-links">
         <li><a href="#how">How it works</a></li>
-        <li><a href="#features">Features</a></li>
+        <li><a href="#compare">Why Briefly</a></li>
         <li><a href="#pricing">Pricing</a></li>
         <li><a href={loginUrl}>Sign in</a></li>
-        <li><a href={loginUrl} className="nav-cta">Get early access</a></li>
+        <li><a href={loginUrl} className="nav-cta">Get started free</a></li>
       </ul>
     </nav>
   );

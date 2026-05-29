@@ -15,28 +15,28 @@ const steps = [
     id: "gather",
     index: "01",
     title: "Gather",
-    desc: "Pulls from every source you follow overnight",
+    desc: "Gmail, YouTube, Reddit, RSS — all your sources, fetched automatically",
     duration: 5000,
   },
   {
     id: "filter",
     index: "02",
     title: "Filter",
-    desc: "Deduplicates and removes what you've already seen",
+    desc: "Same story from 5 sources becomes one item. Already-seen content removed from memory.",
     duration: 5000,
   },
   {
     id: "personalize",
     index: "03",
-    title: "Personalize",
-    desc: "Writes why each story matters to you specifically",
+    title: "Personalise",
+    desc: "Every item scored against your profile, interests, and what you read last week",
     duration: 5500,
   },
   {
     id: "deliver",
     index: "04",
     title: "Deliver",
-    desc: "Your briefing, ready when you wake up",
+    desc: "In your inbox at 7am. The second brain briefed you while you slept.",
     duration: 6000,
   },
 ] as const;
@@ -155,9 +155,9 @@ export function WorkflowDemo() {
         <Reveal>
           <div className="workflow-header">
             <p className="section-label">How it works</p>
-            <h2 className="section-title">From noise to your morning read</h2>
+            <h2 className="section-title">Runs every night. You do nothing.</h2>
             <p className="section-desc">
-              Every night, Briefly runs your sources through a pipeline built to find signal — not summarize everything.
+              Connect your accounts once. Every night, Briefly reads everything you follow, builds your knowledge base, and writes a briefing that knows your history. You wake up, read, done.
             </p>
           </div>
         </Reveal>

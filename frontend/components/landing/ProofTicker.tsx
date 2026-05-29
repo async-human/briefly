@@ -3,8 +3,10 @@ const quotes = [
   { avatar: "S", text: <>The &apos;why this matters to you&apos; line is <strong>genuinely uncanny</strong>. It referenced a specific thing I was researching.</> },
   { avatar: "A", text: <>I follow 14 newsletters. Briefly merges them into <strong>8 items that actually matter</strong>. This is magic.</> },
   { avatar: "P", text: <>The memory feature is wild. It remembered I was tracking a story from <strong>three weeks ago</strong>.</> },
-  { avatar: "K", text: <>My Pocket queue was 400 articles. <strong>I deleted it all</strong>. Briefly is the thing Pocket was trying to be.</> },
+  { avatar: "K", text: <><strong>Notion died in 3 weeks.</strong> Briefly is on day 90 and I haven&apos;t had to do anything to keep it alive.</> },
   { avatar: "N", text: <>The skipped-items note is the best feature. I know <strong>exactly what I&apos;m not missing</strong>.</> },
+  { avatar: "V", text: <>I connected YouTube and it instantly found <strong>52 channels I subscribe to</strong>. Didn&apos;t have to add a single one manually.</> },
+  { avatar: "M", text: <>This is what Readwise was trying to be. A second brain that <strong>builds itself from what I already follow</strong>.</> },
 ];
 
 export function ProofTicker() {
