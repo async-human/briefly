@@ -20,6 +20,7 @@ export function Nav() {
       <ul className="nav-links">
         <li><a href="#how">How it works</a></li>
         <li><a href="#compare">Why Briefly</a></li>
+        <li><a href="#roadmap">Roadmap</a></li>
         <li><a href="#pricing">Pricing</a></li>
         <li><a href={loginUrl}>Sign in</a></li>
         <li><a href={loginUrl} className="nav-cta">Get started free</a></li>
