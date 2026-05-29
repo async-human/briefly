@@ -2639,3 +2639,58 @@ footer {
   border-radius: 0;
   background: transparent;
 }
+
+/* ── PROOF TICKER ── */
+.proof-section {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 32px 0;
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+.proof-ticker {
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+}
+.ticker-track {
+  display: flex;
+  gap: 0;
+  width: max-content;
+  animation: ticker-scroll 40s linear infinite;
+}
+.proof-ticker:hover .ticker-track {
+  animation-play-state: paused;
+}
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.ticker-quote {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 32px;
+  white-space: nowrap;
+  border-right: 1px solid var(--border);
+}
+.quote-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--accent);
+  font-family: var(--serif);
+  flex-shrink: 0;
+}
+.quote-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { DigestPreview } from "./DigestPreview";
+import { ProductPreview } from "./ProductPreview";
 
 export function Hero() {
   return (
@@ -54,7 +54,7 @@ export function Hero() {
         </motion.p>
       </div>
 
-      <DigestPreview />
+      <ProductPreview />
     </section>
   );
 }
