@@ -1,8 +1,8 @@
 import { Nav } from "@/components/landing/Nav";
 import { Hero } from "@/components/landing/Hero";
+import { LiveDemo } from "@/components/landing/LiveDemo";
 import { ProofTicker } from "@/components/landing/ProofTicker";
 import { SourcesStrip } from "@/components/landing/SourcesStrip";
-import { WorkflowDemo } from "@/components/landing/WorkflowDemo";
 import { CompareSection } from "@/components/landing/CompareSection";
 import { Features } from "@/components/landing/Features";
 import { Roadmap } from "@/components/landing/Roadmap";
@@ -12,18 +12,18 @@ import { Footer } from "@/components/landing/Footer";
 
 export default function Home() {
   return (
-    <>
+    <div className="light-page">
       <Nav />
       <Hero />
+      <LiveDemo />
       <ProofTicker />
       <SourcesStrip />
-      <WorkflowDemo />
       <CompareSection />
       <Features />
       <Roadmap />
       <Pricing />
       <CTA />
       <Footer />
-    </>
+    </div>
   );
 }
