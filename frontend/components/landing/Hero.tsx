@@ -3,10 +3,12 @@
 import { motion } from "framer-motion";
 import { ProductPreview } from "./ProductPreview";
 
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] },
+  transition: { duration: 0.7, delay, ease: EASE },
 });
 
 export function Hero() {
@@ -73,7 +75,7 @@ export function Hero() {
           className="hero-right"
           initial={{ opacity: 0, x: 40, scale: 0.96 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}
-          transition={{ duration: 1, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 1, delay: 0.3, ease: EASE }}
         >
           <div className="hero-product-glow" aria-hidden />
           <ProductPreview />
