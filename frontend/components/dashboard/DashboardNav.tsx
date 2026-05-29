@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { clearToken } from "@/lib/auth";
 
 export function DashboardNav({
@@ -12,6 +12,7 @@ export function DashboardNav({
   avatarUrl?: string | null;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const initial = userName?.charAt(0).toUpperCase() ?? "?";
 
   function handleLogout() {
@@ -23,6 +24,20 @@ export function DashboardNav({
     <header className="dash-nav">
       <div className="dash-nav-inner">
         <Link href="/dashboard" className="dash-logo">Briefly</Link>
+        <nav style={{ display: "flex", alignItems: "center", gap: 24 }}>
+          <Link
+            href="/dashboard"
+            className={`dash-nav-link${pathname === "/dashboard" ? " active" : ""}`}
+          >
+            Today
+          </Link>
+          <Link
+            href="/history"
+            className={`dash-nav-link${pathname === "/history" ? " active" : ""}`}
+          >
+            History
+          </Link>
+        </nav>
         <div className="dash-nav-right">
           {userName && (
             <div className="dash-user-chip">

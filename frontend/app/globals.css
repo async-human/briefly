@@ -2448,4 +2448,99 @@ footer {
   .dash-sidebar { position: static; }
   .dash-user-name { display: none; }
   .briefing-empty { padding: 40px 24px; }
+  .history-grid { grid-template-columns: 1fr; }
+  .history-list { max-height: none; border-right: none; border-bottom: 1px solid var(--border); }
+}
+
+/* ── HISTORY ── */
+.dash-nav-link {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+  letter-spacing: 0.01em;
+}
+.dash-nav-link:hover { color: var(--text); }
+.dash-nav-link.active { color: var(--text-secondary); }
+
+.history-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  overflow: hidden;
+  align-items: start;
+  min-height: 500px;
+}
+
+.history-list {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  max-height: 720px;
+}
+
+.history-list-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 16px 20px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.history-list-item:last-child { border-bottom: none; }
+.history-list-item:hover { background: rgba(255,255,255,0.02); }
+.history-list-item.active {
+  background: rgba(201,184,150,0.05);
+  border-left: 2px solid var(--accent-line);
+}
+
+.history-list-date {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+.history-list-item.active .history-list-date { color: var(--accent); }
+
+.history-list-preview {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 8px;
+}
+.history-list-item.active .history-list-preview { color: var(--text); }
+
+.history-list-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.history-detail {
+  overflow: hidden;
+}
+
+.history-detail-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 64px 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.history-detail .briefing-panel {
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }

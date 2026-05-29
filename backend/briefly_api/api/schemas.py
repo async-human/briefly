@@ -167,3 +167,40 @@ class SourceDetectOut(BaseModel):
     hint: str
     confidence: str
 
+
+class GmailSenderOut(BaseModel):
+    email: str
+    name: str
+    count: int
+
+
+class GmailDiscoverOut(BaseModel):
+    senders: list[GmailSenderOut]
+
+
+class BulkSourceCreate(BaseModel):
+    sources: list[SourceCreate]
+
+
+class BulkSourceOut(BaseModel):
+    added: list[SourceOut]
+    skipped: int
+
+
+class FeedbackIn(BaseModel):
+    signal_type: str  # "liked" | "disliked" | "clicked" | "saved"
+    digest_item_id: str
+    digest_id: str | None = None
+
+
+class SourceSuggestionOut(BaseModel):
+    name: str
+    url: str
+    source_type: str
+    topic: str
+    description: str
+
+
+class ReadwiseConnectIn(BaseModel):
+    api_key: str
+

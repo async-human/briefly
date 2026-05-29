@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -183,4 +184,93 @@ async def generate_briefing_now(
         .options(selectinload(Digest.items))
         .where(Digest.id == digest.id)
     )
-    return result.scalar_one(), warnings
+    digest = result.scalar_one()
+
+    await _send_email(digest, user, items_data, settings)
+
+    return digest, warnings
+
+
+async def _send_email(
+    digest: Digest,
+    user: User,
+    items_data: list[dict],
+    settings: Settings,
+) -> None:
+    if not settings.resend_api_key:
+        return
+
+    from briefly_api.services.email_renderer import render_digest_html
+    import resend
+
+    web_url = f"{settings.frontend_url.rstrip('/')}/dashboard"
+    html = render_digest_html(
+        user_name=user.name,
+        digest_date=digest.digest_date,
+        items=items_data,
+        subject_line=digest.subject_line or f"Your briefing — {digest.digest_date}",
+        web_url=web_url,
+    )
+
+    resend.api_key = settings.resend_api_key
+    try:
+        params: resend.Emails.SendParams = {
+            "from": f"{settings.digest_from_name} <{settings.digest_from_email}>",
+            "to": [user.email],
+            "subject": digest.subject_line or f"Your Briefly — {digest.digest_date}",
+            "html": html,
+        }
+        response = await asyncio.to_thread(resend.Emails.send, params)
+        message_id = (
+            response.get("id") if isinstance(response, dict)
+            else getattr(response, "id", None)
+        )
+        log.info("Email sent to %s (message_id=%s)", user.email, message_id)
+    except Exception:
+        log.exception("Failed to send digest email to %s", user.email)
+
+
+async def run_briefing_for_scheduled_user(user_id: str) -> dict:
+    """
+    Entrypoint for the nightly scheduler: opens its own DB session,
+    checks for an existing digest today, generates + emails if missing.
+    """
+    from briefly_api.db.engine import get_session_factory
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    async with get_session_factory()() as session:
+        existing = await session.execute(
+            select(Digest).where(
+                Digest.user_id == user_id,
+                Digest.digest_date == today,
+            )
+        )
+        if existing.scalar_one_or_none():
+            log.info("Scheduler: digest already exists for user %s on %s — skipping", user_id, today)
+            return {"success": True, "skipped": True}
+
+        result = await session.execute(
+            select(User)
+            .options(selectinload(User.profile))
+            .where(User.id == user_id, User.is_active == True)
+        )
+        user = result.scalar_one_or_none()
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        from briefly_api.config import get_settings
+        try:
+            digest, warnings = await generate_briefing_now(user, session, get_settings())
+            return {
+                "success": True,
+                "digest_id": digest.id,
+                "total_shown": digest.total_items_shown,
+                "warnings": warnings,
+            }
+        except ValueError as exc:
+            log.warning("Scheduler: briefing failed for user %s: %s", user_id, exc)
+            return {"success": False, "error": str(exc)}
+        except Exception:
+            log.exception("Scheduler: unhandled error for user %s", user_id)
+            return {"success": False, "error": "Unhandled error"}

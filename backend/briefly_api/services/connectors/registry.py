@@ -6,6 +6,7 @@ from briefly_api.config import Settings
 from briefly_api.services.connectors.base import BaseConnector
 from briefly_api.services.connectors.email import EmailConnector
 from briefly_api.services.connectors.gmail import GmailConnector
+from briefly_api.services.connectors.readwise import ReadwiseConnector
 from briefly_api.services.connectors.reddit import RedditConnector
 from briefly_api.services.connectors.reddit_account import RedditAccountConnector
 from briefly_api.services.connectors.rss import RssConnector
@@ -18,6 +19,7 @@ from briefly_api.services.url_scraper import discover_rss_feed
 CONNECTORS: list[BaseConnector] = [
     EmailConnector(),
     GmailConnector(),
+    ReadwiseConnector(),
     YoutubeAccountConnector(),   # OAuth-connected account (before manual YouTube)
     YoutubeConnector(),
     RedditAccountConnector(),    # OAuth-connected account (before manual Reddit)

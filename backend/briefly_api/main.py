@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from briefly_api.api.router import api_router
 from briefly_api.config import get_settings
 from briefly_api.db.engine import init_db
+from briefly_api.ingestion.smtp_server import start_smtp_server
 from briefly_api.workers.scheduler import digest_scheduler_loop
 
 logging.basicConfig(level=logging.INFO)
@@ -27,6 +28,9 @@ async def lifespan(_app: FastAPI):
     scheduler_task = asyncio.create_task(digest_scheduler_loop())
     logger.info("Digest scheduler started")
 
+    settings = get_settings()
+    smtp_controller = start_smtp_server(settings)
+
     yield
 
     scheduler_task.cancel()
@@ -35,6 +39,10 @@ async def lifespan(_app: FastAPI):
     except asyncio.CancelledError:
         pass
     logger.info("Digest scheduler stopped")
+
+    if smtp_controller:
+        smtp_controller.stop()
+        logger.info("SMTP ingestion server stopped")
 
 
 def create_app() -> FastAPI:

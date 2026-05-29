@@ -127,6 +127,29 @@ export type SourceDetection = {
   confidence: string;
 };
 
+export type GmailSender = {
+  email: string;
+  name: string;
+  count: number;
+};
+
+export type GmailDiscoverResponse = {
+  senders: GmailSender[];
+};
+
+export type BulkAddResponse = {
+  added: Source[];
+  skipped: number;
+};
+
+export type SourceSuggestion = {
+  name: string;
+  url: string;
+  source_type: string;
+  topic: string;
+  description: string;
+};
+
 export type Source = {
   id: string;
   source_type: string;
@@ -141,6 +164,7 @@ export const api = {
   getMe: () => request<MeResponse>("/api/v1/me"),
   getLatestDigest: () => request<Digest | null>("/api/v1/digests/latest"),
   getDigests: () => request<DigestSummary[]>("/api/v1/digests"),
+  getDigest: (id: string) => request<Digest>(`/api/v1/digests/${id}`),
   getSources: () => request<Source[]>("/api/v1/sources"),
   detectSource: (body: { identifier: string; source_type?: string }) =>
     request<SourceDetection>("/api/v1/sources/detect", {
@@ -203,4 +227,29 @@ export const api = {
       "/api/v1/auth/reddit/status",
     ),
   disconnectReddit: () => request<void>("/api/v1/auth/reddit", { method: "DELETE" }),
+
+  // Gmail discovery
+  discoverGmailNewsletters: () =>
+    request<GmailDiscoverResponse>("/api/v1/sources/discover/gmail"),
+  bulkAddSources: (sources: { identifier: string; source_type?: string; name?: string }[]) =>
+    request<BulkAddResponse>("/api/v1/sources/bulk", {
+      method: "POST",
+      body: JSON.stringify({ sources }),
+    }),
+
+  // Source suggestions
+  getSourceSuggestions: () =>
+    request<SourceSuggestion[]>("/api/v1/sources/suggestions"),
+
+  // Item feedback
+  recordFeedback: (body: { signal_type: string; digest_item_id: string; digest_id?: string }) =>
+    request<void>("/api/v1/feedback", { method: "POST", body: JSON.stringify(body) }),
+
+  // Readwise
+  connectReadwise: (api_key: string) =>
+    request<Source>("/api/v1/auth/readwise/connect", {
+      method: "POST",
+      body: JSON.stringify({ api_key }),
+    }),
+  disconnectReadwise: () => request<void>("/api/v1/auth/readwise", { method: "DELETE" }),
 };

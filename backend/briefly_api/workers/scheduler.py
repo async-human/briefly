@@ -19,9 +19,9 @@ import pytz
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-from briefly_api.agents.pipeline import run_for_user
 from briefly_api.db.engine import SessionLocal
 from briefly_api.db.models import Digest, UserProfile
+from briefly_api.services.briefing import run_briefing_for_scheduled_user
 
 log = logging.getLogger(__name__)
 
@@ -72,14 +72,16 @@ async def _get_due_users(now_utc: datetime) -> list[dict]:
 
 async def _run_pipeline_for_user(user_id: str) -> None:
     try:
-        result = await run_for_user(user_id)
-        if result.get("success"):
+        result = await run_briefing_for_scheduled_user(user_id)
+        if result.get("skipped"):
+            log.debug("Scheduler: digest already exists for user %s — skipped", user_id)
+        elif result.get("success"):
             log.info(
-                "Scheduler: digest sent for user %s (%d items, %dms)",
-                user_id, result.get("total_shown", 0), result.get("duration_ms", 0),
+                "Scheduler: digest sent for user %s (%d items)",
+                user_id, result.get("total_shown", 0),
             )
         else:
-            log.warning("Scheduler: pipeline failed for user %s: %s", user_id, result.get("error"))
+            log.warning("Scheduler: briefing failed for user %s: %s", user_id, result.get("error"))
     except Exception:
         log.exception("Scheduler: unhandled error for user %s", user_id)
 

@@ -8,23 +8,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from briefly_api.api.schemas import (
+    BulkSourceCreate,
+    BulkSourceOut,
     DigestOut,
     DigestSummaryOut,
+    FeedbackIn,
     GenerateDigestOut,
+    GmailDiscoverOut,
+    GmailSenderOut,
     MeOut,
     ProfileOut,
+    ReadwiseConnectIn,
     SourceCreate,
     SourceDetectOut,
     SourceOut,
+    SourceSuggestionOut,
     UserOut,
 )
-from briefly_api.auth.gmail import get_gmail_connection
+from briefly_api.auth.gmail import get_gmail_connection, refresh_gmail_access_token
 from briefly_api.auth.youtube import get_youtube_connection
 from briefly_api.auth.reddit import get_reddit_connection
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
-from briefly_api.db.models import Digest, Source, User
+from briefly_api.db.models import (
+    BehavioralSignal, Digest, DigestItem, SignalType, Source, User,
+)
 from briefly_api.services.connectors.registry import detect_source, get_connector
 from briefly_api.services.connectors.types import ALL_SOURCE_TYPES
 
@@ -257,3 +266,277 @@ async def generate_digest_now(
             detail=f"Briefing generation failed: {exc}",
         ) from exc
     return GenerateDigestOut(digest=DigestOut.model_validate(digest), warnings=warnings)
+
+
+# ── Gmail newsletter discovery ────────────────────────────────────────────────
+
+@router.get("/sources/discover/gmail", response_model=GmailDiscoverOut)
+async def discover_gmail_newsletters(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> GmailDiscoverOut:
+    from briefly_api.services.gmail_discovery import discover_newsletter_senders
+
+    connection = await get_gmail_connection(db, user.id)
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Gmail is not connected.",
+        )
+
+    access_token = await refresh_gmail_access_token(connection, settings)
+    await db.commit()
+
+    existing = await db.execute(
+        select(Source).where(
+            Source.user_id == user.id,
+            Source.source_type == "email",
+        )
+    )
+    already_added = {s.identifier for s in existing.scalars().all()}
+
+    senders = await discover_newsletter_senders(access_token, already_added)
+    return GmailDiscoverOut(
+        senders=[GmailSenderOut(**s) for s in senders]
+    )
+
+
+# ── Bulk source add ───────────────────────────────────────────────────────────
+
+@router.post("/sources/bulk", response_model=BulkSourceOut, status_code=status.HTTP_201_CREATED)
+async def bulk_create_sources(
+    body: BulkSourceCreate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> BulkSourceOut:
+    added: list[Source] = []
+    skipped = 0
+
+    for item in body.sources:
+        try:
+            source_type, identifier = await _resolve_source(item, settings)
+        except HTTPException:
+            skipped += 1
+            continue
+
+        existing = await db.execute(
+            select(Source).where(
+                Source.user_id == user.id,
+                Source.source_type == source_type,
+                Source.identifier == identifier,
+            )
+        )
+        if existing.scalar_one_or_none():
+            skipped += 1
+            continue
+
+        source = Source(
+            user_id=user.id,
+            source_type=source_type,
+            identifier=identifier,
+            name=item.name.strip() if item.name else None,
+        )
+        db.add(source)
+        added.append(source)
+
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        skipped += len(added)
+        added = []
+
+    for source in added:
+        await db.refresh(source)
+
+    return BulkSourceOut(
+        added=[SourceOut.model_validate(s) for s in added],
+        skipped=skipped,
+    )
+
+
+# ── Item feedback ─────────────────────────────────────────────────────────────
+
+_SIGNAL_MAP: dict[str, SignalType] = {
+    "liked":    SignalType.saved,
+    "disliked": SignalType.disliked,
+    "clicked":  SignalType.clicked,
+    "saved":    SignalType.saved,
+}
+
+
+@router.post("/feedback", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def record_feedback(
+    body: FeedbackIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    signal_type = _SIGNAL_MAP.get(body.signal_type)
+    if not signal_type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown signal_type '{body.signal_type}'. Use: liked, disliked, clicked, saved.",
+        )
+
+    item_result = await db.execute(
+        select(DigestItem).where(
+            DigestItem.id == body.digest_item_id,
+        ).join(Digest, DigestItem.digest_id == Digest.id).where(
+            Digest.user_id == user.id
+        )
+    )
+    item = item_result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Digest item not found.")
+
+    # Update the item flags
+    if body.signal_type == "liked":
+        item.was_saved = True
+    elif body.signal_type == "disliked":
+        item.was_disliked = True
+    elif body.signal_type == "clicked":
+        item.was_clicked = True
+
+    # Store signal record
+    db.add(BehavioralSignal(
+        user_id=user.id,
+        signal_type=signal_type,
+        digest_id=body.digest_id,
+        digest_item_id=body.digest_item_id,
+        meta={"source_name": item.source_name, "source_url": item.source_url},
+    ))
+
+    # Update source weight in user profile for immediate effect on next briefing
+    if item.source_name and user.profile:
+        await _bump_source_weight(user, item.source_name, body.signal_type, db)
+
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+async def _bump_source_weight(
+    user: User,
+    source_name: str,
+    signal_type: str,
+    db: AsyncSession,
+) -> None:
+    weights: dict = dict(user.profile.source_weights if hasattr(user.profile, "source_weights") else {})
+    # Use source_name as key since we don't always have source_id on the item
+    key = source_name.lower()
+    current = weights.get(key, 0.5)
+    delta = 0.08 if signal_type == "liked" else -0.08 if signal_type == "disliked" else 0.02
+    weights[key] = round(min(1.0, max(0.1, current + delta)), 3)
+
+    # source_weights lives inside the profile JSONB interests field indirectly;
+    # store it in the profile meta via a dedicated approach
+    if user.profile:
+        # We store source weights as a top-level key in interests JSONB for now
+        # (the profile has no dedicated column but we can carry it in topic_clusters meta)
+        existing_clusters = list(user.profile.topic_clusters or [])
+        # Find and update or append a synthetic "source_weight" marker
+        sw_entry = next((c for c in existing_clusters if c.get("_type") == "source_weight"), None)
+        if sw_entry:
+            sw_entry["weights"] = weights
+        else:
+            existing_clusters.append({"_type": "source_weight", "weights": weights})
+        user.profile.topic_clusters = existing_clusters
+
+
+# ── Source suggestions ────────────────────────────────────────────────────────
+
+@router.get("/sources/suggestions", response_model=list[SourceSuggestionOut])
+async def get_source_suggestions(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[SourceSuggestionOut]:
+    from briefly_api.services.source_catalog import get_suggestions
+
+    existing = await db.execute(
+        select(Source).where(Source.user_id == user.id)
+    )
+    already_added = {s.identifier for s in existing.scalars().all()}
+
+    interests = []
+    if user.profile and user.profile.interests:
+        interests = [i.get("topic", "") for i in user.profile.interests]
+
+    suggestions = get_suggestions(interests, already_added, limit=8)
+    return [SourceSuggestionOut(**s) for s in suggestions]
+
+
+# ── Readwise integration ──────────────────────────────────────────────────────
+
+@router.post("/auth/readwise/connect", response_model=SourceOut, status_code=status.HTTP_201_CREATED)
+async def connect_readwise(
+    body: ReadwiseConnectIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> SourceOut:
+    import httpx as _httpx
+
+    # Validate the key works
+    try:
+        async with _httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                "https://readwise.io/api/v2/auth/",
+                headers={"Authorization": f"Token {body.api_key}"},
+            )
+        if resp.status_code != 204:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Readwise API key.",
+            )
+    except _httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not reach Readwise API.",
+        ) from exc
+
+    existing = await db.execute(
+        select(Source).where(
+            Source.user_id == user.id,
+            Source.source_type == "readwise",
+        )
+    )
+    source = existing.scalar_one_or_none()
+    if source:
+        source.meta = {**(source.meta or {}), "api_key": body.api_key}
+    else:
+        source = Source(
+            user_id=user.id,
+            source_type="readwise",
+            identifier="readwise",
+            name="Readwise",
+            meta={"api_key": body.api_key},
+        )
+        db.add(source)
+
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Readwise already connected.")
+
+    await db.refresh(source)
+    return SourceOut.model_validate(source)
+
+
+@router.delete("/auth/readwise", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def disconnect_readwise(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    result = await db.execute(
+        select(Source).where(
+            Source.user_id == user.id,
+            Source.source_type == "readwise",
+        )
+    )
+    source = result.scalar_one_or_none()
+    if source:
+        await db.delete(source)
+        await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

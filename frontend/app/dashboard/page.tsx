@@ -137,6 +137,7 @@ export default function DashboardPage() {
               <SourcesSidebar
                 ingestionEmail={me.ingestion_email}
                 sources={sources}
+                gmailConnected={me.gmail_connected}
                 onSourceAdded={handleSourceAdded}
                 onSourceRemoved={(id) => setSources((prev) => prev.filter((s) => s.id !== id))}
               />
