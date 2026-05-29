@@ -25,7 +25,7 @@ export function Pricing() {
         <Reveal>
           <div className="pricing-header">
             <p className="section-label">Pricing</p>
-            <h2 className="section-title">Start free. Upgrade when it's indispensable.</h2>
+            <h2 className="section-title">Start free. Upgrade when it&apos;s indispensable.</h2>
             <p className="section-desc" style={{ margin: "0 auto" }}>
               Free is enough to feel the value. Pro is what it becomes when you can&apos;t live without it.
             </p>
