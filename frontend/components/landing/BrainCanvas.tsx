@@ -49,6 +49,7 @@ export function BrainCanvas() {
     const pulseTimer: ReturnType<typeof setInterval> = setInterval(spawnPulse, 750);
 
     function resize() {
+      if (!wrap) return;
       W = wrap.offsetWidth;
       H = wrap.offsetHeight;
       canvas.width  = W;
