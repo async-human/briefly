@@ -46,6 +46,7 @@ class RssConnector(BaseConnector):
         limit: int = 8,
         source_name: str | None = None,
         meta: dict | None = None,
+        db: object | None = None,
     ) -> list[NormalizedContent]:
         return await fetch_rss_articles(
             self.normalize_identifier(identifier),

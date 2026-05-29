@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 
 import feedparser
 
 from briefly_api.services.articles import FetchedArticle
+
+log = logging.getLogger(__name__)
 
 
 def _strip_html(text: str) -> str:
@@ -14,6 +17,19 @@ def _strip_html(text: str) -> str:
 
 def _fetch_rss_sync(url: str, limit: int = 5, source_name: str | None = None) -> list[FetchedArticle]:
     feed = feedparser.parse(url)
+
+    # Detect HTTP-level failures — feedparser never raises, it just returns empty.
+    http_status = getattr(feed, "status", None)
+    if http_status and http_status >= 400:
+        log.warning("RSS feed returned HTTP %d for %s", http_status, url)
+        raise ValueError(f"Feed returned HTTP {http_status}: {url}")
+
+    # Detect malformed / unparseable feeds
+    if getattr(feed, "bozo", False) and not feed.entries:
+        exc = getattr(feed, "bozo_exception", None)
+        log.debug("RSS feed bozo error for %s: %s", url, exc)
+        # Don't raise — bozo feeds sometimes still have entries; only skip when empty.
+
     name = source_name or feed.feed.get("title") or url
     articles: list[FetchedArticle] = []
 

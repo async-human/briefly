@@ -1,8 +1,15 @@
 """
 briefly_api/services/connectors/youtube_account.py
 
-YouTubeAccountConnector — fetches videos from ALL channels the user
-subscribes to on YouTube, using their connected OAuth token.
+YouTubeAccountConnector — fetches content from ALL YouTube signals for the
+connected user account:
+
+  1. Subscriptions  — channels the user follows (broad coverage)
+  2. Liked videos   — explicit intent signal (highest quality)
+  3. User playlists — curated collections the user maintains
+
+Liked videos appear first in the merged pool so the relevance agent
+surfaces them preferentially over subscription content.
 """
 from __future__ import annotations
 
@@ -17,26 +24,28 @@ from briefly_api.services.connectors.types import YOUTUBE_ACCOUNT
 
 log = logging.getLogger(__name__)
 
-_SUBS_PRIVATE_HINT = (
-    "No YouTube subscriptions found. In YouTube → Settings → Privacy, turn OFF "
-    "'Keep all my subscriptions private', then reconnect YouTube."
-)
 _API_HINT = (
     "Enable YouTube Data API v3 in Google Cloud Console: "
     "console.cloud.google.com/apis/library/youtube.googleapis.com"
+)
+_EMPTY_HINT = (
+    "No YouTube content found. Possible causes: "
+    "(1) subscriptions are private — YouTube → Settings → Privacy → uncheck 'Keep all my subscriptions private'; "
+    "(2) you have no liked videos; "
+    "(3) YouTube Data API v3 is not enabled in Google Cloud Console."
 )
 
 
 class YoutubeAccountConnector(BaseConnector):
     source_type = YOUTUBE_ACCOUNT
-    label = "YouTube subscriptions"
-    detect_hint = "We'll fetch videos from all channels you subscribe to."
+    label = "YouTube (subscriptions + liked videos)"
+    detect_hint = "We'll fetch videos from your subscriptions, liked videos, and playlists."
 
     def normalize_identifier(self, identifier: str) -> str:
         return identifier.strip().lower()
 
     def can_handle(self, identifier: str) -> bool:
-        return False
+        return False  # Connected via OAuth, not pasted input
 
     async def fetch(
         self,
@@ -52,7 +61,7 @@ class YoutubeAccountConnector(BaseConnector):
             raise ValueError("YouTube account source requires an authenticated user connection.")
 
         from briefly_api.auth.youtube import get_youtube_connection, refresh_youtube_access_token
-        from briefly_api.services.youtube import fetch_subscription_videos
+        from briefly_api.services.youtube import fetch_youtube_content
 
         connection = await get_youtube_connection(db, meta["user_id"])
         if not connection:
@@ -62,14 +71,13 @@ class YoutubeAccountConnector(BaseConnector):
         await db.commit()
 
         max_total = min(limit, 40)
-        max_channels = min(30, max(10, max_total // 2))
+        max_channels = min(50, max(10, max_total // 2))
 
         try:
-            articles, channel_count = await fetch_subscription_videos(
+            articles, counts = await fetch_youtube_content(
                 access_token,
                 settings.reddit_user_agent,
                 max_channels=max_channels,
-                videos_per_channel=2,
                 max_total=max_total,
             )
         except Exception as exc:
@@ -78,19 +86,15 @@ class YoutubeAccountConnector(BaseConnector):
                 raise ValueError(_API_HINT) from exc
             raise
 
-        if channel_count == 0:
-            raise ValueError(_SUBS_PRIVATE_HINT)
-
         if not articles:
-            raise ValueError(
-                f"Found {channel_count} subscribed channels but no recent videos. "
-                "Try again later or add a specific channel URL instead."
-            )
+            raise ValueError(_EMPTY_HINT)
 
         log.info(
-            "YouTubeAccountConnector: %d videos from %d channels",
+            "YouTubeAccountConnector: %d items — %d channels, %d liked, %d playlist(s)",
             len(articles),
-            channel_count,
+            counts.get("subscriptions", 0),
+            counts.get("liked", 0),
+            counts.get("playlists", 0),
         )
         return [_to_normalized(a) for a in articles]
 
@@ -105,8 +109,8 @@ def _to_normalized(article) -> NormalizedContent:
         source_name=article.source_name,
         source_type="youtube",
         section="YouTube",
-        author=article.author,
-        published_at=article.published_at,
+        author=getattr(article, "author", None),
+        published_at=getattr(article, "published_at", None),
         clean_text=article.clean_text or article.summary,
         summary=article.summary,
     )

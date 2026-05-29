@@ -34,6 +34,7 @@ class UrlConnector(BaseConnector):
         limit: int = 8,
         source_name: str | None = None,
         meta: dict | None = None,
+        db: object | None = None,
     ) -> list[NormalizedContent]:
         articles = await scrape_url(self.normalize_identifier(identifier))
         if source_name:

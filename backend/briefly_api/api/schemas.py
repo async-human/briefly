@@ -23,6 +23,8 @@ class ProfileOut(BaseModel):
     digest_time: str = "07:00"
     digest_timezone: str = "Asia/Kolkata"
     interests: list[dict] = Field(default_factory=list)
+    never_show: list[str] = Field(default_factory=list)
+    recent_insight: str | None = None
     onboarding_completed: bool = False
 
     model_config = {"from_attributes": True}
@@ -33,6 +35,9 @@ class ProfileUpdate(BaseModel):
     goal: str | None = None
     digest_time: str | None = None
     digest_timezone: str | None = None
+    interests: list[str] | None = None       # topic strings → stored as {topic, weight, source}
+    never_show: list[str] | None = None      # hard-filter strings
+    recent_insight: str | None = None        # a piece of content that changed their thinking
 
 
 class OnboardingStatusOut(BaseModel):

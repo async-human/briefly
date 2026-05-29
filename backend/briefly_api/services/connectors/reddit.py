@@ -44,6 +44,7 @@ class RedditConnector(BaseConnector):
         limit: int = 8,
         source_name: str | None = None,
         meta: dict | None = None,
+        db: object | None = None,
     ) -> list[NormalizedContent]:
         return await fetch_reddit_posts(
             self.normalize_identifier(identifier),

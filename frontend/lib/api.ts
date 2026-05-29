@@ -52,7 +52,9 @@ export type Profile = {
   goal: string | null;
   digest_time: string;
   digest_timezone: string;
-  interests: Record<string, unknown>[];
+  interests: { topic: string; weight: number; source: string }[];
+  never_show: string[];
+  recent_insight: string | null;
 };
 
 export type MeResponse = {
@@ -157,6 +159,9 @@ export const api = {
     goal?: string;
     digest_time?: string;
     digest_timezone?: string;
+    interests?: string[];
+    never_show?: string[];
+    recent_insight?: string;
   }) =>
     request<OnboardingStatus>("/api/v1/onboarding/profile", {
       method: "PATCH",

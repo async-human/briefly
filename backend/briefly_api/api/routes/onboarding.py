@@ -109,6 +109,16 @@ async def update_onboarding_profile(
         profile.digest_time = body.digest_time
     if body.digest_timezone is not None:
         profile.digest_timezone = body.digest_timezone
+    if body.interests is not None:
+        profile.interests = [
+            {"topic": t.strip().lower(), "weight": 0.8, "source": "declared"}
+            for t in body.interests
+            if t.strip()
+        ]
+    if body.never_show is not None:
+        profile.never_show = [t.strip().lower() for t in body.never_show if t.strip()]
+    if body.recent_insight is not None:
+        profile.recent_insight = body.recent_insight.strip() or None
     await db.commit()
     return await _build_onboarding_status(user, db)
 

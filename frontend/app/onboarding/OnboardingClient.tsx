@@ -13,7 +13,96 @@ const STEPS = [
   { n: 1, label: "About you" },
   { n: 2, label: "Sources" },
   { n: 3, label: "Delivery" },
+  { n: 4, label: "Done" },
 ];
+
+const TOPIC_SUGGESTIONS: Record<string, string[]> = {
+  Founder:           ["product-market fit", "startup funding", "hiring", "growth metrics", "AI tools"],
+  "Product manager": ["product strategy", "user research", "roadmapping", "AI/ML", "growth"],
+  Engineer:          ["system design", "AI/ML", "developer tools", "open source", "security"],
+  Investor:          ["deal flow", "market trends", "valuations", "exits", "emerging tech"],
+  Researcher:        ["academic papers", "methodology", "data science", "policy", "emerging tech"],
+  Other:             ["technology", "business", "science", "design", "policy"],
+};
+const DEFAULT_TOPICS = ["AI agents", "startups", "technology", "design", "science"];
+const NEVER_SHOW_SUGGESTIONS = ["crypto prices", "celebrity news", "sports", "stock tips", "politics"];
+
+function TagInput({
+  label,
+  hint,
+  placeholder,
+  tags,
+  onChange,
+  suggestions = [],
+  variant = "default",
+}: {
+  label: string;
+  hint?: string;
+  placeholder: string;
+  tags: string[];
+  onChange: (tags: string[]) => void;
+  suggestions?: string[];
+  variant?: "default" | "danger";
+}) {
+  const [inputValue, setInputValue] = useState("");
+
+  function add(raw: string) {
+    const tag = raw.trim().toLowerCase().replace(/,+$/, "");
+    if (tag && !tags.includes(tag) && tags.length < 12) {
+      onChange([...tags, tag]);
+    }
+    setInputValue("");
+  }
+
+  function remove(tag: string) {
+    onChange(tags.filter((t) => t !== tag));
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      if (inputValue) add(inputValue);
+    }
+    if (e.key === "Backspace" && !inputValue && tags.length > 0) {
+      remove(tags[tags.length - 1]);
+    }
+  }
+
+  const unusedSuggestions = suggestions.filter((s) => !tags.includes(s)).slice(0, 5);
+
+  return (
+    <div className="onboard-field">
+      <span className="onboard-field-label">{label}</span>
+      {hint && <p className="onboard-field-hint">{hint}</p>}
+      <div className={`tag-input-wrap ${variant === "danger" ? "tag-input-wrap--danger" : ""}`}>
+        {tags.map((tag) => (
+          <span key={tag} className={`tag-chip ${variant === "danger" ? "tag-chip--danger" : ""}`}>
+            {tag}
+            <button type="button" onClick={() => remove(tag)} aria-label={`Remove ${tag}`}>×</button>
+          </span>
+        ))}
+        <input
+          type="text"
+          className="tag-input"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={() => { if (inputValue) add(inputValue); }}
+          placeholder={tags.length === 0 ? placeholder : ""}
+        />
+      </div>
+      {unusedSuggestions.length > 0 && (
+        <div className="tag-suggestions">
+          {unusedSuggestions.map((s) => (
+            <button key={s} type="button" className="tag-suggestion" onClick={() => add(s)}>
+              + {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function GmailIcon() {
   return (
@@ -60,6 +149,9 @@ export default function OnboardingPage() {
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [role, setRole] = useState("");
   const [goal, setGoal] = useState("");
+  const [topics, setTopics] = useState<string[]>([]);
+  const [neverShow, setNeverShow] = useState<string[]>([]);
+  const [recentInsight, setRecentInsight] = useState("");
   const [digestTime, setDigestTime] = useState("07:00");
   const [loading, setLoading] = useState(true);
   const [gmailLoading, setGmailLoading] = useState(false);
@@ -76,6 +168,17 @@ export default function OnboardingPage() {
       .then(([s, meData]) => {
         setStatus(s);
         setMe(meData);
+        // Pre-populate profile fields for returning users
+        if (meData.profile) {
+          if (meData.profile.role) setRole(meData.profile.role);
+          if (meData.profile.goal) setGoal(meData.profile.goal);
+          if (meData.profile.interests?.length) {
+            setTopics(meData.profile.interests.map((i) => i.topic).filter(Boolean));
+          }
+          if (meData.profile.never_show?.length) setNeverShow(meData.profile.never_show);
+          if (meData.profile.recent_insight) setRecentInsight(meData.profile.recent_insight);
+          if (meData.profile.digest_time) setDigestTime(meData.profile.digest_time);
+        }
         if (s.onboarding_completed || s.profile_started) setStep(2);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load onboarding"))
@@ -200,6 +303,9 @@ export default function OnboardingPage() {
       const updated = await api.updateOnboardingProfile({
         role: role || undefined,
         goal: goal || undefined,
+        interests: topics.length ? topics : undefined,
+        never_show: neverShow.length ? neverShow : undefined,
+        recent_insight: recentInsight.trim() || undefined,
       });
       setStatus(updated);
       setStep(2);
@@ -228,7 +334,10 @@ export default function OnboardingPage() {
         digest_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       await api.completeOnboarding();
-      router.replace("/dashboard");
+      // Refresh status so confirmation screen has the latest source counts
+      const updated = await api.getOnboardingStatus();
+      setStatus(updated);
+      setStep(4);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to finish onboarding");
       setFinishing(false);
@@ -312,14 +421,16 @@ export default function OnboardingPage() {
           {step === 1 && (
             <section className="onboard-panel">
               <header className="onboard-panel-head">
-                <p className="onboard-eyebrow">Step 1 of 3</p>
+                <p className="onboard-eyebrow">Step 1 of 4</p>
                 <h1 className="onboard-title">Tell us about yourself</h1>
                 <p className="onboard-desc">
-                  Briefly uses this to decide what&apos;s worth your attention each morning.
+                  Five quick questions. This is what makes your first digest feel personal.
                 </p>
               </header>
 
               <div className="onboard-fields">
+
+                {/* Q1 — Role */}
                 <div className="onboard-field">
                   <span className="onboard-field-label">What best describes you?</span>
                   <div className="onboard-role-grid">
@@ -336,16 +447,55 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
+                {/* Q2 — Goal */}
                 <label className="onboard-field">
-                  <span className="onboard-field-label">What are you trying to stay on top of?</span>
+                  <span className="onboard-field-label">What are you trying to get better at or stay informed about?</span>
                   <textarea
                     className="onboard-input onboard-textarea"
-                    placeholder="e.g. AI agents, startup funding, product design"
+                    placeholder="e.g. Building an AI product and staying ahead of what's happening in the space"
                     value={goal}
                     onChange={(e) => setGoal(e.target.value)}
-                    rows={3}
+                    rows={2}
                   />
                 </label>
+
+                {/* Q3 — Topics */}
+                <TagInput
+                  label="What topics should always be on your radar?"
+                  hint="Press Enter after each topic. These become your relevance filter."
+                  placeholder="e.g. AI agents, startup funding, product design"
+                  tags={topics}
+                  onChange={setTopics}
+                  suggestions={TOPIC_SUGGESTIONS[role] ?? DEFAULT_TOPICS}
+                />
+
+                {/* Q4 — Never show */}
+                <TagInput
+                  label="What do you never want to see?"
+                  hint="Briefly will hard-filter these from every digest."
+                  placeholder="e.g. crypto prices, celebrity news, sports"
+                  tags={neverShow}
+                  onChange={setNeverShow}
+                  suggestions={NEVER_SHOW_SUGGESTIONS}
+                  variant="danger"
+                />
+
+                {/* Q5 — Recent insight (optional) */}
+                <label className="onboard-field">
+                  <span className="onboard-field-label">
+                    Share something you read recently that changed how you think.
+                    <span className="onboard-field-optional"> Optional</span>
+                  </span>
+                  <p className="onboard-field-hint">Helps Briefly understand the kind of thinking you find valuable.</p>
+                  <textarea
+                    className="onboard-input onboard-textarea"
+                    placeholder='e.g. "The Andreessen essay on software eating the world made me see infrastructure companies differently"'
+                    value={recentInsight}
+                    onChange={(e) => setRecentInsight(e.target.value)}
+                    rows={2}
+                  />
+                </label>
+
               </div>
 
               <div className="onboard-actions">
@@ -362,7 +512,7 @@ export default function OnboardingPage() {
           {step === 2 && (
             <section className="onboard-panel onboard-panel-wide">
               <header className="onboard-panel-head">
-                <p className="onboard-eyebrow">Step 2 of 3</p>
+                <p className="onboard-eyebrow">Step 2 of 4</p>
                 <h1 className="onboard-title">Connect your accounts</h1>
                 <p className="onboard-desc">
                   Connect once — Briefly reads everything you already follow so you don&apos;t have to rebuild your reading list.
@@ -530,17 +680,16 @@ export default function OnboardingPage() {
           {step === 3 && (
             <section className="onboard-panel">
               <header className="onboard-panel-head">
-                <p className="onboard-eyebrow">Step 3 of 3</p>
+                <p className="onboard-eyebrow">Step 3 of 4</p>
                 <h1 className="onboard-title">When should we deliver?</h1>
                 <p className="onboard-desc">
-                  Your first briefing is ready to generate from the dashboard.
-                  Automatic morning delivery comes with the nightly pipeline.
+                  Briefly runs every morning. Pick the time that fits your routine.
                 </p>
               </header>
 
               <div className="onboard-time-card">
                 <label className="onboard-field">
-                  <span className="onboard-field-label">Local delivery time</span>
+                  <span className="onboard-field-label">Delivery time</span>
                   <input
                     type="time"
                     className="onboard-input onboard-time-input"
@@ -549,7 +698,7 @@ export default function OnboardingPage() {
                   />
                 </label>
                 <p className="onboard-time-note">
-                  Timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                  Timezone detected: {Intl.DateTimeFormat().resolvedOptions().timeZone}
                 </p>
               </div>
 
@@ -560,11 +709,57 @@ export default function OnboardingPage() {
                   onClick={handleFinish}
                   disabled={finishing}
                 >
-                  {finishing ? "Finishing…" : "Go to dashboard"}
+                  {finishing ? <><span className="btn-spinner btn-spinner-light" /> Setting up…</> : "Set up my briefing"}
                 </button>
               </div>
             </section>
           )}
+
+          {step === 4 && (() => {
+            const newsletterCount = status?.newsletter_count ?? 0;
+            const ytCount = status?.youtube_channel_count ?? 0;
+            const redditCount = status?.reddit_subreddit_count ?? 0;
+            const rssCount = Math.max(0, (status?.sources_count ?? 0) - (newsletterCount > 0 ? 1 : 0) - (ytCount > 0 ? 1 : 0) - (redditCount > 0 ? 1 : 0));
+            const stats = [
+              newsletterCount > 0 && { n: newsletterCount, label: "newsletters" },
+              ytCount > 0 && { n: ytCount, label: "YouTube channels" },
+              redditCount > 0 && { n: redditCount, label: "subreddits" },
+              rssCount > 0 && { n: rssCount, label: "RSS feeds" },
+            ].filter(Boolean) as { n: number; label: string }[];
+
+            return (
+              <section className="onboard-panel onboard-confirm">
+                <div className="onboard-confirm-icon" aria-hidden>✓</div>
+                <h1 className="onboard-confirm-title">You&apos;re all set</h1>
+                <p className="onboard-confirm-time">
+                  Your first Briefly arrives tomorrow at <strong>{digestTime}</strong>.
+                </p>
+
+                {stats.length > 0 && (
+                  <div className="onboard-confirm-stats">
+                    {stats.map(({ n, label }) => (
+                      <div key={label} className="onboard-confirm-stat">
+                        <span className="onboard-confirm-stat-num">{n}</span>
+                        <span className="onboard-confirm-stat-label">{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <p className="onboard-confirm-note">
+                  Briefly will read everything above, pick the most relevant stories for you, and deliver them every morning. Nothing to do — just show up.
+                </p>
+
+                <button
+                  type="button"
+                  className="btn-primary onboard-cta"
+                  onClick={() => router.replace("/dashboard")}
+                >
+                  Open my dashboard
+                </button>
+              </section>
+            );
+          })()}
         </div>
 
         {error && (

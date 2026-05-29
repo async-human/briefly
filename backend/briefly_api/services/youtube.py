@@ -389,13 +389,19 @@ def _fetch_subscription_videos_sync(
             remaining = max_total - len(articles)
             per_channel = min(videos_per_channel, remaining)
             items = _fetch_rss_sync(feed_url, limit=per_channel, source_name=channel_name)
+            if not items:
+                log.debug(
+                    "Channel %s (%s) returned 0 videos from RSS — "
+                    "may not have posted recently or feed is blocked",
+                    channel_name, channel_id,
+                )
             for item in items:
                 item.source_type = "youtube"
                 item.section = "YouTube"
             articles.extend(items)
         except Exception as exc:
             rss_errors += 1
-            log.debug("RSS fetch failed for channel %s: %s", channel_id, exc)
+            log.warning("RSS fetch failed for channel %s (%s): %s", channel_name, channel_id, exc)
             continue
 
     if not articles:
@@ -437,6 +443,189 @@ async def fetch_subscription_videos(
         max_total=max_total,
     )
     return articles, len(channels)
+
+
+# ── Liked videos + playlist fetching ──────────────────────────────────────────
+
+def _fetch_playlist_videos_sync(
+    access_token: str,
+    user_agent: str,
+    playlist_id: str,
+    limit: int = 25,
+) -> list[FetchedArticle]:
+    """
+    Fetch videos from a YouTube playlist via the Data API.
+
+    Works for any playlist the user can read, including:
+      - "LL" (Liked Videos) — strong explicit intent signal
+      - Any user-created playlist ID
+
+    Returns FetchedArticle list with URL set to watch?v=... so
+    _enrich_with_transcripts can fetch transcripts by video ID.
+    """
+    articles: list[FetchedArticle] = []
+    page_token: str | None = None
+
+    with httpx.Client(timeout=20.0) as client:
+        while len(articles) < limit:
+            params: dict = {
+                "part": "snippet",
+                "playlistId": playlist_id,
+                "maxResults": min(50, limit - len(articles)),
+            }
+            if page_token:
+                params["pageToken"] = page_token
+
+            resp = client.get(
+                "https://www.googleapis.com/youtube/v3/playlistItems",
+                params=params,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "User-Agent": user_agent,
+                },
+            )
+
+            if not resp.is_success:
+                log.warning(
+                    "YouTube playlist %s returned HTTP %d: %s",
+                    playlist_id, resp.status_code, resp.text[:200],
+                )
+                break
+
+            data = resp.json()
+            for item in data.get("items", []):
+                snippet = item.get("snippet", {})
+                resource = snippet.get("resourceId", {})
+                video_id = resource.get("videoId")
+                if not video_id:
+                    continue
+
+                title = (snippet.get("title") or "Untitled").strip()
+                # Skip deleted / private videos (YouTube returns these as placeholders)
+                if title in ("Deleted video", "Private video"):
+                    continue
+
+                description = (snippet.get("description") or "")[:400]
+                channel_name = snippet.get("videoOwnerChannelTitle") or "YouTube"
+
+                articles.append(FetchedArticle(
+                    title=title,
+                    url=f"https://www.youtube.com/watch?v={video_id}",
+                    source_name=channel_name,
+                    source_type="youtube",
+                    section="YouTube",
+                    summary=description or "Liked video",
+                ))
+
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+
+    return articles[:limit]
+
+
+def _fetch_user_playlists_sync(
+    access_token: str,
+    user_agent: str,
+    max_playlists: int = 10,
+) -> list[dict]:
+    """
+    Return the user's own playlists as [{"id": ..., "title": ...}].
+    Excludes system playlists (Watch Later = WL, Liked = LL) which are
+    handled separately.
+    """
+    with httpx.Client(timeout=20.0) as client:
+        resp = client.get(
+            "https://www.googleapis.com/youtube/v3/playlists",
+            params={"part": "snippet", "mine": "true", "maxResults": max_playlists},
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "User-Agent": user_agent,
+            },
+        )
+        if not resp.is_success:
+            log.warning("YouTube playlists API returned HTTP %d", resp.status_code)
+            return []
+
+        playlists = []
+        for item in resp.json().get("items", []):
+            pid = item.get("id", "")
+            if pid in ("WL", "LL", "FL"):  # skip system playlists
+                continue
+            title = item.get("snippet", {}).get("title", "")
+            playlists.append({"id": pid, "title": title})
+        return playlists
+
+
+async def fetch_youtube_content(
+    access_token: str,
+    user_agent: str,
+    max_channels: int = 100,
+    max_total: int = 40,
+) -> tuple[list[FetchedArticle], dict]:
+    """
+    Fetch content from all YouTube signals in parallel:
+      1. Subscriptions — channels the user follows
+      2. Liked videos  — explicit positive intent (strongest signal)
+      3. User playlists — curated collections
+
+    Returns (articles, counts) where counts = {subscriptions, liked, playlists}.
+    Articles are deduplicated by URL. Liked videos appear first so the
+    relevance agent sees them at the top of the pool.
+    """
+    # Run subscriptions + liked videos concurrently
+    sub_task = asyncio.create_task(
+        fetch_subscription_videos(access_token, user_agent, max_channels=max_channels, max_total=max_total // 2)
+    )
+    liked_task = asyncio.create_task(
+        asyncio.to_thread(_fetch_playlist_videos_sync, access_token, user_agent, "LL", 20)
+    )
+    playlist_meta_task = asyncio.create_task(
+        asyncio.to_thread(_fetch_user_playlists_sync, access_token, user_agent, 5)
+    )
+
+    sub_articles, channel_count = await sub_task
+    liked_articles = await liked_task
+    user_playlists = await playlist_meta_task
+
+    # Fetch videos from user playlists (up to 5 videos each)
+    playlist_articles: list[FetchedArticle] = []
+    for pl in user_playlists[:5]:
+        try:
+            items = await asyncio.to_thread(
+                _fetch_playlist_videos_sync, access_token, user_agent, pl["id"], 5
+            )
+            playlist_articles.extend(items)
+        except Exception:
+            continue
+
+    # Enrich liked + playlist videos with transcripts (subscriptions already enriched)
+    if liked_articles or playlist_articles:
+        to_enrich = liked_articles + playlist_articles
+        await asyncio.to_thread(_enrich_with_transcripts, to_enrich, min(10, len(to_enrich)))
+        liked_articles = to_enrich[:len(liked_articles)]
+        playlist_articles = to_enrich[len(liked_articles):]
+
+    # Merge: liked first (strongest signal), then subscriptions, then playlists
+    seen: set[str] = set()
+    merged: list[FetchedArticle] = []
+    for article in liked_articles + sub_articles + playlist_articles:
+        url = article.url or ""
+        if url and url in seen:
+            continue
+        seen.add(url)
+        merged.append(article)
+
+    counts = {
+        "subscriptions": channel_count,
+        "liked": len(liked_articles),
+        "playlists": len(user_playlists),
+    }
+    log.info(
+        "YouTube content: %d subscribed channels, %d liked videos, %d playlist(s) → %d total items",
+        channel_count, len(liked_articles), len(user_playlists), len(merged),
+    )
+    return merged[:max_total], counts
 
 
 async def count_subscriptions(access_token: str, user_agent: str) -> int:
