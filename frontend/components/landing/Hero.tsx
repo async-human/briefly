@@ -52,6 +52,7 @@ export function Hero() {
     <section className="hero-v2">
       {/* Ambient background */}
       <div className="hero-bg" aria-hidden>
+        <div className="hero-sunrise" />
         <div className="hero-orb hero-orb-gold" />
         <div className="hero-orb hero-orb-purple" />
         <div className="hero-orb hero-orb-blue" />

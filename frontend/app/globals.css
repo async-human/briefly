@@ -5,15 +5,18 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #080808;
-  --bg-elevated: #0f0f0f;
-  --surface: #141414;
-  --surface-hover: #1a1a1a;
-  --border: rgba(255,255,255,0.06);
-  --border-strong: rgba(255,255,255,0.1);
-  --text: #f5f5f4;
-  --text-secondary: #8a8a8a;
-  --text-muted: #525252;
+  /* Backgrounds — very slight warm amber undertone vs. pure black */
+  --bg: #0a0908;
+  --bg-elevated: #120f0e;
+  --surface: #181512;
+  --surface-hover: #1e1b18;
+  --border: rgba(255,240,220,0.07);
+  --border-strong: rgba(255,240,220,0.12);
+  /* Text — keep near-white but slightly warm */
+  --text: #f6f4f1;
+  --text-secondary: #8c8680;
+  --text-muted: #544f4a;
+  /* Accent — unchanged */
   --accent: #c9b896;
   --accent-dim: rgba(201,184,150,0.1);
   --accent-line: rgba(201,184,150,0.35);
@@ -26,6 +29,13 @@ html { scroll-behavior: smooth; }
 
 body {
   background: var(--bg);
+  /* Warm page-level radial — like a single light source far above */
+  background-image: radial-gradient(
+    ellipse 100% 40% at 50% 0%,
+    rgba(201,150,60,0.04) 0%,
+    transparent 60%
+  );
+  background-attachment: fixed;
   color: var(--text);
   font-family: var(--sans);
   font-size: 16px;
@@ -137,6 +147,28 @@ nav.scrolled {
   inset: 0;
   pointer-events: none;
   z-index: 0;
+}
+/* Sunrise glow — warm horizon at the base of the hero */
+.hero-sunrise {
+  position: absolute;
+  bottom: -80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  height: 480px;
+  background: radial-gradient(
+    ellipse 75% 55% at 50% 100%,
+    rgba(210, 155, 60, 0.09) 0%,
+    rgba(201, 120, 40, 0.04) 40%,
+    transparent 70%
+  );
+  pointer-events: none;
+  filter: blur(8px);
+  animation: sunrise-breathe 8s ease-in-out infinite;
+}
+@keyframes sunrise-breathe {
+  0%, 100% { opacity: 0.8; transform: translateX(-50%) scaleX(1); }
+  50%       { opacity: 1;   transform: translateX(-50%) scaleX(1.06); }
 }
 .hero-orb {
   position: absolute;
@@ -895,6 +927,55 @@ nav.scrolled {
 .pricing-card .btn-ghost {
   width: 100%;
   justify-content: center;
+}
+
+/* ── SECTION DIVIDERS — gradient lines instead of flat borders ── */
+.workflow-section,
+.features-v2,
+.roadmap-section,
+.compare-section,
+.pricing-v2,
+.cta-v2 {
+  border-top: none !important;
+  position: relative;
+}
+.workflow-section::before,
+.features-v2::before,
+.roadmap-section::before,
+.compare-section::before,
+.pricing-v2::before,
+.cta-v2::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(201,184,150,0.15) 30%,
+    rgba(201,184,150,0.22) 50%,
+    rgba(201,184,150,0.15) 70%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+/* Section top-glow — a warm halo just inside the divider */
+.workflow-section::after,
+.features-v2::after,
+.roadmap-section::after,
+.pricing-v2::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50%;
+  height: 120px;
+  background: radial-gradient(ellipse at 50% 0%, rgba(201,150,60,0.04) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 /* ── SHARED SECTION TOKENS ── */
