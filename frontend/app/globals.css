@@ -172,6 +172,23 @@ nav.scrolled {
   background: radial-gradient(ellipse, rgba(201,150,60,0.07) 0%, transparent 65%);
   filter: blur(40px);
 }
+/* Brain canvas wrapper — fades at all four edges */
+.hero-brain-wrap {
+  position: absolute;
+  inset: 0;
+  opacity: 0.52;
+  /* Vignette mask: canvas fades out toward the edges so text stays crisp */
+  -webkit-mask-image: radial-gradient(
+    ellipse 85% 80% at 50% 50%,
+    black 30%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 85% 80% at 50% 50%,
+    black 30%,
+    transparent 100%
+  );
+}
 .hero-light-inner {
   max-width: 960px;
   margin: 0 auto;
