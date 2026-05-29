@@ -50,7 +50,7 @@ function insideBrain(
 function buildEdges(nodes: BNode[], maxDist: number): [number, number][] {
   const edges: [number, number][] = [];
   for (let i = 0; i < nodes.length; i++) {
-    let neighbours: { idx: number; d: number }[] = [];
+    const neighbours: { idx: number; d: number }[] = [];
     for (let j = 0; j < nodes.length; j++) {
       if (i === j) continue;
       const dx = nodes[i].x - nodes[j].x;
@@ -147,7 +147,7 @@ export function BrainCanvas() {
         const y = cy + r * Math.sin(theta) / Math.sqrt(
           Math.pow(Math.cos(theta) * 1.18, 2) + Math.pow(Math.sin(theta) * 0.82, 2)
         );
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        if (i === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
       }
       ctx.closePath();
 
