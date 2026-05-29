@@ -120,6 +120,11 @@ class DigestOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class GenerateDigestOut(BaseModel):
+    digest: DigestOut
+    warnings: list[str] = Field(default_factory=list)
+
+
 class DigestSummaryOut(BaseModel):
     id: str
     digest_date: str

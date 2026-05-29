@@ -4,6 +4,7 @@ import asyncio
 import concurrent.futures
 import logging
 import re
+from datetime import UTC, datetime
 from urllib.parse import quote
 
 import httpx
@@ -100,7 +101,7 @@ def _fetch_transcript_sync(video_id: str) -> str | None:
         return None
 
 
-def _enrich_with_transcripts(articles: list[FetchedArticle]) -> None:
+def _enrich_with_transcripts(articles: list[FetchedArticle], *, max_videos: int | None = None) -> None:
     """
     Fetch transcripts for all articles in parallel and attach them as clean_text.
     Articles that already have a long clean_text are skipped.
@@ -109,6 +110,8 @@ def _enrich_with_transcripts(articles: list[FetchedArticle]) -> None:
     # Map index → video_id for articles that need enrichment
     targets: list[tuple[int, str]] = []
     for i, article in enumerate(articles):
+        if max_videos is not None and len(targets) >= max_videos:
+            break
         video_id = _extract_video_id(article.url or "")
         if video_id:
             targets.append((i, video_id))
@@ -366,31 +369,47 @@ def _fetch_subscriptions_sync(
 def _fetch_subscription_videos_sync(
     channels: list[dict],
     videos_per_channel: int = 2,
+    *,
+    max_total: int = 40,
 ) -> list[FetchedArticle]:
     """
-    Step 1 — RSS: fetch recent video metadata from all subscribed channels.
-    Step 2 — Transcripts: enrich each video with its spoken transcript in parallel.
-
-    The transcript replaces the description as clean_text, giving the pipeline
-    real content to embed and reason over instead of creator marketing copy.
+    Fetch recent video metadata from subscribed channels, then enrich with transcripts.
+    Caps total work so manual briefing generation stays fast.
     """
-    # Step 1: Collect video metadata from all channel RSS feeds
     articles: list[FetchedArticle] = []
+    rss_errors = 0
+
     for ch in channels:
+        if len(articles) >= max_total:
+            break
         channel_id = ch["channel_id"]
         channel_name = ch.get("channel_name", f"YouTube · {channel_id}")
         feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
         try:
-            items = _fetch_rss_sync(feed_url, limit=videos_per_channel, source_name=channel_name)
+            remaining = max_total - len(articles)
+            per_channel = min(videos_per_channel, remaining)
+            items = _fetch_rss_sync(feed_url, limit=per_channel, source_name=channel_name)
             for item in items:
                 item.source_type = "youtube"
                 item.section = "YouTube"
             articles.extend(items)
-        except Exception:
+        except Exception as exc:
+            rss_errors += 1
+            log.debug("RSS fetch failed for channel %s: %s", channel_id, exc)
             continue
 
-    # Step 2: Enrich with transcripts (parallel, with timeout fallback)
-    _enrich_with_transcripts(articles)
+    if not articles:
+        if rss_errors and channels:
+            raise ValueError(
+                f"Found {len(channels)} subscribed channels but could not load their video feeds."
+            )
+        return []
+
+    # Newest first when published_at is available
+    articles.sort(key=lambda a: a.published_at or datetime.min.replace(tzinfo=UTC), reverse=True)
+    articles = articles[:max_total]
+
+    _enrich_with_transcripts(articles, max_videos=min(12, len(articles)))
     return articles
 
 
@@ -399,16 +418,23 @@ async def fetch_subscription_videos(
     user_agent: str,
     max_channels: int = 150,
     videos_per_channel: int = 2,
+    max_total: int = 40,
 ) -> tuple[list[FetchedArticle], int]:
     """
-    Fetch videos from all channels the user subscribes to, with transcripts.
+    Fetch videos from subscribed channels, with transcripts.
     Returns (articles, channel_count).
     """
     channels = await asyncio.to_thread(
         _fetch_subscriptions_sync, access_token, user_agent, max_channels
     )
+    if not channels:
+        return [], 0
+
     articles = await asyncio.to_thread(
-        _fetch_subscription_videos_sync, channels, videos_per_channel
+        _fetch_subscription_videos_sync,
+        channels,
+        videos_per_channel,
+        max_total=max_total,
     )
     return articles, len(channels)
 

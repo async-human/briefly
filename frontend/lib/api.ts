@@ -102,6 +102,11 @@ export type Digest = {
   items: DigestItem[];
 };
 
+export type GenerateDigestResponse = {
+  digest: Digest;
+  warnings: string[];
+};
+
 export type DigestSummary = {
   id: string;
   digest_date: string;
@@ -145,7 +150,7 @@ export const api = {
   deleteSource: (id: string) =>
     request<void>(`/api/v1/sources/${id}`, { method: "DELETE" }),
   generateDigest: () =>
-    request<Digest>("/api/v1/digests/generate", { method: "POST" }),
+    request<GenerateDigestResponse>("/api/v1/digests/generate", { method: "POST" }),
   getOnboardingStatus: () => request<OnboardingStatus>("/api/v1/onboarding/status"),
   updateOnboardingProfile: (body: {
     role?: string;

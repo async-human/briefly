@@ -110,7 +110,7 @@ async def generate_briefing_now(
     settings: Settings,
     *,
     max_items: int = 8,
-) -> Digest:
+) -> tuple[Digest, list[str]]:
     result = await db.execute(
         select(Source).where(Source.user_id == user.id).order_by(Source.created_at.desc())
     )
@@ -162,16 +162,17 @@ async def generate_briefing_now(
     await db.flush()
 
     for i, item in enumerate(items_data):
+        article = articles[i] if i < len(articles) else None
         db.add(
             DigestItem(
                 digest_id=digest.id,
                 position=i + 1,
-                section=item.get("section"),
+                section=item.get("section") or (article.section if article else None),
                 headline=item["headline"],
                 summary=item.get("summary", ""),
                 why_it_matters=item["why_it_matters"],
-                source_name=item.get("source_name"),
-                source_url=item.get("source_url"),
+                source_name=(article.source_name if article else None) or item.get("source_name"),
+                source_url=(article.url if article else None) or item.get("source_url"),
             )
         )
 
@@ -182,4 +183,4 @@ async def generate_briefing_now(
         .options(selectinload(Digest.items))
         .where(Digest.id == digest.id)
     )
-    return result.scalar_one()
+    return result.scalar_one(), warnings

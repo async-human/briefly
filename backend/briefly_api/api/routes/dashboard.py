@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from briefly_api.api.schemas import (
     DigestOut,
     DigestSummaryOut,
+    GenerateDigestOut,
     MeOut,
     ProfileOut,
     SourceCreate,
@@ -238,16 +239,16 @@ async def delete_source(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/digests/generate", response_model=DigestOut)
+@router.post("/digests/generate", response_model=GenerateDigestOut)
 async def generate_digest_now(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
-) -> DigestOut:
+) -> GenerateDigestOut:
     from briefly_api.services.briefing import generate_briefing_now
 
     try:
-        digest = await generate_briefing_now(user, db, settings)
+        digest, warnings = await generate_briefing_now(user, db, settings)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except Exception as exc:
@@ -255,4 +256,4 @@ async def generate_digest_now(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Briefing generation failed: {exc}",
         ) from exc
-    return DigestOut.model_validate(digest)
+    return GenerateDigestOut(digest=DigestOut.model_validate(digest), warnings=warnings)

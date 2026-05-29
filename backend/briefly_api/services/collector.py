@@ -8,9 +8,42 @@ from briefly_api.config import Settings
 from briefly_api.db.models import Source
 from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.connectors.registry import get_connector
-from briefly_api.services.connectors.types import EMAIL, FETCHABLE_SOURCE_TYPES
+from briefly_api.services.connectors.types import (
+    EMAIL,
+    FETCHABLE_SOURCE_TYPES,
+    GMAIL,
+    REDDIT_ACCOUNT,
+    YOUTUBE_ACCOUNT,
+)
 
 log = logging.getLogger(__name__)
+
+# OAuth account sources need a larger fetch pool (many channels / newsletters).
+_ACCOUNT_SOURCE_TYPES = {GMAIL, YOUTUBE_ACCOUNT, REDDIT_ACCOUNT}
+
+
+def _fetch_limit(source_type: str, max_items: int, num_sources: int) -> int:
+    if source_type in _ACCOUNT_SOURCE_TYPES:
+        return min(40, max(max_items * 4, 16))
+    return max(2, max_items // max(num_sources, 1))
+
+
+def _interleave(lists: list[list[NormalizedContent]], max_items: int) -> list[NormalizedContent]:
+    """Round-robin merge so one source doesn't dominate the briefing."""
+    result: list[NormalizedContent] = []
+    indices = [0] * len(lists)
+    while len(result) < max_items:
+        added = False
+        for i, batch in enumerate(lists):
+            if indices[i] < len(batch):
+                result.append(batch[indices[i]])
+                indices[i] += 1
+                added = True
+                if len(result) >= max_items:
+                    break
+        if not added:
+            break
+    return result
 
 
 async def collect_from_sources(
@@ -26,8 +59,7 @@ async def collect_from_sources(
     if not active:
         return [], []
 
-    per_source = max(2, max_items // len(active))
-    articles: list[NormalizedContent] = []
+    batches: list[list[NormalizedContent]] = []
     warnings: list[str] = []
 
     for source in active:
@@ -37,11 +69,12 @@ async def collect_from_sources(
             continue
 
         display_name = source.name
+        source_limit = _fetch_limit(source.source_type, max_items, len(active))
         try:
             fetched = await connector.fetch(
                 source.identifier,
                 settings,
-                limit=per_source,
+                limit=source_limit,
                 source_name=display_name,
                 meta={**(source.meta or {}), "user_id": user_id},
                 db=db,
@@ -50,7 +83,13 @@ async def collect_from_sources(
                 if display_name:
                     item.source_name = display_name
                 item.source_id = source.id
-            articles.extend(fetched)
+            if fetched:
+                batches.append(fetched)
+            elif source.source_type in _ACCOUNT_SOURCE_TYPES:
+                warnings.append(
+                    f"{display_name or source.source_type} returned no items — "
+                    "check connection settings or privacy."
+                )
         except Exception as exc:
             log.exception("Failed to fetch source %s (%s)", source.identifier, source.source_type)
             label = display_name or source.identifier
@@ -62,4 +101,5 @@ async def collect_from_sources(
             f"{len(email_sources)} email-forward source(s) skipped — connect Gmail instead."
         )
 
-    return articles[:max_items], warnings
+    articles = _interleave(batches, max_items)
+    return articles, warnings

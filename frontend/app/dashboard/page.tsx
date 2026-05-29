@@ -6,7 +6,9 @@ import { api, type Digest, type MeResponse, type Source } from "@/lib/api";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { BriefingPanel, SourcesSidebar } from "@/components/dashboard/BriefingPanel";
 
-const FETCHABLE_SOURCE_TYPES = new Set(["rss", "youtube", "reddit", "url", "gmail"]);
+const FETCHABLE_SOURCE_TYPES = new Set([
+  "rss", "youtube", "youtube_account", "reddit", "reddit_account", "url", "gmail",
+]);
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -17,6 +19,7 @@ export default function DashboardPage() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [generateError, setGenerateError] = useState("");
+  const [generateWarnings, setGenerateWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     Promise.all([api.getMe(), api.getLatestDigest(), api.getSources()])
@@ -36,9 +39,11 @@ export default function DashboardPage() {
   async function handleGenerate() {
     setGenerating(true);
     setGenerateError("");
+    setGenerateWarnings([]);
     try {
-      const newDigest = await api.generateDigest();
-      setDigest(newDigest);
+      const result = await api.generateDigest();
+      setDigest(result.digest);
+      setGenerateWarnings(result.warnings);
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : "Failed to generate briefing");
     } finally {
@@ -91,9 +96,11 @@ export default function DashboardPage() {
             <div className="dash-grid">
               <BriefingPanel
                 digest={digest}
+                sources={fetchableSources}
                 sourcesCount={fetchableSources.length}
                 generating={generating}
                 generateError={generateError}
+                generateWarnings={generateWarnings}
                 onGenerate={handleGenerate}
               />
               <SourcesSidebar
