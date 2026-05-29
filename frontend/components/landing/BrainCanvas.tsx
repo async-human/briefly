@@ -44,9 +44,9 @@ export function BrainCanvas() {
 
     let W = 0, H = 0;
     let nodes: Node[]  = [];
-    let pulses: Pulse[] = [];
+    const pulses: Pulse[] = [];
     let raf: number;
-    let pulseTimer: ReturnType<typeof setInterval>;
+    const pulseTimer: ReturnType<typeof setInterval> = setInterval(spawnPulse, 750);
 
     function resize() {
       W = wrap.offsetWidth;
@@ -166,7 +166,6 @@ export function BrainCanvas() {
     // Boot
     resize();
     draw();
-    pulseTimer = setInterval(spawnPulse, 750);
 
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
