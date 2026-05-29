@@ -3,11 +3,39 @@
 import { motion } from "framer-motion";
 import { Reveal } from "./Reveal";
 
-const loop = [
-  { num: "01", label: "Connect your sources" },
-  { num: "02", label: "Briefly reads overnight" },
-  { num: "03", label: "Briefing in your inbox" },
-  { num: "04", label: "Gets smarter every day" },
+const steps = [
+  {
+    num: "01",
+    icon: "⬡",
+    label: "Connect",
+    sub: "Link your Gmail, YouTube, Reddit & RSS in 3 minutes",
+    color: "rgba(201,184,150,0.1)",
+    border: "rgba(201,184,150,0.2)",
+  },
+  {
+    num: "02",
+    icon: "◌",
+    label: "Reads overnight",
+    sub: "Briefly processes everything while you sleep",
+    color: "rgba(91,71,224,0.08)",
+    border: "rgba(91,71,224,0.2)",
+  },
+  {
+    num: "03",
+    icon: "◎",
+    label: "In your inbox",
+    sub: "Personalised briefing lands at 7am every morning",
+    color: "rgba(201,184,150,0.1)",
+    border: "rgba(201,184,150,0.2)",
+  },
+  {
+    num: "04",
+    icon: "✦",
+    label: "Gets smarter",
+    sub: "Learns from every briefing. Day 90 feels like magic",
+    color: "rgba(56,189,248,0.06)",
+    border: "rgba(56,189,248,0.15)",
+  },
 ];
 
 export function CTA() {
@@ -17,7 +45,7 @@ export function CTA() {
         <div className="cta-orb" />
       </div>
 
-      <div className="cta-v2-inner">
+      <div className="cta-v2-inner" style={{ maxWidth: 860 }}>
         <Reveal>
           <p className="section-eyebrow" style={{ textAlign: "center", marginBottom: 20 }}>
             Ready?
@@ -49,26 +77,31 @@ export function CTA() {
           </div>
         </Reveal>
 
-        <Reveal delay={0.28}>
-          <div className="cta-loop">
-            {loop.map((step, i) => (
-              <motion.div
-                key={step.num}
-                className="cta-loop-item"
-                initial={{ opacity: 0, y: 12 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.35 + i * 0.08, duration: 0.5 }}
-              >
-                <span className="cta-loop-num">{step.num}</span>
-                <span className="cta-loop-label">{step.label}</span>
-                {i < loop.length - 1 && (
-                  <span className="cta-loop-arrow" aria-hidden>→</span>
-                )}
-              </motion.div>
-            ))}
-          </div>
-        </Reveal>
+        {/* Step cards */}
+        <div className="cta-steps-row">
+          {steps.map((step, i) => (
+            <motion.div
+              key={step.num}
+              className="cta-step-card"
+              style={
+                {
+                  "--step-color": step.color,
+                  "--step-border": step.border,
+                } as React.CSSProperties
+              }
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ delay: 0.1 + i * 0.1, duration: 0.5, type: "spring", bounce: 0.25 }}
+              whileHover={{ y: -4, transition: { duration: 0.18 } }}
+            >
+              <span className="cta-step-icon">{step.icon}</span>
+              <span className="cta-step-num">{step.num}</span>
+              <p className="cta-step-label">{step.label}</p>
+              <p className="cta-step-sub">{step.sub}</p>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </section>
   );
