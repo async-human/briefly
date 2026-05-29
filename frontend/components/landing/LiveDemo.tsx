@@ -3,6 +3,8 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
 /* ── Types ─────────────────────────────────────────────────────────────────── */
 type Phase = "collect" | "process" | "write" | "deliver";
 
