@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { api, type OnboardingStatus, type MeResponse } from "@/lib/api";
 import { clearToken } from "@/lib/auth";
 import { AddSourceForm } from "@/components/dashboard/AddSourceForm";
@@ -225,6 +226,13 @@ export default function OnboardingPage() {
     }
   }, [searchParams]);
 
+  // Auto-dismiss error toast after 6 seconds
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(""), 6000);
+    return () => clearTimeout(t);
+  }, [error]);
+
   async function handleConnectGmail() {
     setGmailLoading(true);
     setError("");
@@ -361,13 +369,6 @@ export default function OnboardingPage() {
     );
   }
 
-  // Auto-dismiss error toast after 6 seconds
-  useEffect(() => {
-    if (!error) return;
-    const t = setTimeout(() => setError(""), 6000);
-    return () => clearTimeout(t);
-  }, [error]);
-
   return (
     <div className="onboard-shell">
       <div className="onboard-glow" aria-hidden />
@@ -391,7 +392,7 @@ export default function OnboardingPage() {
               aria-label="Account menu"
             >
               {me?.user.avatar_url ? (
-                <img src={me.user.avatar_url} alt="" className="onboard-avatar-img" />
+                <Image src={me.user.avatar_url} alt="" width={34} height={34} className="onboard-avatar-img" />
               ) : (
                 <span className="onboard-avatar-initials">
                   {(me?.user.name ?? me?.user.email ?? "U").charAt(0).toUpperCase()}
