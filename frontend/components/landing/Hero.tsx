@@ -31,66 +31,77 @@ function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
 export function Hero() {
   return (
     <section className="hero-light">
-      {/* Subtle paper texture gradient */}
       <div className="hero-light-bg" aria-hidden>
         <div className="hero-light-glow" />
-        {/* Neural network — 58 drifting nodes, gold pulses along edges */}
-        <div className="hero-brain-wrap">
-          <BrainCanvas />
-        </div>
       </div>
 
-      <div className="hero-light-inner">
-        {/* Problem statement */}
-        <motion.div
-          className="hero-problem"
-          initial={{ opacity: 0, y: 32 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.1, ease: EASE }}
-        >
-          <p className="hero-problem-eyebrow">The problem you know too well</p>
-          <div className="hero-problem-numbers">
-            <div className="hero-problem-stat">
-              <span className="hero-problem-num"><CountUp to={12} /></span>
-              <span className="hero-problem-label">newsletters<br />you&apos;ll never read</span>
-            </div>
-            <div className="hero-problem-sep">+</div>
-            <div className="hero-problem-stat">
-              <span className="hero-problem-num"><CountUp to={52} /></span>
-              <span className="hero-problem-label">YouTube channels<br />unwatched</span>
-            </div>
-            <div className="hero-problem-sep">+</div>
-            <div className="hero-problem-stat">
-              <span className="hero-problem-num"><CountUp to={18} /></span>
-              <span className="hero-problem-label">subreddits<br />you can&apos;t keep up with</span>
-            </div>
-          </div>
-        </motion.div>
+      <div className="hero-split">
+        {/* ── Left: copy ── */}
+        <div className="hero-copy">
+          <motion.p
+            className="hero-problem-eyebrow"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
+          >
+            The problem you know too well
+          </motion.p>
 
-        {/* Divider */}
-        <motion.div
-          className="hero-divider-line"
-          initial={{ scaleX: 0 }}
-          animate={{ scaleX: 1 }}
-          transition={{ duration: 0.9, delay: 0.55, ease: EASE }}
-        />
+          <motion.div
+            className="hero-problem-stack"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.2, ease: EASE }}
+          >
+            <div className="hero-stat-line">
+              <span className="hero-big-num"><CountUp to={12} /></span>
+              <span className="hero-stat-desc">newsletters<br />you&apos;ll never read</span>
+            </div>
+            <div className="hero-stat-line">
+              <span className="hero-big-num"><CountUp to={52} /></span>
+              <span className="hero-stat-desc">YouTube channels<br />unwatched</span>
+            </div>
+            <div className="hero-stat-line">
+              <span className="hero-big-num"><CountUp to={18} /></span>
+              <span className="hero-stat-desc">subreddits<br />you can&apos;t keep up with</span>
+            </div>
+          </motion.div>
 
-        {/* Solution */}
-        <motion.div
-          className="hero-solution"
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.7, ease: EASE }}
-        >
-          <h1 className="hero-light-headline">
+          <motion.div
+            className="hero-rule"
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            transition={{ duration: 0.8, delay: 0.55, ease: EASE }}
+          />
+
+          <motion.h1
+            className="hero-light-headline"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.65, ease: EASE }}
+          >
             Briefly reads all of it.
             <br />
             <span className="hero-light-gradient">You just read the briefing.</span>
-          </h1>
-          <p className="hero-light-sub">
-            Connect your accounts once. Every night, Briefly fetches everything, scores what matters to you, and writes a personalised morning briefing — with sources cited. Zero maintenance. Forever.
-          </p>
-          <div className="hero-light-actions">
+          </motion.h1>
+
+          <motion.p
+            className="hero-light-sub"
+            style={{ margin: "0 0 32px", textAlign: "left" }}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.8, ease: EASE }}
+          >
+            Connect once. Briefly reads everything you follow overnight, scores what matters to your interests, and sends a personalised briefing at 7am — with sources cited. Zero maintenance.
+          </motion.p>
+
+          <motion.div
+            className="hero-light-actions"
+            style={{ justifyContent: "flex-start" }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.9, ease: EASE }}
+          >
             <motion.a
               href="/login"
               className="btn-light-primary"
@@ -99,13 +110,37 @@ export function Hero() {
             >
               Start building yours free →
             </motion.a>
-            <a href="#demo" className="btn-light-ghost">
-              Watch it work ↓
-            </a>
-          </div>
-          <p className="hero-light-fine">
+            <a href="#demo" className="btn-light-ghost">Watch it work ↓</a>
+          </motion.div>
+
+          <motion.p
+            className="hero-light-fine"
+            style={{ textAlign: "left" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.1, duration: 0.5 }}
+          >
             Free to start · No credit card · First briefing tomorrow at 7am
-          </p>
+          </motion.p>
+        </div>
+
+        {/* ── Right: brain ── */}
+        <motion.div
+          className="hero-brain-panel"
+          initial={{ opacity: 0, x: 40, scale: 0.96 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          transition={{ duration: 1, delay: 0.35, ease: EASE }}
+        >
+          <div className="hero-brain-label">
+            <span className="hero-brain-dot" />
+            Building your second brain
+          </div>
+          <div className="hero-brain-canvas">
+            <BrainCanvas />
+          </div>
+          <div className="hero-brain-footer">
+            <span>58 knowledge nodes · 180 connections · live activity</span>
+          </div>
         </motion.div>
       </div>
     </section>

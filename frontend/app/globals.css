@@ -196,6 +196,106 @@ nav.scrolled {
   z-index: 1;
 }
 
+/* Two-column hero split */
+.hero-split {
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+.hero-copy {
+  display: flex;
+  flex-direction: column;
+}
+.hero-problem-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 36px;
+}
+.hero-stat-line {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+.hero-big-num {
+  font-family: var(--serif);
+  font-size: clamp(52px, 6vw, 80px);
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--text);
+}
+.hero-stat-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.hero-rule {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border-strong), transparent);
+  transform-origin: left;
+  margin-bottom: 32px;
+}
+
+/* Brain panel */
+.hero-brain-panel {
+  border: 1px solid rgba(0,200,255,0.15);
+  border-radius: 24px;
+  background: #06091a;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(0,200,255,0.08),
+    0 32px 80px rgba(6,9,26,0.5),
+    0 8px 24px rgba(0,150,255,0.1);
+}
+.hero-brain-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: rgba(0,210,255,0.6);
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid rgba(0,200,255,0.08);
+}
+.hero-brain-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(0,210,255,0.8);
+  box-shadow: 0 0 8px rgba(0,210,255,0.6);
+  animation: dot-pulse-g 2s ease-in-out infinite;
+}
+.hero-brain-canvas {
+  width: 100%;
+  height: 400px;
+  display: block;
+}
+.hero-brain-footer {
+  padding: 10px 18px 14px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: rgba(0,180,255,0.35);
+  letter-spacing: 0.08em;
+  border-top: 1px solid rgba(0,200,255,0.06);
+  text-align: center;
+}
+
+/* Source chip logo */
+.source-chip-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.source-chip-logo svg { display: block; }
+
 /* Problem numbers */
 .hero-problem {
   margin-bottom: 48px;
@@ -4298,9 +4398,17 @@ footer {
   .hero-scroll-hint { display: none; }
   /* Hero light */
   .hero-light { padding: 100px 24px 64px; }
+  .hero-split { grid-template-columns: 1fr; gap: 40px; }
+  .hero-brain-canvas { height: 280px; }
+  .hero-big-num { font-size: clamp(44px, 11vw, 64px); }
   .hero-problem-numbers { gap: 16px; }
   .hero-problem-num { font-size: clamp(44px, 12vw, 72px); }
   .hero-problem-sep { font-size: 36px; }
+  .hero-copy .hero-light-actions { justify-content: center; }
+  .hero-copy .hero-light-fine { text-align: center; }
+  .hero-copy .hero-light-sub { text-align: center; }
+  .hero-copy .hero-light-headline { text-align: center; }
+  .hero-rule { background: linear-gradient(90deg, transparent, var(--border-strong), transparent); }
   /* LiveDemo */
   .livedemo-section { padding: 60px 24px 80px; }
   .livedemo-tabs { flex-wrap: wrap; width: 100%; justify-content: center; }

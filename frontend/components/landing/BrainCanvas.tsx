@@ -2,197 +2,280 @@
 
 import { useEffect, useRef } from "react";
 
-interface Node {
+/* ── Types ─────────────────────────────────────────────────────────────────── */
+interface BNode {
   x: number;
   y: number;
-  vx: number;
-  vy: number;
-  r: number;        // radius
-  opacity: number;
+  activation: number;   // 0 = cool blue, 1 = hot orange
+  activationDecay: number;
 }
 
-interface Pulse {
-  a: number;        // from node index
-  b: number;        // to node index
-  t: number;        // progress 0→1
+interface BPulse {
+  a: number;
+  b: number;
+  t: number;
   speed: number;
 }
 
-const NODE_COUNT   = 58;
-const EDGE_DIST    = 135;
-const NODE_COLOR   = "158, 123, 63";   // warm gold
-const PULSE_COLOR  = "201, 153, 58";   // brighter gold
+/* ── Brain shape: polar radius function ────────────────────────────────────── */
+// Returns normalised radius at angle θ — creates a brain-like silhouette
+function brainR(theta: number): number {
+  // Primary lobes
+  const primary = 1
+    + 0.14 * Math.cos(3 * theta + 0.4)    // frontal / occipital bulge
+    + 0.09 * Math.cos(7 * theta + 0.8)    // major gyri
+    + 0.05 * Math.cos(11 * theta - 0.6)   // minor folds
+    + 0.03 * Math.cos(5 * theta + 2.2);   // asymmetry
 
-function boxMuller(): [number, number] {
-  const u1 = Math.random() || 0.0001;
-  const u2 = Math.random();
-  const mag = Math.sqrt(-2 * Math.log(u1));
-  return [mag * Math.cos(2 * Math.PI * u2), mag * Math.sin(2 * Math.PI * u2)];
+  // Brain is taller at front, compressed at bottom
+  const aspect = Math.sqrt(
+    Math.pow(Math.cos(theta) * 1.18, 2) +
+    Math.pow(Math.sin(theta) * 0.82, 2),
+  );
+
+  return primary / aspect;
 }
 
+function insideBrain(
+  px: number, py: number,
+  cx: number, cy: number,
+  scale: number,
+): boolean {
+  const dx = (px - cx) / scale;
+  const dy = (py - cy) / scale;
+  return Math.sqrt(dx * dx + dy * dy) < brainR(Math.atan2(dy, dx));
+}
+
+/* ── Nearest-neighbour edges (creates mesh-like appearance) ────────────────── */
+function buildEdges(nodes: BNode[], maxDist: number): [number, number][] {
+  const edges: [number, number][] = [];
+  for (let i = 0; i < nodes.length; i++) {
+    let neighbours: { idx: number; d: number }[] = [];
+    for (let j = 0; j < nodes.length; j++) {
+      if (i === j) continue;
+      const dx = nodes[i].x - nodes[j].x;
+      const dy = nodes[i].y - nodes[j].y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < maxDist) neighbours.push({ idx: j, d });
+    }
+    // Keep closest 4 to mimic triangulation
+    neighbours.sort((a, b) => a.d - b.d);
+    for (const nb of neighbours.slice(0, 4)) {
+      if (nb.idx > i) edges.push([i, nb.idx]);
+    }
+  }
+  return edges;
+}
+
+/* ── Main component ────────────────────────────────────────────────────────── */
 export function BrainCanvas() {
-  const wrapRef  = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    const wrap  = wrapRef.current;
     const canvas = canvasRef.current;
-    if (!wrap || !canvas) return;
-
+    if (!canvas) return;
     const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
     if (!ctx) return;
 
-    let W = 0, H = 0;
-    let nodes: Node[]  = [];
-    const pulses: Pulse[] = [];
+    let W = canvas.offsetWidth;
+    let H = canvas.offsetHeight;
+    canvas.width  = W;
+    canvas.height = H;
+
+    const cx     = W * 0.5;
+    const cy     = H * 0.48;
+    const scale  = Math.min(W, H) * 0.43;
+    const GRID   = 28;       // grid spacing for node placement
+    const EDGE_D = GRID * 2.2;
+    const NODE_COUNT_TARGET = 180;
+
+    // ── Generate nodes inside brain shape ──────────────────────────────────
+    const nodes: BNode[] = [];
+    const cols = Math.ceil(W / GRID) + 2;
+    const rows = Math.ceil(H / GRID) + 2;
+
+    for (let row = 0; row < rows && nodes.length < NODE_COUNT_TARGET * 1.3; row++) {
+      for (let col = 0; col < cols && nodes.length < NODE_COUNT_TARGET * 1.3; col++) {
+        const px = col * GRID + (Math.random() - 0.5) * GRID * 0.6;
+        const py = row * GRID + (Math.random() - 0.5) * GRID * 0.6;
+        if (!insideBrain(px, py, cx, cy, scale)) continue;
+        nodes.push({ x: px, y: py, activation: Math.random() * 0.15, activationDecay: 0.008 + Math.random() * 0.006 });
+      }
+    }
+
+    const edges = buildEdges(nodes, EDGE_D);
+    const pulses: BPulse[] = [];
+
+    // ── Periodic activation ────────────────────────────────────────────────
+    const activateInterval = setInterval(() => {
+      // Activate 3-5 random nodes
+      const count = 3 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < count; i++) {
+        const n = nodes[Math.floor(Math.random() * nodes.length)];
+        n.activation = 0.85 + Math.random() * 0.15;
+      }
+    }, 600);
+
+    // ── Periodic pulses ────────────────────────────────────────────────────
+    const pulseInterval = setInterval(() => {
+      // Find an active node and pulse along a random edge from it
+      const activeNodes = nodes
+        .map((n, i) => ({ n, i }))
+        .filter(({ n }) => n.activation > 0.5);
+      if (activeNodes.length === 0) return;
+
+      const { i: fromIdx } = activeNodes[Math.floor(Math.random() * activeNodes.length)];
+      const connected = edges
+        .filter(([a, b]) => a === fromIdx || b === fromIdx)
+        .map(([a, b]) => (a === fromIdx ? b : a));
+      if (connected.length === 0) return;
+
+      const toIdx = connected[Math.floor(Math.random() * connected.length)];
+      pulses.push({ a: fromIdx, b: toIdx, t: 0, speed: 0.018 + Math.random() * 0.012 });
+    }, 180);
+
+    // ── Brain outline path ─────────────────────────────────────────────────
+    function drawBrainOutline(glow: number) {
+      const steps = 180;
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const theta = (i / steps) * Math.PI * 2;
+        const r = brainR(theta) * scale;
+        const x = cx + r * Math.cos(theta) / Math.sqrt(
+          Math.pow(Math.cos(theta) * 1.18, 2) + Math.pow(Math.sin(theta) * 0.82, 2)
+        );
+        const y = cy + r * Math.sin(theta) / Math.sqrt(
+          Math.pow(Math.cos(theta) * 1.18, 2) + Math.pow(Math.sin(theta) * 0.82, 2)
+        );
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+
+      // Outer glow
+      ctx.shadowColor = `rgba(0, 220, 255, ${glow})`;
+      ctx.shadowBlur = 20;
+      ctx.strokeStyle = `rgba(0, 210, 255, ${0.55 + glow * 0.2})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    // ── Render loop ────────────────────────────────────────────────────────
     let raf: number;
-    const pulseTimer: ReturnType<typeof setInterval> = setInterval(spawnPulse, 750);
-
-    function resize() {
-      if (!wrap || !canvas) return;
-      W = wrap.offsetWidth;
-      H = wrap.offsetHeight;
-      canvas.width  = W;
-      canvas.height = H;
-      initNodes();
-    }
-
-    function initNodes() {
-      nodes = [];
-      for (let i = 0; i < NODE_COUNT; i++) {
-        const [z1, z2] = boxMuller();
-        nodes.push({
-          x:  clamp(W / 2 + z1 * (W / 4.2), 20, W - 20),
-          y:  clamp(H / 2 + z2 * (H / 3.8), 20, H - 20),
-          vx: (Math.random() - 0.5) * 0.35,
-          vy: (Math.random() - 0.5) * 0.35,
-          r:  1.4 + Math.random() * 1.8,
-          opacity: 0.35 + Math.random() * 0.55,
-        });
-      }
-    }
-
-    function clamp(v: number, lo: number, hi: number) {
-      return Math.max(lo, Math.min(hi, v));
-    }
-
-    function spawnPulse() {
-      for (let tries = 0; tries < 25; tries++) {
-        const a = Math.floor(Math.random() * NODE_COUNT);
-        const b = Math.floor(Math.random() * NODE_COUNT);
-        if (a === b) continue;
-        const dx = nodes[a].x - nodes[b].x;
-        const dy = nodes[a].y - nodes[b].y;
-        if (Math.sqrt(dx * dx + dy * dy) < EDGE_DIST) {
-          pulses.push({ a, b, t: 0, speed: 0.007 + Math.random() * 0.007 });
-          return;
-        }
-      }
-    }
+    let frame = 0;
 
     function draw() {
+      frame++;
       ctx.clearRect(0, 0, W, H);
 
-      // ── Update nodes ──────────────────────────────────────────────────
-      for (const n of nodes) {
-        n.x += n.vx;
-        n.y += n.vy;
-        if (n.x < 8  || n.x > W - 8)  n.vx *= -1;
-        if (n.y < 8  || n.y > H - 8)  n.vy *= -1;
+      // Dark background
+      ctx.fillStyle = "#06091a";
+      ctx.fillRect(0, 0, W, H);
+
+      // Subtle background glow inside brain region
+      const bgGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, scale * 1.1);
+      bgGlow.addColorStop(0,   "rgba(20, 60, 120, 0.35)");
+      bgGlow.addColorStop(0.6, "rgba(10, 30, 80, 0.15)");
+      bgGlow.addColorStop(1,   "rgba(6, 9, 26, 0)");
+      ctx.fillStyle = bgGlow;
+      ctx.beginPath();
+      ctx.arc(cx, cy, scale * 1.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      // ── Edges ────────────────────────────────────────────────────────────
+      for (const [a, b] of edges) {
+        const na = nodes[a];
+        const nb = nodes[b];
+        const heat = (na.activation + nb.activation) / 2;
+        const r = Math.round(30 + heat * 200);
+        const g = Math.round(150 - heat * 90);
+        const bv = Math.round(220 - heat * 180);
+        const alpha = 0.12 + heat * 0.25;
+        ctx.strokeStyle = `rgba(${r},${g},${bv},${alpha})`;
+        ctx.lineWidth = 0.6 + heat * 0.8;
+        ctx.beginPath();
+        ctx.moveTo(na.x, na.y);
+        ctx.lineTo(nb.x, nb.y);
+        ctx.stroke();
       }
 
-      // ── Edges ─────────────────────────────────────────────────────────
-      ctx.lineWidth = 0.7;
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const dx   = nodes[i].x - nodes[j].x;
-          const dy   = nodes[i].y - nodes[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist >= EDGE_DIST) continue;
-          const alpha = (1 - dist / EDGE_DIST) * 0.16;
-          ctx.strokeStyle = `rgba(${NODE_COLOR}, ${alpha})`;
-          ctx.beginPath();
-          ctx.moveTo(nodes[i].x, nodes[i].y);
-          ctx.lineTo(nodes[j].x, nodes[j].y);
-          ctx.stroke();
-        }
-      }
-
-      // ── Pulses ────────────────────────────────────────────────────────
+      // ── Pulses ────────────────────────────────────────────────────────────
       for (let i = pulses.length - 1; i >= 0; i--) {
         const p = pulses[i];
         p.t += p.speed;
         if (p.t >= 1) { pulses.splice(i, 1); continue; }
 
-        const from = nodes[p.a];
-        const to   = nodes[p.b];
-        const px   = from.x + (to.x - from.x) * p.t;
-        const py   = from.y + (to.y - from.y) * p.t;
+        const na  = nodes[p.a];
+        const nb  = nodes[p.b];
+        const px  = na.x + (nb.x - na.x) * p.t;
+        const py  = na.y + (nb.y - na.y) * p.t;
+        const fade = 1 - Math.abs(p.t - 0.5) * 2;
 
-        // Fade in/out over the pulse lifetime
-        const fade = 1 - Math.abs(p.t - 0.5) * 2.2;
-        const pulseAlpha = Math.max(0, Math.min(1, fade));
-
-        const g = ctx.createRadialGradient(px, py, 0, px, py, 9);
-        g.addColorStop(0, `rgba(${PULSE_COLOR}, ${0.95 * pulseAlpha})`);
-        g.addColorStop(0.4, `rgba(${PULSE_COLOR}, ${0.4 * pulseAlpha})`);
-        g.addColorStop(1, `rgba(${PULSE_COLOR}, 0)`);
-        ctx.fillStyle = g;
+        ctx.shadowColor = "rgba(255, 200, 50, 0.9)";
+        ctx.shadowBlur = 12;
+        const pg = ctx.createRadialGradient(px, py, 0, px, py, 7);
+        pg.addColorStop(0, `rgba(255, 220, 80, ${fade})`);
+        pg.addColorStop(1, "rgba(255, 150, 30, 0)");
+        ctx.fillStyle = pg;
         ctx.beginPath();
-        ctx.arc(px, py, 9, 0, Math.PI * 2);
+        ctx.arc(px, py, 7, 0, Math.PI * 2);
         ctx.fill();
+        ctx.shadowBlur = 0;
       }
 
-      // ── Nodes ─────────────────────────────────────────────────────────
+      // ── Nodes ─────────────────────────────────────────────────────────────
       for (const n of nodes) {
-        // Soft glow
-        const glow = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r * 4);
-        glow.addColorStop(0, `rgba(${PULSE_COLOR}, ${n.opacity * 0.18})`);
-        glow.addColorStop(1, `rgba(${PULSE_COLOR}, 0)`);
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, n.r * 4, 0, Math.PI * 2);
-        ctx.fill();
+        n.activation = Math.max(0, n.activation - n.activationDecay);
 
-        // Core dot
-        ctx.fillStyle = `rgba(${NODE_COLOR}, ${n.opacity})`;
+        const heat  = n.activation;
+        const r     = Math.round(50 + heat * 220);
+        const g     = Math.round(160 - heat * 100);
+        const bv    = Math.round(230 - heat * 200);
+        const size  = 2.2 + heat * 3.5;
+
+        // Node glow
+        if (heat > 0.1) {
+          ctx.shadowColor = `rgba(${r},${g},${bv}, ${heat * 0.8})`;
+          ctx.shadowBlur  = 8 + heat * 16;
+        }
+
+        ctx.fillStyle = `rgba(${r},${g},${bv}, ${0.5 + heat * 0.5})`;
         ctx.beginPath();
-        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+        ctx.arc(n.x, n.y, size, 0, Math.PI * 2);
         ctx.fill();
+        ctx.shadowBlur = 0;
       }
+
+      // ── Brain silhouette glow ─────────────────────────────────────────────
+      const glowPulse = 0.4 + 0.15 * Math.sin(frame * 0.025);
+      drawBrainOutline(glowPulse);
 
       raf = requestAnimationFrame(draw);
     }
 
-    // Boot
-    resize();
     draw();
 
-    const ro = new ResizeObserver(resize);
-    ro.observe(wrap);
+    const ro = new ResizeObserver(() => {
+      if (!canvas) return;
+      W = canvas.offsetWidth;
+      H = canvas.offsetHeight;
+      canvas.width  = W;
+      canvas.height = H;
+    });
+    ro.observe(canvas);
 
     return () => {
       cancelAnimationFrame(raf);
-      clearInterval(pulseTimer);
+      clearInterval(activateInterval);
+      clearInterval(pulseInterval);
       ro.disconnect();
     };
   }, []);
 
   return (
-    <div
-      ref={wrapRef}
-      style={{
-        position: "absolute",
-        inset: 0,
-        pointerEvents: "none",
-        overflow: "hidden",
-      }}
-      aria-hidden
-    >
-      <canvas
-        ref={canvasRef}
-        style={{ display: "block", width: "100%", height: "100%" }}
-      />
-    </div>
+    <canvas
+      ref={canvasRef}
+      style={{ display: "block", width: "100%", height: "100%", borderRadius: "inherit" }}
+    />
   );
 }

@@ -50,7 +50,7 @@ const features = [
     desc: "Connect Gmail, YouTube, Reddit, and any RSS feed once. Every night, Briefly fetches everything automatically. No saving, tagging, or organising — ever.",
     icon: "⚡",
     size: "large",
-    sources: ["Gmail", "YouTube", "Reddit", "RSS", "Readwise"],
+    sources: ["Gmail", "YouTube", "Reddit", "RSS", "Readwise", "HN"],
   },
   {
     num: "02",
