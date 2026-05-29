@@ -366,52 +366,124 @@ def _fetch_subscriptions_sync(
     return channels[:max_channels]
 
 
+def _fetch_channel_videos_api_sync(
+    access_token: str,
+    user_agent: str,
+    channel_id: str,
+    channel_name: str,
+    limit: int = 3,
+) -> list[FetchedArticle]:
+    """
+    Fetch recent videos for a channel via the YouTube Data API uploads playlist.
+
+    Each channel UCxxxxxxx has a corresponding uploads playlist UUxxxxxxx (UC→UU).
+    This is authenticated, so it bypasses server-IP bot detection that plagues
+    anonymous RSS requests.  Costs 1 quota unit per channel.
+    """
+    if not channel_id.startswith("UC"):
+        return []
+
+    uploads_playlist = "UU" + channel_id[2:]
+    articles: list[FetchedArticle] = []
+
+    with httpx.Client(timeout=15.0) as client:
+        resp = client.get(
+            "https://www.googleapis.com/youtube/v3/playlistItems",
+            params={"part": "snippet", "playlistId": uploads_playlist, "maxResults": limit},
+            headers={"Authorization": f"Bearer {access_token}", "User-Agent": user_agent},
+        )
+        if not resp.is_success:
+            log.debug(
+                "Uploads playlist API returned %d for channel %s — falling back to RSS",
+                resp.status_code, channel_id,
+            )
+            return []
+
+        for item in resp.json().get("items", []):
+            snippet = item.get("snippet", {})
+            resource = snippet.get("resourceId", {})
+            video_id = resource.get("videoId")
+            if not video_id:
+                continue
+            title = (snippet.get("title") or "Untitled").strip()
+            if title in ("Deleted video", "Private video"):
+                continue
+
+            published_at = None
+            if ts := snippet.get("publishedAt"):
+                try:
+                    published_at = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                except ValueError:
+                    pass
+
+            articles.append(FetchedArticle(
+                title=title,
+                url=f"https://www.youtube.com/watch?v={video_id}",
+                source_name=snippet.get("channelTitle") or channel_name,
+                source_type="youtube",
+                section="YouTube",
+                summary=(snippet.get("description") or "")[:400] or "YouTube video",
+                published_at=published_at,
+            ))
+
+    return articles
+
+
 def _fetch_subscription_videos_sync(
     channels: list[dict],
+    access_token: str,
+    user_agent: str,
     videos_per_channel: int = 2,
     *,
     max_total: int = 40,
 ) -> list[FetchedArticle]:
     """
-    Fetch recent video metadata from subscribed channels, then enrich with transcripts.
-    Caps total work so manual briefing generation stays fast.
+    Fetch recent videos from each subscribed channel.
+
+    Primary: YouTube Data API uploads playlist (authenticated, no bot detection).
+    Fallback: public RSS feed (feedparser) — used when the API call fails.
     """
     articles: list[FetchedArticle] = []
-    rss_errors = 0
 
     for ch in channels:
         if len(articles) >= max_total:
             break
+
         channel_id = ch["channel_id"]
         channel_name = ch.get("channel_name", f"YouTube · {channel_id}")
-        feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-        try:
-            remaining = max_total - len(articles)
-            per_channel = min(videos_per_channel, remaining)
-            items = _fetch_rss_sync(feed_url, limit=per_channel, source_name=channel_name)
-            if not items:
-                log.debug(
-                    "Channel %s (%s) returned 0 videos from RSS — "
-                    "may not have posted recently or feed is blocked",
-                    channel_name, channel_id,
-                )
-            for item in items:
-                item.source_type = "youtube"
-                item.section = "YouTube"
-            articles.extend(items)
-        except Exception as exc:
-            rss_errors += 1
-            log.warning("RSS fetch failed for channel %s (%s): %s", channel_name, channel_id, exc)
-            continue
+        remaining = min(videos_per_channel, max_total - len(articles))
+
+        # Primary: YouTube Data API (reliable from server IPs)
+        items = _fetch_channel_videos_api_sync(
+            access_token, user_agent, channel_id, channel_name, remaining
+        )
+
+        # Fallback: public RSS feed
+        if not items:
+            feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+            try:
+                rss_items = _fetch_rss_sync(feed_url, limit=remaining, source_name=channel_name)
+                for item in rss_items:
+                    item.source_type = "youtube"
+                    item.section = "YouTube"
+                items = rss_items
+            except Exception as exc:
+                log.debug("RSS fallback failed for %s: %s", channel_name, exc)
+
+        if not items:
+            log.debug("No videos found for channel %s (%s)", channel_name, channel_id)
+
+        articles.extend(items)
 
     if not articles:
-        if rss_errors and channels:
-            raise ValueError(
-                f"Found {len(channels)} subscribed channels but could not load their video feeds."
-            )
+        log.warning(
+            "No videos fetched from %d subscribed channels. "
+            "Channels may not have posted recently, or both API and RSS failed.",
+            len(channels),
+        )
         return []
 
-    # Newest first when published_at is available
+    # Newest first
     articles.sort(key=lambda a: a.published_at or datetime.min.replace(tzinfo=UTC), reverse=True)
     articles = articles[:max_total]
 
@@ -439,6 +511,8 @@ async def fetch_subscription_videos(
     articles = await asyncio.to_thread(
         _fetch_subscription_videos_sync,
         channels,
+        access_token,
+        user_agent,
         videos_per_channel,
         max_total=max_total,
     )

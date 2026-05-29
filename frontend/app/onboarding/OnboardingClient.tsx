@@ -361,9 +361,23 @@ export default function OnboardingPage() {
     );
   }
 
+  // Auto-dismiss error toast after 6 seconds
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(""), 6000);
+    return () => clearTimeout(t);
+  }, [error]);
+
   return (
     <div className="onboard-shell">
       <div className="onboard-glow" aria-hidden />
+
+      {error && (
+        <div className="onboard-error-toast" role="alert" onClick={() => setError("")}>
+          <span>{error}</span>
+          <button type="button" aria-label="Dismiss">×</button>
+        </div>
+      )}
 
       <header className="onboard-header">
         <Link href="/" className="onboard-logo">Briefly</Link>
@@ -762,11 +776,6 @@ export default function OnboardingPage() {
           })()}
         </div>
 
-        {error && (
-          <div className="onboard-banner onboard-banner-error" role="alert">
-            {error}
-          </div>
-        )}
       </main>
     </div>
   );
