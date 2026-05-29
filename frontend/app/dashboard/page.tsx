@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type Digest, type MeResponse, type Source } from "@/lib/api";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
@@ -21,39 +21,71 @@ export default function DashboardPage() {
   const [generateError, setGenerateError] = useState("");
   const [generateWarnings, setGenerateWarnings] = useState<string[]>([]);
 
-  useEffect(() => {
-    Promise.all([api.getMe(), api.getLatestDigest(), api.getSources()])
-      .then(([meData, digestData, sourcesData]) => {
-        if (!meData.onboarding_completed) {
-          router.replace("/onboarding");
-          return;
-        }
-        setMe(meData);
-        setDigest(digestData);
-        setSources(sourcesData);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load dashboard"))
-      .finally(() => setLoading(false));
-  }, [router]);
+  // Prevent double-generation if the effect runs twice in dev (StrictMode)
+  const generatingRef = useRef(false);
 
-  async function handleGenerate() {
+  async function runGenerate() {
+    if (generatingRef.current) return;
+    generatingRef.current = true;
     setGenerating(true);
     setGenerateError("");
     setGenerateWarnings([]);
     try {
       const result = await api.generateDigest();
       setDigest(result.digest);
-      setGenerateWarnings(result.warnings);
+      setGenerateWarnings(result.warnings ?? []);
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : "Failed to generate briefing");
     } finally {
       setGenerating(false);
+      generatingRef.current = false;
     }
   }
 
-  const fetchableSources = sources.filter((s) =>
-    FETCHABLE_SOURCE_TYPES.has(s.source_type),
-  );
+  useEffect(() => {
+    async function init() {
+      try {
+        const [meData, digestData, sourcesData] = await Promise.all([
+          api.getMe(),
+          api.getLatestDigest(),
+          api.getSources(),
+        ]);
+
+        if (!meData.onboarding_completed) {
+          router.replace("/onboarding");
+          return;
+        }
+
+        setMe(meData);
+        setDigest(digestData);
+        setSources(sourcesData);
+        setLoading(false);
+
+        // Auto-generate if there is no digest today and the user has sources
+        const today = new Date().toISOString().split("T")[0];
+        const needsDigest = !digestData || digestData.digest_date < today;
+        const hasSources = sourcesData.some((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
+
+        if (needsDigest && hasSources) {
+          runGenerate();
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load dashboard");
+        setLoading(false);
+      }
+    }
+
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
+
+  function handleSourceAdded(source: Source) {
+    setSources((prev) => [source, ...prev]);
+    // Re-generate immediately so the new source appears in the briefing
+    runGenerate();
+  }
+
+  const fetchableSources = sources.filter((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
   const greeting = me?.user.name?.split(" ")[0] ?? "there";
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -101,12 +133,11 @@ export default function DashboardPage() {
                 generating={generating}
                 generateError={generateError}
                 generateWarnings={generateWarnings}
-                onGenerate={handleGenerate}
               />
               <SourcesSidebar
                 ingestionEmail={me.ingestion_email}
                 sources={sources}
-                onSourceAdded={(s) => setSources((prev) => [s, ...prev])}
+                onSourceAdded={handleSourceAdded}
                 onSourceRemoved={(id) => setSources((prev) => prev.filter((s) => s.id !== id))}
               />
             </div>

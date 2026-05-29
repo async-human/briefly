@@ -9,6 +9,8 @@ import {
   sourceDisplayName,
 } from "./sourceLabels";
 
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+
 type SourcesSidebarProps = {
   ingestionEmail: string;
   sources: Source[];
@@ -93,6 +95,8 @@ export function SourcesSidebar({
   );
 }
 
+// ── Source tabs ───────────────────────────────────────────────────────────────
+
 type SourceTab = {
   id: string;
   label: string;
@@ -125,16 +129,31 @@ function buildSourceTabs(items: DigestItem[], sources: Source[]): SourceTab[] {
   }));
 
   if (other.length > 0) {
-    tabs.push({
-      id: "__other__",
-      label: "Other",
-      type: "other",
-      items: other,
-    });
+    tabs.push({ id: "__other__", label: "Other", type: "other", items: other });
   }
 
   return tabs;
 }
+
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+
+function BriefingItemSkeleton() {
+  return (
+    <article className="briefing-item briefing-item-skeleton" aria-hidden>
+      <span className="skeleton-block" style={{ width: 24, height: 14, borderRadius: 3 }} />
+      <div className="briefing-item-body" style={{ gap: 8 }}>
+        <span className="skeleton-block" style={{ width: "55%", height: 11 }} />
+        <span className="skeleton-block" style={{ width: "88%", height: 17 }} />
+        <span className="skeleton-block" style={{ width: "70%", height: 17 }} />
+        <span className="skeleton-block" style={{ width: "92%", height: 13, marginTop: 4 }} />
+        <span className="skeleton-block" style={{ width: "80%", height: 13 }} />
+        <span className="skeleton-block" style={{ width: "60%", height: 13 }} />
+      </div>
+    </article>
+  );
+}
+
+// ── Briefing item ─────────────────────────────────────────────────────────────
 
 function BriefingItemCard({ item, index }: { item: DigestItem; index: number }) {
   return (
@@ -158,6 +177,8 @@ function BriefingItemCard({ item, index }: { item: DigestItem; index: number }) 
   );
 }
 
+// ── Main panel ────────────────────────────────────────────────────────────────
+
 type BriefingPanelProps = {
   digest: Digest | null;
   sources: Source[];
@@ -165,7 +186,6 @@ type BriefingPanelProps = {
   generating: boolean;
   generateError: string;
   generateWarnings?: string[];
-  onGenerate: () => void;
 };
 
 export function BriefingPanel({
@@ -175,7 +195,6 @@ export function BriefingPanel({
   generating,
   generateError,
   generateWarnings = [],
-  onGenerate,
 }: BriefingPanelProps) {
   const sourceTabs = useMemo(
     () => (digest ? buildSourceTabs(digest.items, sources) : []),
@@ -197,7 +216,24 @@ export function BriefingPanel({
 
   const activeTabMeta = sourceTabs.find((tab) => tab.id === activeTab);
 
+  // ── No digest yet — show skeleton if generating, else wait-state ─────────
   if (!digest) {
+    if (generating) {
+      return (
+        <div className="briefing-panel">
+          <div className="briefing-generating-bar">
+            <span className="briefing-generating-dot" />
+            Reading your feeds…
+          </div>
+          <div className="briefing-items">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <BriefingItemSkeleton key={i} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="briefing-empty">
         <div className="briefing-empty-icon">
@@ -205,57 +241,27 @@ export function BriefingPanel({
         </div>
         <h2 className="briefing-empty-title">No briefing yet</h2>
         <p className="briefing-empty-desc">
-          Connect a source, then generate your first read — takes about 30 seconds.
+          {sourcesCount > 0
+            ? "Your briefing is being prepared. Check back in a moment."
+            : "Connect a source in the panel on the right — your briefing will generate automatically."}
         </p>
-
-        <ol className="briefing-steps">
-          <li className={sourcesCount > 0 ? "done" : ""}>
-            <span className="step-num">1</span>
-            <span>Add any source in the panel →</span>
-          </li>
-          <li>
-            <span className="step-num">2</span>
-            <span>Click generate below</span>
-          </li>
-        </ol>
-
-        <button
-          type="button"
-          className="btn-primary briefing-generate"
-          onClick={onGenerate}
-          disabled={generating || sourcesCount === 0}
-        >
-          {generating ? (
-            <>
-              <span className="btn-spinner" />
-              Reading your feeds…
-            </>
-          ) : (
-            "Generate briefing"
-          )}
-        </button>
-
-        {sourcesCount === 0 && (
-          <p className="briefing-empty-hint">
-            Add at least one source (RSS, YouTube, Reddit, or website) to continue.
-          </p>
-        )}
-        {generateError && <p className="form-error">{generateError}</p>}
-        {generateWarnings.length > 0 && (
-          <ul className="briefing-warnings">
-            {generateWarnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        )}
+        {generateError && <p className="form-error" style={{ marginTop: 16 }}>{generateError}</p>}
       </div>
     );
   }
 
+  // ── Digest exists ────────────────────────────────────────────────────────
   const showTabs = sources.length > 1 || sourceTabs.some((tab) => tab.id === "__other__");
 
   return (
     <div className="briefing-panel">
+      {generating && (
+        <div className="briefing-generating-bar">
+          <span className="briefing-generating-dot" />
+          Updating your briefing…
+        </div>
+      )}
+
       {generateWarnings.length > 0 && (
         <ul className="briefing-warnings briefing-warnings-panel">
           {generateWarnings.map((warning) => (
@@ -276,14 +282,6 @@ export function BriefingPanel({
             </>
           )}
         </div>
-        <button
-          type="button"
-          className="briefing-refresh"
-          onClick={onGenerate}
-          disabled={generating}
-        >
-          {generating ? "Generating…" : "Refresh"}
-        </button>
       </div>
 
       {showTabs && (
@@ -329,7 +327,10 @@ export function BriefingPanel({
       )}
 
       <div className="briefing-items" role="tabpanel">
-        {visibleItems.length > 0 ? (
+        {generating ? (
+          // Show skeletons overlaid when regenerating after a source was added
+          Array.from({ length: 5 }).map((_, i) => <BriefingItemSkeleton key={i} />)
+        ) : visibleItems.length > 0 ? (
           visibleItems.map((item, index) => (
             <BriefingItemCard key={item.id} item={item} index={index} />
           ))
