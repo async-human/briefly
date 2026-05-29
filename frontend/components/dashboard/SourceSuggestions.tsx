@@ -30,16 +30,16 @@ export function SourceSuggestions({
     try {
       const src = await api.addSource({ identifier: suggestion.url, name: suggestion.name });
       onAdded(src);
-      setDismissed((prev) => new Set([...prev, suggestion.url]));
+      setDismissed((prev) => new Set(Array.from(prev).concat(suggestion.url)));
     } catch {/* silent — source may already exist */
-      setDismissed((prev) => new Set([...prev, suggestion.url]));
+      setDismissed((prev) => new Set(Array.from(prev).concat(suggestion.url)));
     } finally {
       setAdding(null);
     }
   }
 
   function handleDismiss(url: string) {
-    setDismissed((prev) => new Set([...prev, url]));
+    setDismissed((prev) => new Set(Array.from(prev).concat(url)));
   }
 
   return (
