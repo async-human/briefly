@@ -48,15 +48,14 @@ function DigestDetail({ digestId }: { digestId: string }) {
   useEffect(() => {
     setLoading(true);
     setDigest(null);
-    api.getDigest(digestId).then((d) => {
-      setDigest(d);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    api.getDigest(digestId)
+      .then((d) => { setDigest(d); setLoading(false); })
+      .catch(() => setLoading(false));
   }, [digestId]);
 
   if (loading) {
     return (
-      <div className="history-detail-loading">
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "64px 0", color: "var(--text-muted)", fontSize: 14 }}>
         <span className="btn-spinner" />
         <p>Loading briefing…</p>
       </div>
@@ -64,11 +63,16 @@ function DigestDetail({ digestId }: { digestId: string }) {
   }
 
   if (!digest) {
-    return <div className="history-detail-loading"><p style={{ color: "var(--text-muted)" }}>Failed to load.</p></div>;
+    return (
+      <div style={{ padding: "64px 0", textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
+        Failed to load briefing.
+      </div>
+    );
   }
 
   return (
-    <div className="briefing-panel">
+    <>
+      {/* Toolbar */}
       <div className="briefing-toolbar">
         <div className="briefing-stats">
           <span>{digest.total_items_shown} items</span>
@@ -84,12 +88,13 @@ function DigestDetail({ digestId }: { digestId: string }) {
           )}
         </div>
       </div>
+      {/* Items */}
       <div className="briefing-items" role="list">
         {digest.items.map((item, i) => (
           <HistoryItemCard key={item.id} item={item} index={i} />
         ))}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -101,10 +106,7 @@ export default function HistoryPage() {
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
 
   useEffect(() => {
-    if (!getToken()) {
-      router.replace("/login");
-      return;
-    }
+    if (!getToken()) { router.replace("/login"); return; }
     Promise.all([api.getMe(), api.getDigests()])
       .then(([meData, list]) => {
         setMe({ name: meData.user.name, avatar_url: meData.user.avatar_url });
@@ -143,8 +145,28 @@ export default function HistoryPage() {
                 </p>
               </div>
             ) : (
-              <div className="history-grid">
-                <nav className="history-list" aria-label="Past briefings">
+              /* Inline layout styles guarantee the sidebar+detail structure renders
+                 correctly regardless of CSS class loading order or purging. */
+              <div style={{
+                display: "flex",
+                alignItems: "stretch",
+                border: "1px solid var(--border)",
+                borderRadius: 14,
+                background: "var(--bg-elevated)",
+                overflow: "hidden",
+                minHeight: 500,
+              }}>
+                {/* Sidebar — digest list */}
+                <nav
+                  aria-label="Past briefings"
+                  style={{
+                    width: 260,
+                    flexShrink: 0,
+                    borderRight: "1px solid var(--border)",
+                    overflowY: "auto",
+                    maxHeight: "76vh",
+                  }}
+                >
                   {digests.map((d) => (
                     <button
                       key={d.id}
@@ -165,8 +187,22 @@ export default function HistoryPage() {
                     </button>
                   ))}
                 </nav>
-                <div className="history-detail">
-                  {selectedId && <DigestDetail key={selectedId} digestId={selectedId} />}
+
+                {/* Detail panel — selected briefing */}
+                <div style={{
+                  flex: 1,
+                  minWidth: 0,
+                  overflowY: "auto",
+                  maxHeight: "76vh",
+                }}>
+                  {selectedId
+                    ? <DigestDetail key={selectedId} digestId={selectedId} />
+                    : (
+                      <div style={{ padding: "64px 0", textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
+                        Select a briefing to read it.
+                      </div>
+                    )
+                  }
                 </div>
               </div>
             )}
