@@ -2593,8 +2593,9 @@ footer {
   --accent-dim:    rgba(158,123,63,0.10);
   --accent-line:   rgba(158,123,63,0.28);
   display: grid;
-  grid-template-columns: 1fr 480px;
-  min-height: 100vh;
+  grid-template-columns: 1fr 460px;
+  height: 100vh;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
 }
@@ -2605,14 +2606,14 @@ footer {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 64px;
+  padding: 32px 56px;
   background: var(--bg);
   overflow: hidden;
 }
 .login-left-inner {
   position: relative;
   z-index: 1;
-  max-width: 520px;
+  max-width: 500px;
   width: 100%;
 }
 
@@ -2651,23 +2652,23 @@ footer {
 
 .login-brand {
   font-family: var(--serif);
-  font-size: 22px;
+  font-size: 20px;
   letter-spacing: -0.03em;
   color: var(--text);
   text-decoration: none;
   display: block;
-  margin-bottom: 64px;
+  margin-bottom: 24px;
 }
 
-.login-pitch { margin-bottom: 28px; }
+.login-pitch { margin-bottom: 14px; }
 .login-headline {
   font-family: var(--serif);
-  font-size: clamp(42px, 5vw, 64px);
+  font-size: clamp(32px, 3.8vw, 48px);
   font-weight: 400;
   letter-spacing: -0.035em;
-  line-height: 1.08;
+  line-height: 1.06;
   color: var(--text);
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 .login-headline-accent {
   background: linear-gradient(135deg, #7a4f1a 0%, #c9993a 45%, #9e6b28 100%);
@@ -2676,9 +2677,9 @@ footer {
   background-clip: text;
 }
 .login-pitch-sub {
-  font-size: 16px;
+  font-size: 14px;
   color: var(--text-secondary);
-  line-height: 1.7;
+  line-height: 1.6;
   max-width: 440px;
 }
 
@@ -2746,9 +2747,10 @@ footer {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px 40px;
+  padding: 32px 40px;
   border-left: 1px solid var(--border);
   background: var(--bg-elevated);
+  overflow: hidden;
 }
 
 .login-card {
@@ -2767,7 +2769,7 @@ footer {
 
 .login-card-head {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 .login-card-title {
   font-family: var(--serif);
@@ -2789,7 +2791,7 @@ footer {
   justify-content: center;
   gap: 12px;
   width: 100%;
-  padding: 15px 24px;
+  padding: 13px 24px;
   background: var(--bg);
   border: 1px solid var(--border-strong);
   border-radius: 100px;
@@ -2830,33 +2832,33 @@ footer {
 
 /* ── Responsive ── */
 @media (max-width: 860px) {
-  .login-shell { grid-template-columns: 1fr; }
-  .login-left  { padding: 48px 32px; min-height: 60vh; }
-  .login-right { border-left: none; border-top: 1px solid var(--border); padding: 48px 32px; }
-  .login-brand { margin-bottom: 40px; }
+  .login-shell { grid-template-columns: 1fr; height: auto; overflow: auto; }
+  .login-left  { padding: 40px 32px; }
+  .login-right { border-left: none; border-top: 1px solid var(--border); padding: 40px 32px; overflow: auto; }
+  .login-brand { margin-bottom: 24px; }
 }
 @media (max-width: 480px) {
-  .login-left  { padding: 40px 24px; }
-  .login-right { padding: 40px 24px; }
-  .login-headline { font-size: 38px; }
+  .login-left  { padding: 32px 20px; }
+  .login-right { padding: 32px 20px; }
+  .login-headline { font-size: 32px; }
 }
 
 /* ── LOGIN LIVE PREVIEW ── */
 .lp-preview {
   background: var(--bg);
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
-  padding: 18px 22px;
+  border-radius: 14px;
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   box-shadow: 0 4px 28px rgba(28,24,18,0.07), 0 1px 4px rgba(28,24,18,0.04);
 }
 .lp-preview-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
 .lp-preview-live { display: flex; align-items: center; gap: 7px; }
@@ -2886,28 +2888,28 @@ footer {
 .lp-preview-sources {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 6px;
 }
 .lp-source-row {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
 }
 .lp-source-icon {
-  width: 22px; height: 22px;
+  width: 18px; height: 18px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 5px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 10px;
+  font-size: 9px;
   color: var(--accent);
   background: var(--surface);
   flex-shrink: 0;
 }
 .lp-source-name {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-secondary);
-  width: 64px;
+  width: 58px;
   flex-shrink: 0;
 }
 .lp-source-bar-wrap {
@@ -2932,10 +2934,10 @@ footer {
 }
 .lp-preview-item {
   border-top: 1px solid var(--border);
-  padding-top: 13px;
+  padding-top: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 .lp-item-meta {
   display: flex;
@@ -2967,10 +2969,10 @@ footer {
 }
 .lp-item-headline {
   font-family: var(--serif);
-  font-size: 14.5px;
+  font-size: 13.5px;
   font-weight: 400;
   letter-spacing: -0.02em;
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--text);
   margin: 0;
 }
@@ -2988,11 +2990,11 @@ footer {
   margin-bottom: 4px;
 }
 .lp-why-text {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-secondary);
-  line-height: 1.55;
+  line-height: 1.5;
   margin: 0;
-  height: 38px;
+  height: 34px;
   overflow: hidden;
 }
 .lp-cursor {
@@ -3010,7 +3012,7 @@ footer {
 }
 /* Fixed-height container — nothing outside the card moves */
 .lp-preview-slot {
-  height: 150px;
+  height: 128px;
   overflow: hidden;
   position: relative;
   flex-shrink: 0;
@@ -3036,7 +3038,7 @@ footer {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-top: 10px;
+  padding-top: 8px;
   border-top: 1px solid var(--border);
 }
 .lp-footer-stat {
@@ -3100,9 +3102,9 @@ footer {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  margin-bottom: 20px;
-  padding: 14px 16px;
+  gap: 7px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
