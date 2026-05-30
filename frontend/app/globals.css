@@ -4296,8 +4296,8 @@ footer {
   .dash-sidebar { position: static; }
   .dash-user-name { display: none; }
   .briefing-empty { padding: 40px 24px; }
-  .history-grid { grid-template-columns: 1fr; align-items: start; }
-  .history-list { max-height: 280px; border-right: none; border-bottom: 1px solid var(--border); }
+  .history-grid { flex-direction: column; }
+  .history-list { width: 100%; max-height: 260px; border-right: none; border-bottom: 1px solid var(--border); }
   .history-detail { max-height: none; }
   /* Hero v2 */
   .hero-v2 { padding: 100px 24px 64px; }
@@ -4354,18 +4354,18 @@ footer {
 .dash-nav-link.active { color: var(--text-secondary); }
 
 .history-grid {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 0;
+  display: flex;
+  align-items: stretch;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--bg-elevated);
   overflow: hidden;
-  align-items: stretch;
   min-height: 500px;
 }
 
 .history-list {
+  width: 280px;
+  flex-shrink: 0;
   border-right: 1px solid var(--border);
   overflow-y: auto;
   max-height: 76vh;
@@ -4417,6 +4417,8 @@ footer {
 }
 
 .history-detail {
+  flex: 1;
+  min-width: 0;
   overflow-y: auto;
   max-height: 76vh;
 }

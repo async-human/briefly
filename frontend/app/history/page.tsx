@@ -126,7 +126,7 @@ export default function HistoryPage() {
           </div>
         ) : (
           <>
-            <header className="dash-hero" style={{ marginBottom: 32 }}>
+            <header className="dash-hero">
               <div>
                 <p className="dash-hero-label">Archive</p>
                 <h1 className="dash-hero-title">Past briefings</h1>
