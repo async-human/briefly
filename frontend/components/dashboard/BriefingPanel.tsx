@@ -319,8 +319,8 @@ function FeedbackButton({
         display: "flex",
         alignItems: "center",
         gap: 5,
-        background: "none",
-        border: "1px solid var(--border)",
+        border: "1px solid",
+        borderColor: active ? activeColor : "var(--border)",
         borderRadius: 6,
         cursor: "pointer",
         fontSize: 12,
@@ -328,7 +328,6 @@ function FeedbackButton({
         transition: "color 0.15s, border-color 0.15s, background 0.15s",
         padding: "4px 10px",
         lineHeight: 1,
-        borderColor: active ? activeColor : "var(--border)",
         background: active ? `${activeColor}12` : "transparent",
       }}
     >
