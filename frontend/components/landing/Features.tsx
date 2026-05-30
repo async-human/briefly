@@ -97,8 +97,11 @@ export function Features() {
         {/* Bento grid */}
         <div className="bento-grid">
           {/* Large card — top left, spans 2 rows */}
-          <Reveal delay={0}>
-            <motion.div whileHover={{ y: -4, transition: { duration: 0.2 } }} className="bento-cell bento-large">
+          <Reveal delay={0} className="bento-cell bento-large">
+            <motion.div
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
+              style={{ flex: 1, display: "flex", flexDirection: "column" }}
+            >
               <SpotlightCard className="bento-card-inner">
                 <div className="bento-top">
                   <span className="bento-icon">{features[0].icon}</span>
@@ -118,8 +121,11 @@ export function Features() {
 
           {/* Small cards */}
           {features.slice(1).map((f, i) => (
-            <Reveal key={f.num} delay={0.08 + i * 0.07}>
-              <motion.div whileHover={{ y: -4, transition: { duration: 0.2 } }} className="bento-cell">
+            <Reveal key={f.num} delay={0.08 + i * 0.07} className="bento-cell">
+              <motion.div
+                whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                style={{ flex: 1, display: "flex", flexDirection: "column" }}
+              >
                 <SpotlightCard className="bento-card-inner">
                   <div className="bento-top">
                     <span className="bento-icon">{f.icon}</span>
