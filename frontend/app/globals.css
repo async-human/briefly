@@ -2324,18 +2324,18 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
 }
 .roadmap-badge-now {
   color: var(--accent);
-  border-color: rgba(201,184,150,0.3);
-  background: rgba(201,184,150,0.08);
+  border-color: var(--accent-line);
+  background: var(--accent-dim);
 }
 .roadmap-badge-coming {
   color: var(--text-muted);
-  border-color: rgba(255,255,255,0.1);
-  background: transparent;
+  border-color: var(--border);
+  background: var(--bg-elevated);
 }
 .roadmap-badge-vision {
   color: var(--text-muted);
-  border-color: rgba(255,255,255,0.06);
-  background: transparent;
+  border-color: var(--border);
+  background: var(--bg-elevated);
 }
 .roadmap-card-name {
   font-family: var(--serif);
@@ -2673,8 +2673,8 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--text) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--text) 4%, transparent) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 75%);
   pointer-events: none;
@@ -2704,7 +2704,7 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   left: 12.5%;
   right: 12.5%;
   height: 2px;
-  background: rgba(255,255,255,0.06);
+  background: var(--border);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -2712,9 +2712,9 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   position: absolute;
   inset: 0 auto 0 0;
   height: 100%;
-  background: linear-gradient(90deg, rgba(201,184,150,0.75), rgba(201,184,150,0.35));
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 40%, transparent));
   border-radius: 2px;
-  box-shadow: 0 0 12px rgba(201,184,150,0.35);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .rm3-track-shimmer {
   position: absolute;
@@ -2748,23 +2748,31 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  background: var(--surface);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.25s, background 0.25s;
+  transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
+  box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.12);
 }
-.rm3-track-dot-now {
-  border-color: rgba(201,184,150,0.4);
-  background: rgba(201,184,150,0.1);
+.rm3-track-dot-now,
+.rm3-track-dot-coming,
+.rm3-track-dot-vision {
+  border-color: var(--border);
+  background: var(--surface);
 }
 .rm3-track-node.active .rm3-track-dot,
 .rm3-track-node.reached .rm3-track-dot {
-  border-color: rgba(201,184,150,0.35);
+  border-color: var(--border-strong);
+}
+.rm3-track-node.active .rm3-track-dot {
+  border-color: var(--accent-line);
+  background: var(--accent-dim);
+  box-shadow: 0 0 0 6px var(--accent-dim), 0 8px 24px -8px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .rm3-track-node.active .rm3-track-dot-now {
-  box-shadow: 0 0 0 6px rgba(201,184,150,0.08), 0 0 28px rgba(201,184,150,0.25);
+  box-shadow: 0 0 0 6px var(--accent-dim), 0 0 24px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .rm3-track-icon {
   font-size: 22px;
@@ -2790,27 +2798,55 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   transform: translateY(0);
 }
 
-/* Spotlight panel */
+/* Spotlight panel — unified card shell for every version */
 .rm3-stage-wrap {
   margin-top: 40px;
   min-height: 340px;
 }
 .rm3-spotlight {
   position: relative;
-  border-radius: 28px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.025);
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  background: var(--surface);
   padding: 36px 40px;
   overflow: hidden;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 20px 56px -28px rgba(0, 0, 0, 0.18);
+}
+.rm3-spotlight::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+  pointer-events: none;
 }
 .rm3-spotlight-now {
-  border-color: rgba(201,184,150,0.22);
-  background: linear-gradient(145deg, rgba(201,184,150,0.08) 0%, rgba(255,255,255,0.02) 45%);
-  box-shadow: 0 32px 80px -24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(201,184,150,0.2);
+  border-color: var(--accent-line);
+  background: linear-gradient(160deg, var(--accent-dim) 0%, var(--surface) 52%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 24px 64px -24px rgba(0, 0, 0, 0.2),
+    0 0 0 1px var(--accent-dim);
 }
+.rm3-spotlight-now::before {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent-line) 28%,
+    var(--accent) 50%,
+    var(--accent-line) 72%,
+    transparent
+  );
+}
+.rm3-spotlight-coming,
 .rm3-spotlight-vision {
-  opacity: 0.92;
-  border-color: rgba(255,255,255,0.05);
+  border-color: var(--border);
+  background: var(--surface);
 }
 .rm3-orb {
   position: absolute;
@@ -2845,12 +2881,14 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   font-family: var(--serif);
   font-size: clamp(100px, 14vw, 160px);
   font-weight: 700;
-  color: rgba(255,255,255,0.03);
+  color: color-mix(in srgb, var(--text) 4%, transparent);
   line-height: 1;
   pointer-events: none;
   user-select: none;
 }
-.rm3-spotlight-now .rm3-watermark { color: rgba(201,184,150,0.07); }
+.rm3-spotlight-now .rm3-watermark {
+  color: color-mix(in srgb, var(--accent) 12%, transparent);
+}
 
 .rm3-spotlight-grid {
   display: grid;
@@ -2868,13 +2906,20 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
   margin-bottom: 20px;
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.12);
 }
 .rm3-icon-stage-now {
-  border-color: rgba(201,184,150,0.35);
-  background: linear-gradient(135deg, rgba(201,184,150,0.16), rgba(201,184,150,0.04));
+  border-color: var(--accent-line);
+  background: linear-gradient(135deg, var(--accent-dim), var(--bg-elevated));
+  box-shadow: 0 8px 28px -10px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.rm3-icon-stage-coming,
+.rm3-icon-stage-vision {
+  border-color: var(--border);
+  background: var(--bg-elevated);
 }
 .rm3-icon-emoji {
   font-size: 32px;
@@ -2953,8 +2998,8 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   gap: 8px;
   padding: 10px 14px;
   border-radius: 100px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.3;
@@ -2962,8 +3007,8 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   transition: border-color 0.2s, background 0.2s, color 0.2s;
 }
 .rm3-chip:hover {
-  border-color: rgba(201,184,150,0.25);
-  background: rgba(201,184,150,0.06);
+  border-color: var(--accent-line);
+  background: var(--accent-dim);
   color: var(--text);
 }
 .rm3-chip-dot {
@@ -2972,7 +3017,12 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   border-radius: 50%;
   background: var(--accent);
   flex-shrink: 0;
-  box-shadow: 0 0 8px rgba(201,184,150,0.5);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.rm3-spotlight-coming .rm3-chip-dot,
+.rm3-spotlight-vision .rm3-chip-dot {
+  background: var(--text-muted);
+  box-shadow: none;
 }
 .rm3-details {
   margin-top: 20px;
@@ -3019,7 +3069,7 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   right: 0;
   height: 2px;
   background: linear-gradient(90deg, var(--accent), transparent);
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 /* Stage strip */
@@ -3036,20 +3086,23 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   gap: 4px;
   padding: 16px 18px;
   border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.06);
-  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  background: var(--surface);
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s, transform 0.2s;
+  box-shadow: 0 10px 28px -18px rgba(0, 0, 0, 0.14);
 }
 .rm3-strip-card:hover {
-  border-color: rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.04);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 .rm3-strip-card.active {
-  border-color: rgba(201,184,150,0.28);
-  background: rgba(201,184,150,0.06);
-  box-shadow: 0 8px 32px -8px rgba(201,184,150,0.15);
+  border-color: var(--accent-line);
+  background: linear-gradient(160deg, var(--accent-dim) 0%, var(--surface) 70%);
+  box-shadow:
+    0 12px 32px -14px color-mix(in srgb, var(--accent) 22%, transparent),
+    0 0 0 1px var(--accent-dim);
 }
 .rm3-strip-icon { font-size: 18px; line-height: 1; }
 .rm3-strip-ver {
@@ -3068,6 +3121,9 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
 .rm3-footnote {
   margin-top: 36px;
   padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -189,7 +189,7 @@ function SpotlightPanel({ stage }: { stage: (typeof stages)[0] }) {
             >
               {stage.icon}
             </motion.span>
-            <span className="rm3-icon-ring" aria-hidden />
+            {stage.status === "now" && <span className="rm3-icon-ring" aria-hidden />}
           </motion.div>
 
           <div className="rm3-spotlight-meta">
