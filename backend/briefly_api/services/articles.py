@@ -18,6 +18,7 @@ class NormalizedContent:
     clean_text: str = ""
     summary: str = ""
     source_id: str = ""  # DB Source.id — injected by collector after fetch
+    meta: dict = field(default_factory=dict)  # connector-specific extras
 
     def __post_init__(self) -> None:
         if not self.summary and self.clean_text:

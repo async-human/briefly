@@ -22,10 +22,15 @@ from sqlalchemy.orm import joinedload
 from briefly_api.db.engine import SessionLocal
 from briefly_api.db.models import Digest, UserProfile
 from briefly_api.services.briefing import run_briefing_for_scheduled_user
+from briefly_api.workers.footprint_scanner import run_nightly_scan
 
 log = logging.getLogger(__name__)
 
 _POLL_INTERVAL_SECONDS = 60
+
+# Track which calendar day the footprint scan has already run on (UTC date string).
+# Reset to None on process restart — that's fine; the scan is idempotent.
+_last_footprint_scan_date: str | None = None
 
 
 async def _get_due_users(now_utc: datetime) -> list[dict]:
@@ -70,6 +75,13 @@ async def _get_due_users(now_utc: datetime) -> list[dict]:
     return due
 
 
+async def _run_footprint_scan() -> None:
+    try:
+        await run_nightly_scan()
+    except Exception:
+        log.exception("Scheduler: footprint scan failed")
+
+
 async def _run_pipeline_for_user(user_id: str) -> None:
     try:
         result = await run_briefing_for_scheduled_user(user_id)
@@ -92,12 +104,15 @@ async def digest_scheduler_loop() -> None:
     from the FastAPI lifespan in main.py.
     """
     log.info("Digest scheduler started (polling every %ds)", _POLL_INTERVAL_SECONDS)
+    global _last_footprint_scan_date
 
     while True:
         try:
             now_utc = datetime.now(timezone.utc)
-            due_users = await _get_due_users(now_utc)
+            today = now_utc.strftime("%Y-%m-%d")
 
+            # ── Nightly digests ───────────────────────────────────────────────
+            due_users = await _get_due_users(now_utc)
             if due_users:
                 log.info(
                     "Scheduler: %d user(s) due for digest at %s UTC",
@@ -107,6 +122,14 @@ async def digest_scheduler_loop() -> None:
                     *[_run_pipeline_for_user(u["user_id"]) for u in due_users],
                     return_exceptions=True,
                 )
+
+            # ── Nightly footprint scan (01:00–01:01 UTC, once per day) ────────
+            # Runs after most users' digests have fired, uses only Gmail metadata
+            # (no email bodies), and is fully idempotent.
+            if _last_footprint_scan_date != today and now_utc.hour == 1 and now_utc.minute == 0:
+                _last_footprint_scan_date = today
+                asyncio.create_task(_run_footprint_scan())
+                log.info("Scheduler: footprint scan task scheduled for %s", today)
 
         except Exception:
             log.exception("Scheduler: error in poll loop — will retry next cycle")

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse, Response
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.api.schemas import (
@@ -46,9 +49,12 @@ from briefly_api.auth.reddit import (
     upsert_reddit_connection,
 )
 from briefly_api.config import Settings, get_settings
-from briefly_api.db.engine import get_db
-from briefly_api.db.models import Source, User
+from briefly_api.db.engine import SessionLocal, get_db
+from briefly_api.db.models import Source, User, UserProfile
+from briefly_api.embeddings.adapter import get_embedding_adapter
 from briefly_api.services.gmail import count_newsletters
+
+log = logging.getLogger(__name__)
 from briefly_api.services.youtube import count_subscriptions
 from briefly_api.services.reddit import count_subscribed_subreddits
 
@@ -127,12 +133,56 @@ async def update_onboarding_profile(
 async def complete_onboarding(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> OnboardingCompleteOut:
     if not user.profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
     user.profile.onboarding_completed = True
     await db.commit()
+
+    # Seed the Personal Relevance Vector in the background — don't block the response.
+    profile_snapshot = {
+        "role": user.profile.role,
+        "goal": user.profile.goal,
+        "interests": user.profile.interests or [],
+        "topic_clusters": user.profile.topic_clusters or [],
+    }
+    asyncio.create_task(_seed_profile_embedding(user.id, profile_snapshot, settings))
+
     return OnboardingCompleteOut(onboarding_completed=True)
+
+
+async def _seed_profile_embedding(
+    user_id: str,
+    profile_snapshot: dict,
+    settings: Settings,
+) -> None:
+    """
+    Generate and store the initial profile embedding from the user's
+    onboarding answers. This becomes the Personal Relevance Vector used
+    by RelevanceAgent to score every inbound content item.
+    """
+    try:
+        embedder = get_embedding_adapter(settings)
+        text = embedder.embed_text_for_profile(profile_snapshot)
+        if not text.strip():
+            log.warning("_seed_profile_embedding: empty profile text for user %s — skipping", user_id)
+            return
+
+        embedding = await embedder.embed(text)
+
+        async with SessionLocal() as db:
+            await db.execute(
+                update(UserProfile)
+                .where(UserProfile.user_id == user_id)
+                .values(profile_embedding=embedding)
+            )
+            await db.commit()
+
+        log.info("_seed_profile_embedding: stored %d-dim vector for user %s", len(embedding), user_id)
+
+    except Exception:
+        log.exception("_seed_profile_embedding: failed for user %s", user_id)
 
 
 # ── Gmail OAuth ───────────────────────────────────────────────────────────────

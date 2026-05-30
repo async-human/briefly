@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+from urllib.parse import urlparse
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -34,8 +38,17 @@ from briefly_api.db.engine import get_db
 from briefly_api.db.models import (
     BehavioralSignal, Digest, DigestItem, SignalType, Source, User,
 )
+from briefly_api.db.engine import SessionLocal
 from briefly_api.services.connectors.registry import detect_source, get_connector
 from briefly_api.services.connectors.types import ALL_SOURCE_TYPES
+from briefly_api.services.url_scraper import discover_rss_feed
+
+log = logging.getLogger(__name__)
+
+# Minimum number of clicks on a domain before auto-subscribing its RSS feed
+_CLICK_DISCOVERY_THRESHOLD = 2
+# Lookback window for counting clicks (days)
+_CLICK_WINDOW_DAYS = 30
 
 router = APIRouter(tags=["dashboard"])
 
@@ -413,6 +426,14 @@ async def record_feedback(
         await _bump_source_weight(user, item.source_name, body.signal_type, db)
 
     await db.commit()
+
+    # Click-to-discover: if the user has clicked articles from the same domain
+    # enough times, automatically probe for an RSS feed and add it as a source.
+    if body.signal_type == "clicked" and item.source_url:
+        asyncio.create_task(
+            _maybe_discover_from_click(user.id, item.source_url)
+        )
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -442,6 +463,86 @@ async def _bump_source_weight(
         else:
             existing_clusters.append({"_type": "source_weight", "weights": weights})
         user.profile.topic_clusters = existing_clusters
+
+
+async def _maybe_discover_from_click(user_id: str, source_url: str) -> None:
+    """
+    Confidence-gated click-to-discover:
+    Count how many times this user has clicked articles from the same domain
+    in the past _CLICK_WINDOW_DAYS days.  Once the count reaches
+    _CLICK_DISCOVERY_THRESHOLD, probe the domain for an RSS feed and
+    auto-create a Source record.
+
+    Runs as a fire-and-forget background task — never blocks the HTTP response.
+    """
+    try:
+        parsed = urlparse(source_url)
+        domain = parsed.netloc.lstrip("www.").lower()
+        if not domain:
+            return
+
+        from datetime import datetime, timedelta, timezone
+        cutoff = datetime.now(timezone.utc) - timedelta(days=_CLICK_WINDOW_DAYS)
+
+        async with SessionLocal() as db:
+            # Count clicks for any URL containing this domain
+            click_count = await db.scalar(
+                select(func.count())
+                .select_from(BehavioralSignal)
+                .where(
+                    BehavioralSignal.user_id == user_id,
+                    BehavioralSignal.signal_type == SignalType.clicked,
+                    BehavioralSignal.meta["source_url"].as_string().contains(domain),
+                    BehavioralSignal.created_at >= cutoff,
+                )
+            )
+
+            if (click_count or 0) < _CLICK_DISCOVERY_THRESHOLD:
+                return
+
+            # Don't add if a source for this domain already exists
+            existing = await db.scalar(
+                select(func.count())
+                .select_from(Source)
+                .where(
+                    Source.user_id == user_id,
+                    Source.identifier.contains(domain),
+                )
+            )
+            if existing:
+                return
+
+            # Probe the domain for an RSS feed
+            rss_url = await discover_rss_feed(f"https://{domain}")
+            if not rss_url:
+                log.debug("click_discover: no RSS found for %s (user %s)", domain, user_id)
+                return
+
+            try:
+                source = Source(
+                    user_id=user_id,
+                    source_type="rss",
+                    identifier=rss_url,
+                    name=domain,
+                    meta={
+                        "auto_discovered": True,
+                        "discovery_method": "click_signal",
+                        "confidence": 0.6,
+                        "trigger_domain": domain,
+                        "click_count": click_count,
+                    },
+                )
+                db.add(source)
+                await db.commit()
+                log.info(
+                    "click_discover: auto-added RSS '%s' for user %s after %d click(s)",
+                    rss_url, user_id, click_count,
+                )
+            except IntegrityError:
+                await db.rollback()  # race condition — another task already added it
+
+    except Exception:
+        log.exception("click_discover: unexpected error for user %s url %s", user_id, source_url)
 
 
 # ── Source suggestions ────────────────────────────────────────────────────────

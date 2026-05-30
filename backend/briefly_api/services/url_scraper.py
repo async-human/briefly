@@ -23,12 +23,18 @@ class UrlFetchError(ValueError):
 def _browser_headers(url: str) -> dict[str, str]:
     parsed = urlparse(url)
     origin = f"{parsed.scheme}://{parsed.netloc}"
+    host = parsed.netloc.lower().lstrip("www.")
+
+    # Medium serves different content based on referrer; using medium.com itself
+    # as the referrer signals an internal navigation and avoids bot-detection 403s.
+    referer = "https://medium.com/" if (host == "medium.com" or host.endswith(".medium.com")) else origin + "/"
+
     return {
         "User-Agent": _BROWSER_UA,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
         "Accept-Encoding": "gzip, deflate",
-        "Referer": origin + "/",
+        "Referer": referer,
         "Sec-Fetch-Dest": "document",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Site": "none",

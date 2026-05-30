@@ -12,6 +12,7 @@ import httpx
 from briefly_api.config import Settings
 from briefly_api.db.models import OAuthConnection
 from briefly_api.services.articles import NormalizedContent
+from briefly_api.services.medium_extractor import is_medium_sender
 
 GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
 
@@ -19,6 +20,7 @@ NEWSLETTER_QUERY = (
     "label:newsletters OR "
     "from:substack.com OR from:beehiiv.com OR from:mail.beehiiv.com OR "
     "from:convertkit.com OR from:buttondown.email OR "
+    "from:medium.com OR from:noreply@medium.com OR "
     'subject:(newsletter OR digest OR "weekly issue")'
 )
 
@@ -37,6 +39,26 @@ def _header_value(headers: list[dict], name: str) -> str:
         if header.get("name", "").lower() == name.lower():
             return header.get("value", "")
     return ""
+
+
+def _extract_raw_html(payload: dict) -> str | None:
+    """Return the raw HTML body of an email without any conversion."""
+    mime = payload.get("mimeType", "")
+    body_data = payload.get("body", {}).get("data")
+    if body_data and "html" in mime:
+        return _decode_b64url(body_data)
+
+    for part in payload.get("parts", []):
+        part_mime = part.get("mimeType", "")
+        if part_mime.startswith("multipart/"):
+            nested = _extract_raw_html(part)
+            if nested:
+                return nested
+        if part_mime == "text/html":
+            data = part.get("body", {}).get("data")
+            if data:
+                return _decode_b64url(data)
+    return None
 
 
 def _extract_body(payload: dict) -> str:
@@ -97,6 +119,16 @@ def _message_to_content(message: dict) -> NormalizedContent | None:
                 pass
 
     msg_id = message.get("id", "")
+
+    # For Medium digest emails, stash the raw HTML so the connector can
+    # extract individual article URLs before handing off to the pipeline.
+    meta: dict = {}
+    if is_medium_sender(author):
+        raw_html = _extract_raw_html(payload)
+        if raw_html:
+            meta["is_medium_digest"] = True
+            meta["raw_html"] = raw_html
+
     return NormalizedContent(
         title=subject.strip(),
         url=f"https://mail.google.com/mail/u/0/#inbox/{msg_id}",
@@ -107,6 +139,7 @@ def _message_to_content(message: dict) -> NormalizedContent | None:
         published_at=published_at,
         clean_text=body,
         summary=body[:400],
+        meta=meta,
     )
 
 
