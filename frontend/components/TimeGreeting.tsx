@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { getTimeGreeting, type TimeGreeting } from "@/lib/greeting";
+import { getTimeGreeting, type GreetingPeriod, type TimeGreeting } from "@/lib/greeting";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -14,6 +14,48 @@ function useTimeGreeting(): TimeGreeting | null {
   }, []);
 
   return greeting;
+}
+
+function GreetingIcon({
+  period,
+  emoji,
+  size = "sm",
+}: {
+  period: GreetingPeriod;
+  emoji: string;
+  size?: "sm" | "lg";
+}) {
+  return (
+    <span
+      className={`time-greeting-icon-wrap time-greeting-icon-wrap--${period} time-greeting-icon-wrap--${size}`}
+      aria-hidden
+    >
+      {period === "morning" && (
+        <>
+          <span className="time-greeting-spark time-greeting-spark--a" />
+          <span className="time-greeting-spark time-greeting-spark--b" />
+          <span className="time-greeting-spark time-greeting-spark--c" />
+        </>
+      )}
+      {period === "night" && (
+        <>
+          <span className="time-greeting-star time-greeting-star--a">✦</span>
+          <span className="time-greeting-star time-greeting-star--b">✧</span>
+        </>
+      )}
+      {period === "afternoon" && <span className="time-greeting-cloud-puff" />}
+      {period === "evening" && <span className="time-greeting-evening-glow" />}
+
+      <motion.span
+        className="time-greeting-emoji-shell"
+        initial={{ scale: 0, rotate: -24, opacity: 0 }}
+        animate={{ scale: 1, rotate: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 460, damping: 13, mass: 0.7 }}
+      >
+        <span className={`time-greeting-emoji time-greeting-emoji--${period}`}>{emoji}</span>
+      </motion.span>
+    </span>
+  );
 }
 
 export function TimeGreetingBadge() {
@@ -30,14 +72,7 @@ export function TimeGreetingBadge() {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.55, ease: EASE }}
     >
-      <motion.span
-        className="time-greeting-emoji"
-        aria-hidden
-        animate={{ y: [0, -3, 0], rotate: [0, -6, 6, 0] }}
-        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", repeatDelay: 2 }}
-      >
-        {greeting.emoji}
-      </motion.span>
+      <GreetingIcon period={greeting.period} emoji={greeting.emoji} size="sm" />
       <motion.span
         className="time-greeting-text"
         key={greeting.period}
@@ -66,15 +101,16 @@ export function TimeGreetingHero({ name }: { name: string }) {
   return (
     <>
       <motion.p
-        className="dash-hero-label"
+        className="dash-hero-label time-greeting-hero-label"
         key={`label-${greeting.period}`}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: EASE }}
       >
+        <GreetingIcon period={greeting.period} emoji={greeting.emoji} size="sm" />
         {greeting.briefingLabel}
       </motion.p>
-      <h1 className="dash-hero-title">
+      <h1 className="dash-hero-title time-greeting-hero-title">
         <motion.span
           className="time-greeting-hero-phrase"
           key={`phrase-${greeting.period}`}
@@ -92,6 +128,7 @@ export function TimeGreetingHero({ name }: { name: string }) {
         >
           {name}
         </motion.span>
+        <GreetingIcon period={greeting.period} emoji={greeting.emoji} size="lg" />
       </h1>
     </>
   );
