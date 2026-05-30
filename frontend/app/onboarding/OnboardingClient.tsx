@@ -10,11 +10,11 @@ import { AddSourceForm } from "@/components/dashboard/AddSourceForm";
 
 const ROLES = ["Founder", "Product manager", "Engineer", "Investor", "Researcher", "Other"];
 
+// Three visible steps — time picker is merged into the Done screen
 const STEPS = [
   { n: 1, label: "About you" },
   { n: 2, label: "Sources" },
-  { n: 3, label: "Delivery" },
-  { n: 4, label: "Done" },
+  { n: 3, label: "Done" },
 ];
 
 const TOPIC_SUGGESTIONS: Record<string, string[]> = {
@@ -26,7 +26,6 @@ const TOPIC_SUGGESTIONS: Record<string, string[]> = {
   Other:             ["technology", "business", "science", "design", "policy"],
 };
 const DEFAULT_TOPICS = ["AI agents", "startups", "technology", "design", "science"];
-const NEVER_SHOW_SUGGESTIONS = ["crypto prices", "celebrity news", "sports", "stock tips", "politics"];
 
 function TagInput({
   label,
@@ -35,7 +34,6 @@ function TagInput({
   tags,
   onChange,
   suggestions = [],
-  variant = "default",
 }: {
   label: string;
   hint?: string;
@@ -43,41 +41,31 @@ function TagInput({
   tags: string[];
   onChange: (tags: string[]) => void;
   suggestions?: string[];
-  variant?: "default" | "danger";
 }) {
   const [inputValue, setInputValue] = useState("");
 
   function add(raw: string) {
     const tag = raw.trim().toLowerCase().replace(/,+$/, "");
-    if (tag && !tags.includes(tag) && tags.length < 12) {
-      onChange([...tags, tag]);
-    }
+    if (tag && !tags.includes(tag) && tags.length < 12) onChange([...tags, tag]);
     setInputValue("");
   }
 
-  function remove(tag: string) {
-    onChange(tags.filter((t) => t !== tag));
-  }
+  function remove(tag: string) { onChange(tags.filter((t) => t !== tag)); }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      if (inputValue) add(inputValue);
-    }
-    if (e.key === "Backspace" && !inputValue && tags.length > 0) {
-      remove(tags[tags.length - 1]);
-    }
+    if (e.key === "Enter" || e.key === ",") { e.preventDefault(); if (inputValue) add(inputValue); }
+    if (e.key === "Backspace" && !inputValue && tags.length > 0) remove(tags[tags.length - 1]);
   }
 
-  const unusedSuggestions = suggestions.filter((s) => !tags.includes(s)).slice(0, 5);
+  const unused = suggestions.filter((s) => !tags.includes(s)).slice(0, 5);
 
   return (
     <div className="onboard-field">
       <span className="onboard-field-label">{label}</span>
       {hint && <p className="onboard-field-hint">{hint}</p>}
-      <div className={`tag-input-wrap ${variant === "danger" ? "tag-input-wrap--danger" : ""}`}>
+      <div className="tag-input-wrap">
         {tags.map((tag) => (
-          <span key={tag} className={`tag-chip ${variant === "danger" ? "tag-chip--danger" : ""}`}>
+          <span key={tag} className="tag-chip">
             {tag}
             <button type="button" onClick={() => remove(tag)} aria-label={`Remove ${tag}`}>×</button>
           </span>
@@ -92,12 +80,10 @@ function TagInput({
           placeholder={tags.length === 0 ? placeholder : ""}
         />
       </div>
-      {unusedSuggestions.length > 0 && (
+      {unused.length > 0 && (
         <div className="tag-suggestions">
-          {unusedSuggestions.map((s) => (
-            <button key={s} type="button" className="tag-suggestion" onClick={() => add(s)}>
-              + {s}
-            </button>
+          {unused.map((s) => (
+            <button key={s} type="button" className="tag-suggestion" onClick={() => add(s)}>+ {s}</button>
           ))}
         </div>
       )}
@@ -151,10 +137,9 @@ export default function OnboardingPage() {
   const [role, setRole] = useState("");
   const [goal, setGoal] = useState("");
   const [topics, setTopics] = useState<string[]>([]);
-  const [neverShow, setNeverShow] = useState<string[]>([]);
-  const [recentInsight, setRecentInsight] = useState("");
   const [digestTime, setDigestTime] = useState("07:00");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [gmailLoading, setGmailLoading] = useState(false);
   const [youtubeLoading, setYoutubeLoading] = useState(false);
   const [redditLoading, setRedditLoading] = useState(false);
@@ -169,15 +154,11 @@ export default function OnboardingPage() {
       .then(([s, meData]) => {
         setStatus(s);
         setMe(meData);
-        // Pre-populate profile fields for returning users
         if (meData.profile) {
           if (meData.profile.role) setRole(meData.profile.role);
           if (meData.profile.goal) setGoal(meData.profile.goal);
-          if (meData.profile.interests?.length) {
+          if (meData.profile.interests?.length)
             setTopics(meData.profile.interests.map((i) => i.topic).filter(Boolean));
-          }
-          if (meData.profile.never_show?.length) setNeverShow(meData.profile.never_show);
-          if (meData.profile.recent_insight) setRecentInsight(meData.profile.recent_insight);
           if (meData.profile.digest_time) setDigestTime(meData.profile.digest_time);
         }
         if (s.onboarding_completed || s.profile_started) setStep(2);
@@ -186,10 +167,7 @@ export default function OnboardingPage() {
       .finally(() => setLoading(false));
   }, [router]);
 
-  function handleSignOut() {
-    clearToken();
-    router.replace("/login");
-  }
+  function handleSignOut() { clearToken(); router.replace("/login"); }
 
   useEffect(() => {
     const gmail = searchParams.get("gmail");
@@ -200,7 +178,7 @@ export default function OnboardingPage() {
       setBanner("Gmail connected — your newsletters are now in the pipeline.");
       api.getOnboardingStatus().then(setStatus);
     } else if (gmail === "denied") {
-      setError("Google blocked Gmail access. Add your email as a test user in Google Cloud Console (OAuth consent screen → Test users), then try again.");
+      setError("Google blocked Gmail access. Add your email as a test user in Google Cloud Console, then try again.");
     } else if (gmail === "error") {
       setError("Gmail connection was cancelled or failed. Please try again.");
     }
@@ -226,7 +204,6 @@ export default function OnboardingPage() {
     }
   }, [searchParams]);
 
-  // Auto-dismiss error toast after 6 seconds
   useEffect(() => {
     if (!error) return;
     const t = setTimeout(() => setError(""), 6000);
@@ -234,91 +211,49 @@ export default function OnboardingPage() {
   }, [error]);
 
   async function handleConnectGmail() {
-    setGmailLoading(true);
-    setError("");
-    try {
-      const { url } = await api.startGmailConnect("/onboarding");
-      window.location.href = url;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start Gmail connection");
-      setGmailLoading(false);
-    }
+    setGmailLoading(true); setError("");
+    try { const { url } = await api.startGmailConnect("/onboarding"); window.location.href = url; }
+    catch (err) { setError(err instanceof Error ? err.message : "Could not start Gmail connection"); setGmailLoading(false); }
   }
-
   async function handleDisconnectGmail() {
     setError("");
-    try {
-      await api.disconnectGmail();
-      const updated = await api.getOnboardingStatus();
-      setStatus(updated);
-      setBanner("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not disconnect Gmail");
-    }
+    try { await api.disconnectGmail(); setStatus(await api.getOnboardingStatus()); setBanner(""); }
+    catch (err) { setError(err instanceof Error ? err.message : "Could not disconnect Gmail"); }
   }
-
   async function handleConnectYouTube() {
-    setYoutubeLoading(true);
-    setError("");
-    try {
-      const { url } = await api.startYouTubeConnect("/onboarding");
-      window.location.href = url;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start YouTube connection");
-      setYoutubeLoading(false);
-    }
+    setYoutubeLoading(true); setError("");
+    try { const { url } = await api.startYouTubeConnect("/onboarding"); window.location.href = url; }
+    catch (err) { setError(err instanceof Error ? err.message : "Could not start YouTube connection"); setYoutubeLoading(false); }
   }
-
   async function handleDisconnectYouTube() {
     setError("");
-    try {
-      await api.disconnectYouTube();
-      const updated = await api.getOnboardingStatus();
-      setStatus(updated);
-      setBanner("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not disconnect YouTube");
-    }
+    try { await api.disconnectYouTube(); setStatus(await api.getOnboardingStatus()); setBanner(""); }
+    catch (err) { setError(err instanceof Error ? err.message : "Could not disconnect YouTube"); }
   }
-
   async function handleConnectReddit() {
-    setRedditLoading(true);
-    setError("");
-    try {
-      const { url } = await api.startRedditConnect("/onboarding");
-      window.location.href = url;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start Reddit connection");
-      setRedditLoading(false);
-    }
+    setRedditLoading(true); setError("");
+    try { const { url } = await api.startRedditConnect("/onboarding"); window.location.href = url; }
+    catch (err) { setError(err instanceof Error ? err.message : "Could not start Reddit connection"); setRedditLoading(false); }
   }
-
   async function handleDisconnectReddit() {
     setError("");
-    try {
-      await api.disconnectReddit();
-      const updated = await api.getOnboardingStatus();
-      setStatus(updated);
-      setBanner("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not disconnect Reddit");
-    }
+    try { await api.disconnectReddit(); setStatus(await api.getOnboardingStatus()); setBanner(""); }
+    catch (err) { setError(err instanceof Error ? err.message : "Could not disconnect Reddit"); }
   }
 
   async function handleSaveProfile() {
-    setError("");
+    setSaving(true); setError("");
     try {
-      const updated = await api.updateOnboardingProfile({
+      await api.updateOnboardingProfile({
         role: role || undefined,
-        goal: goal || undefined,
+        goal: goal.trim() || undefined,
         interests: topics.length ? topics : undefined,
-        never_show: neverShow.length ? neverShow : undefined,
-        recent_insight: recentInsight.trim() || undefined,
       });
-      setStatus(updated);
       setStep(2);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -326,26 +261,23 @@ export default function OnboardingPage() {
     setError("");
     try {
       await api.addSource({ identifier: "https://hnrss.org/frontpage", name: "Hacker News" });
-      const updated = await api.getOnboardingStatus();
-      setStatus(updated);
+      setStatus(await api.getOnboardingStatus());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add Hacker News");
     }
   }
 
+  // Merges the old "Step 3" (time save) + "Step 4" (complete) into one action.
+  // Called directly when the user clicks "Open my dashboard" on Step 3.
   async function handleFinish() {
-    setFinishing(true);
-    setError("");
+    setFinishing(true); setError("");
     try {
       await api.updateOnboardingProfile({
         digest_time: digestTime,
         digest_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       await api.completeOnboarding();
-      // Refresh status so confirmation screen has the latest source counts
-      const updated = await api.getOnboardingStatus();
-      setStatus(updated);
-      setStep(4);
+      router.replace("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to finish onboarding");
       setFinishing(false);
@@ -361,13 +293,13 @@ export default function OnboardingPage() {
   if (loading) {
     return (
       <div className="onboard-shell">
-        <div className="onboard-loading">
-          <span className="btn-spinner" />
-          <p>Setting up your briefing…</p>
-        </div>
+        <div className="onboard-loading"><span className="btn-spinner" /><p>Setting up…</p></div>
       </div>
     );
   }
+
+  // Map internal step (1-3) to progress bar segment (same here, since we have 3 steps)
+  const progressStep = Math.min(step, 3);
 
   return (
     <div className="onboard-shell">
@@ -383,14 +315,9 @@ export default function OnboardingPage() {
       <header className="onboard-header">
         <Link href="/" className="onboard-logo">Briefly</Link>
         <div className="onboard-header-right">
-          <span className="onboard-step-counter">{step} / {STEPS.length}</span>
+          <span className="onboard-step-counter">{progressStep} / {STEPS.length}</span>
           <div className="onboard-profile-wrap">
-            <button
-              type="button"
-              className="onboard-avatar-btn"
-              onClick={() => setProfileMenuOpen((o) => !o)}
-              aria-label="Account menu"
-            >
+            <button type="button" className="onboard-avatar-btn" onClick={() => setProfileMenuOpen((o) => !o)} aria-label="Account menu">
               {me?.user.avatar_url ? (
                 <Image src={me.user.avatar_url} alt="" width={34} height={34} className="onboard-avatar-img" />
               ) : (
@@ -407,9 +334,7 @@ export default function OnboardingPage() {
                     <p className="onboard-profile-name">{me?.user.name ?? "Account"}</p>
                     <p className="onboard-profile-email">{me?.user.email}</p>
                   </div>
-                  <button type="button" className="onboard-signout-btn" onClick={handleSignOut}>
-                    Sign out
-                  </button>
+                  <button type="button" className="onboard-signout-btn" onClick={handleSignOut}>Sign out</button>
                 </div>
               </>
             )}
@@ -417,126 +342,89 @@ export default function OnboardingPage() {
         </div>
       </header>
 
-      <div className="onboard-progress-bar" aria-label={`Step ${step} of ${STEPS.length}`}>
+      <div className="onboard-progress-bar" aria-label={`Step ${progressStep} of ${STEPS.length}`}>
         {STEPS.map(({ n, label }) => (
           <button
             key={n}
             type="button"
-            className={`onboard-progress-segment ${step >= n ? "done" : ""} ${step === n ? "current" : ""}`}
+            className={`onboard-progress-segment ${progressStep >= n ? "done" : ""} ${progressStep === n ? "current" : ""}`}
             onClick={() => n < step && setStep(n)}
             disabled={n > step}
             aria-label={label}
-            aria-current={step === n ? "step" : undefined}
+            aria-current={progressStep === n ? "step" : undefined}
           />
         ))}
       </div>
 
       <main className="onboard-main">
         <div key={step} className="onboard-panel-wrap">
+
+          {/* ── Step 1: About you (3 questions) ─────────────────────────────── */}
           {step === 1 && (
             <section className="onboard-panel">
               <header className="onboard-panel-head">
-                <p className="onboard-eyebrow">Step 1 of 4</p>
+                <p className="onboard-eyebrow">Step 1 of 3</p>
                 <h1 className="onboard-title">Tell us about yourself</h1>
-                <p className="onboard-desc">
-                  Five quick questions. This is what makes your first digest feel personal.
-                </p>
+                <p className="onboard-desc">Three quick questions — this is what makes your first digest feel personal.</p>
               </header>
 
               <div className="onboard-fields">
-
                 {/* Q1 — Role */}
                 <div className="onboard-field">
                   <span className="onboard-field-label">What best describes you?</span>
                   <div className="onboard-role-grid">
                     {ROLES.map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        className={`onboard-role-pill ${role === r ? "selected" : ""}`}
-                        onClick={() => setRole(r)}
-                      >
+                      <button key={r} type="button" className={`onboard-role-pill ${role === r ? "selected" : ""}`} onClick={() => setRole(r)}>
                         {r}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Q2 — Goal */}
+                {/* Q2 — Goal (single line) */}
                 <label className="onboard-field">
-                  <span className="onboard-field-label">What are you trying to get better at or stay informed about?</span>
-                  <textarea
-                    className="onboard-input onboard-textarea"
-                    placeholder="e.g. Building an AI product and staying ahead of what's happening in the space"
+                  <span className="onboard-field-label">What&apos;s your main focus right now?</span>
+                  <input
+                    type="text"
+                    className="onboard-input"
+                    placeholder="e.g. Building an AI product and staying ahead of the space"
                     value={goal}
                     onChange={(e) => setGoal(e.target.value)}
-                    rows={2}
                   />
                 </label>
 
                 {/* Q3 — Topics */}
                 <TagInput
                   label="What topics should always be on your radar?"
-                  hint="Press Enter after each topic. These become your relevance filter."
+                  hint="These become your relevance filter — Briefly scores every article against them."
                   placeholder="e.g. AI agents, startup funding, product design"
                   tags={topics}
                   onChange={setTopics}
                   suggestions={TOPIC_SUGGESTIONS[role] ?? DEFAULT_TOPICS}
                 />
-
-                {/* Q4 — Never show */}
-                <TagInput
-                  label="What do you never want to see?"
-                  hint="Briefly will hard-filter these from every digest."
-                  placeholder="e.g. crypto prices, celebrity news, sports"
-                  tags={neverShow}
-                  onChange={setNeverShow}
-                  suggestions={NEVER_SHOW_SUGGESTIONS}
-                  variant="danger"
-                />
-
-                {/* Q5 — Recent insight (optional) */}
-                <label className="onboard-field">
-                  <span className="onboard-field-label">
-                    Share something you read recently that changed how you think.
-                    <span className="onboard-field-optional"> Optional</span>
-                  </span>
-                  <p className="onboard-field-hint">Helps Briefly understand the kind of thinking you find valuable.</p>
-                  <textarea
-                    className="onboard-input onboard-textarea"
-                    placeholder='e.g. "The Andreessen essay on software eating the world made me see infrastructure companies differently"'
-                    value={recentInsight}
-                    onChange={(e) => setRecentInsight(e.target.value)}
-                    rows={2}
-                  />
-                </label>
-
               </div>
 
               <div className="onboard-actions">
-                <button type="button" className="btn-primary onboard-cta" onClick={handleSaveProfile}>
-                  Continue
+                <button type="button" className="btn-primary onboard-cta" onClick={handleSaveProfile} disabled={saving}>
+                  {saving ? <><span className="btn-spinner btn-spinner-light" /> Saving…</> : "Continue"}
                 </button>
-                <button type="button" className="onboard-ghost" onClick={() => setStep(2)}>
-                  Skip for now
-                </button>
+                <button type="button" className="onboard-ghost" onClick={() => setStep(2)}>Skip for now</button>
               </div>
             </section>
           )}
 
+          {/* ── Step 2: Connect accounts ─────────────────────────────────────── */}
           {step === 2 && (
             <section className="onboard-panel onboard-panel-wide">
               <header className="onboard-panel-head">
-                <p className="onboard-eyebrow">Step 2 of 4</p>
+                <p className="onboard-eyebrow">Step 2 of 3</p>
                 <h1 className="onboard-title">Connect your accounts</h1>
                 <p className="onboard-desc">
                   Connect once — Briefly reads everything you already follow so you don&apos;t have to rebuild your reading list.
                 </p>
               </header>
 
-              {banner && (
-                <div className="onboard-banner onboard-banner-success">{banner}</div>
-              )}
+              {banner && <div className="onboard-banner onboard-banner-success">{banner}</div>}
 
               {/* Gmail */}
               <article className={`onboard-account-card ${status?.gmail_connected ? "connected" : ""}`}>
@@ -548,9 +436,7 @@ export default function OnboardingPage() {
                     {status?.gmail_connected ? (
                       <div className="onboard-account-meta">
                         {status.gmail_email && <span className="onboard-account-meta-email">{status.gmail_email}</span>}
-                        {status.newsletter_count != null && (
-                          <span className="onboard-account-meta-stat">{status.newsletter_count}+ newsletters</span>
-                        )}
+                        {status.newsletter_count != null && <span className="onboard-account-meta-stat">{status.newsletter_count}+ newsletters</span>}
                       </div>
                     ) : (
                       <p className="onboard-account-hint">Only newsletter-like emails — never personal mail.</p>
@@ -584,10 +470,8 @@ export default function OnboardingPage() {
                           <span className="onboard-account-meta-stat">{status.youtube_channel_count} channels</span>
                         ) : (
                           <span className="onboard-account-meta-warn">
-                            No channels found — your YouTube subscriptions may be set to private.{" "}
-                            <a href="https://www.youtube.com/account_privacy" target="_blank" rel="noreferrer" style={{ color: "inherit", textDecoration: "underline" }}>
-                              Check privacy settings ↗
-                            </a>
+                            No channels found — your YouTube subscriptions may be private.{" "}
+                            <a href="https://www.youtube.com/account_privacy" target="_blank" rel="noreferrer" style={{ color: "inherit", textDecoration: "underline" }}>Check settings ↗</a>
                           </span>
                         )}
                       </div>
@@ -619,9 +503,7 @@ export default function OnboardingPage() {
                     <p className="onboard-account-sub">All subreddits you subscribe to</p>
                     {status?.reddit_connected ? (
                       <div className="onboard-account-meta">
-                        {status.reddit_subreddit_count != null && (
-                          <span className="onboard-account-meta-stat">{status.reddit_subreddit_count} subreddits</span>
-                        )}
+                        {status.reddit_subreddit_count != null && <span className="onboard-account-meta-stat">{status.reddit_subreddit_count} subreddits</span>}
                       </div>
                     ) : (
                       <p className="onboard-account-hint">Hot posts from your subscriptions — no manual entry needed.</p>
@@ -643,14 +525,11 @@ export default function OnboardingPage() {
               </article>
 
               {/* RSS / URL fallback */}
-              <div className="onboard-secondary" style={{ marginTop: "24px" }}>
+              <div className="onboard-secondary" style={{ marginTop: 24 }}>
                 <div className="onboard-secondary-card">
                   <div className="onboard-secondary-head">
                     <span className="onboard-secondary-icon">RSS</span>
-                    <div>
-                      <h3>Add any URL</h3>
-                      <p>Blogs, news sites, RSS feeds, or any website</p>
-                    </div>
+                    <div><h3>Add any URL</h3><p>Blogs, news sites, RSS feeds, or any website</p></div>
                   </div>
                   <div className="onboard-add-form">
                     <AddSourceForm onAdded={() => api.getOnboardingStatus().then(setStatus)} />
@@ -660,81 +539,45 @@ export default function OnboardingPage() {
                 <div className="onboard-secondary-card">
                   <div className="onboard-secondary-head">
                     <span className="onboard-secondary-icon">HN</span>
-                    <div>
-                      <h3>Quick add</h3>
-                      <p>Popular sources, one tap</p>
-                    </div>
+                    <div><h3>Quick add</h3><p>Popular sources, one tap</p></div>
                   </div>
-                  <button type="button" className="onboard-chip-btn" onClick={handleAddHackerNews}>
-                    Hacker News
-                  </button>
+                  <button type="button" className="onboard-chip-btn" onClick={handleAddHackerNews}>Hacker News</button>
                   {(status?.sources_count ?? 0) > 0 && (
-                    <p className="onboard-source-count">
-                      {status?.sources_count} source{(status?.sources_count ?? 0) === 1 ? "" : "s"} connected
-                    </p>
+                    <p className="onboard-source-count">{status?.sources_count} source{(status?.sources_count ?? 0) === 1 ? "" : "s"} connected</p>
                   )}
                 </div>
               </div>
 
               <div className="onboard-actions">
+                {/* Proactive hint — visible always, changes tone once connected */}
+                <p className={`onboard-hint ${canContinueStep2 ? "onboard-hint--success" : ""}`}>
+                  {canContinueStep2
+                    ? "✓ You're connected — ready to continue."
+                    : "Connect at least one account or add a URL above to continue."}
+                </p>
                 <button
                   type="button"
                   className="btn-primary onboard-cta"
-                  onClick={() => status?.onboarding_completed ? router.replace("/dashboard") : setStep(3)}
+                  onClick={() => setStep(3)}
                   disabled={!canContinueStep2}
                 >
-                  {status?.onboarding_completed ? "Go to dashboard" : "Continue"}
-                </button>
-                {!canContinueStep2 && (
-                  <p className="onboard-hint">Connect at least one account or add a source.</p>
-                )}
-              </div>
-            </section>
-          )}
-
-          {step === 3 && (
-            <section className="onboard-panel">
-              <header className="onboard-panel-head">
-                <p className="onboard-eyebrow">Step 3 of 4</p>
-                <h1 className="onboard-title">When should we deliver?</h1>
-                <p className="onboard-desc">
-                  Briefly runs every morning. Pick the time that fits your routine.
-                </p>
-              </header>
-
-              <div className="onboard-time-card">
-                <label className="onboard-field">
-                  <span className="onboard-field-label">Delivery time</span>
-                  <input
-                    type="time"
-                    className="onboard-input onboard-time-input"
-                    value={digestTime}
-                    onChange={(e) => setDigestTime(e.target.value)}
-                  />
-                </label>
-                <p className="onboard-time-note">
-                  Timezone detected: {Intl.DateTimeFormat().resolvedOptions().timeZone}
-                </p>
-              </div>
-
-              <div className="onboard-actions">
-                <button
-                  type="button"
-                  className="btn-primary onboard-cta"
-                  onClick={handleFinish}
-                  disabled={finishing}
-                >
-                  {finishing ? <><span className="btn-spinner btn-spinner-light" /> Setting up…</> : "Set up my briefing"}
+                  Continue
                 </button>
               </div>
             </section>
           )}
 
-          {step === 4 && (() => {
+          {/* ── Step 3: Done — time picker + stats + CTA ─────────────────────── */}
+          {step === 3 && (() => {
             const newsletterCount = status?.newsletter_count ?? 0;
             const ytCount = status?.youtube_channel_count ?? 0;
             const redditCount = status?.reddit_subreddit_count ?? 0;
-            const rssCount = Math.max(0, (status?.sources_count ?? 0) - (newsletterCount > 0 ? 1 : 0) - (ytCount > 0 ? 1 : 0) - (redditCount > 0 ? 1 : 0));
+            const rssCount = Math.max(0,
+              (status?.sources_count ?? 0)
+              - (newsletterCount > 0 ? 1 : 0)
+              - (ytCount > 0 ? 1 : 0)
+              - (redditCount > 0 ? 1 : 0)
+            );
             const stats = [
               newsletterCount > 0 && { n: newsletterCount, label: "newsletters" },
               ytCount > 0 && { n: ytCount, label: "YouTube channels" },
@@ -746,9 +589,6 @@ export default function OnboardingPage() {
               <section className="onboard-panel onboard-confirm">
                 <div className="onboard-confirm-icon" aria-hidden>✓</div>
                 <h1 className="onboard-confirm-title">You&apos;re all set</h1>
-                <p className="onboard-confirm-time">
-                  Your first Briefly arrives tomorrow at <strong>{digestTime}</strong>.
-                </p>
 
                 {stats.length > 0 && (
                   <div className="onboard-confirm-stats">
@@ -761,22 +601,42 @@ export default function OnboardingPage() {
                   </div>
                 )}
 
+                {/* Time picker — merged here from old step 3 */}
+                <div className="onboard-time-card" style={{ marginTop: 28, marginBottom: 8 }}>
+                  <label className="onboard-field" style={{ textAlign: "left" }}>
+                    <span className="onboard-field-label">Deliver my briefing at</span>
+                    <input
+                      type="time"
+                      className="onboard-input onboard-time-input"
+                      value={digestTime}
+                      onChange={(e) => setDigestTime(e.target.value)}
+                    />
+                  </label>
+                  <p className="onboard-time-note">
+                    Timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                  </p>
+                </div>
+
                 <p className="onboard-confirm-note">
-                  Briefly will read everything above, pick the most relevant stories for you, and deliver them every morning. Nothing to do — just show up.
+                  Briefly will read everything above, pick the most relevant stories for you, and deliver them every morning — nothing to do, just show up.
                 </p>
 
                 <button
                   type="button"
                   className="btn-primary onboard-cta"
-                  onClick={() => router.replace("/dashboard")}
+                  onClick={handleFinish}
+                  disabled={finishing}
                 >
-                  Open my dashboard
+                  {finishing ? <><span className="btn-spinner btn-spinner-light" /> Opening dashboard…</> : "Open my dashboard →"}
                 </button>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
+                  We&apos;ll start generating your first briefing as soon as you land.
+                </p>
               </section>
             );
           })()}
-        </div>
 
+        </div>
       </main>
     </div>
   );

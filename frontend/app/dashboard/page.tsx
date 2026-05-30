@@ -17,19 +17,35 @@ export default function DashboardPage() {
   const [sources, setSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [generatingPhase, setGeneratingPhase] = useState(0);
+  const [neverShow, setNeverShow] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [generateError, setGenerateError] = useState("");
   const [generateWarnings, setGenerateWarnings] = useState<string[]>([]);
 
-  // Prevent double-generation if the effect runs twice in dev (StrictMode)
   const generatingRef = useRef(false);
+  const phaseTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  function clearPhaseTimers() {
+    phaseTimers.current.forEach(clearTimeout);
+    phaseTimers.current = [];
+  }
 
   async function runGenerate() {
     if (generatingRef.current) return;
     generatingRef.current = true;
     setGenerating(true);
+    setGeneratingPhase(0);
     setGenerateError("");
     setGenerateWarnings([]);
+
+    // Advance phase text every few seconds so the wait feels active
+    clearPhaseTimers();
+    phaseTimers.current = [
+      setTimeout(() => setGeneratingPhase(1), 4000),
+      setTimeout(() => setGeneratingPhase(2), 9000),
+    ];
+
     try {
       const result = await api.generateDigest();
       setDigest(result.digest);
@@ -37,7 +53,9 @@ export default function DashboardPage() {
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : "Failed to generate briefing");
     } finally {
+      clearPhaseTimers();
       setGenerating(false);
+      setGeneratingPhase(0);
       generatingRef.current = false;
     }
   }
@@ -59,16 +77,14 @@ export default function DashboardPage() {
         setMe(meData);
         setDigest(digestData);
         setSources(sourcesData);
+        setNeverShow(meData.profile?.never_show ?? []);
         setLoading(false);
 
-        // Auto-generate if there is no digest today and the user has sources
         const today = new Date().toISOString().split("T")[0];
         const needsDigest = !digestData || digestData.digest_date < today;
         const hasSources = sourcesData.some((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
 
-        if (needsDigest && hasSources) {
-          runGenerate();
-        }
+        if (needsDigest && hasSources) runGenerate();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load dashboard");
         setLoading(false);
@@ -76,21 +92,28 @@ export default function DashboardPage() {
     }
 
     init();
+    return () => clearPhaseTimers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   function handleSourceAdded(source: Source) {
     setSources((prev) => [source, ...prev]);
-    // Re-generate immediately so the new source appears in the briefing
     runGenerate();
+  }
+
+  async function handleNeverShowChange(tags: string[]) {
+    setNeverShow(tags);
+    try {
+      await api.updateOnboardingProfile({ never_show: tags });
+    } catch {
+      // optimistic — state already updated, silent failure is acceptable
+    }
   }
 
   const fetchableSources = sources.filter((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
   const greeting = me?.user.name?.split(" ")[0] ?? "there";
   const today = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
+    weekday: "long", month: "long", day: "numeric",
   });
 
   return (
@@ -131,6 +154,7 @@ export default function DashboardPage() {
                 sources={fetchableSources}
                 sourcesCount={fetchableSources.length}
                 generating={generating}
+                generatingPhase={generatingPhase}
                 generateError={generateError}
                 generateWarnings={generateWarnings}
               />
@@ -140,6 +164,8 @@ export default function DashboardPage() {
                 gmailConnected={me.gmail_connected}
                 onSourceAdded={handleSourceAdded}
                 onSourceRemoved={(id) => setSources((prev) => prev.filter((s) => s.id !== id))}
+                neverShow={neverShow}
+                onNeverShowChange={handleNeverShowChange}
               />
             </div>
           </>

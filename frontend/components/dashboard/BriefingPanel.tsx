@@ -11,6 +11,56 @@ import {
   sourceDisplayName,
 } from "./sourceLabels";
 
+// ── Never-show inline editor ──────────────────────────────────────────────────
+
+function NeverShowEditor({
+  tags,
+  onSave,
+}: {
+  tags: string[];
+  onSave: (tags: string[]) => void;
+}) {
+  const [inputValue, setInputValue] = useState("");
+
+  function add(raw: string) {
+    const tag = raw.trim().toLowerCase().replace(/,+$/, "");
+    if (tag && !tags.includes(tag)) onSave([...tags, tag]);
+    setInputValue("");
+  }
+
+  function remove(tag: string) { onSave(tags.filter((t) => t !== tag)); }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") { e.preventDefault(); if (inputValue) add(inputValue); }
+    if (e.key === "Backspace" && !inputValue && tags.length > 0) remove(tags[tags.length - 1]);
+  }
+
+  return (
+    <div>
+      <div className="tag-input-wrap tag-input-wrap--danger" style={{ marginBottom: 8 }}>
+        {tags.map((tag) => (
+          <span key={tag} className="tag-chip tag-chip--danger">
+            {tag}
+            <button type="button" onClick={() => remove(tag)} aria-label={`Remove ${tag}`}>×</button>
+          </span>
+        ))}
+        <input
+          type="text"
+          className="tag-input"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={() => { if (inputValue) add(inputValue); }}
+          placeholder={tags.length === 0 ? "e.g. crypto, sports, politics" : ""}
+        />
+      </div>
+      {tags.length === 0 && (
+        <p style={{ fontSize: 12, color: "var(--text-muted)" }}>Nothing filtered yet. Add topics to block.</p>
+      )}
+    </div>
+  );
+}
+
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 type SourcesSidebarProps = {
@@ -19,6 +69,8 @@ type SourcesSidebarProps = {
   gmailConnected: boolean;
   onSourceAdded: (source: Source) => void;
   onSourceRemoved: (sourceId: string) => void;
+  neverShow: string[];
+  onNeverShowChange: (tags: string[]) => void;
 };
 
 export function SourcesSidebar({
@@ -27,6 +79,8 @@ export function SourcesSidebar({
   gmailConnected,
   onSourceAdded,
   onSourceRemoved,
+  neverShow,
+  onNeverShowChange,
 }: SourcesSidebarProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -45,10 +99,10 @@ export function SourcesSidebar({
   return (
     <aside className="dash-sidebar">
       <div className="dash-card">
-        <p className="dash-card-label">Ingestion email</p>
-        <h2 className="dash-card-title">Forward newsletters here</h2>
+        <p className="dash-card-label">Newsletter intake</p>
+        <h2 className="dash-card-title">Get any newsletter in your briefing</h2>
         <p className="dash-card-desc">
-          Any email sent to this address becomes a source in your briefing.
+          Forward it to this address once — it becomes a permanent source, scored and included every morning.
         </p>
         <div className="ingestion-box">
           <code className="ingestion-email">{ingestionEmail}</code>
@@ -103,6 +157,14 @@ export function SourcesSidebar({
       <SourceSuggestions existingSources={sources} onAdded={onSourceAdded} />
 
       <ReadwiseCard sources={sources} onAdded={onSourceAdded} onRemoved={onSourceRemoved} />
+
+      {/* Never-show filter — moved here from onboarding */}
+      <div className="dash-card">
+        <p className="dash-card-label">Filters</p>
+        <h2 className="dash-card-title">Topics to skip</h2>
+        <p className="dash-card-desc">These are hard-filtered from every briefing, no matter the source.</p>
+        <NeverShowEditor tags={neverShow} onSave={onNeverShowChange} />
+      </div>
     </aside>
   );
 }
@@ -252,21 +314,26 @@ function FeedbackButton({
     <button
       type="button"
       aria-label={label}
-      title={label}
       onClick={onClick}
       style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
         background: "none",
-        border: "none",
+        border: "1px solid var(--border)",
+        borderRadius: 6,
         cursor: "pointer",
-        fontSize: 14,
+        fontSize: 12,
         color: active ? activeColor : "var(--text-muted)",
-        transition: "color 0.15s, transform 0.1s",
-        transform: active ? "scale(1.2)" : "scale(1)",
-        padding: "2px 4px",
+        transition: "color 0.15s, border-color 0.15s, background 0.15s",
+        padding: "4px 10px",
         lineHeight: 1,
+        borderColor: active ? activeColor : "var(--border)",
+        background: active ? `${activeColor}12` : "transparent",
       }}
     >
-      {icon}
+      <span style={{ fontSize: 13 }}>{icon}</span>
+      <span>{label}</span>
     </button>
   );
 }
@@ -310,7 +377,7 @@ function BriefingItemCard({ item, digestId, index }: { item: DigestItem; digestI
         <h3 className="briefing-item-headline">{item.headline}</h3>
         {item.summary && <p className="briefing-item-summary">{item.summary}</p>}
         <blockquote className="briefing-item-why">{item.why_it_matters}</blockquote>
-        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
           <FeedbackButton icon="👍" label="More like this" active={liked} activeColor="var(--accent)" onClick={handleLike} />
           <FeedbackButton icon="👎" label="Less like this" active={disliked} activeColor="#c47070" onClick={handleDislike} />
         </div>
@@ -321,11 +388,18 @@ function BriefingItemCard({ item, digestId, index }: { item: DigestItem; digestI
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
+const GENERATING_PHASES = [
+  "Fetching from your sources…",
+  "Scoring what matters to you…",
+  "Writing your briefing…",
+];
+
 type BriefingPanelProps = {
   digest: Digest | null;
   sources: Source[];
   sourcesCount: number;
   generating: boolean;
+  generatingPhase?: number;
   generateError: string;
   generateWarnings?: string[];
 };
@@ -335,6 +409,7 @@ export function BriefingPanel({
   sources,
   sourcesCount,
   generating,
+  generatingPhase = 0,
   generateError,
   generateWarnings = [],
 }: BriefingPanelProps) {
@@ -365,7 +440,7 @@ export function BriefingPanel({
         <div className="briefing-panel">
           <div className="briefing-generating-bar">
             <span className="briefing-generating-dot" />
-            Reading your feeds…
+            {GENERATING_PHASES[generatingPhase] ?? GENERATING_PHASES[0]}
           </div>
           <div className="briefing-items">
             {Array.from({ length: 5 }).map((_, i) => (
