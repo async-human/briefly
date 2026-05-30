@@ -31,7 +31,7 @@ export function BrainCanvas() {
 
       // Scatter neurons across the full hero with slight margin
       nodes = [];
-      const count = Math.min(180, Math.floor((W * H) / 6000));
+      const count = Math.min(220, Math.floor((W * H) / 4500));
       for (let i = 0; i < count; i++) {
         nodes.push({
           x: W * 0.04 + Math.random() * W * 0.92,
@@ -91,9 +91,9 @@ export function BrainCanvas() {
         const na = nodes[a], nb = nodes[b];
         const heat = (na.act + nb.act) * 0.5;
         // base opacity very low; rises slightly when nodes are active
-        const alpha = 0.05 + heat * 0.10;
+        const alpha = 0.14 + heat * 0.22;
         ctx.strokeStyle = `rgba(158,123,63,${alpha})`;
-        ctx.lineWidth   = 0.6 + heat * 0.5;
+        ctx.lineWidth   = 0.7 + heat * 0.8;
         ctx.beginPath();
         ctx.moveTo(na.x, na.y);
         ctx.lineTo(nb.x, nb.y);
@@ -110,7 +110,7 @@ export function BrainCanvas() {
         const py = na.y + (nb.y - na.y) * p.t;
         const fade = Math.max(0, 1 - Math.abs(p.t - 0.5) * 2.5);
         const g = ctx.createRadialGradient(px, py, 0, px, py, 6);
-        g.addColorStop(0, `rgba(200,155,60,${0.45 * fade})`);
+        g.addColorStop(0, `rgba(200,155,60,${0.75 * fade})`);
         g.addColorStop(1, "rgba(200,155,60,0)");
         ctx.fillStyle = g;
         ctx.beginPath();
@@ -121,8 +121,8 @@ export function BrainCanvas() {
       // Neuron bodies
       for (const n of nodes) {
         n.act = Math.max(0, n.act - n.decay);
-        const alpha = 0.10 + n.act * 0.45;
-        const r     = 1.2 + n.act * 2.6;
+        const alpha = 0.22 + n.act * 0.60;
+        const r     = 1.5 + n.act * 3.2;
         ctx.fillStyle = `rgba(158,123,63,${alpha})`;
         ctx.beginPath();
         ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
