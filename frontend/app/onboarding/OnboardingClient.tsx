@@ -152,8 +152,14 @@ export default function OnboardingPage() {
   useEffect(() => {
     Promise.all([api.getOnboardingStatus(), api.getMe()])
       .then(([s, meData]) => {
+        // Completed users should be on the dashboard, not onboarding
+        if (s.onboarding_completed) {
+          router.replace("/dashboard");
+          return;
+        }
         setStatus(s);
         setMe(meData);
+        // Pre-fill saved values so returning mid-flow users don't start blank
         if (meData.profile) {
           if (meData.profile.role) setRole(meData.profile.role);
           if (meData.profile.goal) setGoal(meData.profile.goal);
@@ -161,7 +167,7 @@ export default function OnboardingPage() {
             setTopics(meData.profile.interests.map((i) => i.topic).filter(Boolean));
           if (meData.profile.digest_time) setDigestTime(meData.profile.digest_time);
         }
-        if (s.onboarding_completed || s.profile_started) setStep(2);
+        // Always start at step 1 — never skip ahead
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load onboarding"))
       .finally(() => setLoading(false));
