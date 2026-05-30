@@ -203,15 +203,31 @@ export default function DashboardPage() {
                 <TimeGreetingHero name={greeting} />
                 <p className="dash-hero-date">{today}</p>
               </div>
-              <div className="dash-hero-meta">
-                <div className="meta-pill">
-                  <span className="meta-value">{sources.length}</span>
-                  <span className="meta-label">sources</span>
+              <div className="dash-hero-right">
+                <div className="dash-hero-meta">
+                  <div className="meta-pill">
+                    <span className="meta-value">{sources.length}</span>
+                    <span className="meta-label">sources</span>
+                  </div>
+                  <div className="meta-pill">
+                    <span className="meta-value">{digest?.total_items_shown ?? "—"}</span>
+                    <span className="meta-label">items today</span>
+                  </div>
+                  {(me.reading_streak ?? 0) > 0 && (
+                    <div className="meta-pill meta-pill-streak">
+                      <span className="meta-value">{me.reading_streak}</span>
+                      <span className="meta-label">day streak 🔥</span>
+                    </div>
+                  )}
                 </div>
-                <div className="meta-pill">
-                  <span className="meta-value">{digest?.total_items_shown ?? "—"}</span>
-                  <span className="meta-label">items today</span>
-                </div>
+                {digest && !generating && (
+                  <a
+                    href={`/dashboard/read/${digest.id}`}
+                    className="dash-read-btn"
+                  >
+                    Read today&apos;s brief →
+                  </a>
+                )}
               </div>
             </header>
 

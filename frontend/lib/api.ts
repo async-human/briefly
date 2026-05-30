@@ -65,6 +65,7 @@ export type MeResponse = {
   gmail_connected: boolean;
   youtube_connected: boolean;
   reddit_connected: boolean;
+  reading_streak: number;
 };
 
 export type OnboardingStatus = {
@@ -80,6 +81,20 @@ export type OnboardingStatus = {
   sources_count: number;
 };
 
+export type MemoryConnection = {
+  type: string;
+  description: string;
+  digest_id?: string;
+  item_id?: string;
+};
+
+export type SkippedItem = {
+  title: string;
+  source: string;
+  reason: string;
+  score: number;
+};
+
 export type DigestItem = {
   id: string;
   position: number;
@@ -90,6 +105,10 @@ export type DigestItem = {
   source_name: string | null;
   source_url: string | null;
   all_sources: Record<string, unknown>[];
+  memory_connections: MemoryConnection[];
+  was_saved: boolean;
+  was_clicked: boolean;
+  duplicate_count: number;
 };
 
 export type Digest = {
@@ -102,6 +121,7 @@ export type Digest = {
   total_items_shown: number;
   created_at: string;
   items: DigestItem[];
+  meta: { skipped?: SkippedItem[] };
 };
 
 export type GenerateDigestResponse = {
@@ -244,6 +264,18 @@ export const api = {
   // Item feedback
   recordFeedback: (body: { signal_type: string; digest_item_id: string; digest_id?: string }) =>
     request<void>("/api/v1/feedback", { method: "POST", body: JSON.stringify(body) }),
+
+  // Reading session completion — records a "opened" signal with elapsed time
+  completeReading: (digestId: string, readTimeSec: number) =>
+    request<void>("/api/v1/feedback", {
+      method: "POST",
+      body: JSON.stringify({
+        signal_type: "opened",
+        digest_item_id: digestId,   // reuse field to carry digest id
+        digest_id: digestId,
+        read_time_seconds: readTimeSec,
+      }),
+    }).catch(() => { /* non-critical */ }),
 
   // Readwise
   connectReadwise: (api_key: string) =>

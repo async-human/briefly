@@ -66,6 +66,15 @@ async def init_db() -> None:
             )
         except Exception as exc:
             logger.warning("onboarding_completed migration: %s", exc)
+        try:
+            await conn.execute(
+                text("""
+                    ALTER TABLE digests
+                    ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT '{}'::jsonb
+                """)
+            )
+        except Exception as exc:
+            logger.warning("digest.meta migration: %s", exc)
     logger.info("Database initialized")
 
 

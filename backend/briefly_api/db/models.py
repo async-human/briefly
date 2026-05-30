@@ -301,6 +301,7 @@ class Digest(Base):
     total_items_shown: Mapped[int] = mapped_column(Integer, default=0)
     sources_included: Mapped[list[str]] = mapped_column(JSONB, default=list)  # source IDs
     pipeline_duration_ms: Mapped[int | None] = mapped_column(Integer)
+    meta: Mapped[dict] = mapped_column(JSONB, default=dict)  # skipped items, pipeline extras
 
     # Delivery
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

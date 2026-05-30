@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import date, timedelta
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -80,6 +81,34 @@ async def _resolve_source(body: SourceCreate, settings: Settings) -> tuple[str, 
     return detected.source_type, detected.identifier
 
 
+async def _compute_streak(user_id: str, db: AsyncSession) -> int:
+    """Return the number of consecutive days the user has had a digest."""
+    result = await db.execute(
+        select(Digest.digest_date)
+        .where(Digest.user_id == user_id, Digest.status.in_(["sent", "ready"]))
+        .order_by(Digest.digest_date.desc())
+        .limit(366)
+    )
+    dates_str = [row[0] for row in result]
+    if not dates_str:
+        return 0
+
+    dates = sorted([date.fromisoformat(d) for d in dates_str], reverse=True)
+    today = date.today()
+
+    # Only count as active if the most recent digest is today or yesterday
+    if dates[0] < today - timedelta(days=1):
+        return 0
+
+    streak = 1
+    for i in range(1, len(dates)):
+        if dates[i] == dates[i - 1] - timedelta(days=1):
+            streak += 1
+        else:
+            break
+    return streak
+
+
 @router.get("/me", response_model=MeOut)
 async def get_me(
     user: User = Depends(get_current_user),
@@ -91,6 +120,7 @@ async def get_me(
     gmail = await get_gmail_connection(db, user.id)
     youtube = await get_youtube_connection(db, user.id)
     reddit = await get_reddit_connection(db, user.id)
+    streak = await _compute_streak(user.id, db)
     return MeOut(
         user=UserOut.model_validate(user),
         profile=profile,
@@ -99,6 +129,7 @@ async def get_me(
         gmail_connected=gmail is not None,
         youtube_connected=youtube is not None,
         reddit_connected=reddit is not None,
+        reading_streak=streak,
     )
 
 

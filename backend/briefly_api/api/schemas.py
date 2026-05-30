@@ -95,6 +95,7 @@ class MeOut(BaseModel):
     gmail_connected: bool = False
     youtube_connected: bool = False
     reddit_connected: bool = False
+    reading_streak: int = 0  # consecutive days with a digest
 
 
 class DigestItemOut(BaseModel):
@@ -107,6 +108,10 @@ class DigestItemOut(BaseModel):
     source_name: str | None
     source_url: str | None
     all_sources: list[dict] = Field(default_factory=list)
+    memory_connections: list[dict] = Field(default_factory=list)
+    was_saved: bool = False
+    was_clicked: bool = False
+    duplicate_count: int = 1
 
     model_config = {"from_attributes": True}
 
@@ -121,6 +126,7 @@ class DigestOut(BaseModel):
     total_items_shown: int
     created_at: datetime
     items: list[DigestItemOut] = Field(default_factory=list)
+    meta: dict = Field(default_factory=dict)  # skipped items, pipeline extras
 
     model_config = {"from_attributes": True}
 

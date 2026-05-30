@@ -149,6 +149,22 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
 
     digest_id = str(uuid.uuid4())
     resend_message_id = ctx.__dict__.get("resend_message_id")
+    # Build human-readable skipped-item list for the reading-mode transparency layer
+    _REASON_LABELS = {
+        "never_show":    "Topic you've blocked",
+        "low_relevance": "Low relevance score",
+        "crowded_out":   "Good fit — cut for length",
+    }
+    skipped_preview = [
+        {
+            "title":  item.title,
+            "source": item.source_name or "",
+            "reason": _REASON_LABELS.get(item.drop_reason, item.drop_reason or "Filtered"),
+            "score":  round(item.relevance_score, 2),
+        }
+        for item in (list(getattr(ctx, "dropped_items", [])) + list(getattr(ctx, "crowded_out_items", [])))[:25]
+    ]
+
     digest = Digest(
         id=digest_id,
         user_id=ctx.user.user_id,
@@ -163,6 +179,7 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
         total_items_shown=ctx.total_shown,
         pipeline_duration_ms=ctx.pipeline_duration_ms,
         resend_message_id=resend_message_id,
+        meta={"skipped": skipped_preview},
     )
     session.add(digest)
 
