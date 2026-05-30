@@ -27,17 +27,14 @@ export function DashboardNav({
           <Link href="/dashboard" className="dash-logo">Briefly</Link>
         </div>
         <nav className="dash-nav-tabs" aria-label="Dashboard sections">
-          <Link
-            href="/dashboard"
-            className={`dash-nav-link${pathname === "/dashboard" ? " active" : ""}`}
-          >
+          <Link href="/dashboard" className={`dash-nav-link${pathname === "/dashboard" ? " active" : ""}`}>
             Today
           </Link>
-          <Link
-            href="/history"
-            className={`dash-nav-link${pathname === "/history" ? " active" : ""}`}
-          >
+          <Link href="/history" className={`dash-nav-link${pathname === "/history" ? " active" : ""}`}>
             History
+          </Link>
+          <Link href="/settings" className={`dash-nav-link${pathname === "/settings" ? " active" : ""}`}>
+            Preferences
           </Link>
         </nav>
         <div className="dash-nav-right">

@@ -8,6 +8,60 @@ import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { HistoryArchive } from "@/components/history/HistoryArchive";
 import { getToken } from "@/lib/auth";
 
+function HistorySkeleton() {
+  return (
+    <>
+      {/* Hero */}
+      <div className="dash-skeleton-hero">
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <span className="skeleton-block" style={{ width: 60, height: 10, display: "block" }} />
+          <span className="skeleton-block" style={{ width: 200, height: 34, display: "block" }} />
+          <span className="skeleton-block" style={{ width: 120, height: 13, display: "block" }} />
+        </div>
+        <div style={{ display: "flex", gap: 12 }}>
+          {[1, 2].map((i) => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
+              <span className="skeleton-block" style={{ width: 28, height: 28, display: "block" }} />
+              <span className="skeleton-block" style={{ width: 52, height: 11, display: "block" }} />
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* History grid */}
+      <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden", minHeight: 480, background: "var(--bg-elevated)" }}>
+        {/* Sidebar */}
+        <div style={{ width: 260, flexShrink: 0, borderRight: "1px solid var(--border)", padding: "8px 0" }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>
+              <span className="skeleton-block" style={{ width: 80, height: 10, display: "block" }} />
+              <span className="skeleton-block" style={{ width: "85%", height: 13, display: "block" }} />
+              <span className="skeleton-block" style={{ width: "65%", height: 13, display: "block" }} />
+              <span className="skeleton-block" style={{ width: 60, height: 10, display: "block" }} />
+            </div>
+          ))}
+        </div>
+        {/* Detail */}
+        <div style={{ flex: 1, padding: "0" }}>
+          <div style={{ padding: "14px 24px", borderBottom: "1px solid var(--border)" }}>
+            <span className="skeleton-block" style={{ width: 220, height: 11, display: "block" }} />
+          </div>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} style={{ display: "flex", gap: 20, padding: "20px 24px", borderBottom: "1px solid var(--border)" }}>
+              <span className="skeleton-block" style={{ width: 24, height: 14, display: "block", flexShrink: 0 }} />
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 9 }}>
+                <span className="skeleton-block" style={{ width: "45%", height: 10, display: "block" }} />
+                <span className="skeleton-block" style={{ width: "80%", height: 17, display: "block" }} />
+                <span className="skeleton-block" style={{ width: "65%", height: 17, display: "block" }} />
+                <span className="skeleton-block" style={{ width: "92%", height: 13, display: "block" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function HistoryPage() {
   const router = useRouter();
   const [digests, setDigests] = useState<DigestSummary[]>([]);
@@ -37,10 +91,7 @@ export default function HistoryPage() {
       <DashboardNav userName={me?.name ?? null} avatarUrl={me?.avatar_url} />
       <main className="dash-main">
         {loading ? (
-          <div className="dash-loading-state">
-            <span className="btn-spinner" />
-            <p>Loading history…</p>
-          </div>
+          <HistorySkeleton />
         ) : (
           <>
             <header className="dash-hero history-page-hero">

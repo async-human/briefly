@@ -10,6 +10,76 @@ const FETCHABLE_SOURCE_TYPES = new Set([
   "rss", "youtube", "youtube_account", "reddit", "reddit_account", "url", "gmail",
 ]);
 
+function SkeletonBlock({ w, h, mb = 0 }: { w: number | string; h: number; mb?: number }) {
+  return (
+    <span
+      className="skeleton-block"
+      style={{ width: w, height: h, marginBottom: mb, display: "block" }}
+    />
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <>
+      {/* Hero */}
+      <div className="dash-skeleton-hero">
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <SkeletonBlock w={64} h={10} />
+          <SkeletonBlock w={240} h={34} />
+          <SkeletonBlock w={180} h={13} />
+        </div>
+        <div style={{ display: "flex", gap: 12 }}>
+          {[1, 2].map((i) => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
+              <SkeletonBlock w={28} h={28} />
+              <SkeletonBlock w={44} h={11} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Grid */}
+      <div className="dash-skeleton-grid">
+        {/* Briefing panel */}
+        <div className="briefing-panel" style={{ overflow: "hidden" }}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)" }}>
+            <SkeletonBlock w={200} h={11} />
+          </div>
+          <div style={{ padding: "8px 0" }}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} style={{ display: "flex", gap: 20, padding: "20px 24px", borderBottom: "1px solid var(--border)" }}>
+                <SkeletonBlock w={24} h={14} />
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 9 }}>
+                  <SkeletonBlock w="50%" h={10} />
+                  <SkeletonBlock w="88%" h={17} />
+                  <SkeletonBlock w="72%" h={17} />
+                  <SkeletonBlock w="90%" h={13} />
+                  <SkeletonBlock w="75%" h={13} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {[{ lines: 4, btn: true }, { lines: 3, btn: false }].map((card, ci) => (
+            <div key={ci} className="dash-card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <SkeletonBlock w={80} h={10} />
+              <SkeletonBlock w="55%" h={20} />
+              {Array.from({ length: card.lines - 2 }).map((_, i) => (
+                <SkeletonBlock key={i} w={i % 2 === 0 ? "90%" : "75%"} h={13} />
+              ))}
+              {card.btn && <SkeletonBlock w="100%" h={38} mb={4} />}
+            </div>
+          ))}
+        </aside>
+      </div>
+    </>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [me, setMe] = useState<MeResponse | null>(null);
@@ -122,10 +192,7 @@ export default function DashboardPage() {
 
       <main className="dash-main">
         {loading ? (
-          <div className="dash-loading-state">
-            <span className="btn-spinner" />
-            <p>Loading your briefing…</p>
-          </div>
+          <DashboardSkeleton />
         ) : error || !me ? (
           <p className="form-error dash-error">{error || "Something went wrong"}</p>
         ) : (
