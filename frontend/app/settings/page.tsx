@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, type Profile } from "@/lib/api";
+import { api } from "@/lib/api";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { getToken } from "@/lib/auth";
 
@@ -144,7 +144,6 @@ export default function SettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
 
   // Local editable state
   const [role, setRole] = useState("");
@@ -179,7 +178,6 @@ export default function SettingsPage() {
         if (!meData.onboarding_completed) { router.replace("/onboarding"); return; }
         setMe({ name: meData.user.name, avatar_url: meData.user.avatar_url });
         const p = meData.profile;
-        setProfile(p);
         if (p) {
           setRole(p.role ?? "");
           setGoal(p.goal ?? "");
@@ -191,7 +189,8 @@ export default function SettingsPage() {
       })
       .catch(() => router.replace("/login"))
       .finally(() => setLoading(false));
-    return () => savedTimers.current.forEach(clearTimeout);
+    const timers = savedTimers.current;
+    return () => timers.forEach(clearTimeout);
   }, [router]);
 
   async function saveProfile() {
