@@ -7,6 +7,7 @@ const stages = [
   {
     version: "V1",
     status: "now" as const,
+    icon: "⚡",
     name: "Self-Building Digest",
     tagline: "The core loop. Reads everything. Writes for you.",
     features: [
@@ -20,6 +21,7 @@ const stages = [
   {
     version: "V2",
     status: "coming" as const,
+    icon: "✏",
     name: "Manual Capture Layer",
     tagline: "Add your own voice to the second brain.",
     features: [
@@ -33,6 +35,7 @@ const stages = [
   {
     version: "V3",
     status: "coming" as const,
+    icon: "◎",
     name: "Ask Briefly",
     tagline: "Conversational search across everything it knows.",
     features: [
@@ -46,6 +49,7 @@ const stages = [
   {
     version: "V4",
     status: "vision" as const,
+    icon: "✦",
     name: "Knowledge Graph",
     tagline: "Proactive intelligence that works for you in the background.",
     features: [
@@ -58,34 +62,19 @@ const stages = [
   },
 ];
 
-const STATUS_CONFIG = {
-  now: {
-    badge: "Available now",
-    badgeClass: "roadmap-badge-now",
-    opacity: 1,
-    borderColor: "rgba(201,184,150,0.3)",
-    glow: true,
-  },
-  coming: {
-    badge: "Coming soon",
-    badgeClass: "roadmap-badge-coming",
-    opacity: 0.6,
-    borderColor: "rgba(255,255,255,0.07)",
-    glow: false,
-  },
-  vision: {
-    badge: "Vision",
-    badgeClass: "roadmap-badge-vision",
-    opacity: 0.38,
-    borderColor: "rgba(255,255,255,0.05)",
-    glow: false,
-  },
+const STATUS = {
+  now:    { badge: "Live now",    badgeClass: "roadmap-badge-now",    opacity: 1,    dim: false },
+  coming: { badge: "Coming soon", badgeClass: "roadmap-badge-coming", opacity: 0.62, dim: true  },
+  vision: { badge: "Vision",      badgeClass: "roadmap-badge-vision", opacity: 0.38, dim: true  },
 };
+
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 export function Roadmap() {
   return (
     <section className="roadmap-section" id="roadmap">
       <div className="roadmap-inner">
+
         <Reveal>
           <div className="section-header-centered">
             <p className="section-eyebrow">Roadmap</p>
@@ -95,87 +84,78 @@ export function Roadmap() {
               <span className="hero-gradient-text">Here&apos;s where we&apos;re taking you.</span>
             </h2>
             <p className="section-body">
-              Each version ships independently and is valuable on its own. Pro members get every version
-              as it ships — no price increase, no re-subscription.
+              Each version ships independently and is valuable on its own.
+              Pro members get every version as it ships — no price increase.
             </p>
           </div>
         </Reveal>
 
-        {/* Timeline connector line */}
-        <div className="roadmap-timeline" aria-hidden>
-          <motion.div
-            className="roadmap-timeline-fill"
-            initial={{ scaleX: 0 }}
-            whileInView={{ scaleX: 1 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 1.6, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
-          />
-          {stages.map((s, i) => (
-            <div
-              key={s.version}
-              className={`roadmap-dot${s.status === "now" ? " roadmap-dot-now" : ""}`}
-              style={{ left: `${(i / (stages.length - 1)) * 100}%` }}
-            />
-          ))}
-        </div>
-
-        {/* Stage cards */}
-        <div className="roadmap-cards">
+        {/* ── Vertical timeline ── */}
+        <div className="rm-timeline">
           {stages.map((stage, i) => {
-            const cfg = STATUS_CONFIG[stage.status];
-            return (
-              <motion.div
-                key={stage.version}
-                className={`roadmap-card roadmap-card-${stage.status}`}
-                initial={{ opacity: 0, y: 28 }}
-                whileInView={{ opacity: cfg.opacity, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ delay: 0.1 + i * 0.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                whileHover={
-                  stage.status === "now"
-                    ? { y: -6, transition: { duration: 0.2 } }
-                    : { opacity: Math.min(cfg.opacity + 0.15, 0.85), transition: { duration: 0.2 } }
-                }
-                style={{ borderColor: cfg.borderColor }}
-              >
-                {cfg.glow && <div className="roadmap-card-glow" aria-hidden />}
+            const cfg = STATUS[stage.status];
+            const isLast = i === stages.length - 1;
 
-                <div className="roadmap-card-top">
-                  <span className="roadmap-version">{stage.version}</span>
-                  <span className={`roadmap-badge ${cfg.badgeClass}`}>{cfg.badge}</span>
+            return (
+              <div key={stage.version} className="rm-row">
+
+                {/* Spine: icon dot + connecting line */}
+                <div className="rm-spine" aria-hidden>
+                  <div className={`rm-icon-wrap${stage.status === "now" ? " rm-icon-live" : ""}`}>
+                    <span className="rm-icon">{stage.icon}</span>
+                  </div>
+                  {!isLast && <div className="rm-connector" />}
                 </div>
 
-                <h3 className="roadmap-card-name">{stage.name}</h3>
-                <p className="roadmap-card-tagline">{stage.tagline}</p>
+                {/* Card */}
+                <motion.div
+                  className={`rm-card${stage.status === "now" ? " rm-card-live" : ""}`}
+                  style={{ opacity: cfg.opacity }}
+                  initial={{ opacity: 0, x: 20 }}
+                  whileInView={{ opacity: cfg.opacity, x: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ delay: i * 0.1, duration: 0.55, ease: EASE }}
+                >
+                  <div className="rm-card-header">
+                    <span className="rm-ver">{stage.version}</span>
+                    <span className={`roadmap-badge ${cfg.badgeClass}`}>{cfg.badge}</span>
+                  </div>
 
-                <ul className="roadmap-features">
-                  {stage.features.map((f) => (
-                    <li key={f} className="roadmap-feature">
-                      <span className="roadmap-check" aria-hidden>
-                        {stage.status === "now" ? "✓" : "◌"}
-                      </span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
+                  <h3 className="rm-name">{stage.name}</h3>
+                  <p className="rm-tagline">{stage.tagline}</p>
 
-                {stage.status === "now" && (
-                  <a href="/login" className="roadmap-cta-btn">
-                    Start with V1 free →
-                  </a>
-                )}
-              </motion.div>
+                  <ul className="rm-features">
+                    {stage.features.map((f) => (
+                      <li key={f} className="rm-feature">
+                        <span className="rm-check" aria-hidden>
+                          {stage.status === "now" ? "✓" : "◌"}
+                        </span>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+
+                  {stage.status === "now" && (
+                    <a href="/login" className="rm-cta">
+                      Start with V1 free →
+                    </a>
+                  )}
+                </motion.div>
+
+              </div>
             );
           })}
         </div>
 
         <Reveal delay={0.3}>
           <p className="roadmap-footnote">
-            Pro members get V2, V3, and V4 as they ship — included in the $9/month. No price changes, no re-subscription.
+            Pro members get V2, V3, and V4 as they ship — included in the $9/month.
+            No price changes, no re-subscription.
             <br />
             The earlier you join, the more you benefit from the compounding.
           </p>
         </Reveal>
+
       </div>
     </section>
   );

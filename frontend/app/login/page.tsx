@@ -204,7 +204,16 @@ export default function LoginPage() {
     const token = getToken();
     if (!token) { setChecking(false); return; }
     api.getMe()
-      .then((me) => router.replace(me.onboarding_completed ? "/dashboard" : "/onboarding"))
+      .then((me) => {
+        if (me.onboarding_completed) {
+          // Returning user — take them straight to their digest feed
+          router.replace("/dashboard");
+        } else {
+          // Has a token but hasn't finished setup — show the sign-in page so
+          // they can re-authenticate and proceed through onboarding normally
+          setChecking(false);
+        }
+      })
       .catch(() => setChecking(false));
   }, [router]);
 

@@ -2575,57 +2575,104 @@ footer {
   transition: transform 0.25s ease, opacity 0.2s ease;
   transform-origin: center;
 }
-.nav-hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-.nav-hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
-.nav-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+.nav-hamburger span:nth-child(1) { transform-origin: center; }
+.nav-hamburger span:nth-child(3) { transform-origin: center; }
 
+/* ── Mobile overlay ── */
 .nav-mobile-menu {
   position: fixed;
   inset: 0;
   z-index: 150;
   display: flex;
   flex-direction: column;
+  background: var(--bg);
+  padding: 0 32px 48px;
+}
+
+/* Close × button — top-right of overlay */
+.nav-mobile-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 80px 32px 48px;
-  background: var(--bg);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  z-index: 10;
 }
-.nav-mobile-menu a {
+.nav-mobile-close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* Brand wordmark inside overlay */
+.nav-mobile-brand {
   font-family: var(--serif);
-  font-size: clamp(26px, 7vw, 36px);
+  font-size: 20px;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  padding-top: 28px;
+  margin-bottom: 40px;
+}
+
+/* Nav links */
+.nav-mobile-links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.nav-mobile-links a {
+  font-family: var(--serif);
+  font-size: clamp(28px, 8vw, 40px);
   font-weight: 400;
   letter-spacing: -0.025em;
   color: var(--text);
   text-decoration: none;
-  line-height: 1.3;
-  transition: color 0.2s;
-  text-align: center;
+  line-height: 1.25;
+  padding: 6px 0;
+  transition: color 0.15s;
 }
-.nav-mobile-menu a:hover { color: var(--accent); }
-.nav-mobile-divider {
-  width: 40px;
-  height: 1px;
-  background: var(--border);
-  margin: 16px 0;
+.nav-mobile-links a:hover { color: var(--accent); }
+
+/* CTAs at the bottom */
+.nav-mobile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 32px;
+  border-top: 1px solid var(--border);
 }
 .nav-mobile-signin {
-  font-family: var(--sans) !important;
-  font-size: 15px !important;
-  color: var(--text-secondary) !important;
-  letter-spacing: 0 !important;
+  display: block;
+  text-align: center;
+  font-size: 15px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 12px;
+  transition: color 0.2s;
 }
+.nav-mobile-signin:hover { color: var(--text); }
 .nav-mobile-cta {
-  font-family: var(--sans) !important;
-  font-size: 15px !important;
-  font-weight: 500 !important;
-  letter-spacing: 0 !important;
-  color: var(--bg) !important;
+  display: block;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--bg);
   background: var(--text);
-  padding: 14px 32px;
+  text-decoration: none;
+  padding: 14px 24px;
   border-radius: 100px;
-  margin-top: 8px;
+  transition: opacity 0.2s;
 }
+.nav-mobile-cta:hover { opacity: 0.88; }
 
 /* ── RESPONSIVE (landing page) ── */
 @media (max-width: 900px) {
@@ -2664,8 +2711,7 @@ footer {
   /* CTA steps: 2×2 grid */
   .cta-steps-row { grid-template-columns: 1fr 1fr; }
 
-  /* Roadmap cards: 2 columns */
-  .roadmap-cards { grid-template-columns: 1fr 1fr; gap: 10px; }
+  /* Roadmap: vertical timeline needs no mobile overrides */
 
   /* Pricing: single column */
   .pricing-v2-cards { grid-template-columns: 1fr; }
@@ -2706,9 +2752,7 @@ footer {
   .cta-step-card { padding: 20px 12px; }
   .cta-step-label { font-size: 14px; }
 
-  /* Roadmap: single column on phones */
-  .roadmap-cards { grid-template-columns: 1fr; }
-  .roadmap-card { padding: 22px 18px; }
+  /* Roadmap: vertical timeline — no overrides needed */
 
   /* Typography scale-down */
   .section-heading { font-size: clamp(24px, 8vw, 34px); }
@@ -2739,6 +2783,172 @@ footer {
   /* Pricing card internals */
   .pricing-v2-card { padding: 28px 22px; }
   .pricing-v2-cards { gap: 14px; }
+}
+
+/* ── ROADMAP V2 — vertical timeline ────────────────────────────────────────
+   Replaces the old horizontal 4-column grid.
+   Works identically on desktop, tablet, and mobile — no media queries needed.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.rm-timeline {
+  max-width: 680px;
+  margin: 56px auto 64px;
+  display: flex;
+  flex-direction: column;
+}
+
+.rm-row {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 0 20px;
+}
+
+/* ── Spine (left column) ── */
+.rm-spine {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 5px;
+}
+
+.rm-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+  z-index: 1;
+  transition: border-color 0.3s;
+}
+.rm-icon-live {
+  border-color: var(--accent-line);
+  background: var(--accent-dim);
+  box-shadow: 0 0 16px rgba(158,123,63,0.2);
+  animation: rm-icon-breathe 3s ease-in-out infinite;
+}
+@keyframes rm-icon-breathe {
+  0%, 100% { box-shadow: 0 0 12px rgba(158,123,63,0.15); }
+  50%       { box-shadow: 0 0 24px rgba(158,123,63,0.32); }
+}
+.rm-icon {
+  line-height: 1;
+  display: block;
+}
+
+.rm-connector {
+  width: 1px;
+  flex: 1;
+  min-height: 28px;
+  margin: 10px 0;
+  background: linear-gradient(to bottom, var(--accent-line) 0%, var(--border) 100%);
+}
+
+/* ── Card (right column) ── */
+.rm-card {
+  padding-bottom: 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rm-row:last-child .rm-card { padding-bottom: 0; }
+
+.rm-card-live {
+  /* Subtle left accent line on the active card */
+  padding-left: 20px;
+  border-left: 2px solid var(--accent-line);
+  margin-left: -20px;
+}
+
+.rm-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+
+.rm-ver {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.rm-name {
+  font-family: var(--serif);
+  font-size: clamp(18px, 3vw, 24px);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  color: var(--text);
+  margin: 0;
+}
+
+.rm-tagline {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.rm-features {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 4px 0 0;
+}
+
+.rm-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.rm-check {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+  flex-shrink: 0;
+  margin-top: 3px;
+  opacity: 0.9;
+}
+
+.rm-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  width: fit-content;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--accent-line);
+  border-radius: 100px;
+  padding: 9px 20px;
+  background: var(--accent-dim);
+  transition: background 0.2s, border-color 0.2s, gap 0.2s;
+}
+.rm-cta:hover {
+  background: rgba(158,123,63,0.15);
+  border-color: rgba(158,123,63,0.4);
+  gap: 10px;
+}
+
+/* Light page badge colour overrides */
+.light-page .roadmap-badge-coming,
+.light-page .roadmap-badge-vision {
+  border-color: var(--border-strong);
 }
 
 /* ── LOGIN PAGE ── */
@@ -5359,10 +5569,8 @@ footer {
   /* CTA */
   .cta-v2 { padding: 100px 24px; }
   .cta-steps-row { grid-template-columns: 1fr 1fr; }
-  /* Roadmap */
+  /* Roadmap — vertical timeline, no grid overrides needed */
   .roadmap-section { padding: 80px 24px; }
-  .roadmap-cards { grid-template-columns: 1fr 1fr; gap: 12px; }
-  .roadmap-timeline { display: none; }
   /* Compare */
   .compare-section { padding: 80px 24px; }
   .compare-header-row { display: none; }

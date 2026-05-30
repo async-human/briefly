@@ -13,7 +13,6 @@ export function Nav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Lock body scroll while mobile menu is open
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
@@ -36,29 +35,44 @@ export function Nav() {
           <li><a href="/login" className="nav-cta">Get started free</a></li>
         </ul>
 
-        {/* Hamburger button — mobile only */}
+        {/* Hamburger — mobile only */}
         <button
-          className={`nav-hamburger${menuOpen ? " open" : ""}`}
-          onClick={() => setMenuOpen((v) => !v)}
-          aria-label={menuOpen ? "Close menu" : "Open menu"}
-          aria-expanded={menuOpen}
+          className="nav-hamburger"
+          onClick={() => setMenuOpen(true)}
+          aria-label="Open menu"
         >
-          <span />
-          <span />
-          <span />
+          <span /><span /><span />
         </button>
       </nav>
 
-      {/* Full-screen mobile menu */}
+      {/* Full-screen mobile overlay */}
       {menuOpen && (
         <div className="nav-mobile-menu" role="dialog" aria-modal="true">
-          <a href="#how"     onClick={close}>How it works</a>
-          <a href="#compare" onClick={close}>Why Briefly</a>
-          <a href="#roadmap" onClick={close}>Roadmap</a>
-          <a href="#pricing" onClick={close}>Pricing</a>
-          <div className="nav-mobile-divider" />
-          <a href="/login" onClick={close} className="nav-mobile-signin">Sign in</a>
-          <a href="/login" onClick={close} className="nav-mobile-cta">Get started free →</a>
+
+          {/* Explicit close button in top-right of overlay */}
+          <button
+            className="nav-mobile-close"
+            onClick={close}
+            aria-label="Close menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+              <path d="M4 4l12 12M16 4L4 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>
+
+          <div className="nav-mobile-brand">Briefly</div>
+
+          <nav className="nav-mobile-links">
+            <a href="#how"     onClick={close}>How it works</a>
+            <a href="#compare" onClick={close}>Why Briefly</a>
+            <a href="#roadmap" onClick={close}>Roadmap</a>
+            <a href="#pricing" onClick={close}>Pricing</a>
+          </nav>
+
+          <div className="nav-mobile-actions">
+            <a href="/login" onClick={close} className="nav-mobile-signin">Sign in</a>
+            <a href="/login" onClick={close} className="nav-mobile-cta">Get started free</a>
+          </div>
         </div>
       )}
     </>
