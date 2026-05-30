@@ -2655,8 +2655,15 @@ footer {
   margin: 0 auto;
   padding: 18px 32px;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: "brand tabs account";
   align-items: center;
+  column-gap: 20px;
+}
+.dash-nav-brand {
+  grid-area: brand;
+  justify-self: start;
+  min-width: 0;
 }
 .dash-logo {
   font-family: var(--serif);
@@ -2664,9 +2671,10 @@ footer {
   color: var(--text);
   text-decoration: none;
   letter-spacing: -0.03em;
-  justify-self: start;
+  white-space: nowrap;
 }
 .dash-nav-tabs {
+  grid-area: tabs;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -2675,6 +2683,9 @@ footer {
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
   justify-self: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
 }
 .dash-nav-link {
   font-size: 13px;
@@ -2691,15 +2702,21 @@ footer {
   background: rgba(201, 184, 150, 0.1);
 }
 .dash-nav-right {
+  grid-area: account;
   display: flex;
   align-items: center;
-  gap: 20px;
+  justify-content: flex-end;
+  gap: 16px;
   justify-self: end;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 .dash-user-chip {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 .dash-avatar {
   width: 28px;
@@ -2720,6 +2737,10 @@ footer {
 .dash-user-name {
   font-size: 13px;
   color: var(--text-secondary);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dash-logout {
   background: none;
@@ -2729,6 +2750,8 @@ footer {
   cursor: pointer;
   transition: color 0.2s;
   letter-spacing: 0.01em;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .dash-logout:hover { color: var(--text); }
 
@@ -4308,6 +4331,22 @@ footer {
   .onboard-main { padding: 32px 20px 72px; }
   .onboard-secondary { grid-template-columns: 1fr; }
   .onboard-gmail-top { flex-direction: column; }
+}
+
+@media (max-width: 1024px) {
+  .dash-nav-inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "brand account"
+      "tabs tabs";
+    row-gap: 14px;
+    padding: 16px 20px;
+  }
+  .dash-nav-tabs {
+    width: 100%;
+    justify-self: center;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 900px) {

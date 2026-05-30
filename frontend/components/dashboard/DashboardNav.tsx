@@ -23,8 +23,10 @@ export function DashboardNav({
   return (
     <header className="dash-nav">
       <div className="dash-nav-inner">
-        <Link href="/dashboard" className="dash-logo">Briefly</Link>
-        <nav className="dash-nav-tabs">
+        <div className="dash-nav-brand">
+          <Link href="/dashboard" className="dash-logo">Briefly</Link>
+        </div>
+        <nav className="dash-nav-tabs" aria-label="Dashboard sections">
           <Link
             href="/dashboard"
             className={`dash-nav-link${pathname === "/dashboard" ? " active" : ""}`}
