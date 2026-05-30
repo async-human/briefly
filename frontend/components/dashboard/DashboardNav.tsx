@@ -24,7 +24,7 @@ export function DashboardNav({
     <header className="dash-nav">
       <div className="dash-nav-inner">
         <Link href="/dashboard" className="dash-logo">Briefly</Link>
-        <nav style={{ display: "flex", alignItems: "center", gap: 24 }}>
+        <nav className="dash-nav-tabs">
           <Link
             href="/dashboard"
             className={`dash-nav-link${pathname === "/dashboard" ? " active" : ""}`}

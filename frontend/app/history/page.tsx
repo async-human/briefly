@@ -1,102 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, type Digest, type DigestItem, type DigestSummary } from "@/lib/api";
+import { api, type DigestSummary } from "@/lib/api";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
+import { HistoryArchive } from "@/components/history/HistoryArchive";
 import { getToken } from "@/lib/auth";
-
-function formatDate(iso: string) {
-  const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const label = status === "sent" ? "Sent" : status === "ready" ? "Ready" : status;
-  const color = status === "sent" ? "var(--accent)" : "var(--text-muted)";
-  return (
-    <span style={{ fontFamily: "var(--mono)", fontSize: 9, color, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-      {label}
-    </span>
-  );
-}
-
-function HistoryItemCard({ item, index }: { item: DigestItem; index: number }) {
-  return (
-    <article className="briefing-item">
-      <span className="briefing-item-index">{String(index + 1).padStart(2, "0")}</span>
-      <div className="briefing-item-body">
-        {item.section && <p className="briefing-item-section">{item.section}</p>}
-        <div className="briefing-item-meta">
-          <span>{item.source_name}</span>
-          {item.source_url && (
-            <a href={item.source_url} target="_blank" rel="noopener noreferrer">Read source</a>
-          )}
-        </div>
-        <h3 className="briefing-item-headline">{item.headline}</h3>
-        {item.summary && <p className="briefing-item-summary">{item.summary}</p>}
-        <blockquote className="briefing-item-why">{item.why_it_matters}</blockquote>
-      </div>
-    </article>
-  );
-}
-
-function DigestDetail({ digestId }: { digestId: string }) {
-  const [digest, setDigest] = useState<Digest | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    setDigest(null);
-    api.getDigest(digestId)
-      .then((d) => { setDigest(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [digestId]);
-
-  if (loading) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "64px 0", color: "var(--text-muted)", fontSize: 14 }}>
-        <span className="btn-spinner" />
-        <p>Loading briefing…</p>
-      </div>
-    );
-  }
-
-  if (!digest) {
-    return (
-      <div style={{ padding: "64px 0", textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
-        Failed to load briefing.
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {/* Toolbar */}
-      <div className="briefing-toolbar">
-        <div className="briefing-stats">
-          <span>{digest.total_items_shown} items</span>
-          <span className="briefing-stat-dot" />
-          <span>{formatDate(digest.digest_date)}</span>
-          {digest.subject_line && (
-            <>
-              <span className="briefing-stat-dot" />
-              <span style={{ fontFamily: "var(--sans)", textTransform: "none", letterSpacing: 0 }}>
-                {digest.subject_line}
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-      {/* Items */}
-      <div className="briefing-items" role="list">
-        {digest.items.map((item, i) => (
-          <HistoryItemCard key={item.id} item={item} index={i} />
-        ))}
-      </div>
-    </>
-  );
-}
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -106,7 +16,10 @@ export default function HistoryPage() {
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
 
   useEffect(() => {
-    if (!getToken()) { router.replace("/login"); return; }
+    if (!getToken()) {
+      router.replace("/login");
+      return;
+    }
     Promise.all([api.getMe(), api.getDigests()])
       .then(([meData, list]) => {
         setMe({ name: meData.user.name, avatar_url: meData.user.avatar_url });
@@ -116,6 +29,8 @@ export default function HistoryPage() {
       .catch(() => router.replace("/login"))
       .finally(() => setLoading(false));
   }, [router]);
+
+  const totalItems = digests.reduce((sum, d) => sum + d.total_items_shown, 0);
 
   return (
     <div className="dash-shell">
@@ -128,83 +43,50 @@ export default function HistoryPage() {
           </div>
         ) : (
           <>
-            <header className="dash-hero">
+            <header className="dash-hero history-page-hero">
               <div>
                 <p className="dash-hero-label">Archive</p>
                 <h1 className="dash-hero-title">Past briefings</h1>
-                <p className="dash-hero-date">{digests.length} briefing{digests.length !== 1 ? "s" : ""}</p>
+                <p className="dash-hero-date">
+                  {digests.length > 0
+                    ? `${digests.length} day${digests.length !== 1 ? "s" : ""} saved`
+                    : "Your reading history lives here"}
+                </p>
               </div>
+              {digests.length > 0 && (
+                <div className="dash-hero-meta">
+                  <div className="meta-pill">
+                    <span className="meta-value">{digests.length}</span>
+                    <span className="meta-label">briefings</span>
+                  </div>
+                  <div className="meta-pill">
+                    <span className="meta-value">{totalItems}</span>
+                    <span className="meta-label">items read</span>
+                  </div>
+                </div>
+              )}
             </header>
 
             {digests.length === 0 ? (
-              <div className="briefing-empty">
-                <div className="briefing-empty-icon"><span className="briefing-empty-ring" /></div>
-                <h2 className="briefing-empty-title">No past briefings</h2>
+              <div className="history-empty">
+                <div className="briefing-empty-icon">
+                  <span className="briefing-empty-ring" />
+                </div>
+                <h2 className="briefing-empty-title">No past briefings yet</h2>
                 <p className="briefing-empty-desc">
-                  Generate your first briefing from the dashboard and it will appear here.
+                  Generate your first briefing from Today&apos;s dashboard — each day you refresh,
+                  a new entry appears here.
                 </p>
+                <Link href="/dashboard" className="btn-primary history-empty-cta">
+                  Go to Today
+                </Link>
               </div>
             ) : (
-              /* Inline layout styles guarantee the sidebar+detail structure renders
-                 correctly regardless of CSS class loading order or purging. */
-              <div style={{
-                display: "flex",
-                alignItems: "stretch",
-                border: "1px solid var(--border)",
-                borderRadius: 14,
-                background: "var(--bg-elevated)",
-                overflow: "hidden",
-                minHeight: 500,
-              }}>
-                {/* Sidebar — digest list */}
-                <nav
-                  aria-label="Past briefings"
-                  style={{
-                    width: 260,
-                    flexShrink: 0,
-                    borderRight: "1px solid var(--border)",
-                    overflowY: "auto",
-                    maxHeight: "76vh",
-                  }}
-                >
-                  {digests.map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      className={`history-list-item${selectedId === d.id ? " active" : ""}`}
-                      onClick={() => setSelectedId(d.id)}
-                    >
-                      <div className="history-list-date">{formatDate(d.digest_date)}</div>
-                      <div className="history-list-preview">
-                        {d.preview_text || d.subject_line || "Briefing"}
-                      </div>
-                      <div className="history-list-meta">
-                        <StatusBadge status={d.status} />
-                        <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text-muted)" }}>
-                          {d.total_items_shown} items
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </nav>
-
-                {/* Detail panel — selected briefing */}
-                <div style={{
-                  flex: 1,
-                  minWidth: 0,
-                  overflowY: "auto",
-                  maxHeight: "76vh",
-                }}>
-                  {selectedId
-                    ? <DigestDetail key={selectedId} digestId={selectedId} />
-                    : (
-                      <div style={{ padding: "64px 0", textAlign: "center", color: "var(--text-muted)", fontSize: 14 }}>
-                        Select a briefing to read it.
-                      </div>
-                    )
-                  }
-                </div>
-              </div>
+              <HistoryArchive
+                digests={digests}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+              />
             )}
           </>
         )}
