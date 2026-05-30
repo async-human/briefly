@@ -2,6 +2,7 @@
 
 import { motion, useInView } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { BrainCanvas } from "./BrainCanvas";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -33,6 +34,8 @@ export function Hero() {
       {/* Subtle paper texture gradient */}
       <div className="hero-light-bg" aria-hidden>
         <div className="hero-light-glow" />
+        {/* Brain silhouette — ambient background, very low opacity */}
+        <BrainCanvas />
       </div>
 
       <div className="hero-light-inner">
