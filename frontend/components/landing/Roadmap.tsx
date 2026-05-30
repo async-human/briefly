@@ -1,7 +1,11 @@
 "use client";
 
-import { useRef } from "react";
-import { motion, useInView } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import {
+  AnimatePresence,
+  motion,
+  useInView,
+} from "framer-motion";
 import { Reveal } from "./Reveal";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -14,6 +18,7 @@ const stages = [
     icon: "⚡",
     name: "Self-Building Digest",
     tagline: "The core loop. Reads everything. Writes for you.",
+    highlights: ["Gmail · YouTube · Reddit · RSS", "8–14 item daily briefing", "Why-it-matters on every item", "Email at your time"],
     features: [
       "Gmail, YouTube, Reddit, RSS — connected once",
       "Personalised 8–14 item morning briefing",
@@ -29,6 +34,7 @@ const stages = [
     icon: "✏",
     name: "Manual Capture Layer",
     tagline: "Add your own voice to the second brain.",
+    highlights: ["Paste any link", "Voice notes → structured", "PDF & doc upload", "Browser extension"],
     features: [
       "Paste any link — Briefly fetches and indexes it",
       "Write a note — free-form text into knowledge base",
@@ -44,6 +50,7 @@ const stages = [
     icon: "◎",
     name: "Ask Briefly",
     tagline: "Conversational search across everything it knows.",
+    highlights: ["Ask your knowledge base", "Answers with citations", "Follow-up on any item", "Weekly memory digest"],
     features: [
       "Ask questions across your full knowledge base",
       "Synthesised answers with citations — not just results",
@@ -58,7 +65,8 @@ const stages = [
     status: "vision" as const,
     icon: "✦",
     name: "Knowledge Graph",
-    tagline: "Proactive intelligence that works for you in the background.",
+    tagline: "Proactive intelligence in the background.",
+    highlights: ["Connected topics & entities", "Story threads over time", "Proactive resurfacing", "Mobile + X integration"],
     features: [
       "Entities, topics, ideas connected across all content",
       "Story threads tracked across sources and time",
@@ -70,147 +78,274 @@ const stages = [
 ];
 
 const STATUS = {
-  now:    { badge: "Live now",    cls: "roadmap-badge-now",    opacity: 1    },
-  coming: { badge: "Coming soon", cls: "roadmap-badge-coming", opacity: 0.65 },
-  vision: { badge: "Vision",      cls: "roadmap-badge-vision", opacity: 0.38 },
+  now: { badge: "Live now", cls: "roadmap-badge-now" },
+  coming: { badge: "Coming soon", cls: "roadmap-badge-coming" },
+  vision: { badge: "Vision", cls: "roadmap-badge-vision" },
 };
 
-function RoadmapCard({ stage, index }: { stage: typeof stages[0]; index: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-80px 0px" });
-  const cfg = STATUS[stage.status];
+function JourneyTrack({
+  active,
+  onSelect,
+  inView,
+}: {
+  active: number;
+  onSelect: (i: number) => void;
+  inView: boolean;
+}) {
+  const fillPercent = (active / (stages.length - 1)) * 100;
 
   return (
-    <motion.div
-      ref={ref}
-      className={`rm2-card rm2-card-${stage.status}`}
-      initial={{ opacity: 0, y: 36 }}
-      whileInView={{ opacity: cfg.opacity, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.6, ease: EASE, delay: index * 0.1 }}
-      whileHover={
-        stage.status !== "vision"
-          ? { y: -6, transition: { duration: 0.22, ease: EASE } }
-          : {}
-      }
-    >
-      {/* Ambient glow — V1 only */}
-      {stage.status === "now" && <div className="rm2-glow" aria-hidden />}
-
-      {/* Large background watermark number */}
-      <span className="rm2-watermark" aria-hidden>{stage.num}</span>
-
-      {/* Top row: icon + status badge */}
-      <div className="rm2-top">
-        <div className={`rm2-icon-wrap rm2-icon-wrap-${stage.status}`}>
-          <span className="rm2-icon-inner">{stage.icon}</span>
-        </div>
-        <span className={`roadmap-badge ${cfg.cls}`}>{cfg.badge}</span>
+    <div className="rm3-track" role="tablist" aria-label="Product roadmap versions">
+      <div className="rm3-track-rail" aria-hidden>
+        <motion.div
+          className="rm3-track-fill"
+          initial={{ width: "0%" }}
+          animate={{ width: inView ? `${fillPercent}%` : "0%" }}
+          transition={{ duration: 0.65, ease: EASE }}
+        />
+        <motion.div
+          className="rm3-track-shimmer"
+          animate={inView ? { x: ["-100%", "220%"] } : { x: "-100%" }}
+          transition={{ duration: 2.8, repeat: Infinity, repeatDelay: 3, ease: "easeInOut" }}
+        />
       </div>
 
-      {/* Identity */}
-      <div className="rm2-identity">
-        <span className="rm2-ver">{stage.version}</span>
-        <h3 className="rm2-name">{stage.name}</h3>
-        <p className="rm2-tagline">{stage.tagline}</p>
-      </div>
+      {stages.map((stage, i) => {
+        const isActive = i === active;
+        const isReached = i <= active;
+        const cfg = STATUS[stage.status];
 
-      {/* Feature list — items stagger in as card enters viewport */}
-      <ul className="rm2-features">
-        {stage.features.map((f, fi) => (
-          <motion.li
-            key={f}
-            className="rm2-feature"
-            initial={{ opacity: 0, x: -10 }}
-            animate={inView ? { opacity: 1, x: 0 } : {}}
-            transition={{ duration: 0.32, ease: EASE, delay: 0.28 + fi * 0.06 }}
+        return (
+          <button
+            key={stage.version}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            aria-controls={`rm3-panel-${stage.version}`}
+            className={`rm3-track-node${isActive ? " active" : ""}${isReached ? " reached" : ""}`}
+            onClick={() => onSelect(i)}
           >
-            <span className="rm2-bullet" aria-hidden>
-              {stage.status === "now" ? "✓" : "○"}
-            </span>
-            {f}
-          </motion.li>
-        ))}
-      </ul>
-
-      {stage.status === "now" && (
-        <a href="/login" className="rm2-cta">
-          Start with V1 free →
-        </a>
-      )}
-    </motion.div>
+            <motion.span
+              className={`rm3-track-dot rm3-track-dot-${stage.status}`}
+              animate={
+                isActive
+                  ? { scale: [1, 1.08, 1], boxShadow: ["0 0 0 0 rgba(201,184,150,0)", "0 0 0 10px rgba(201,184,150,0.12)", "0 0 0 0 rgba(201,184,150,0)"] }
+                  : { scale: 1 }
+              }
+              transition={{ duration: 2.2, repeat: isActive ? Infinity : 0, ease: "easeInOut" }}
+            >
+              <motion.span
+                className="rm3-track-icon"
+                animate={isActive ? { y: [0, -3, 0], rotate: [0, 8, -6, 0] } : { y: 0, rotate: 0 }}
+                transition={{ duration: 2.5, repeat: isActive ? Infinity : 0, ease: "easeInOut", repeatDelay: 0.5 }}
+              >
+                {stage.icon}
+              </motion.span>
+            </motion.span>
+            <span className="rm3-track-ver">{stage.version}</span>
+            <span className={`roadmap-badge ${cfg.cls} rm3-track-badge`}>{cfg.badge}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
-/* Horizontal progress track above the grid */
-function ProgressTrack() {
+function SpotlightPanel({ stage }: { stage: (typeof stages)[0] }) {
+  const cfg = STATUS[stage.status];
+
   return (
-    <Reveal delay={0.12}>
-      <div className="rm2-track">
-        {stages.map((stage, i) => {
-          const isLive = stage.status === "now";
-          return (
-            <div key={stage.version} className="rm2-track-item">
-              {/* Connector line before this dot (except first) */}
-              {i > 0 && (
-                <div className={`rm2-track-line ${i === 1 ? "rm2-line-accent" : ""}`} />
-              )}
+    <motion.article
+      key={stage.version}
+      id={`rm3-panel-${stage.version}`}
+      role="tabpanel"
+      className={`rm3-spotlight rm3-spotlight-${stage.status}`}
+      initial={{ opacity: 0, y: 28, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -16, scale: 0.98 }}
+      transition={{ duration: 0.45, ease: EASE }}
+    >
+      {stage.status === "now" && (
+        <>
+          <div className="rm3-orb rm3-orb-a" aria-hidden />
+          <div className="rm3-orb rm3-orb-b" aria-hidden />
+        </>
+      )}
 
-              {/* Dot */}
-              <div className={`rm2-track-dot${isLive ? " rm2-track-dot-live" : ""}`}>
-                <span className="rm2-track-icon">{stage.icon}</span>
-              </div>
+      <span className="rm3-watermark" aria-hidden>{stage.num}</span>
 
-              {/* Label */}
-              <span className={`rm2-track-label${isLive ? " rm2-track-label-live" : ""}`}>
-                {stage.version}
-              </span>
-            </div>
-          );
-        })}
+      <div className="rm3-spotlight-grid">
+        <div className="rm3-spotlight-left">
+          <motion.div
+            className={`rm3-icon-stage rm3-icon-stage-${stage.status}`}
+            initial={{ scale: 0.6, rotate: -12, opacity: 0 }}
+            animate={{ scale: 1, rotate: 0, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 320, damping: 18, delay: 0.05 }}
+          >
+            <motion.span
+              className="rm3-icon-emoji"
+              animate={{ y: [0, -4, 0] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+            >
+              {stage.icon}
+            </motion.span>
+            <span className="rm3-icon-ring" aria-hidden />
+          </motion.div>
+
+          <div className="rm3-spotlight-meta">
+            <span className="rm3-ver">{stage.version}</span>
+            <span className={`roadmap-badge ${cfg.cls}`}>{cfg.badge}</span>
+          </div>
+
+          <h3 className="rm3-name">{stage.name}</h3>
+          <p className="rm3-tagline">{stage.tagline}</p>
+
+          {stage.status === "now" && (
+            <motion.a
+              href="/login"
+              className="rm3-cta"
+              whileHover={{ x: 4 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              Start with V1 free →
+            </motion.a>
+          )}
+        </div>
+
+        <div className="rm3-spotlight-right">
+          <p className="rm3-highlights-label">What ships</p>
+          <ul className="rm3-chips">
+            {stage.highlights.map((h, hi) => (
+              <motion.li
+                key={h}
+                className="rm3-chip"
+                initial={{ opacity: 0, y: 12, scale: 0.92 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.35, ease: EASE, delay: 0.08 + hi * 0.07 }}
+                whileHover={{ y: -2, transition: { duration: 0.15 } }}
+              >
+                <span className="rm3-chip-dot" aria-hidden />
+                {h}
+              </motion.li>
+            ))}
+          </ul>
+
+          <details className="rm3-details">
+            <summary>Full feature list</summary>
+            <ul className="rm3-details-list">
+              {stage.features.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ul>
+          </details>
+        </div>
       </div>
-    </Reveal>
+
+      <motion.div
+        className="rm3-progress-bar"
+        aria-hidden
+        initial={{ scaleX: 0 }}
+        animate={{ scaleX: 1 }}
+        transition={{ duration: 0.5, ease: EASE, delay: 0.15 }}
+        style={{ transformOrigin: "left center" }}
+      />
+    </motion.article>
+  );
+}
+
+function StageStrip({
+  active,
+  onSelect,
+}: {
+  active: number;
+  onSelect: (i: number) => void;
+}) {
+  return (
+    <div className="rm3-strip">
+      {stages.map((stage, i) => (
+        <motion.button
+          key={stage.version}
+          type="button"
+          className={`rm3-strip-card${i === active ? " active" : ""}`}
+          onClick={() => onSelect(i)}
+          whileHover={{ y: i === active ? 0 : -3 }}
+          whileTap={{ scale: 0.98 }}
+          layout
+        >
+          <span className="rm3-strip-icon">{stage.icon}</span>
+          <span className="rm3-strip-ver">{stage.version}</span>
+          <span className="rm3-strip-name">{stage.name}</span>
+        </motion.button>
+      ))}
+    </div>
   );
 }
 
 export function Roadmap() {
-  return (
-    <section className="roadmap-section" id="roadmap">
-      <div className="roadmap-inner">
+  const sectionRef = useRef<HTMLElement>(null);
+  const inView = useInView(sectionRef, { once: false, margin: "-15% 0px" });
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
 
+  const selectStage = (i: number) => {
+    setActive(i);
+    setPaused(true);
+  };
+
+  useEffect(() => {
+    if (!inView || paused) return;
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReduced) return;
+    const timer = window.setInterval(() => {
+      setActive((prev) => (prev + 1) % stages.length);
+    }, 7000);
+    return () => window.clearInterval(timer);
+  }, [inView, paused]);
+
+  return (
+    <section className="roadmap-section rm3-section" id="roadmap" ref={sectionRef}>
+      <div className="rm3-bg-grid" aria-hidden />
+
+      <div className="roadmap-inner">
         <Reveal>
-          <div className="section-header-centered">
+          <div className="section-header-centered rm3-header">
             <p className="section-eyebrow">Roadmap</p>
             <h2 className="section-heading">
               You&apos;re joining at V1.
               <br />
-              <span className="hero-gradient-text">Here&apos;s where we&apos;re taking you.</span>
+              <span className="hero-gradient-text">Here&apos;s the journey ahead.</span>
             </h2>
-            <p className="section-body">
-              Each version ships independently and is valuable on its own.
-              Pro members get every version as it ships — no price increase.
+            <p className="section-body rm3-subcopy">
+              Tap a version to explore. Each release stands on its own — Pro includes them all.
             </p>
           </div>
         </Reveal>
 
-        <ProgressTrack />
-
-        {/* 2-column card grid */}
-        <div className="rm2-grid">
-          {stages.map((stage, i) => (
-            <RoadmapCard key={stage.version} stage={stage} index={i} />
-          ))}
-        </div>
-
-        <Reveal delay={0.3}>
-          <p className="roadmap-footnote">
-            Pro members get V2, V3, and V4 as they ship — included in the $9/month.
-            No price changes, no re-subscription.
-            <br />
-            The earlier you join, the more you benefit from the compounding.
-          </p>
+        <Reveal delay={0.1}>
+          <JourneyTrack active={active} onSelect={selectStage} inView={inView} />
         </Reveal>
 
+        <div className="rm3-stage-wrap">
+          <AnimatePresence mode="wait">
+            <SpotlightPanel key={stages[active].version} stage={stages[active]} />
+          </AnimatePresence>
+        </div>
+
+        <Reveal delay={0.15}>
+          <StageStrip active={active} onSelect={selectStage} />
+        </Reveal>
+
+        <Reveal delay={0.25}>
+          <motion.p
+            className="roadmap-footnote rm3-footnote"
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, ease: EASE }}
+          >
+            Pro members get V2, V3, and V4 as they ship — $9/month, no price increases.
+          </motion.p>
+        </Reveal>
       </div>
     </section>
   );
