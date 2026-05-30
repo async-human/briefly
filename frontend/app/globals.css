@@ -2601,10 +2601,7 @@ footer {
   align-items: center;
   justify-content: center;
   padding: 64px;
-  background:
-    radial-gradient(ellipse 80% 60% at 20% 50%, rgba(158,123,63,0.09), transparent),
-    radial-gradient(ellipse 60% 80% at 80% 20%, rgba(158,123,63,0.05), transparent),
-    var(--bg);
+  background: var(--bg);
   overflow: hidden;
 }
 .login-left-inner {
@@ -2613,13 +2610,38 @@ footer {
   max-width: 520px;
   width: 100%;
 }
-.login-left-glow {
-  pointer-events: none;
+
+/* Animated ambient blobs */
+.login-blob {
   position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 10% 90%, rgba(158,123,63,0.06), transparent 50%),
-    radial-gradient(circle at 90% 10%, rgba(158,123,63,0.04), transparent 40%);
+  border-radius: 50%;
+  filter: blur(60px);
+  pointer-events: none;
+  opacity: 0.55;
+}
+.login-blob-1 {
+  width: 480px; height: 480px;
+  background: radial-gradient(circle, rgba(158,123,63,0.18), transparent 70%);
+  top: -120px; left: -100px;
+  animation: blob-drift 14s ease-in-out infinite;
+}
+.login-blob-2 {
+  width: 320px; height: 320px;
+  background: radial-gradient(circle, rgba(201,153,58,0.12), transparent 70%);
+  bottom: -60px; right: 60px;
+  animation: blob-drift 18s ease-in-out infinite reverse;
+}
+.login-blob-3 {
+  width: 240px; height: 240px;
+  background: radial-gradient(circle, rgba(158,123,63,0.10), transparent 70%);
+  top: 50%; left: 55%;
+  animation: blob-drift 10s ease-in-out infinite;
+  animation-delay: -5s;
+}
+@keyframes blob-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(24px, -20px) scale(1.06); }
+  66%       { transform: translate(-16px, 16px) scale(0.96); }
 }
 
 .login-brand {
@@ -2674,13 +2696,30 @@ footer {
   color: var(--accent);
   font-size: 12px;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
 }
+.login-feature-item:hover .login-feature-icon {
+  transform: translateX(4px);
+}
+.login-feature-item {
+  transition: color 0.2s;
+}
+.login-feature-item:hover { color: var(--text); }
 
 .login-quote {
   padding: 20px 24px;
   border-left: 2px solid var(--accent-line);
   background: var(--accent-dim);
   border-radius: 0 10px 10px 0;
+  position: relative;
+  overflow: hidden;
+}
+.login-quote::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(158,123,63,0.06), transparent 60%);
+  pointer-events: none;
 }
 .login-quote-text {
   font-family: var(--serif);

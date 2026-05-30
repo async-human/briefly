@@ -3,8 +3,17 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { getToken, googleLoginUrl } from "@/lib/auth";
 import { api } from "@/lib/api";
+
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+const FEATURES = [
+  "Connect Gmail, YouTube, Reddit once",
+  "Reads 50 items · Shows the 10 that matter",
+  "Cited, personal, in your inbox every morning",
+];
 
 const SOCIAL_PROOF = [
   { quote: "This replaced my entire morning reading routine.", name: "Founder, seed-stage startup" },
@@ -32,7 +41,7 @@ export default function LoginPage() {
     const token = getToken();
     if (!token) { setChecking(false); return; }
     api.getMe()
-      .then((me) => { router.replace(me.onboarding_completed ? "/dashboard" : "/onboarding"); })
+      .then((me) => router.replace(me.onboarding_completed ? "/dashboard" : "/onboarding"))
       .catch(() => setChecking(false));
   }, [router]);
 
@@ -41,65 +50,113 @@ export default function LoginPage() {
   return (
     <div className="login-shell">
 
-      {/* ── Left panel — branding + value props ── */}
+      {/* ── Left panel ── */}
       <div className="login-left">
+        {/* Animated ambient blobs */}
+        <div className="login-blob login-blob-1" aria-hidden />
+        <div className="login-blob login-blob-2" aria-hidden />
+        <div className="login-blob login-blob-3" aria-hidden />
+
         <div className="login-left-inner">
-          <Link href="/" className="login-brand">Briefly</Link>
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.05, ease: EASE }}
+          >
+            <Link href="/" className="login-brand">Briefly</Link>
+          </motion.div>
 
           <div className="login-pitch">
-            <h1 className="login-headline">
+            <motion.h1
+              className="login-headline"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.15, ease: EASE }}
+            >
               Read less.<br />
               <span className="login-headline-accent">Know more.</span>
-            </h1>
-            <p className="login-pitch-sub">
+            </motion.h1>
+            <motion.p
+              className="login-pitch-sub"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3, ease: EASE }}
+            >
               Briefly reads everything you follow — newsletters, YouTube, Reddit, RSS —
-              and delivers one sharp, personalised briefing every morning. Nothing to manage. Forever.
-            </p>
+              and delivers one sharp, personalised briefing every morning.
+              Nothing to manage. Forever.
+            </motion.p>
           </div>
 
-          <ul className="login-features">
-            {[
-              { icon: "→", text: "Connect Gmail, YouTube, Reddit once" },
-              { icon: "→", text: "Reads 50 items · Shows the 10 that matter to you" },
-              { icon: "→", text: "Cited, personal, in your inbox at 7 am" },
-            ].map(({ icon, text }) => (
-              <li key={text} className="login-feature-item">
-                <span className="login-feature-icon">{icon}</span>
+          <motion.ul
+            className="login-features"
+            initial="hidden"
+            animate="visible"
+            variants={{ visible: { transition: { staggerChildren: 0.1, delayChildren: 0.45 } } }}
+          >
+            {FEATURES.map((text) => (
+              <motion.li
+                key={text}
+                className="login-feature-item"
+                variants={{
+                  hidden: { opacity: 0, x: -12 },
+                  visible: { opacity: 1, x: 0, transition: { duration: 0.5, ease: EASE } },
+                }}
+              >
+                <span className="login-feature-icon">→</span>
                 <span>{text}</span>
-              </li>
+              </motion.li>
             ))}
-          </ul>
+          </motion.ul>
 
-          {checking ? null : (
-            <div className="login-quote">
-              <p className="login-quote-text">&ldquo;{quote.quote}&rdquo;</p>
-              <p className="login-quote-attr">— {quote.name}</p>
-            </div>
+          {!checking && (
+            <motion.div
+              className="login-quote"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.85, ease: EASE }}
+            >
+              {/* Continuous gentle float */}
+              <motion.div
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <p className="login-quote-text">&ldquo;{quote.quote}&rdquo;</p>
+                <p className="login-quote-attr">— {quote.name}</p>
+              </motion.div>
+            </motion.div>
           )}
         </div>
-
-        {/* Decorative ambient glow */}
-        <div className="login-left-glow" aria-hidden />
       </div>
 
-      {/* ── Right panel — sign-in card ── */}
+      {/* ── Right panel ── */}
       <div className="login-right">
         {checking ? (
-          <div className="login-card">
+          <div className="login-card" style={{ gap: 16 }}>
             <span className="btn-spinner" style={{ borderColor: "var(--border-strong)", borderTopColor: "var(--accent)" }} />
             <p className="auth-loading">Signing you in…</p>
           </div>
         ) : (
-          <div className="login-card">
+          <motion.div
+            className="login-card"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.1, ease: EASE }}
+          >
             <div className="login-card-head">
               <h2 className="login-card-title">Welcome to Briefly</h2>
               <p className="login-card-sub">Sign in to start your morning briefing</p>
             </div>
 
-            <a href={googleLoginUrl()} className="login-google-btn">
+            <motion.a
+              href={googleLoginUrl()}
+              className="login-google-btn"
+              whileHover={{ scale: 1.015, boxShadow: "0 6px 20px rgba(28,24,18,0.12)" }}
+              whileTap={{ scale: 0.985 }}
+            >
               <GoogleIcon />
               Continue with Google
-            </a>
+            </motion.a>
 
             <p className="login-card-footnote">
               By continuing you agree to our{" "}
@@ -107,7 +164,7 @@ export default function LoginPage() {
               {" "}and{" "}
               <Link href="/privacy" className="login-card-link">privacy policy</Link>.
             </p>
-          </div>
+          </motion.div>
         )}
       </div>
     </div>
