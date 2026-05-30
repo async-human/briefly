@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, type Digest, type MeResponse, type Source } from "@/lib/api";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { BriefingPanel, SourcesSidebar } from "@/components/dashboard/BriefingPanel";
+import { TimeGreetingHero } from "@/components/TimeGreeting";
 
 const FETCHABLE_SOURCE_TYPES = new Set([
   "rss", "youtube", "youtube_account", "reddit", "reddit_account", "url", "gmail",
@@ -199,8 +200,7 @@ export default function DashboardPage() {
           <>
             <header className="dash-hero">
               <div>
-                <p className="dash-hero-label">Morning briefing</p>
-                <h1 className="dash-hero-title">Good morning, {greeting}</h1>
+                <TimeGreetingHero name={greeting} />
                 <p className="dash-hero-date">{today}</p>
               </div>
               <div className="dash-hero-meta">

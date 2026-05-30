@@ -6,6 +6,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { getToken, googleLoginUrl } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { TimeGreetingBadge, TimeGreetingCardTitle } from "@/components/TimeGreeting";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -283,9 +284,11 @@ export default function LoginPage() {
             transition={{ duration: 0.55, delay: 0.1, ease: EASE }}
           >
             <div className="login-card-head">
-              <div className="lp-morning-badge">☀️ Good morning</div>
-              <h2 className="login-card-title">Start your day sharper</h2>
-              <p className="login-card-sub">Your personalised briefing, every morning at 7 AM.</p>
+              <TimeGreetingBadge />
+              <h2 className="login-card-title">
+                <TimeGreetingCardTitle />
+              </h2>
+              <p className="login-card-sub">Your personalised briefing, delivered when you need it.</p>
             </div>
 
             <div className="lp-perks">

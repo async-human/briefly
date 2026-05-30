@@ -3084,10 +3084,11 @@ footer {
 }
 
 /* Right panel enhancements */
+.time-greeting-badge,
 .lp-morning-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.06em;
@@ -3095,8 +3096,52 @@ footer {
   background: var(--accent-dim);
   border: 1px solid var(--accent-line);
   border-radius: 100px;
-  padding: 4px 13px;
+  padding: 5px 14px;
   margin-bottom: 14px;
+}
+.time-greeting-badge-skeleton {
+  width: 132px;
+  height: 28px;
+  opacity: 0.35;
+}
+.time-greeting-emoji {
+  display: inline-flex;
+  font-size: 12px;
+  line-height: 1;
+}
+.time-greeting-text {
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    #f0dfc0 45%,
+    var(--accent) 90%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: greeting-shimmer 5s ease-in-out infinite;
+}
+@keyframes greeting-shimmer {
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+}
+.time-greeting-hero-phrase {
+  display: inline-block;
+  background: linear-gradient(
+    120deg,
+    var(--text) 0%,
+    #f0dfc0 42%,
+    var(--text) 78%
+  );
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: greeting-shimmer 6s ease-in-out infinite;
+}
+.time-greeting-hero-name {
+  display: inline-block;
 }
 .lp-perks {
   width: 100%;
