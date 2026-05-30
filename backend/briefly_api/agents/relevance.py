@@ -75,6 +75,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         # Hard block: never-show filter
         if _matches_never_show(item, never_show):
             item.relevance_score = 0.0
+            item.drop_reason = "never_show"
             dropped.append(item)
             log.debug("Dropped (never-show): %s", item.title[:60])
             continue
@@ -100,6 +101,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         if final >= s.relevance_threshold:
             scored.append(item)
         else:
+            item.drop_reason = "low_relevance"
             dropped.append(item)
             log.debug("Dropped (score=%.2f < %.2f): %s", final, s.relevance_threshold, item.title[:60])
 

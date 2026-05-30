@@ -42,10 +42,29 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     return ctx
 
 
+def _build_skipped_log(ctx: PipelineContext) -> dict:
+    """Aggregate counts by drop reason for the reading-log footer."""
+    n_dupes = max(0, ctx.total_ingested - ctx.total_after_dedup) if ctx.total_after_dedup else 0
+    n_never_show = sum(1 for i in ctx.dropped_items if i.drop_reason == "never_show")
+    n_low_relevance = sum(1 for i in ctx.dropped_items if i.drop_reason == "low_relevance")
+    n_crowded_out = len(ctx.crowded_out_items)
+    n_sources = len({i.source_id for i in ctx.raw_items}) if ctx.raw_items else 0
+    never_show_labels = ctx.user.profile.get("never_show", [])[:3]
+    return {
+        "n_ingested": ctx.total_ingested,
+        "n_shown": len(ctx.digest_items),
+        "n_sources": n_sources,
+        "n_dupes": n_dupes,
+        "n_never_show": n_never_show,
+        "n_low_relevance": n_low_relevance,
+        "n_crowded_out": n_crowded_out,
+        "never_show_labels": never_show_labels,
+    }
+
+
 def _render_html(ctx: PipelineContext) -> str:
     """Render the digest as an inline-CSS HTML email."""
     user_name = ctx.user.name or "there"
-    skipped_note = ctx.__dict__.get("skipped_note", "")
 
     # Group items by section
     sections: dict[str, list[DigestItemDraft]] = defaultdict(list)
@@ -93,11 +112,33 @@ def _render_html(ctx: PipelineContext) -> str:
             {items_html}
           </div>"""
 
-    skipped_html = ""
-    if skipped_note:
-        skipped_html = f"""
-          <p style="font-size:13px;color:#999;margin-top:32px;padding-top:16px;
-                    border-top:1px solid #eee;font-style:italic;">{_esc(skipped_note)}</p>"""
+    sl = _build_skipped_log(ctx)
+    n_skipped = sl["n_ingested"] - sl["n_shown"]
+    rows = ""
+    if sl["n_dupes"]:
+        rows += _skip_row(str(sl["n_dupes"]), "duplicate stories merged into the items above")
+    if sl["n_low_relevance"]:
+        rows += _skip_row(str(sl["n_low_relevance"]), "didn’t match your interests closely enough")
+    if sl["n_never_show"]:
+        label_str = (", ".join(_esc(t) for t in sl["never_show_labels"]) + " &amp; others") if sl["never_show_labels"] else "your topics"
+        rows += _skip_row(str(sl["n_never_show"]), f"blocked by your never-show filters ({label_str})")
+    if sl["n_crowded_out"]:
+        rows += _skip_row(str(sl["n_crowded_out"]), "crowded out — already featured enough from that source today")
+
+    skipped_html = f"""
+          <div style="margin-top:40px;padding-top:20px;border-top:1px solid #f0ede8;">
+            <p style="font-size:10px;font-weight:700;color:#ccc;letter-spacing:1.8px;
+                      text-transform:uppercase;margin:0 0 12px 0;">Briefly&rsquo;s reading log</p>
+            <p style="font-size:13px;color:#aaa;margin:0 0 14px 0;line-height:1.6;">
+              Scanned <strong style="color:#888;">{sl["n_ingested"]}</strong> stories across
+              <strong style="color:#888;">{sl["n_sources"]}</strong> sources today &mdash;
+              showed you <strong style="color:#888;">{sl["n_shown"]}</strong>.
+              {"The other <strong style=’color:#888;’>" + str(n_skipped) + "</strong>:" if n_skipped else ""}
+            </p>
+            <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+              {rows}
+            </table>
+          </div>"""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -143,6 +184,18 @@ def _render_html(ctx: PipelineContext) -> str:
 def _render_web(ctx: PipelineContext) -> str:
     """Lightweight web version (same structure, no email hacks needed)."""
     return ctx.html_body  # reuse email HTML for now
+
+
+def _skip_row(count: str, reason: str) -> str:
+    """One bullet row in the reading-log table."""
+    return (
+        f'<tr>'
+        f'<td style="padding:3px 10px 3px 0;font-size:13px;color:#ccc;vertical-align:top;">&bull;</td>'
+        f'<td style="padding:3px 0;font-size:13px;color:#aaa;line-height:1.5;">'
+        f'<strong style="color:#888;">{_esc(count)}</strong> {reason}'
+        f'</td>'
+        f'</tr>'
+    )
 
 
 def _esc(text: str) -> str:

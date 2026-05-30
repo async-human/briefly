@@ -64,8 +64,15 @@ async def run(ctx: PipelineContext) -> PipelineContext:
 
     ctx.selected_item_ids = [i.id for i in selected]
 
+    # Track items that passed relevance but were cut by size/source-diversity cap
+    selected_ids = set(ctx.selected_item_ids)
+    for item in ranked:
+        if item.id not in selected_ids:
+            item.drop_reason = "crowded_out"
+    ctx.crowded_out_items = [i for i in ranked if i.id not in selected_ids]
+
     log.info(
-        "BriefingPlannerAgent: selected %d items from pool of %d",
-        len(selected), len(items),
+        "BriefingPlannerAgent: selected %d items from pool of %d (%d crowded out)",
+        len(selected), len(items), len(ctx.crowded_out_items),
     )
     return ctx

@@ -44,6 +44,7 @@ class RawItem:
     is_duplicate: bool = False
     canonical_id: str | None = None     # ID of primary item if this is a dupe
     duplicate_sources: list[dict] = field(default_factory=list)  # other sources that covered this
+    drop_reason: str = ""               # "never_show" | "low_relevance" | "crowded_out"
 
 
 @dataclass
@@ -111,6 +112,7 @@ class PipelineContext:
     # Stage 6: Planned digest (populated by BriefingPlannerAgent)
     planned_sections: list[dict] = field(default_factory=list)  # [{"name": ..., "item_ids": [...]}]
     selected_item_ids: list[str] = field(default_factory=list)
+    crowded_out_items: list[RawItem] = field(default_factory=list)  # passed relevance but cut by planner
 
     # Stage 7: Written digest (populated by BriefingWriterAgent)
     digest_items: list[DigestItemDraft] = field(default_factory=list)
