@@ -156,7 +156,7 @@ nav.scrolled {
 /* ── HERO LIGHT ── */
 .hero-light {
   position: relative;
-  padding: 140px 80px 100px;
+  padding: 80px 80px 80px;
   overflow: hidden;
 }
 .hero-light-bg {
@@ -207,7 +207,7 @@ nav.scrolled {
 
 /* Problem numbers */
 .hero-problem {
-  margin-bottom: 48px;
+  margin-bottom: 24px;
   text-align: center;
 }
 .hero-problem-eyebrow {
@@ -216,38 +216,38 @@ nav.scrolled {
   color: var(--text-muted);
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  margin-bottom: 36px;
+  margin-bottom: 18px;
 }
 .hero-problem-numbers {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 32px;
+  gap: 20px;
   flex-wrap: wrap;
 }
 .hero-problem-stat {
   display: flex;
   align-items: baseline;
-  gap: 16px;
+  gap: 12px;
 }
 .hero-problem-num {
   font-family: var(--serif);
-  font-size: clamp(56px, 8vw, 96px);
+  font-size: clamp(34px, 4.5vw, 56px);
   font-weight: 400;
   letter-spacing: -0.05em;
   line-height: 1;
   color: var(--text);
 }
 .hero-problem-label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-muted);
   line-height: 1.4;
-  max-width: 120px;
+  max-width: 100px;
   text-align: left;
 }
 .hero-problem-sep {
   font-family: var(--serif);
-  font-size: 48px;
+  font-size: 28px;
   color: var(--border-strong);
   line-height: 1;
   font-weight: 300;
@@ -259,7 +259,7 @@ nav.scrolled {
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
   transform-origin: left;
-  margin-bottom: 48px;
+  margin-bottom: 28px;
 }
 
 /* Solution */
@@ -4580,10 +4580,10 @@ footer {
   .hero-v2-sub { font-size: 15px; }
   .hero-scroll-hint { display: none; }
   /* Hero light */
-  .hero-light { padding: 100px 24px 64px; }
-  .hero-problem-numbers { gap: 16px; }
-  .hero-problem-num { font-size: clamp(44px, 12vw, 72px); }
-  .hero-problem-sep { font-size: 36px; }
+  .hero-light { padding: 64px 24px 56px; }
+  .hero-problem-numbers { gap: 12px; }
+  .hero-problem-num { font-size: clamp(28px, 9vw, 48px); }
+  .hero-problem-sep { font-size: 22px; }
   /* LiveDemo */
   .livedemo-section { padding: 60px 24px 80px; }
   .livedemo-tabs { flex-wrap: wrap; width: 100%; justify-content: center; }
