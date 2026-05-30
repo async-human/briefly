@@ -143,43 +143,46 @@ function BriefingPreview() {
         ))}
       </div>
 
-      <AnimatePresence mode="wait">
-        {phase === "briefing" ? (
-          <motion.div
-            key={`item-${itemIndex}`}
-            className="lp-preview-item"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.4, ease: EASE }}
-          >
-            <div className="lp-item-meta">
-              <span className="lp-item-source">{item.source}</span>
-              <span className="lp-item-tag">{item.tag}</span>
-              <span className="lp-item-time">{item.time}</span>
-            </div>
-            <p className="lp-item-headline">{item.headline}</p>
-            <div className="lp-item-why">
-              <span className="lp-why-label">why this</span>
-              <p className="lp-why-text">
-                {displayedWhy}
-                <span className="lp-cursor" />
-              </p>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="loading"
-            className="lp-preview-loading"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <span className="lp-loading-text">Reading your feeds…</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Fixed-height slot so the card never resizes as content changes */}
+      <div className="lp-preview-slot">
+        <AnimatePresence mode="wait">
+          {phase === "briefing" ? (
+            <motion.div
+              key={`item-${itemIndex}`}
+              className="lp-preview-item"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.4, ease: EASE }}
+            >
+              <div className="lp-item-meta">
+                <span className="lp-item-source">{item.source}</span>
+                <span className="lp-item-tag">{item.tag}</span>
+                <span className="lp-item-time">{item.time}</span>
+              </div>
+              <p className="lp-item-headline">{item.headline}</p>
+              <div className="lp-item-why">
+                <span className="lp-why-label">why this</span>
+                <p className="lp-why-text">
+                  {displayedWhy}
+                  <span className="lp-cursor" />
+                </p>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="loading"
+              className="lp-preview-loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <span className="lp-loading-text">Reading your feeds…</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       <div className="lp-preview-footer">
         <span className="lp-footer-stat">60 items read</span>
