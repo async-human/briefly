@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type Digest, type DigestItem } from "@/lib/api";
@@ -236,7 +236,8 @@ export default function ReadingPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [loading, isComplete]);
 
-  const items = digest?.items ?? [];
+  // Memoise so useCallback deps don't change on every render
+  const items = useMemo(() => digest?.items ?? [], [digest]);
 
   // ── Navigation ────────────────────────────────────────────────────────────
   const complete = useCallback(() => {
@@ -246,11 +247,16 @@ export default function ReadingPage() {
     api.completeReading(digest.id, elapsed);
   }, [digest, elapsed]);
 
+  const addToSaved = useCallback((id: string) => {
+    // Array.from avoids the Set-spread downlevelIteration TS error
+    setSaved((prev) => new Set(Array.from(prev).concat(id)));
+  }, []);
+
   const advance = useCallback((withSave = false) => {
     if (!digest) return;
     const item = items[currentIndex];
     if (withSave && item && !saved.has(item.id)) {
-      setSaved((prev) => new Set([...prev, item.id]));
+      addToSaved(item.id);
       api.recordFeedback({ signal_type: "saved", digest_item_id: item.id, digest_id: digest.id });
     }
     setDirection(1);
@@ -259,7 +265,7 @@ export default function ReadingPage() {
     } else {
       setCurrentIndex((i) => i + 1);
     }
-  }, [currentIndex, items, digest, saved, complete]);
+  }, [currentIndex, items, digest, saved, complete, addToSaved]);
 
   const goBack = useCallback(() => {
     if (currentIndex > 0) {
@@ -272,9 +278,9 @@ export default function ReadingPage() {
     if (!digest) return;
     const item = items[currentIndex];
     if (!item || saved.has(item.id)) return;
-    setSaved((prev) => new Set([...prev, item.id]));
+    addToSaved(item.id);
     api.recordFeedback({ signal_type: "saved", digest_item_id: item.id, digest_id: digest.id });
-  }, [currentIndex, items, digest, saved]);
+  }, [currentIndex, items, digest, saved, addToSaved]);
 
   // Keyboard shortcuts
   useEffect(() => {
