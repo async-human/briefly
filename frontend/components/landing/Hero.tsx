@@ -28,6 +28,12 @@ function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
   return <span ref={ref}>{n}{suffix}</span>;
 }
 
+const PROBLEM_STATS = [
+  { to: 12, line1: "newsletters", line2: "you'll never read" },
+  { to: 52, line1: "YouTube channels", line2: "unwatched" },
+  { to: 18, line1: "subreddits", line2: "you can't keep up with" },
+] as const;
+
 export function Hero() {
   return (
     <section className="hero-light">
@@ -48,20 +54,28 @@ export function Hero() {
         >
           <p className="hero-problem-eyebrow">The problem you know too well</p>
           <div className="hero-problem-numbers">
-            <div className="hero-problem-stat">
-              <span className="hero-problem-num"><CountUp to={12} /></span>
-              <span className="hero-problem-label">newsletters<br />you&apos;ll never read</span>
-            </div>
-            <div className="hero-problem-sep">+</div>
-            <div className="hero-problem-stat">
-              <span className="hero-problem-num"><CountUp to={52} /></span>
-              <span className="hero-problem-label">YouTube channels<br />unwatched</span>
-            </div>
-            <div className="hero-problem-sep">+</div>
-            <div className="hero-problem-stat">
-              <span className="hero-problem-num"><CountUp to={18} /></span>
-              <span className="hero-problem-label">subreddits<br />you can&apos;t keep up with</span>
-            </div>
+            {PROBLEM_STATS.map((stat, i) => (
+              <motion.div
+                key={stat.line1}
+                className="hero-problem-stat"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.55, delay: 0.2 + i * 0.1, ease: EASE }}
+              >
+                <span className="hero-problem-num">
+                  <CountUp to={stat.to} />
+                </span>
+                <span className="hero-problem-label">
+                  <span className="hero-problem-label-main">{stat.line1}</span>
+                  <span className="hero-problem-label-sub">{stat.line2}</span>
+                </span>
+                {i < PROBLEM_STATS.length - 1 && (
+                  <span className="hero-problem-sep" aria-hidden>
+                    +
+                  </span>
+                )}
+              </motion.div>
+            ))}
           </div>
         </motion.div>
 
