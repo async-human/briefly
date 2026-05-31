@@ -109,6 +109,7 @@ function FaviconImg({
   const [failed, setFailed] = useState(false);
   if (failed) return <>{fallback}</>;
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`}
       width={size}

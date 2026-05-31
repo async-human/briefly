@@ -6,7 +6,6 @@ import { AddSourceForm, CopyEmailButton } from "./AddSourceForm";
 import { GmailDiscovery } from "./GmailDiscovery";
 import { SourceSuggestions } from "./SourceSuggestions";
 import {
-  SOURCE_TYPE_LABELS,
   matchItemToSource,
   sourceDisplayName,
 } from "./sourceLabels";
