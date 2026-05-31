@@ -4573,35 +4573,68 @@ footer {
   opacity: 0.35;
 }
 
-/* Time-of-day mark — minimal SVG, no emoji */
+/* Time-of-day mark — visible SVG with period-specific color */
 .daymark {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border-radius: 7px;
+  border-radius: 12px;
   border: 1px solid var(--accent-line);
   background: var(--accent-dim);
   color: var(--accent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) inset;
 }
 .daymark--sm {
-  width: 22px;
-  height: 22px;
-  padding: 3px;
+  width: 30px;
+  height: 30px;
+  padding: 5px;
+  border-radius: 9px;
 }
 .daymark--md {
-  width: 26px;
-  height: 26px;
-  padding: 4px;
+  width: 34px;
+  height: 34px;
+  padding: 6px;
+}
+.daymark--lg {
+  width: 56px;
+  height: 56px;
+  padding: 10px;
+  border-radius: 16px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 8px 24px rgba(0, 0, 0, 0.06);
+}
+.daymark--morning {
+  color: #b87820;
+  border-color: rgba(184, 120, 32, 0.35);
+  background: linear-gradient(155deg, rgba(255, 220, 140, 0.55) 0%, rgba(255, 248, 230, 0.85) 100%);
+}
+.daymark--afternoon {
+  color: #c4922a;
+  border-color: rgba(196, 146, 42, 0.35);
+  background: linear-gradient(155deg, rgba(255, 210, 100, 0.5) 0%, rgba(255, 250, 235, 0.9) 100%);
+}
+.daymark--evening {
+  color: #c45a38;
+  border-color: rgba(196, 90, 56, 0.35);
+  background: linear-gradient(155deg, rgba(255, 170, 120, 0.45) 0%, rgba(255, 235, 220, 0.88) 100%);
+}
+.daymark--night {
+  color: #6b7db8;
+  border-color: rgba(107, 125, 184, 0.35);
+  background: linear-gradient(155deg, rgba(120, 140, 210, 0.35) 0%, rgba(230, 235, 250, 0.92) 100%);
 }
 .daymark svg {
   width: 100%;
   height: 100%;
   display: block;
+  overflow: visible;
 }
 .daymark-stroke {
   stroke: currentColor;
-  stroke-width: 1.5;
+  stroke-width: 1.75;
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -4610,58 +4643,71 @@ footer {
   fill: currentColor;
   stroke: none;
 }
+.daymark-orb-outline {
+  stroke-width: 1.5;
+  opacity: 0.85;
+}
 .daymark-orb {
-  opacity: 0.92;
   animation: daymark-breathe 5s ease-in-out infinite;
 }
 .daymark-horizon {
-  opacity: 0.45;
+  stroke-width: 2;
+  opacity: 0.7;
 }
 .daymark-ray {
-  opacity: 0.35;
-  animation: daymark-ray 4s ease-in-out infinite;
+  stroke-width: 1.75;
+  opacity: 0.75;
+  animation: daymark-ray 4.5s ease-in-out infinite;
 }
-.daymark-ray-2 { animation-delay: 0.6s; }
-.daymark-ray-3 { animation-delay: 1.2s; }
+.daymark-ray-2 { animation-delay: 0.5s; }
+.daymark-ray-3 { animation-delay: 1s; }
+.daymark-ray-4 { animation-delay: 1.5s; }
+.daymark-ray-5 { animation-delay: 2s; }
 .daymark-orbit {
-  opacity: 0.35;
-  stroke-dasharray: 3 5;
-  transform-origin: 12px 12px;
-  animation: daymark-orbit 28s linear infinite;
+  opacity: 0.45;
+  stroke-width: 1.25;
+  stroke-dasharray: 4 6;
+  transform-origin: 16px 16px;
+  animation: daymark-orbit 32s linear infinite;
 }
-.daymark-glow {
-  opacity: 0.25;
-  stroke-width: 1;
+.daymark-sky {
+  animation: daymark-breathe 6s ease-in-out infinite;
 }
 .daymark-star {
-  opacity: 0.5;
+  opacity: 0.85;
   animation: daymark-star 3.5s ease-in-out infinite;
 }
-.daymark-star-2 {
-  animation-delay: 1.4s;
-  opacity: 0.35;
-}
+.daymark-star-2 { animation-delay: 0.9s; opacity: 0.65; }
+.daymark-star-3 { animation-delay: 1.8s; opacity: 0.5; }
 @keyframes daymark-breathe {
-  0%, 100% { opacity: 0.65; }
+  0%, 100% { opacity: 0.82; }
   50% { opacity: 1; }
 }
 @keyframes daymark-ray {
-  0%, 100% { opacity: 0.25; }
-  50% { opacity: 0.7; }
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
 }
 @keyframes daymark-orbit {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 @keyframes daymark-star {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.85; }
+  0%, 100% { opacity: 0.45; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
 }
 
 .time-greeting-hero-label {
-  display: inline-flex;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.time-greeting-hero-head {
+  display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 18px;
+}
+.time-greeting-hero-title {
+  margin-bottom: 0;
 }
 
 .time-greeting-text {
@@ -4677,13 +4723,26 @@ footer {
   display: inline;
 }
 
+@media (max-width: 640px) {
+  .time-greeting-hero-head {
+    gap: 14px;
+  }
+  .daymark--lg {
+    width: 48px;
+    height: 48px;
+    padding: 8px;
+    border-radius: 14px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .daymark-orb,
   .daymark-ray,
   .daymark-orbit,
-  .daymark-star {
+  .daymark-star,
+  .daymark-sky {
     animation: none !important;
-    opacity: 0.85;
+    opacity: 1;
   }
 }
 

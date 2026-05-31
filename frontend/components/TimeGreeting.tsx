@@ -58,28 +58,37 @@ export function TimeGreetingHero({ name }: { name: string }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: EASE }}
       >
-        <DaymarkIcon period={greeting.period} size="sm" />
         {greeting.briefingLabel}
       </motion.p>
-      <h1 className="dash-hero-title">
-        <motion.span
-          className="time-greeting-hero-phrase"
-          key={`phrase-${greeting.period}`}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, ease: EASE }}
+      <div className="time-greeting-hero-head">
+        <motion.div
+          key={`mark-${greeting.period}`}
+          initial={{ opacity: 0, scale: 0.92 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: EASE }}
         >
-          {greeting.label},{" "}
-        </motion.span>
-        <motion.span
-          className="time-greeting-hero-name"
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.08, ease: EASE }}
-        >
-          {name}
-        </motion.span>
-      </h1>
+          <DaymarkIcon period={greeting.period} size="lg" />
+        </motion.div>
+        <h1 className="dash-hero-title time-greeting-hero-title">
+          <motion.span
+            className="time-greeting-hero-phrase"
+            key={`phrase-${greeting.period}`}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: EASE }}
+          >
+            {greeting.label},{" "}
+          </motion.span>
+          <motion.span
+            className="time-greeting-hero-name"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.08, ease: EASE }}
+          >
+            {name}
+          </motion.span>
+        </h1>
+      </div>
     </>
   );
 }
