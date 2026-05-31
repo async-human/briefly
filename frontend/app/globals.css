@@ -4915,37 +4915,55 @@ footer {
   50% { opacity: 1; transform: scale(1); }
 }
 
-.time-greeting-hero-label {
-  display: block;
-  margin-bottom: 12px;
+/* ── Animated greeting hero (tg-*) ── */
+.tg-hero-title {
+  margin-bottom: 0;
+  display: block; /* ensure full width so words wrap correctly */
+}
+.tg-phrase {
+  /* words display inline so they wrap naturally with the name */
+  display: inline;
+}
+.tg-word {
+  display: inline-block;
+  margin-right: 0.28em;
+}
+.tg-comma {
+  display: inline-block;
+  margin-right: 0.28em;
+}
+/* Period-specific gradient on the phrase */
+.tg-phrase--morning  { background: linear-gradient(135deg, #b8821a, #d4a84b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.tg-phrase--afternoon{ background: linear-gradient(135deg, #c07520, #e09a3a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.tg-phrase--evening  { background: linear-gradient(135deg, #b05030, #d07050); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.tg-phrase--night    { background: linear-gradient(135deg, #5568a0, #7a8ec0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+/* Light-page overrides for contrast */
+.light-page .tg-phrase--morning  { background: linear-gradient(135deg, #9a6010, #c4882a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.light-page .tg-phrase--afternoon{ background: linear-gradient(135deg, #9a5c14, #c07830); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.light-page .tg-phrase--evening  { background: linear-gradient(135deg, #8a3820, #b45840); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.light-page .tg-phrase--night    { background: linear-gradient(135deg, #3a4a78, #5a6898); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+.tg-name {
+  display: inline-block;
+  color: var(--text);
+}
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.time-greeting-hero-head {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-.time-greeting-hero-title {
-  margin-bottom: 0;
-}
 
 .time-greeting-text {
   color: var(--accent);
   letter-spacing: 0.06em;
 }
 
-.time-greeting-hero-phrase {
-  display: inline;
-  color: var(--text);
-}
-.time-greeting-hero-name {
-  display: inline;
-}
-
 @media (max-width: 640px) {
-  .time-greeting-hero-head {
-    gap: 14px;
-  }
   .daymark--lg {
     width: 48px;
     height: 48px;
