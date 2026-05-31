@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { api, type GmailSender, type Source } from "@/lib/api";
 
-export function GmailDiscovery({ onAdded }: { onAdded: (s: Source) => void }) {
+export function GmailDiscovery({
+  onAdded,
+  compact = false,
+}: {
+  onAdded: (s: Source) => void;
+  compact?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [senders, setSenders] = useState<GmailSender[]>([]);
@@ -66,12 +72,19 @@ export function GmailDiscovery({ onAdded }: { onAdded: (s: Source) => void }) {
   }
 
   return (
-    <div className="dash-card">
-      <p className="dash-card-label">Gmail</p>
-      <h2 className="dash-card-title">Discover newsletters</h2>
-      <p className="dash-card-desc">
-        Scan your inbox to find newsletters you already receive and add them in one click.
-      </p>
+    <div className={compact ? "dash-integration-block" : "dash-card"}>
+      {!compact && (
+        <>
+          <p className="dash-card-label">Gmail</p>
+          <h2 className="dash-card-title">Discover newsletters</h2>
+        </>
+      )}
+      {compact && <p className="dash-integration-label">Gmail inbox scan</p>}
+      {!compact && (
+        <p className="dash-card-desc">
+          Scan your inbox to find newsletters you already receive and add them in one click.
+        </p>
+      )}
 
       {!open ? (
         <button type="button" className="briefing-refresh" onClick={handleDiscover}>
