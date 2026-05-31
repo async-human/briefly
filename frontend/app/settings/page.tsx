@@ -236,8 +236,8 @@ export default function SettingsPage() {
     <div className="dash-shell">
       <DashboardNav userName={me?.name ?? null} avatarUrl={me?.avatar_url} />
       <main className="dash-main">
-        <header className="dash-hero">
-          <div>
+        <header className="dash-hero dash-hero-v2">
+          <div className="dash-hero-main">
             <p className="dash-hero-label">Account</p>
             <h1 className="dash-hero-title">Preferences</h1>
             <p className="dash-hero-date">Adjust how Briefly works for you</p>

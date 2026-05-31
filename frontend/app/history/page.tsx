@@ -11,42 +11,38 @@ import { getToken } from "@/lib/auth";
 function HistorySkeleton() {
   return (
     <>
-      {/* Hero */}
-      <div className="dash-skeleton-hero">
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="dash-skeleton-hero dash-skeleton-hero-v2">
+        <div className="dash-skeleton-hero-main">
           <span className="skeleton-block" style={{ width: 60, height: 10, display: "block" }} />
-          <span className="skeleton-block" style={{ width: 200, height: 34, display: "block" }} />
-          <span className="skeleton-block" style={{ width: 120, height: 13, display: "block" }} />
+          <span className="skeleton-block" style={{ width: 200, height: 34, display: "block", marginTop: 10 }} />
+          <span className="skeleton-block" style={{ width: 120, height: 13, display: "block", marginTop: 10 }} />
         </div>
-        <div style={{ display: "flex", gap: 12 }}>
+        <div className="dash-skeleton-hero-stats">
           {[1, 2].map((i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
+            <div key={i} className="dash-skeleton-stat">
               <span className="skeleton-block" style={{ width: 28, height: 28, display: "block" }} />
-              <span className="skeleton-block" style={{ width: 52, height: 11, display: "block" }} />
+              <span className="skeleton-block" style={{ width: 52, height: 11, display: "block", marginTop: 6 }} />
             </div>
           ))}
         </div>
       </div>
-      {/* History grid */}
-      <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden", minHeight: 480, background: "var(--bg-elevated)" }}>
-        {/* Sidebar */}
-        <div style={{ width: 260, flexShrink: 0, borderRight: "1px solid var(--border)", padding: "8px 0" }}>
+      <div className="history-skeleton-shell">
+        <div className="history-skeleton-rail">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div key={i} className="history-skeleton-day">
               <span className="skeleton-block" style={{ width: 80, height: 10, display: "block" }} />
-              <span className="skeleton-block" style={{ width: "85%", height: 13, display: "block" }} />
-              <span className="skeleton-block" style={{ width: "65%", height: 13, display: "block" }} />
-              <span className="skeleton-block" style={{ width: 60, height: 10, display: "block" }} />
+              <span className="skeleton-block" style={{ width: "85%", height: 13, display: "block", marginTop: 8 }} />
+              <span className="skeleton-block" style={{ width: "65%", height: 13, display: "block", marginTop: 8 }} />
+              <span className="skeleton-block" style={{ width: 60, height: 10, display: "block", marginTop: 8 }} />
             </div>
           ))}
         </div>
-        {/* Detail */}
-        <div style={{ flex: 1, padding: "0" }}>
-          <div style={{ padding: "14px 24px", borderBottom: "1px solid var(--border)" }}>
+        <div className="history-skeleton-detail">
+          <div className="history-skeleton-detail-head">
             <span className="skeleton-block" style={{ width: 220, height: 11, display: "block" }} />
           </div>
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} style={{ display: "flex", gap: 20, padding: "20px 24px", borderBottom: "1px solid var(--border)" }}>
+            <div key={i} className="history-skeleton-item">
               <span className="skeleton-block" style={{ width: 24, height: 14, display: "block", flexShrink: 0 }} />
               <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 9 }}>
                 <span className="skeleton-block" style={{ width: "45%", height: 10, display: "block" }} />
@@ -94,8 +90,8 @@ export default function HistoryPage() {
           <HistorySkeleton />
         ) : (
           <>
-            <header className="dash-hero history-page-hero">
-              <div>
+            <header className="dash-hero dash-hero-v2 history-page-hero">
+              <div className="dash-hero-main">
                 <p className="dash-hero-label">Archive</p>
                 <h1 className="dash-hero-title">Past briefings</h1>
                 <p className="dash-hero-date">
@@ -105,16 +101,16 @@ export default function HistoryPage() {
                 </p>
               </div>
               {digests.length > 0 && (
-                <div className="dash-hero-meta">
-                  <div className="meta-pill">
-                    <span className="meta-value">{digests.length}</span>
-                    <span className="meta-label">briefings</span>
-                  </div>
-                  <div className="meta-pill">
-                    <span className="meta-value">{totalItems}</span>
-                    <span className="meta-label">items read</span>
-                  </div>
-                </div>
+                <ul className="dash-hero-stats" aria-label="Archive summary">
+                  <li>
+                    <span className="dash-hero-stat-value">{digests.length}</span>
+                    <span className="dash-hero-stat-label">briefings</span>
+                  </li>
+                  <li>
+                    <span className="dash-hero-stat-value">{totalItems}</span>
+                    <span className="dash-hero-stat-label">items read</span>
+                  </li>
+                </ul>
               )}
             </header>
 
