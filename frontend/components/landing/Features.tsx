@@ -352,12 +352,11 @@ export function Features() {
       <div className="features-v2-inner">
         <Reveal>
           <div className="section-header-centered">
-            <p className="section-eyebrow">Why Briefly</p>
-            <h2 className="section-heading">Not another tool to maintain</h2>
+            <p className="section-eyebrow">In practice</p>
+            <h2 className="section-heading">Four ideas behind every briefing</h2>
             <p className="section-body">
-              Notion dies when you stop feeding it. Feedly is a firehose. Readwise needs you to highlight first.
-              <br />
-              Briefly needs nothing except the accounts you already have.
+              Most tools wait for you to save, sort, and revisit.
+              Briefly works in the background — and meets you each morning with exactly what matters.
             </p>
           </div>
         </Reveal>

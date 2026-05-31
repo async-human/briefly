@@ -717,7 +717,7 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
 .light-page .workflow-section::before,
 .light-page .features-v2::before,
 .light-page .roadmap-section::before,
-.light-page .compare-section::before,
+.light-page .principles-section::before,
 .light-page .pricing-v2::before,
 .light-page .cta-v2::before {
   background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
@@ -725,6 +725,7 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
 .light-page .workflow-section::after,
 .light-page .features-v2::after,
 .light-page .roadmap-section::after,
+.light-page .principles-section::after,
 .light-page .pricing-v2::after {
   background: radial-gradient(ellipse at 50% 0%, rgba(158,123,63,0.04), transparent 70%);
 }
@@ -1552,7 +1553,7 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
 .workflow-section,
 .features-v2,
 .roadmap-section,
-.compare-section,
+.principles-section,
 .pricing-v2,
 .cta-v2 {
   border-top: none !important;
@@ -1561,7 +1562,7 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
 .workflow-section::before,
 .features-v2::before,
 .roadmap-section::before,
-.compare-section::before,
+.principles-section::before,
 .pricing-v2::before,
 .cta-v2::before {
   content: "";
@@ -1585,6 +1586,7 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
 .workflow-section::after,
 .features-v2::after,
 .roadmap-section::after,
+.principles-section::after,
 .pricing-v2::after {
   content: "";
   position: absolute;
@@ -3632,6 +3634,200 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   line-height: 1.55;
 }
 
+/* ── PRINCIPLES (USP manifesto) ── */
+.principles-section {
+  padding: 100px 48px 120px;
+  border-top: 1px solid var(--border);
+}
+.principles-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+.principles-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 64px 72px;
+  align-items: start;
+}
+.principles-intro {
+  position: sticky;
+  top: 100px;
+}
+.principles-headline {
+  font-family: var(--serif);
+  font-size: clamp(28px, 3.6vw, 40px);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+  color: var(--text);
+  margin: 0 0 18px;
+}
+.principles-lede {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  margin: 0 0 28px;
+  max-width: 32ch;
+}
+.principles-pullquote {
+  position: relative;
+  padding: 18px 0 0 20px;
+  border-left: 2px solid var(--accent-line);
+}
+.principles-pullquote-mark {
+  position: absolute;
+  top: 4px;
+  left: 20px;
+  font-family: var(--serif);
+  font-size: 48px;
+  line-height: 1;
+  color: color-mix(in srgb, var(--accent) 35%, transparent);
+  pointer-events: none;
+}
+.principles-pullquote p {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding-top: 12px;
+  font-family: var(--serif);
+  font-size: 17px;
+  font-style: italic;
+  letter-spacing: -0.01em;
+  line-height: 1.45;
+  color: var(--text);
+}
+.principles-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.principle-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 20px;
+  padding: 28px 0;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.25s;
+}
+.principle-row:first-child {
+  padding-top: 0;
+}
+.principle-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.principle-row:hover {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 4%, transparent) 40%,
+    transparent 100%
+  );
+}
+.principle-num {
+  font-family: var(--serif);
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: color-mix(in srgb, var(--accent) 55%, var(--text-muted));
+  padding-top: 2px;
+}
+.principle-body {
+  min-width: 0;
+}
+.principle-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.principle-title {
+  font-family: var(--serif);
+  font-size: clamp(18px, 2.2vw, 22px);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--text);
+  margin: 0;
+}
+.principle-tag {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-line);
+  border-radius: 100px;
+  padding: 4px 10px;
+  margin-top: 3px;
+}
+.principle-desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  max-width: 56ch;
+}
+.principles-footnote {
+  margin: 32px 0 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  color: var(--text-muted);
+  max-width: 48ch;
+}
+
+@media (max-width: 900px) {
+  .principles-section { padding: 80px 24px 96px; }
+  .principles-layout {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+  .principles-intro {
+    position: static;
+    text-align: center;
+  }
+  .principles-lede {
+    max-width: none;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .principles-pullquote {
+    max-width: 360px;
+    margin: 0 auto;
+    text-align: left;
+  }
+  .principles-footnote {
+    max-width: none;
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .principle-row {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 14px;
+    padding: 22px 0;
+  }
+  .principle-num { font-size: 22px; }
+}
+
+@media (max-width: 480px) {
+  .principle-head {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .principle-tag { align-self: flex-start; }
+}
+
 /* ── CTA ── */
 .cta-section {
   padding: 120px 48px;
@@ -4007,7 +4203,7 @@ footer {
   /* Sections: tighter vertical padding */
   .features-v2,
   .roadmap-section,
-  .compare-section,
+  .principles-section,
   .pricing-v2,
   .cta-v2 { padding: 64px 20px; }
 
@@ -8303,11 +8499,7 @@ footer {
   /* Roadmap — vertical timeline, no grid overrides needed */
   .roadmap-section { padding: 80px 24px; }
   /* Compare */
-  .compare-section { padding: 80px 24px; }
-  .compare-header-row { display: none; }
-  .compare-row { grid-template-columns: 1fr; gap: 6px; }
-  .compare-col-what::before { content: "What: "; font-size: 10px; color: var(--text-muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em; }
-  .compare-col-why::before { content: "Why: "; font-size: 10px; color: var(--text-muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em; }
+  .principles-section { padding: 80px 24px; }
   .cta-loop { flex-direction: column; }
   .cta-loop-arrow { transform: rotate(90deg); }
 }

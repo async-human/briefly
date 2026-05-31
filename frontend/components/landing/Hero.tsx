@@ -100,7 +100,9 @@ export function Hero() {
             <span className="hero-light-gradient">You just read the briefing.</span>
           </h1>
           <p className="hero-light-sub">
-            Connect your accounts once. Every night, Briefly fetches everything, scores what matters to you, and writes a personalised morning briefing — with sources cited. Zero maintenance. Forever.
+            Connect your accounts once. Every night, Briefly reads everything — deduplicates across sources,
+            scores what matters to you, and writes a personalised morning briefing with every claim cited.
+            Zero maintenance. Forever.
           </p>
           <div className="hero-light-actions">
             <motion.a

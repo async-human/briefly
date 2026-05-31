@@ -3,7 +3,7 @@ import { Hero } from "@/components/landing/Hero";
 import { LiveDemo } from "@/components/landing/LiveDemo";
 import { ProofTicker } from "@/components/landing/ProofTicker";
 import { SourcesStrip } from "@/components/landing/SourcesStrip";
-import { CompareSection } from "@/components/landing/CompareSection";
+import { PrinciplesSection } from "@/components/landing/PrinciplesSection";
 import { Features } from "@/components/landing/Features";
 import { Roadmap } from "@/components/landing/Roadmap";
 import { Pricing } from "@/components/landing/Pricing";
@@ -18,7 +18,7 @@ export default function Home() {
       <LiveDemo />
       <ProofTicker />
       <SourcesStrip />
-      <CompareSection />
+      <PrinciplesSection />
       <Features />
       <Roadmap />
       <Pricing />

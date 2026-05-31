@@ -6,8 +6,8 @@ import { AnimatePresence, motion } from "framer-motion";
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 const NAV_LINKS = [
-  { href: "#how", label: "How it works" },
-  { href: "#compare", label: "Why Briefly" },
+  { href: "#why", label: "Why Briefly" },
+  { href: "#features", label: "Features" },
   { href: "#roadmap", label: "Roadmap" },
   { href: "#pricing", label: "Pricing" },
 ];
