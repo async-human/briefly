@@ -76,11 +76,11 @@ export function BrainCanvas() {
     }
 
     const activateTimer = setInterval(() => {
-      for (let i = 0; i < 2 + Math.floor(Math.random() * 3); i++) {
+      for (let i = 0; i < 1 + Math.floor(Math.random() * 2); i++) {
         if (!nodes.length) break;
-        nodes[Math.floor(Math.random() * nodes.length)].act = 0.6 + Math.random() * 0.4;
+        nodes[Math.floor(Math.random() * nodes.length)].act = 0.28 + Math.random() * 0.22;
       }
-    }, 900);
+    }, 1200);
 
     const pulseTimer = setInterval(() => {
       if (!nodes.length || !edges.length) return;
@@ -124,8 +124,8 @@ export function BrainCanvas() {
           if (dist < CURSOR_RADIUS) {
             // Smooth cosine-shaped falloff: full boost at centre, zero at edge
             const t = 1 - dist / CURSOR_RADIUS;
-            const boost = Math.pow(t, 1.8) * 0.045; // gentle per-frame increment
-            n.act = Math.min(1.0, n.act + boost);
+            const boost = Math.pow(t, 2.2) * 0.022;
+            n.act = Math.min(0.6, n.act + boost);
           }
         }
       }
@@ -134,8 +134,8 @@ export function BrainCanvas() {
       for (const [a, b] of edges) {
         const na = nodes[a], nb = nodes[b];
         const heat = (na.act + nb.act) * 0.5;
-        ctx.strokeStyle = `rgba(158,123,63,${0.14 + heat * 0.22})`;
-        ctx.lineWidth   = 0.7 + heat * 0.8;
+        ctx.strokeStyle = `rgba(158,123,63,${0.05 + heat * 0.10})`;
+        ctx.lineWidth   = 0.4 + heat * 0.45;
         ctx.beginPath();
         ctx.moveTo(na.x, na.y);
         ctx.lineTo(nb.x, nb.y);
@@ -152,7 +152,7 @@ export function BrainCanvas() {
         const py = na.y + (nb.y - na.y) * p.t;
         const fade = Math.max(0, 1 - Math.abs(p.t - 0.5) * 2.5);
         const g = ctx.createRadialGradient(px, py, 0, px, py, 6);
-        g.addColorStop(0, `rgba(200,155,60,${0.75 * fade})`);
+        g.addColorStop(0, `rgba(200,155,60,${0.35 * fade})`);
         g.addColorStop(1, "rgba(200,155,60,0)");
         ctx.fillStyle = g;
         ctx.beginPath();
@@ -163,8 +163,8 @@ export function BrainCanvas() {
       // ── Neuron bodies (decay applied here so boost above is always first) ─────
       for (const n of nodes) {
         n.act = Math.max(0, n.act - n.decay);
-        const alpha = 0.22 + n.act * 0.60;
-        const r     = 1.5 + n.act * 3.2;
+        const alpha = 0.08 + n.act * 0.28;
+        const r     = 1.0 + n.act * 1.8;
         ctx.fillStyle = `rgba(158,123,63,${alpha})`;
         ctx.beginPath();
         ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
