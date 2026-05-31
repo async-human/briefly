@@ -3288,10 +3288,10 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   .rm3-track-shimmer,
   .rm3-orb,
   .rm3-icon-ring,
-  .time-greeting-emoji--morning,
-  .time-greeting-emoji--afternoon,
-  .time-greeting-emoji--evening,
-  .time-greeting-emoji--night {
+  .daymark-orb,
+  .daymark-ray,
+  .daymark-orbit,
+  .daymark-star {
     animation: none !important;
   }
 }
@@ -4573,264 +4573,120 @@ footer {
   opacity: 0.35;
 }
 
-/* Cute animated greeting icons */
-.time-greeting-icon-wrap {
-  position: relative;
+/* Time-of-day mark — minimal SVG, no emoji */
+.daymark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border-radius: 7px;
+  border: 1px solid var(--accent-line);
+  background: var(--accent-dim);
+  color: var(--accent);
 }
-.time-greeting-icon-wrap--sm {
+.daymark--sm {
   width: 22px;
   height: 22px;
+  padding: 3px;
 }
-.time-greeting-icon-wrap--lg {
-  width: 44px;
-  height: 44px;
-  margin-left: 10px;
-  vertical-align: -6px;
+.daymark--md {
+  width: 26px;
+  height: 26px;
+  padding: 4px;
 }
-.time-greeting-emoji-shell {
-  position: relative;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transform-origin: center center;
+.daymark svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
-.time-greeting-emoji {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  transform-origin: center center;
+.daymark-stroke {
+  stroke: currentColor;
+  stroke-width: 1.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.time-greeting-icon-wrap--sm .time-greeting-emoji {
-  font-size: 13px;
+.daymark-fill {
+  fill: currentColor;
+  stroke: none;
 }
-.time-greeting-icon-wrap--lg .time-greeting-emoji {
-  font-size: 30px;
+.daymark-orb {
+  opacity: 0.92;
+  animation: daymark-breathe 5s ease-in-out infinite;
 }
-
-/* Looping emoji motion — one personality per time of day */
-.time-greeting-emoji--morning {
-  animation: greeting-emoji-morning 2.6s ease-in-out 0.5s infinite;
+.daymark-horizon {
+  opacity: 0.45;
 }
-.time-greeting-emoji--afternoon {
-  animation: greeting-emoji-afternoon 3.4s ease-in-out 0.5s infinite;
+.daymark-ray {
+  opacity: 0.35;
+  animation: daymark-ray 4s ease-in-out infinite;
 }
-.time-greeting-emoji--evening {
-  animation: greeting-emoji-evening 3.1s ease-in-out 0.5s infinite;
+.daymark-ray-2 { animation-delay: 0.6s; }
+.daymark-ray-3 { animation-delay: 1.2s; }
+.daymark-orbit {
+  opacity: 0.35;
+  stroke-dasharray: 3 5;
+  transform-origin: 12px 12px;
+  animation: daymark-orbit 28s linear infinite;
 }
-.time-greeting-emoji--night {
-  animation: greeting-emoji-night 3.8s ease-in-out 0.5s infinite;
+.daymark-glow {
+  opacity: 0.25;
+  stroke-width: 1;
 }
-@keyframes greeting-emoji-morning {
-  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
-  35% { transform: translateY(-5px) rotate(12deg) scale(1.16); }
-  65% { transform: translateY(-2px) rotate(-8deg) scale(1.08); }
+.daymark-star {
+  opacity: 0.5;
+  animation: daymark-star 3.5s ease-in-out infinite;
 }
-@keyframes greeting-emoji-afternoon {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  33% { transform: translate(4px, -4px) rotate(6deg); }
-  66% { transform: translate(-3px, -2px) rotate(-5deg); }
+.daymark-star-2 {
+  animation-delay: 1.4s;
+  opacity: 0.35;
 }
-@keyframes greeting-emoji-evening {
-  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
-  50% { transform: translateY(5px) rotate(-14deg) scale(0.92); }
+@keyframes daymark-breathe {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
 }
-@keyframes greeting-emoji-night {
-  0%, 100% { transform: rotate(-10deg) translateY(0); }
-  50% { transform: rotate(10deg) translateY(-3px); }
+@keyframes daymark-ray {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.7; }
 }
-
-/* Morning — sun glow + sparkles */
-.time-greeting-icon-wrap--morning::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 210, 120, 0.45) 0%, transparent 72%);
-  animation: greeting-sun-glow 2.4s ease-in-out infinite;
-  z-index: 0;
+@keyframes daymark-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
-.time-greeting-icon-wrap--lg.time-greeting-icon-wrap--morning::before {
-  inset: -6px;
-}
-@keyframes greeting-sun-glow {
-  0%, 100% { transform: scale(0.85); opacity: 0.45; }
-  50% { transform: scale(1.15); opacity: 0.85; }
-}
-.time-greeting-spark {
-  position: absolute;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #ffe08a;
-  z-index: 1;
-  box-shadow: 0 0 6px rgba(255, 210, 120, 0.8);
-}
-.time-greeting-spark--a {
-  top: -2px;
-  right: 0;
-  animation: greeting-spark-pop 2s ease-in-out infinite;
-}
-.time-greeting-spark--b {
-  bottom: 0;
-  left: -1px;
-  animation: greeting-spark-pop 2s ease-in-out 0.6s infinite;
-}
-.time-greeting-spark--c {
-  top: 4px;
-  left: -3px;
-  width: 3px;
-  height: 3px;
-  animation: greeting-spark-pop 2.2s ease-in-out 1.1s infinite;
-}
-.time-greeting-icon-wrap--lg .time-greeting-spark--a { top: 2px; right: 2px; }
-.time-greeting-icon-wrap--lg .time-greeting-spark--b { bottom: 4px; left: 2px; }
-.time-greeting-icon-wrap--lg .time-greeting-spark--c { top: 10px; left: 0; }
-@keyframes greeting-spark-pop {
-  0%, 100% { transform: scale(0.4); opacity: 0; }
-  40% { transform: scale(1.2); opacity: 1; }
-  70% { transform: scale(0.8); opacity: 0.5; }
-}
-
-/* Afternoon — drifting cloud puff */
-.time-greeting-cloud-puff {
-  position: absolute;
-  bottom: 1px;
-  right: -4px;
-  width: 10px;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.35);
-  z-index: 1;
-  animation: greeting-cloud-puff 3.2s ease-in-out infinite;
-}
-.time-greeting-icon-wrap--lg .time-greeting-cloud-puff {
-  width: 16px;
-  height: 9px;
-  right: -2px;
-  bottom: 4px;
-}
-@keyframes greeting-cloud-puff {
-  0%, 100% { transform: translateX(0) scale(1); opacity: 0.35; }
-  50% { transform: translateX(3px) scale(1.15); opacity: 0.65; }
-}
-
-/* Evening — warm sunset glow */
-.time-greeting-evening-glow {
-  position: absolute;
-  inset: -1px -3px -4px -3px;
-  border-radius: 50% 50% 40% 40%;
-  background: linear-gradient(to top, rgba(255, 140, 80, 0.35), transparent);
-  z-index: 0;
-  animation: greeting-evening-glow 3s ease-in-out infinite;
-}
-.time-greeting-icon-wrap--lg .time-greeting-evening-glow {
-  inset: -2px -5px -8px -5px;
-}
-@keyframes greeting-evening-glow {
-  0%, 100% { opacity: 0.35; transform: scaleY(0.9); }
-  50% { opacity: 0.75; transform: scaleY(1.08); }
-}
-
-/* Night — twinkling stars */
-.time-greeting-star {
-  position: absolute;
-  z-index: 1;
-  color: #f0dfc0;
-  line-height: 1;
-  pointer-events: none;
-}
-.time-greeting-star--a {
-  top: -1px;
-  right: -2px;
-  font-size: 7px;
-  animation: greeting-star-twinkle 2.2s ease-in-out infinite;
-}
-.time-greeting-star--b {
-  bottom: 0;
-  left: -3px;
-  font-size: 6px;
-  animation: greeting-star-twinkle 2.2s ease-in-out 1s infinite;
-}
-.time-greeting-icon-wrap--lg .time-greeting-star--a {
-  top: 2px;
-  right: 0;
-  font-size: 11px;
-}
-.time-greeting-icon-wrap--lg .time-greeting-star--b {
-  bottom: 4px;
-  left: 0;
-  font-size: 9px;
-}
-.time-greeting-icon-wrap--night::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(180, 200, 255, 0.18) 0%, transparent 70%);
-  animation: greeting-moon-glow 3.5s ease-in-out infinite;
-  z-index: 0;
-}
-@keyframes greeting-moon-glow {
-  0%, 100% { opacity: 0.4; transform: scale(0.95); }
-  50% { opacity: 0.9; transform: scale(1.05); }
-}
-@keyframes greeting-star-twinkle {
-  0%, 100% { transform: scale(0.6) rotate(0deg); opacity: 0.2; }
-  50% { transform: scale(1.15) rotate(20deg); opacity: 1; }
+@keyframes daymark-star {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.85; }
 }
 
 .time-greeting-hero-label {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-}
-.time-greeting-hero-title {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0;
+  gap: 9px;
 }
 
 .time-greeting-text {
-  background: linear-gradient(
-    90deg,
-    var(--accent) 0%,
-    #f0dfc0 45%,
-    var(--accent) 90%
-  );
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: greeting-shimmer 5s ease-in-out infinite;
+  color: var(--accent);
+  letter-spacing: 0.06em;
 }
-@keyframes greeting-shimmer {
-  0%, 100% { background-position: 0% center; }
-  50% { background-position: 100% center; }
-}
+
 .time-greeting-hero-phrase {
-  display: inline-block;
-  background: linear-gradient(
-    120deg,
-    var(--text) 0%,
-    #f0dfc0 42%,
-    var(--text) 78%
-  );
-  background-size: 220% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: greeting-shimmer 6s ease-in-out infinite;
+  display: inline;
+  color: var(--text);
 }
 .time-greeting-hero-name {
-  display: inline-block;
+  display: inline;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .daymark-orb,
+  .daymark-ray,
+  .daymark-orbit,
+  .daymark-star {
+    animation: none !important;
+    opacity: 0.85;
+  }
+}
+
 .lp-perks {
   width: 100%;
   display: flex;

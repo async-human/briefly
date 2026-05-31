@@ -3,7 +3,6 @@ export type GreetingPeriod = "morning" | "afternoon" | "evening" | "night";
 export type TimeGreeting = {
   period: GreetingPeriod;
   label: string;
-  emoji: string;
   briefingLabel: string;
   cardTitle: string;
 };
@@ -15,7 +14,6 @@ export function getTimeGreeting(date = new Date()): TimeGreeting {
     return {
       period: "morning",
       label: "Good morning",
-      emoji: "☀️",
       briefingLabel: "Morning briefing",
       cardTitle: "Start your day sharper",
     };
@@ -25,7 +23,6 @@ export function getTimeGreeting(date = new Date()): TimeGreeting {
     return {
       period: "afternoon",
       label: "Good afternoon",
-      emoji: "🌤️",
       briefingLabel: "Afternoon briefing",
       cardTitle: "Stay sharp this afternoon",
     };
@@ -35,7 +32,6 @@ export function getTimeGreeting(date = new Date()): TimeGreeting {
     return {
       period: "evening",
       label: "Good evening",
-      emoji: "🌅",
       briefingLabel: "Evening briefing",
       cardTitle: "Wind down with clarity",
     };
@@ -44,7 +40,6 @@ export function getTimeGreeting(date = new Date()): TimeGreeting {
   return {
     period: "night",
     label: "Good night",
-    emoji: "🌙",
     briefingLabel: "Tonight's briefing",
     cardTitle: "Catch up before tomorrow",
   };
