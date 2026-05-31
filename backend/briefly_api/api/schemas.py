@@ -96,6 +96,7 @@ class MeOut(BaseModel):
     youtube_connected: bool = False
     reddit_connected: bool = False
     reading_streak: int = 0  # consecutive days with a digest
+    auto_suggestions: list["AutoSuggestionOut"] = Field(default_factory=list)
 
 
 class DigestItemOut(BaseModel):
@@ -205,6 +206,17 @@ class SourceSuggestionOut(BaseModel):
     source_type: str
     topic: str
     description: str
+
+
+class AutoSuggestionOut(BaseModel):
+    name: str
+    url: str
+    source_type: str = "rss"
+    topic: str
+    description: str
+    reason: str = ""
+    discovered_at: str | None = None
+    source: str = "catalog"  # catalog | medium
 
 
 class ReadwiseConnectIn(BaseModel):

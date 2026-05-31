@@ -21,6 +21,7 @@ from briefly_api.api.schemas import (
     GenerateDigestOut,
     GmailDiscoverOut,
     GmailSenderOut,
+    AutoSuggestionOut,
     MeOut,
     ProfileOut,
     ReadwiseConnectIn,
@@ -109,6 +110,34 @@ async def _compute_streak(user_id: str, db: AsyncSession) -> int:
     return streak
 
 
+async def _auto_suggestions_for_user(user: User, db: AsyncSession) -> list[AutoSuggestionOut]:
+    """Return interest-driven suggestions not already connected as sources."""
+    if not user.profile or not user.profile.suggested_sources:
+        return []
+
+    result = await db.execute(
+        select(Source.identifier).where(Source.user_id == user.id)
+    )
+    already_added = {row[0].lower() for row in result.all()}
+
+    out: list[AutoSuggestionOut] = []
+    for item in user.profile.suggested_sources:
+        url = (item.get("url") or "").strip()
+        if not url or url.lower() in already_added:
+            continue
+        out.append(AutoSuggestionOut(
+            name=item.get("name") or url,
+            url=url,
+            source_type=item.get("source_type") or "rss",
+            topic=item.get("topic") or "",
+            description=item.get("description") or "",
+            reason=item.get("reason") or "",
+            discovered_at=item.get("discovered_at"),
+            source=item.get("source") or "catalog",
+        ))
+    return out
+
+
 @router.get("/me", response_model=MeOut)
 async def get_me(
     user: User = Depends(get_current_user),
@@ -121,6 +150,7 @@ async def get_me(
     youtube = await get_youtube_connection(db, user.id)
     reddit = await get_reddit_connection(db, user.id)
     streak = await _compute_streak(user.id, db)
+    auto_suggestions = await _auto_suggestions_for_user(user, db)
     return MeOut(
         user=UserOut.model_validate(user),
         profile=profile,
@@ -130,6 +160,7 @@ async def get_me(
         youtube_connected=youtube is not None,
         reddit_connected=reddit is not None,
         reading_streak=streak,
+        auto_suggestions=auto_suggestions,
     )
 
 

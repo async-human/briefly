@@ -9,6 +9,74 @@ unless explicitly set to "url" for sites that need full-page scraping.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
+# ── Medium tag RSS mapping ────────────────────────────────────────────────────
+# Medium publishes public RSS feeds for every tag at medium.com/feed/tag/{slug}
+# Map common topic keywords → Medium tag slugs so the interest-discovery loop
+# can construct the URL automatically.
+_MEDIUM_TAG_MAP: dict[str, str] = {
+    "ai":                  "artificial-intelligence",
+    "artificial intelligence": "artificial-intelligence",
+    "machine learning":    "machine-learning",
+    "deep learning":       "deep-learning",
+    "llm":                 "llm",
+    "startups":            "startups",
+    "startup":             "startup",
+    "entrepreneurship":    "entrepreneurship",
+    "product":             "product-management",
+    "product management":  "product-management",
+    "design":              "design",
+    "ux":                  "ux",
+    "engineering":         "software-engineering",
+    "software":            "software-engineering",
+    "programming":         "programming",
+    "python":              "python",
+    "javascript":          "javascript",
+    "typescript":          "typescript",
+    "data science":        "data-science",
+    "finance":             "finance",
+    "investing":           "investing",
+    "crypto":              "cryptocurrency",
+    "blockchain":          "blockchain",
+    "science":             "science",
+    "health":              "health",
+    "productivity":        "productivity",
+    "leadership":          "leadership",
+    "marketing":           "marketing",
+    "growth":              "growth-hacking",
+    "india":               "india",
+    "venture capital":     "venture-capital",
+    "saas":                "saas",
+}
+
+def _medium_entries_for_topics(topics: list[str]) -> list[dict]:
+    """Return Medium tag RSS entries for each matched topic (deduped)."""
+    seen_slugs: set[str] = set()
+    entries: list[dict] = []
+    for t in topics:
+        t_lower = t.lower().strip()
+        # Direct match
+        slug = _MEDIUM_TAG_MAP.get(t_lower)
+        # Substring match if no direct hit
+        if not slug:
+            for key, val in _MEDIUM_TAG_MAP.items():
+                if key in t_lower or t_lower in key:
+                    slug = val
+                    break
+        if slug and slug not in seen_slugs:
+            seen_slugs.add(slug)
+            display = slug.replace("-", " ").title()
+            entries.append({
+                "name": f"Medium · {display}",
+                "url": f"https://medium.com/feed/tag/{slug}",
+                "topic": t_lower,
+                "description": f"Top Medium stories tagged {display} — community writing and expert blogs",
+                "source": "medium",
+            })
+    return entries
+
+
 _CATALOG: list[dict] = [
     # ── AI & Machine Learning ─────────────────────────────────────────────────
     {"name": "The Rundown AI", "url": "https://www.therundown.ai/rss",
@@ -151,5 +219,97 @@ def get_suggestions(
             "source_type": "rss",
             "topic": entry["topic"],
             "description": entry["description"],
+        })
+    return results
+
+
+def get_interest_driven_suggestions(
+    inferred_topics: list[str],
+    declared_interests: list[str],
+    already_added_urls: set[str],
+    existing_suggestions: list[dict] | None = None,
+    limit: int = 5,
+) -> list[dict]:
+    """
+    Suggest sources by combining:
+      1. Curated RSS catalog scored against inferred + declared topics
+      2. Medium tag RSS feeds for matched topics
+
+    Returns up to `limit` new suggestions not already added or previously suggested.
+    Each result includes a human-readable `reason` explaining why it was picked.
+    """
+    already_lower = {u.lower() for u in already_added_urls}
+    existing_urls = {s["url"].lower() for s in (existing_suggestions or [])}
+    skip_urls = already_lower | existing_urls
+
+    all_topics = list(dict.fromkeys(
+        [t.lower().strip() for t in inferred_topics + declared_interests if t.strip()]
+    ))
+    interest_text = " ".join(all_topics)
+
+    def _score(entry: dict) -> tuple[int, str]:
+        if entry["url"].lower() in skip_urls:
+            return -1, ""
+        if not interest_text:
+            return 0, "Broadly recommended"
+        score = 0
+        matched: list[str] = []
+        topic = entry["topic"].lower()
+        name  = entry["name"].lower()
+        desc  = entry["description"].lower()
+        for word in interest_text.split():
+            if len(word) < 3:
+                continue
+            if word in topic:
+                score += 3
+                matched.append(word)
+            elif word in name:
+                score += 2
+                matched.append(word)
+            elif word in desc:
+                score += 1
+                matched.append(word)
+        reason = ""
+        if matched:
+            unique = list(dict.fromkeys(matched))[:2]
+            reason = f"Matches your interest in {', '.join(unique)}"
+        return score, reason
+
+    # Score curated catalog
+    catalog_scored: list[tuple[dict, int, str]] = []
+    for entry in _CATALOG:
+        s, reason = _score(entry)
+        if s >= 0:
+            catalog_scored.append((entry, s, reason))
+
+    # Add Medium tag entries for matched topics
+    medium_entries = _medium_entries_for_topics(all_topics)
+    medium_scored: list[tuple[dict, int, str]] = []
+    for entry in medium_entries:
+        s, reason = _score(entry)
+        if s >= 0:
+            # Medium is a bonus, cap its score so curated feeds rank above it
+            medium_scored.append((entry, min(s, 4), reason or f"Medium blogs about {entry['topic']}"))
+
+    combined = sorted(
+        catalog_scored + medium_scored,
+        key=lambda x: x[1],
+        reverse=True,
+    )
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    results: list[dict] = []
+    for entry, score, reason in combined:
+        if len(results) >= limit:
+            break
+        results.append({
+            "name":        entry["name"],
+            "url":         entry["url"],
+            "source_type": "rss",
+            "topic":       entry["topic"],
+            "description": entry["description"],
+            "reason":      reason or "Recommended based on your reading history",
+            "discovered_at": now,
+            "source": entry.get("source", "catalog"),
         })
     return results

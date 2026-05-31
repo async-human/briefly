@@ -66,6 +66,7 @@ export type MeResponse = {
   youtube_connected: boolean;
   reddit_connected: boolean;
   reading_streak: number;
+  auto_suggestions: AutoSuggestion[];
 };
 
 export type OnboardingStatus = {
@@ -168,6 +169,12 @@ export type SourceSuggestion = {
   source_type: string;
   topic: string;
   description: string;
+};
+
+export type AutoSuggestion = SourceSuggestion & {
+  reason: string;
+  discovered_at?: string | null;
+  source: "catalog" | "medium" | string;
 };
 
 export type Source = {

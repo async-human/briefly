@@ -18,6 +18,7 @@ from briefly_api.agents import (
     collector,
     deduplication,
     delivery,
+    interest_discovery,
     learning,
     memory,
     novelty,
@@ -109,10 +110,10 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
         # ── Persist digest to DB ──────────────────────────────────────────────
         digest_id = await _persist_digest(session, ctx)
 
-        # ── Learning agent runs async (doesn't block delivery) ───────────────
-        # Will be triggered by webhook when user opens the email
-        # For now, run synchronously after delivery
-        ctx = await _run_agent("LearningAgent", learning.run, ctx)
+        # ── Post-delivery learning & discovery (non-blocking) ────────────────
+        ctx = await _run_agent("LearningAgent",          learning.run,          ctx)
+        ctx = await _run_agent("InterestDiscoveryAgent", interest_discovery.run, ctx)
+        await session.commit()
 
         duration_ms = ctx.pipeline_duration_ms
         log.info(

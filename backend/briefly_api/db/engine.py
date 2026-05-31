@@ -75,6 +75,15 @@ async def init_db() -> None:
             )
         except Exception as exc:
             logger.warning("digest.meta migration: %s", exc)
+        try:
+            await conn.execute(
+                text("""
+                    ALTER TABLE user_profiles
+                    ADD COLUMN IF NOT EXISTS suggested_sources JSONB DEFAULT '[]'::jsonb
+                """)
+            )
+        except Exception as exc:
+            logger.warning("suggested_sources migration: %s", exc)
     logger.info("Database initialized")
 
 

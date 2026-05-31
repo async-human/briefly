@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { api, type Digest, type DigestItem, type Source } from "@/lib/api";
+import { api, type AutoSuggestion, type Digest, type DigestItem, type Source } from "@/lib/api";
 import { AddSourceForm, CopyEmailButton } from "./AddSourceForm";
 import { GmailDiscovery } from "./GmailDiscovery";
 import { SourceSuggestions } from "./SourceSuggestions";
@@ -67,6 +67,7 @@ type SourcesSidebarProps = {
   ingestionEmail: string;
   sources: Source[];
   gmailConnected: boolean;
+  autoSuggestions?: AutoSuggestion[];
   onSourceAdded: (source: Source) => void;
   onSourceRemoved: (sourceId: string) => void;
   neverShow: string[];
@@ -77,6 +78,7 @@ export function SourcesSidebar({
   ingestionEmail,
   sources,
   gmailConnected,
+  autoSuggestions = [],
   onSourceAdded,
   onSourceRemoved,
   neverShow,
@@ -208,7 +210,11 @@ export function SourcesSidebar({
         <GmailDiscovery onAdded={onSourceAdded} />
       )}
 
-      <SourceSuggestions existingSources={sources} onAdded={onSourceAdded} />
+      <SourceSuggestions
+        existingSources={sources}
+        onAdded={onSourceAdded}
+        autoSuggestions={autoSuggestions}
+      />
 
       <ReadwiseCard sources={sources} onAdded={onSourceAdded} onRemoved={onSourceRemoved} />
 

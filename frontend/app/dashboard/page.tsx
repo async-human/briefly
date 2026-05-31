@@ -245,6 +245,7 @@ export default function DashboardPage() {
                 ingestionEmail={me.ingestion_email}
                 sources={sources}
                 gmailConnected={me.gmail_connected}
+                autoSuggestions={me.auto_suggestions ?? []}
                 onSourceAdded={handleSourceAdded}
                 onSourceRemoved={(id) => setSources((prev) => prev.filter((s) => s.id !== id))}
                 neverShow={neverShow}

@@ -141,6 +141,11 @@ class UserProfile(Base):
     # Updated when interests change significantly
     profile_embedding: Mapped[list[float] | None] = mapped_column(Vector(1024))
 
+    # Auto-discovered source suggestions — written by InterestDiscoveryAgent
+    # Structure: [{"name": str, "url": str, "source_type": str, "topic": str,
+    #              "description": str, "reason": str, "discovered_at": str}]
+    suggested_sources: Mapped[list[dict]] = mapped_column(JSONB, nullable=True, default=list, server_default="[]")
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
