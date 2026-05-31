@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getToken, googleLoginUrl } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { TimeGreetingBadge, TimeGreetingCardTitle } from "@/components/TimeGreeting";
+import { SourceIcon } from "@/components/SourceIcon";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -35,10 +36,10 @@ const SAMPLE_ITEMS = [
 ];
 
 const SOURCES = [
-  { name: "Gmail",   count: 14, icon: "✉" },
-  { name: "YouTube", count: 6,  icon: "▶" },
-  { name: "Reddit",  count: 22, icon: "↑" },
-  { name: "HN",      count: 18, icon: "#" },
+  { name: "Gmail",        type: "gmail",   count: 14 },
+  { name: "YouTube",      type: "youtube", count: 6  },
+  { name: "Reddit",       type: "reddit",  count: 22 },
+  { name: "Hacker News",  type: "rss",     count: 18 },
 ];
 
 const FLOAT_BADGES = [
@@ -122,7 +123,7 @@ function BriefingPreview() {
       <div className="lp-preview-sources">
         {SOURCES.map((src, i) => (
           <div key={src.name} className="lp-source-row">
-            <span className="lp-source-icon">{src.icon}</span>
+            <span className="lp-source-icon"><SourceIcon type={src.type} name={src.name} size={16} /></span>
             <span className="lp-source-name">{src.name}</span>
             <div className="lp-source-bar-wrap">
               <motion.div

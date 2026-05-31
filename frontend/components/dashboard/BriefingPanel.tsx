@@ -10,6 +10,7 @@ import {
   matchItemToSource,
   sourceDisplayName,
 } from "./sourceLabels";
+import { SourceIcon } from "@/components/SourceIcon";
 
 // ── Never-show inline editor ──────────────────────────────────────────────────
 
@@ -171,8 +172,13 @@ export function SourcesSidebar({
           <ul className="source-list source-list-connected">
             {sources.map((source) => (
               <li key={source.id} className="source-list-item">
-                <span className="source-type">
-                  {SOURCE_TYPE_LABELS[source.source_type] ?? source.source_type}
+                <span className="source-type-icon">
+                  <SourceIcon
+                    type={source.source_type}
+                    name={source.name ?? undefined}
+                    url={source.identifier?.startsWith("http") ? source.identifier : undefined}
+                    size={20}
+                  />
                 </span>
                 <div className="source-info">
                   <span className="source-name">{sourceDisplayName(source)}</span>
@@ -572,7 +578,7 @@ export function BriefingPanel({
                 onClick={() => setActiveTab(tab.id)}
               >
                 <span className="briefing-tab-type">
-                  {SOURCE_TYPE_LABELS[tab.type] ?? tab.type}
+                  <SourceIcon type={tab.type} name={tab.label} size={14} />
                 </span>
                 <span className="briefing-tab-label">{tab.label}</span>
                 <span className="briefing-tab-count">{tab.items.length}</span>
@@ -585,7 +591,7 @@ export function BriefingPanel({
       {activeTab !== "all" && activeTabMeta && (
         <div className="briefing-tab-context">
           <span className="briefing-tab-context-type">
-            {SOURCE_TYPE_LABELS[activeTabMeta.type] ?? activeTabMeta.type}
+            <SourceIcon type={activeTabMeta.type} name={activeTabMeta.label} size={16} />
           </span>
           <span className="briefing-tab-context-name">{activeTabMeta.label}</span>
         </div>

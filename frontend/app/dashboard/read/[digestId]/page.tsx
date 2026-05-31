@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type Digest, type DigestItem } from "@/lib/api";
+import { SourceIcon } from "@/components/SourceIcon";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Mode = "quick" | "deep";
@@ -57,9 +58,13 @@ function ReadingCard({
         transition={{ duration: 0.3, ease: EASE }}
       >
         <div className="read-meta-left">
-          <span className="read-source-dot" aria-hidden />
+          <SourceIcon
+            name={item.source_name ?? undefined}
+            url={item.source_url ?? undefined}
+            size={18}
+          />
           {item.source_name && (
-            <span className="read-meta-source">{item.source_name.toUpperCase()}</span>
+            <span className="read-meta-source">{item.source_name}</span>
           )}
           {item.section && (
             <>

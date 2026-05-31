@@ -459,14 +459,11 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   font-size: 13px;
 }
 .demo-source-icon {
-  width: 28px; height: 28px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px;
-  color: var(--accent);
-  background: var(--surface);
+  width: 20px; height: 20px;
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  line-height: 0;
 }
 .demo-source-name { color: var(--text-secondary); width: 170px; flex-shrink: 0; }
 .demo-source-bar-wrap {
@@ -4583,14 +4580,11 @@ footer {
   gap: 8px;
 }
 .lp-source-icon {
-  width: 18px; height: 18px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 9px;
-  color: var(--accent);
-  background: var(--surface);
+  width: 16px; height: 16px;
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  line-height: 0;
 }
 .lp-source-name {
   font-family: var(--mono);
@@ -6461,12 +6455,10 @@ footer {
 }
 
 .briefing-tab-type {
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  line-height: 0;
 }
 
 .briefing-tab-label {
@@ -6502,11 +6494,10 @@ footer {
   padding: 14px 24px 0;
 }
 .briefing-tab-context-type {
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  line-height: 0;
 }
 .briefing-tab-context-name {
   font-size: 14px;
@@ -6888,17 +6879,12 @@ footer {
   border-bottom: 1px solid var(--border);
 }
 .source-list-item:last-child { border-bottom: none; }
-.source-type {
-  font-family: var(--mono);
-  font-size: 8px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 3px 6px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+.source-type-icon {
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
-  margin-top: 2px;
+  width: 20px;
+  height: 20px;
 }
 .source-info {
   display: flex;

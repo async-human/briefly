@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { SourceIcon } from "@/components/SourceIcon";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -35,10 +36,10 @@ function useTypewriter(text: string, active: boolean, speed = 18) {
 
 /* ── Collect phase ─────────────────────────────────────────────────────────── */
 const SOURCES = [
-  { name: "Gmail newsletters", icon: "✉", count: 14, delay: 0.1 },
-  { name: "YouTube transcripts", icon: "▶", count: 8,  delay: 0.5 },
-  { name: "Reddit threads",      icon: "↑", count: 12, delay: 0.9 },
-  { name: "RSS feeds",           icon: "◉", count: 13, delay: 1.3 },
+  { name: "Gmail newsletters",  type: "gmail",   count: 14, delay: 0.1 },
+  { name: "YouTube transcripts",type: "youtube", count: 8,  delay: 0.5 },
+  { name: "Reddit threads",     type: "reddit",  count: 12, delay: 0.9 },
+  { name: "RSS feeds",           type: "rss",     count: 13, delay: 1.3 },
 ];
 
 function CollectPhase() {
@@ -73,7 +74,7 @@ function CollectPhase() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: s.delay, duration: 0.4 }}
           >
-            <span className="demo-source-icon">{s.icon}</span>
+            <span className="demo-source-icon"><SourceIcon type={s.type} name={s.name} size={16} /></span>
             <span className="demo-source-name">{s.name}</span>
             <div className="demo-source-bar-wrap">
               <motion.div
