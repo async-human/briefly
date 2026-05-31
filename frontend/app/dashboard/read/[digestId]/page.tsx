@@ -24,6 +24,19 @@ function fmtTime(s: number) {
 }
 
 // ── Card component ─────────────────────────────────────────────────────────────
+function SaveIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} aria-hidden>
+      <path
+        d="M12 3.5l2.35 4.76 5.25.76-3.8 3.7.9 5.23L12 15.9l-4.7 2.47.9-5.23-3.8-3.7 5.25-.76L12 3.5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function ReadingCard({
   item, mode, isSaved, onSave,
 }: { item: DigestItem; mode: Mode; isSaved: boolean; onSave: () => void }) {
@@ -33,63 +46,65 @@ function ReadingCard({
     : null;
 
   return (
-    <div className="read-card">
-      {/* ① Source row */}
-      <div className="read-card-top">
-        <div className="read-source-row">
-          {item.source_name && (
-            <span className="read-chip">{item.source_name.toUpperCase()}</span>
+    <article className="read-card">
+      <div className="read-card-glow" aria-hidden />
+      <div className="read-card-inner">
+        <header className="read-card-top">
+          <div className="read-source-row">
+            {item.source_name && (
+              <span className="read-chip">{item.source_name.toUpperCase()}</span>
+            )}
+            {item.section && (
+              <span className="read-chip read-chip-accent">{item.section}</span>
+            )}
+            {coverageNote && (
+              <span className="read-coverage">{coverageNote}</span>
+            )}
+          </div>
+          <button
+            className={`read-save-btn${isSaved ? " saved" : ""}`}
+            onClick={onSave}
+            aria-label={isSaved ? "Saved" : "Save for later"}
+          >
+            <SaveIcon filled={isSaved} />
+          </button>
+        </header>
+
+        <div className="read-card-body">
+          <h2 className="read-headline">{item.headline}</h2>
+
+          {mode === "deep" && item.summary && (
+            <p className="read-summary">{item.summary}</p>
           )}
-          {item.section && (
-            <span className="read-chip read-chip-accent">{item.section}</span>
+
+          <div className="read-why">
+            <span className="read-why-label">Why this matters to you</span>
+            <p className="read-why-text">{item.why_it_matters}</p>
+          </div>
+
+          {firstMemory && mode === "deep" && (
+            <div className="read-memory">
+              <span className="read-memory-label">Connected to you</span>
+              <p className="read-memory-text">{firstMemory.description}</p>
+            </div>
           )}
-          {coverageNote && (
-            <span className="read-coverage">{coverageNote}</span>
+
+          {item.source_url && mode === "deep" && (
+            <a
+              href={item.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="read-article-link"
+            >
+              Read full article
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </a>
           )}
         </div>
-        <button
-          className={`read-save-btn${isSaved ? " saved" : ""}`}
-          onClick={onSave}
-          aria-label={isSaved ? "Saved" : "Save for later"}
-        >
-          {isSaved ? "★" : "☆"}
-        </button>
       </div>
-
-      {/* ② Headline */}
-      <h2 className="read-headline">{item.headline}</h2>
-
-      {/* ③ Summary — Deep Read only */}
-      {mode === "deep" && item.summary && (
-        <p className="read-summary">{item.summary}</p>
-      )}
-
-      {/* ④ Why This Matters — always visible, the core value prop */}
-      <div className="read-why">
-        <span className="read-why-label">💡 Why this matters to you</span>
-        <p className="read-why-text">{item.why_it_matters}</p>
-      </div>
-
-      {/* ⑤ Memory connection — Deep Read only */}
-      {firstMemory && mode === "deep" && (
-        <div className="read-memory">
-          <span className="read-memory-icon">🔗</span>
-          <span className="read-memory-text">{firstMemory.description}</span>
-        </div>
-      )}
-
-      {/* ⑥ Read full article link — Deep Read only */}
-      {item.source_url && mode === "deep" && (
-        <a
-          href={item.source_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="read-article-link"
-        >
-          Read full article ↗
-        </a>
-      )}
-    </div>
+    </article>
   );
 }
 
@@ -361,15 +376,27 @@ export default function ReadingPage() {
 
         <div className="read-header-right">
           {streak > 0 && (
-            <span className="read-streak-badge">Day {streak} 🔥</span>
+            <span className="read-streak-badge">
+              <span className="read-streak-dot" aria-hidden />
+              Day {streak}
+            </span>
           )}
-          <button
-            className={`read-mode-btn${mode === "quick" ? " active" : ""}`}
-            onClick={() => setMode((m) => m === "quick" ? "deep" : "quick")}
-            title={mode === "quick" ? "Switch to Deep Read" : "Switch to Quick Takes"}
-          >
-            {mode === "quick" ? "⚡ Quick" : "📖 Deep"}
-          </button>
+          <div className="read-mode-toggle" role="group" aria-label="Reading mode">
+            <button
+              type="button"
+              className={`read-mode-opt${mode === "quick" ? " active" : ""}`}
+              onClick={() => setMode("quick")}
+            >
+              Quick
+            </button>
+            <button
+              type="button"
+              className={`read-mode-opt${mode === "deep" ? " active" : ""}`}
+              onClick={() => setMode("deep")}
+            >
+              Deep
+            </button>
+          </div>
         </div>
       </header>
 
@@ -409,10 +436,11 @@ export default function ReadingPage() {
         <div className="read-footer-center">
           <span className="read-counter">{currentIndex + 1} of {items.length}</span>
           <button
-            className="read-save-text-btn"
+            className={`read-save-text-btn${saved.has(item.id) ? " saved" : ""}`}
             onClick={() => advance(true)}
           >
-            {saved.has(item.id) ? "★ Saved" : "☆ Save & next"}
+            <SaveIcon filled={saved.has(item.id)} />
+            {saved.has(item.id) ? "Saved" : "Save & next"}
           </button>
         </div>
 
