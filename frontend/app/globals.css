@@ -1987,22 +1987,13 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   gap: 4px;
   position: relative;
 }
-.bento-viz-source-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 50%, transparent);
-  animation: bento-source-pulse 2.4s ease-in-out infinite;
-}
-.bento-viz-source:nth-child(2) .bento-viz-source-dot { animation-delay: 0.3s; }
-.bento-viz-source:nth-child(3) .bento-viz-source-dot { animation-delay: 0.6s; }
-.bento-viz-source:nth-child(4) .bento-viz-source-dot { animation-delay: 0.9s; }
-.bento-viz-source:nth-child(5) .bento-viz-source-dot { animation-delay: 1.2s; }
-.bento-viz-source:nth-child(6) .bento-viz-source-dot { animation-delay: 1.5s; }
-@keyframes bento-source-pulse {
-  0%, 100% { transform: scale(0.85); opacity: 0.55; }
-  50% { transform: scale(1.15); opacity: 1; }
+.bento-viz-source-icon {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 .bento-viz-source-line {
   width: 1px;
@@ -2188,7 +2179,6 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   .features-orb-a,
   .features-orb-b,
   .bento-glyph-pulse,
-  .bento-viz-source-dot,
   .bento-viz-hub-ring,
   .bento-viz-hub-pulse {
     animation: none !important;
@@ -4733,15 +4723,18 @@ footer {
 /* Floating source badges */
 .lp-float-badge {
   position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.08em;
   color: var(--text-muted);
   border: 1px solid var(--border);
   border-radius: 100px;
-  padding: 4px 12px;
+  padding: 5px 10px 5px 7px;
   background: var(--surface);
-  opacity: 0.55;
+  opacity: 0.6;
   pointer-events: none;
   user-select: none;
   z-index: 0;

@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { motion, useInView, useSpring, useTransform } from "framer-motion";
 import { Reveal } from "./Reveal";
+import { SourceIcon } from "@/components/SourceIcon";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -24,7 +25,7 @@ const features: Feature[] = [
     desc: "Connect Gmail, YouTube, Reddit, and any RSS feed once. Every night, Briefly fetches everything automatically. No saving, tagging, or organising — ever.",
     variant: "sleep",
     size: "large",
-    sources: ["Gmail", "YouTube", "Reddit", "RSS", "Readwise", "HN"],
+    sources: ["Gmail", "YouTube", "Reddit", "RSS", "Readwise", "Hacker News"],
   },
   {
     num: "02",
@@ -99,7 +100,9 @@ function SleepViz({ sources }: { sources: string[] }) {
             animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.4, delay: 0.1 + i * 0.07, ease: EASE }}
           >
-            <span className="bento-viz-source-dot" />
+            <span className="bento-viz-source-icon">
+              <SourceIcon name={s} size={18} />
+            </span>
             <span className="bento-viz-source-line" />
             <span className="bento-viz-source-label">{s}</span>
           </motion.div>

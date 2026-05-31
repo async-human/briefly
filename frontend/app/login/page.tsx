@@ -43,12 +43,12 @@ const SOURCES = [
 ];
 
 const FLOAT_BADGES = [
-  { label: "Gmail",    top: "12%",  right: "6%",  cls: "lp-drift-1", delay: "0s" },
-  { label: "YouTube",  top: "58%",  right: "3%",  cls: "lp-drift-2", delay: "2.5s" },
-  { label: "Reddit",   bottom: "20%", right: "12%", cls: "lp-drift-3", delay: "1s" },
-  { label: "Readwise", bottom: "28%", left: "3%",  cls: "lp-drift-2", delay: "3.5s" },
-  { label: "HN",       top: "32%",  left: "2%",   cls: "lp-drift-1", delay: "1.8s" },
-  { label: "RSS",      bottom: "8%", right: "38%", cls: "lp-drift-3", delay: "4s" },
+  { label: "Gmail",        type: "gmail",    name: "Gmail",        top: "12%",    right: "6%",   cls: "lp-drift-1", delay: "0s"   },
+  { label: "YouTube",      type: "youtube",  name: "YouTube",      top: "58%",    right: "3%",   cls: "lp-drift-2", delay: "2.5s" },
+  { label: "Reddit",       type: "reddit",   name: "Reddit",       bottom: "20%", right: "12%",  cls: "lp-drift-3", delay: "1s"   },
+  { label: "Readwise",     type: "readwise", name: "Readwise",     bottom: "28%", left: "3%",    cls: "lp-drift-2", delay: "3.5s" },
+  { label: "Hacker News",  type: "rss",      name: "Hacker News",  top: "32%",    left: "2%",    cls: "lp-drift-1", delay: "1.8s" },
+  { label: "RSS",          type: "rss",      name: "RSS",          bottom: "8%",  right: "38%",  cls: "lp-drift-3", delay: "4s"   },
 ];
 
 function GoogleIcon() {
@@ -240,6 +240,7 @@ export default function LoginPage() {
             } as React.CSSProperties}
             aria-hidden
           >
+            <SourceIcon type={b.type} name={b.name} size={14} />
             {b.label}
           </div>
         ))}
