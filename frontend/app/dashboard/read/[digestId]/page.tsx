@@ -44,6 +44,8 @@ function ReadingCard({
   const coverageNote = item.duplicate_count > 1
     ? `Also covered by ${item.duplicate_count - 1} other source${item.duplicate_count > 2 ? "s" : ""}`
     : null;
+  const hasDeepSummary = mode === "deep" && !!item.summary;
+  const whyDelay = hasDeepSummary ? 0.16 : 0.1;
 
   return (
     <article className="read-card">
@@ -71,36 +73,63 @@ function ReadingCard({
         </header>
 
         <div className="read-card-body">
-          <h2 className="read-headline">{item.headline}</h2>
+          <motion.h2
+            className="read-headline"
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: EASE }}
+          >
+            {item.headline}
+          </motion.h2>
 
-          {mode === "deep" && item.summary && (
-            <p className="read-summary">{item.summary}</p>
+          {hasDeepSummary && (
+            <motion.p
+              className="read-summary"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.08, ease: EASE }}
+            >
+              {item.summary}
+            </motion.p>
           )}
 
-          <div className="read-why">
+          <motion.div
+            className="read-why"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: whyDelay, ease: EASE }}
+          >
             <span className="read-why-label">Why this matters to you</span>
             <p className="read-why-text">{item.why_it_matters}</p>
-          </div>
+          </motion.div>
 
           {firstMemory && mode === "deep" && (
-            <div className="read-memory">
+            <motion.div
+              className="read-memory"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.22, ease: EASE }}
+            >
               <span className="read-memory-label">Connected to you</span>
               <p className="read-memory-text">{firstMemory.description}</p>
-            </div>
+            </motion.div>
           )}
 
           {item.source_url && mode === "deep" && (
-            <a
+            <motion.a
               href={item.source_url}
               target="_blank"
               rel="noopener noreferrer"
               className="read-article-link"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.35, delay: 0.28, ease: EASE }}
             >
               Read full article
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
                 <path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-            </a>
+            </motion.a>
           )}
         </div>
       </div>
@@ -212,6 +241,60 @@ function CompletionScreen({
   );
 }
 
+// ── Skeleton loading screen ───────────────────────────────────────────────────
+function ReadingSkeleton() {
+  return (
+    <div className="read-shell">
+      <header className="read-header">
+        <div className="rsk rsk-back" />
+        <div className="read-progress-bar" />
+        <div className="read-header-right">
+          <div className="rsk rsk-badge" />
+          <div className="rsk rsk-toggle" />
+        </div>
+      </header>
+
+      <main className="read-card-area">
+        <div className="read-card-wrapper">
+          <article className="read-card">
+            <div className="read-card-glow" aria-hidden />
+            <div className="read-card-inner">
+              <header className="read-card-top">
+                <div className="read-source-row">
+                  <div className="rsk rsk-chip" />
+                  <div className="rsk rsk-chip-sm" />
+                </div>
+                <div className="rsk rsk-save" />
+              </header>
+              <div className="read-card-body">
+                <div className="rsk-group">
+                  <div className="rsk rsk-h1" />
+                  <div className="rsk rsk-h2" />
+                  <div className="rsk rsk-h3" />
+                </div>
+                <div className="rsk-why-wrap">
+                  <div className="rsk rsk-why-label" />
+                  <div className="rsk rsk-why-line" />
+                  <div className="rsk rsk-why-line" style={{ width: "76%" }} />
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </main>
+
+      <footer className="read-footer">
+        <div className="rsk rsk-nav" />
+        <div className="read-footer-center">
+          <div className="rsk rsk-counter" />
+          <div className="rsk rsk-save-label" />
+        </div>
+        <div className="rsk rsk-nav" />
+      </footer>
+    </div>
+  );
+}
+
 // ── Main reading page ─────────────────────────────────────────────────────────
 export default function ReadingPage() {
   const params = useParams();
@@ -315,13 +398,7 @@ export default function ReadingPage() {
   }, [advance, goBack, toggleSave, isComplete, router]);
 
   // ── Render ────────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="read-shell read-shell-center">
-        <span className="read-loading-dot" />
-      </div>
-    );
-  }
+  if (loading) return <ReadingSkeleton />;
 
   if (!digest || items.length === 0) {
     return (

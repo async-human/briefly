@@ -5156,7 +5156,17 @@ footer {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(212, 170, 106, 0.5), transparent);
+  background: linear-gradient(90deg, transparent 10%, rgba(212, 170, 106, 0.65) 40%, rgba(212, 170, 106, 0.75) 60%, transparent 90%);
+  pointer-events: none;
+}
+.read-card-glow::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 40px;
+  background: radial-gradient(ellipse at top, rgba(212, 170, 106, 0.08), transparent 70%);
   pointer-events: none;
 }
 .read-card-inner {
@@ -5164,7 +5174,7 @@ footer {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 20px 22px 18px;
+  padding: 24px 28px 22px;
   gap: 0;
 }
 
@@ -5182,11 +5192,12 @@ footer {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: clamp(10px, 1.8vh, 16px);
+  gap: clamp(18px, 2.8vh, 26px);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+  padding-top: 2px;
 }
 .read-card-body::-webkit-scrollbar {
   width: 4px;
@@ -5252,10 +5263,10 @@ footer {
 /* Headline */
 .read-headline {
   font-family: var(--serif);
-  font-size: clamp(19px, 4.2vw, 28px);
+  font-size: clamp(22px, 4.8vw, 34px);
   font-weight: 400;
-  letter-spacing: -0.03em;
-  line-height: 1.22;
+  letter-spacing: -0.035em;
+  line-height: 1.26;
   color: var(--text);
   margin: 0;
   flex-shrink: 0;
@@ -5274,36 +5285,68 @@ footer {
 
 /* Why This Matters */
 .read-why {
+  position: relative;
+  overflow: hidden;
   flex-shrink: 0;
-  background: linear-gradient(135deg, rgba(158, 123, 63, 0.14) 0%, rgba(158, 123, 63, 0.06) 100%);
-  border: 1px solid var(--accent-line);
-  border-radius: 14px;
-  padding: 12px 14px;
+  background: linear-gradient(145deg, rgba(158, 123, 63, 0.16) 0%, rgba(158, 123, 63, 0.07) 60%, rgba(158, 123, 63, 0.04) 100%);
+  border: 1px solid rgba(212, 170, 106, 0.22);
+  border-radius: 18px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
+}
+/* Golden left bar */
+.read-why::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 16px;
+  bottom: 16px;
+  width: 2.5px;
+  background: linear-gradient(to bottom, rgba(212, 170, 106, 0.85), rgba(212, 170, 106, 0.25));
+  border-radius: 0 2px 2px 0;
+  pointer-events: none;
+}
+/* Slow light sweep — signals this is a living insight */
+.read-why::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 80%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(212, 170, 106, 0.07), transparent);
+  animation: why-sweep 7s ease-in-out 2s infinite;
+  pointer-events: none;
+}
+@keyframes why-sweep {
+  0%   { left: -80%; }
+  40%  { left: 130%; }
+  100% { left: 130%; }
 }
 .read-why-label {
   font-family: var(--mono);
   font-size: 9px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--accent);
+  opacity: 0.9;
 }
 .read-why-label::before {
   content: "";
   display: inline-block;
-  width: 12px;
-  height: 1px;
-  background: var(--accent);
+  width: 14px;
+  height: 1.5px;
+  background: linear-gradient(90deg, rgba(212, 170, 106, 0.9), rgba(212, 170, 106, 0.3));
   margin-right: 8px;
   vertical-align: middle;
-  opacity: 0.7;
+  border-radius: 1px;
 }
 .read-why-text {
-  font-size: clamp(12px, 2.6vw, 13.5px);
+  font-size: clamp(13px, 2.8vw, 14.5px);
   color: var(--text-secondary);
-  line-height: 1.55;
+  line-height: 1.62;
   margin: 0;
 }
 
@@ -5437,6 +5480,54 @@ footer {
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Skeleton shimmer (rsk-*) ── */
+@keyframes rsk-shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+.rsk {
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 0%,
+    rgba(255,255,255,0.09) 50%,
+    rgba(255,255,255,0.04) 100%
+  );
+  background-size: 600px 100%;
+  animation: rsk-shimmer 1.6s ease-in-out infinite;
+}
+.rsk-back    { width: 36px;  height: 36px; border-radius: 10px; flex-shrink: 0; }
+.rsk-badge   { width: 70px;  height: 26px; border-radius: 100px; }
+.rsk-toggle  { width: 108px; height: 34px; border-radius: 10px; }
+.rsk-chip    { width: 78px;  height: 24px; border-radius: 100px; }
+.rsk-chip-sm { width: 60px;  height: 24px; border-radius: 100px; }
+.rsk-save    { width: 34px;  height: 34px; border-radius: 10px; flex-shrink: 0; }
+
+.rsk-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rsk-h1 { height: 30px; width: 100%;  border-radius: 8px; }
+.rsk-h2 { height: 30px; width: 84%;   border-radius: 8px; }
+.rsk-h3 { height: 26px; width: 58%;   border-radius: 8px; }
+
+.rsk-why-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(212, 170, 106, 0.14);
+  background: linear-gradient(145deg, rgba(158,123,63,0.1), rgba(158,123,63,0.04));
+}
+.rsk-why-label { height: 12px; width: 44%; border-radius: 4px; }
+.rsk-why-line  { height: 15px; width: 100%; border-radius: 4px; }
+
+.rsk-nav        { width: 72px;  height: 36px; border-radius: 10px; }
+.rsk-counter    { width: 56px;  height: 13px; border-radius: 4px; }
+.rsk-save-label { width: 82px;  height: 13px; border-radius: 4px; }
 
 /* ── Completion screen ── */
 .read-complete {
