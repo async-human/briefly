@@ -6679,11 +6679,13 @@ footer {
   font-size: 10px;
   color: var(--text-secondary);
   word-break: break-all;
-  padding: 12px 14px;
+  padding: 10px 12px;
   background: var(--surface);
   border-radius: 8px;
   border: 1px solid var(--border);
   line-height: 1.5;
+  flex: 1;
+  min-width: 0;
 }
 .copy-email-btn {
   align-self: flex-start;
@@ -6694,8 +6696,119 @@ footer {
   cursor: pointer;
   padding: 0;
   transition: opacity 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .copy-email-btn:hover { opacity: 0.75; }
+
+/* ── Newsletter intake card (nl-*) ── */
+.nl-steps {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.nl-step {
+  display: flex;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.nl-step:last-child { border-bottom: none; }
+.nl-step-num {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+.nl-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.nl-step-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.35;
+}
+.nl-step-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.55;
+}
+.nl-address-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nl-link {
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+.nl-link:hover { opacity: 0.75; }
+
+/* Active newsletter senders */
+.nl-active {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.nl-active-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.nl-active-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.nl-active-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.nl-active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6aab8a;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(106, 171, 138, 0.5);
+}
+.nl-active-name {
+  word-break: break-all;
+  font-family: var(--mono);
+  font-size: 11px;
+}
 
 /* Source form */
 .source-form {

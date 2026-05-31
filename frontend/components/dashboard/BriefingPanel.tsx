@@ -96,18 +96,67 @@ export function SourcesSidebar({
     }
   }
 
+  const emailSources = sources.filter((s) => s.source_type === "email");
+
   return (
     <aside className="dash-sidebar">
-      <div className="dash-card">
-        <p className="dash-card-label">Newsletter intake</p>
-        <h2 className="dash-card-title">Get any newsletter in your briefing</h2>
-        <p className="dash-card-desc">
-          Forward it to this address once — it becomes a permanent source, scored and included every morning.
-        </p>
-        <div className="ingestion-box">
-          <code className="ingestion-email">{ingestionEmail}</code>
-          <CopyEmailButton email={ingestionEmail} />
-        </div>
+      <div className="dash-card nl-card">
+        <p className="dash-card-label">Newsletters</p>
+        <h2 className="dash-card-title">Add any newsletter to your briefing</h2>
+
+        <ol className="nl-steps">
+          <li className="nl-step">
+            <span className="nl-step-num">1</span>
+            <div className="nl-step-body">
+              <p className="nl-step-title">Copy your personal Briefly address</p>
+              <div className="nl-address-row">
+                <code className="ingestion-email">{ingestionEmail}</code>
+                <CopyEmailButton email={ingestionEmail} />
+              </div>
+            </div>
+          </li>
+          <li className="nl-step">
+            <span className="nl-step-num">2</span>
+            <div className="nl-step-body">
+              <p className="nl-step-title">Use it when subscribing to any newsletter</p>
+              <p className="nl-step-desc">
+                Substack, Morning Brew, Lenny&apos;s, anything. Enter this as your email
+                instead of your personal address when you sign up.
+              </p>
+            </div>
+          </li>
+          <li className="nl-step">
+            <span className="nl-step-num">3</span>
+            <div className="nl-step-body">
+              <p className="nl-step-title">Already subscribed elsewhere? Forward it</p>
+              <p className="nl-step-desc">
+                In Gmail, create a filter to auto-forward newsletters to this address.
+              </p>
+              <a
+                href="https://mail.google.com/mail/u/0/#settings/filters"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="nl-link"
+              >
+                Open Gmail filter settings →
+              </a>
+            </div>
+          </li>
+        </ol>
+
+        {emailSources.length > 0 && (
+          <div className="nl-active">
+            <p className="nl-active-label">Already feeding your briefing</p>
+            <ul className="nl-active-list">
+              {emailSources.map((s) => (
+                <li key={s.id} className="nl-active-item">
+                  <span className="nl-active-dot" aria-hidden />
+                  <span className="nl-active-name">{s.name || s.identifier}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="dash-card">

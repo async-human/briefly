@@ -76,7 +76,7 @@ async def collect_from_sources(
                 settings,
                 limit=source_limit,
                 source_name=display_name,
-                meta={**(source.meta or {}), "user_id": user_id},
+                meta={**(source.meta or {}), "user_id": user_id, "source_id": source.id},
                 db=db,
             )
             for item in fetched:
@@ -94,12 +94,6 @@ async def collect_from_sources(
             log.exception("Failed to fetch source %s (%s)", source.identifier, source.source_type)
             label = display_name or source.identifier
             warnings.append(f"Could not fetch {label}: {exc}")
-
-    email_sources = [s for s in sources if s.source_type == EMAIL]
-    if email_sources:
-        warnings.append(
-            f"{len(email_sources)} email-forward source(s) skipped — connect Gmail instead."
-        )
 
     articles = _interleave(batches, max_items)
     return articles, warnings
