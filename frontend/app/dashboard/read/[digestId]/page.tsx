@@ -38,102 +38,118 @@ function SaveIcon({ filled }: { filled: boolean }) {
 }
 
 function ReadingCard({
-  item, mode, isSaved, onSave,
-}: { item: DigestItem; mode: Mode; isSaved: boolean; onSave: () => void }) {
+  item, mode, isSaved, onSave, index,
+}: { item: DigestItem; mode: Mode; isSaved: boolean; onSave: () => void; index: number }) {
   const firstMemory = item.memory_connections?.[0];
   const coverageNote = item.duplicate_count > 1
     ? `Also covered by ${item.duplicate_count - 1} other source${item.duplicate_count > 2 ? "s" : ""}`
     : null;
   const hasDeepSummary = mode === "deep" && !!item.summary;
-  const whyDelay = hasDeepSummary ? 0.16 : 0.1;
 
   return (
-    <article className="read-card">
-      <div className="read-card-glow" aria-hidden />
-      <div className="read-card-inner">
-        <header className="read-card-top">
-          <div className="read-source-row">
-            {item.source_name && (
-              <span className="read-chip">{item.source_name.toUpperCase()}</span>
-            )}
-            {item.section && (
-              <span className="read-chip read-chip-accent">{item.section}</span>
-            )}
-            {coverageNote && (
-              <span className="read-coverage">{coverageNote}</span>
-            )}
-          </div>
-          <button
-            className={`read-save-btn${isSaved ? " saved" : ""}`}
-            onClick={onSave}
-            aria-label={isSaved ? "Saved" : "Save for later"}
-          >
-            <SaveIcon filled={isSaved} />
-          </button>
-        </header>
+    <div className="read-stage">
 
-        <div className="read-card-body">
-          <motion.h2
-            className="read-headline"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: EASE }}
-          >
-            {item.headline}
-          </motion.h2>
-
-          {hasDeepSummary && (
-            <motion.p
-              className="read-summary"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.08, ease: EASE }}
-            >
-              {item.summary}
-            </motion.p>
+      {/* ── Meta row ── */}
+      <motion.div
+        className="read-meta"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, ease: EASE }}
+      >
+        <div className="read-meta-left">
+          <span className="read-source-dot" aria-hidden />
+          {item.source_name && (
+            <span className="read-meta-source">{item.source_name.toUpperCase()}</span>
           )}
-
-          <motion.div
-            className="read-why"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: whyDelay, ease: EASE }}
-          >
-            <span className="read-why-label">Why this matters to you</span>
-            <p className="read-why-text">{item.why_it_matters}</p>
-          </motion.div>
-
-          {firstMemory && mode === "deep" && (
-            <motion.div
-              className="read-memory"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.4, delay: 0.22, ease: EASE }}
-            >
-              <span className="read-memory-label">Connected to you</span>
-              <p className="read-memory-text">{firstMemory.description}</p>
-            </motion.div>
+          {item.section && (
+            <>
+              <span className="read-meta-sep" aria-hidden>·</span>
+              <span className="read-meta-chip">{item.section}</span>
+            </>
           )}
-
-          {item.source_url && mode === "deep" && (
-            <motion.a
-              href={item.source_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="read-article-link"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.35, delay: 0.28, ease: EASE }}
-            >
-              Read full article
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </motion.a>
+          {coverageNote && (
+            <span className="read-meta-coverage">{coverageNote}</span>
           )}
         </div>
+        <button
+          className={`read-save-btn${isSaved ? " saved" : ""}`}
+          onClick={onSave}
+          aria-label={isSaved ? "Saved" : "Save for later"}
+        >
+          <SaveIcon filled={isSaved} />
+        </button>
+      </motion.div>
+
+      {/* ── Headline zone — vertically centered ── */}
+      <div className="read-headline-zone">
+        <span className="read-bg-num" aria-hidden>
+          {String(index + 1).padStart(2, "0")}
+        </span>
+
+        <motion.h1
+          className="read-headline-xl"
+          initial={{ opacity: 0, y: 22 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: EASE }}
+        >
+          {item.headline}
+        </motion.h1>
+
+        {hasDeepSummary && (
+          <motion.p
+            className="read-summary-v2"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1, ease: EASE }}
+          >
+            {item.summary}
+          </motion.p>
+        )}
       </div>
-    </article>
+
+      {/* ── Why this matters ── */}
+      <motion.div
+        className="read-why-v2"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: hasDeepSummary ? 0.18 : 0.12, ease: EASE }}
+      >
+        <div className="read-why-v2-header">
+          <span className="read-why-v2-icon" aria-hidden>✦</span>
+          <span className="read-why-v2-label">Why this matters to you</span>
+        </div>
+        <p className="read-why-v2-text">{item.why_it_matters}</p>
+        {item.source_url && mode === "deep" && (
+          <motion.a
+            href={item.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="read-article-link"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.35, delay: 0.28, ease: EASE }}
+          >
+            Read full article
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </motion.a>
+        )}
+      </motion.div>
+
+      {/* ── Memory connection (deep only) ── */}
+      {firstMemory && mode === "deep" && (
+        <motion.div
+          className="read-memory-v2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.24, ease: EASE }}
+        >
+          <span className="read-memory-v2-label">⌥  Connected to you</span>
+          <p className="read-memory-v2-text">{firstMemory.description}</p>
+        </motion.div>
+      )}
+    </div>
   );
 }
 
@@ -256,30 +272,36 @@ function ReadingSkeleton() {
 
       <main className="read-card-area">
         <div className="read-card-wrapper">
-          <article className="read-card">
-            <div className="read-card-glow" aria-hidden />
-            <div className="read-card-inner">
-              <header className="read-card-top">
-                <div className="read-source-row">
-                  <div className="rsk rsk-chip" />
-                  <div className="rsk rsk-chip-sm" />
-                </div>
-                <div className="rsk rsk-save" />
-              </header>
-              <div className="read-card-body">
-                <div className="rsk-group">
-                  <div className="rsk rsk-h1" />
-                  <div className="rsk rsk-h2" />
-                  <div className="rsk rsk-h3" />
-                </div>
-                <div className="rsk-why-wrap">
-                  <div className="rsk rsk-why-label" />
-                  <div className="rsk rsk-why-line" />
-                  <div className="rsk rsk-why-line" style={{ width: "76%" }} />
-                </div>
+          <div className="read-stage">
+            {/* Meta row */}
+            <div className="read-meta">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div className="rsk" style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0 }} />
+                <div className="rsk rsk-chip" />
+                <div className="rsk rsk-chip-sm" />
+              </div>
+              <div className="rsk rsk-save" />
+            </div>
+
+            {/* Headline zone */}
+            <div className="read-headline-zone">
+              <div className="rsk-group">
+                <div className="rsk rsk-h1-xl" />
+                <div className="rsk rsk-h2-xl" />
+                <div className="rsk rsk-h3-xl" />
               </div>
             </div>
-          </article>
+
+            {/* Why block */}
+            <div className="rsk-why-wrap">
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div className="rsk" style={{ width: 10, height: 10, borderRadius: "50%" }} />
+                <div className="rsk rsk-why-label" />
+              </div>
+              <div className="rsk rsk-why-line" />
+              <div className="rsk rsk-why-line" style={{ width: "74%" }} />
+            </div>
+          </div>
         </div>
       </main>
 
@@ -495,6 +517,7 @@ export default function ReadingPage() {
               mode={mode}
               isSaved={saved.has(item.id)}
               onSave={toggleSave}
+              index={currentIndex}
             />
           </motion.div>
         </AnimatePresence>
