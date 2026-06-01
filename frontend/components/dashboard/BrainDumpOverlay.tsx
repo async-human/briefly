@@ -415,6 +415,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
               </div>
             )}
 
+            <div className="brain-dump-panel-body">
             {view === "history" && phase !== "success" ? (
               <div className="brain-dump-history-panel">
                 <BrainDumpHistory
@@ -614,6 +615,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                 </div>
               </div>
             )}
+            </div>
           </motion.div>
         </>
       )}

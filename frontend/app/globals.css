@@ -9718,10 +9718,12 @@ footer {
   z-index: 71;
   inset: 0;
   margin: auto;
+  display: flex;
+  flex-direction: column;
   width: min(480px, calc(100vw - 32px));
   height: fit-content;
   max-height: calc(100vh - 48px);
-  overflow-y: auto;
+  overflow: hidden;
   padding: 0;
   border-radius: 24px;
   border: 1px solid var(--border-strong);
@@ -9734,9 +9736,43 @@ footer {
     0 0 0 1px rgba(255, 255, 255, 0.04) inset,
     0 24px 64px -16px rgba(28, 24, 18, 0.22),
     0 8px 24px -8px rgba(28, 24, 18, 0.12);
+}
+.brain-dump-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.brain-dump-panel-body:hover,
+.brain-dump-panel-body:focus-within {
+  scrollbar-color: color-mix(in srgb, var(--accent) 35%, var(--border-strong)) transparent;
+}
+.brain-dump-panel-body::-webkit-scrollbar {
+  width: 5px;
+}
+.brain-dump-panel-body::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 8px 0;
+}
+.brain-dump-panel-body::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 100px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.25s ease;
+}
+.brain-dump-panel-body:hover::-webkit-scrollbar-thumb,
+.brain-dump-panel-body:focus-within::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 28%, var(--border-strong));
+}
+.brain-dump-panel-body::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent) 45%, var(--border-strong));
 }
 .brain-dump-header {
+  flex-shrink: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -9804,8 +9840,10 @@ footer {
 }
 .brain-dump-textarea {
   width: 100%;
-  min-height: 168px;
+  min-height: 148px;
+  max-height: min(220px, 32vh);
   resize: none;
+  overflow-y: auto;
   font-size: 15px;
   line-height: 1.6;
   margin-bottom: 0;
@@ -9826,6 +9864,16 @@ footer {
   border-color: var(--accent-line);
   box-shadow: 0 0 0 3px var(--accent-dim);
   background: var(--bg);
+}
+.brain-dump-textarea::-webkit-scrollbar {
+  width: 4px;
+}
+.brain-dump-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+.brain-dump-textarea::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 22%, var(--border-strong));
+  border-radius: 100px;
 }
 .brain-dump-input-wrap {
   margin-bottom: 18px;
@@ -10139,6 +10187,7 @@ footer {
   flex: 1;
 }
 .brain-dump-tabs {
+  flex-shrink: 0;
   display: flex;
   gap: 4px;
   margin: 16px 28px 20px;
@@ -10206,8 +10255,6 @@ footer {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: min(420px, 55vh);
-  overflow-y: auto;
 }
 .brain-dump-history-item {
   border: 1px solid var(--border);
