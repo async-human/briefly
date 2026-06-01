@@ -8,7 +8,7 @@ import { ThemeToggle } from "./ThemeToggle";
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 const NAV_LINKS = [
-  { href: "#why", label: "Why Briefly" },
+  { href: "#why", label: "Why" },
   { href: "#features", label: "Features" },
   { href: "#roadmap", label: "Roadmap" },
   { href: "#pricing", label: "Pricing" },
@@ -38,38 +38,36 @@ export function Nav() {
   return (
     <>
       <nav className={`landing-nav${scrolled ? " scrolled" : ""}${menuOpen ? " menu-open" : ""}`}>
-        <a href="#" className="nav-logo">Briefly</a>
+        <div className="nav-inner">
+          <a href="#" className="nav-logo">Briefly</a>
 
-        <ul className="nav-links">
-          {NAV_LINKS.map((l) => (
-            <li key={l.href}>
-              <a href={l.href}>{l.label}</a>
-            </li>
-          ))}
-          <li>
+          <ul className="nav-center">
+            {NAV_LINKS.map((l) => (
+              <li key={l.href}>
+                <a href={l.href}>{l.label}</a>
+              </li>
+            ))}
+          </ul>
+
+          <div className="nav-actions">
             <ThemeToggle compact />
-          </li>
-          <li>
-            <a href="/login">Sign in</a>
-          </li>
-          <li>
-            <a href="/login" className="nav-cta">
-              Get started free
-            </a>
-          </li>
-        </ul>
+            <span className="nav-actions-divider" aria-hidden />
+            <a href="/login" className="nav-signin">Sign in</a>
+            <a href="/login" className="nav-cta">Get started</a>
+          </div>
 
-        <button
-          className="nav-hamburger"
-          onClick={menuOpen ? close : open}
-          aria-label={menuOpen ? "Close menu" : "Open menu"}
-          aria-expanded={menuOpen}
-          type="button"
-        >
-          <span />
-          <span />
-          <span />
-        </button>
+          <button
+            className="nav-hamburger"
+            onClick={menuOpen ? close : open}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            type="button"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+        </div>
       </nav>
 
       <AnimatePresence>
