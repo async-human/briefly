@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     groq_api_key: str = ""
 
+    # ── Speech-to-text — fully agnostic ───────────────────────────────────────
+    # groq → whisper-large-v3 (fast + cheap, recommended)
+    # openai → whisper-1
+    stt_provider: Literal["groq", "openai"] = "groq"
+    stt_model: str = "whisper-large-v3"
+
     # ── Embeddings — fully agnostic ───────────────────────────────────────────
     embedding_provider: Literal["voyage", "openai"] = "voyage"
     embedding_model: str = "voyage-3"

@@ -222,3 +222,20 @@ class AutoSuggestionOut(BaseModel):
 class ReadwiseConnectIn(BaseModel):
     api_key: str
 
+
+class BrainDumpTextIn(BaseModel):
+    text: str = Field(..., min_length=1, max_length=50_000)
+
+
+class BrainDumpOut(BaseModel):
+    id: str
+    title: str
+    clean_summary: str
+    intent_type: str
+    action_items: list[str] = Field(default_factory=list)
+    relevance_keywords: list[str] = Field(default_factory=list)
+    should_inject_into_morning_brief: bool = False
+    raw_transcript: str
+    input_mode: str
+    created_at: datetime
+

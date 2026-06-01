@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { DashboardNav } from "@/components/dashboard/DashboardNav";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { getToken } from "@/lib/auth";
 
 const ROLES = ["Founder", "Product manager", "Engineer", "Investor", "Researcher", "Other"];
@@ -233,9 +233,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="dash-shell">
-      <DashboardNav userName={me?.name ?? null} avatarUrl={me?.avatar_url} />
-      <main className="dash-main">
+    <DashboardShell userName={me?.name ?? null} avatarUrl={me?.avatar_url}>
         <header className="dash-hero dash-hero-v2">
           <div className="dash-hero-main">
             <p className="dash-hero-label">Account</p>
@@ -362,7 +360,6 @@ export default function SettingsPage() {
 
           </div>
         )}
-      </main>
-    </div>
+    </DashboardShell>
   );
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type DigestSummary } from "@/lib/api";
-import { DashboardNav } from "@/components/dashboard/DashboardNav";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { HistoryArchive } from "@/components/history/HistoryArchive";
 import { getToken } from "@/lib/auth";
 
@@ -83,9 +83,7 @@ export default function HistoryPage() {
   const totalItems = digests.reduce((sum, d) => sum + d.total_items_shown, 0);
 
   return (
-    <div className="dash-shell">
-      <DashboardNav userName={me?.name ?? null} avatarUrl={me?.avatar_url} />
-      <main className="dash-main">
+    <DashboardShell userName={me?.name ?? null} avatarUrl={me?.avatar_url}>
         {loading ? (
           <HistorySkeleton />
         ) : (
@@ -137,7 +135,6 @@ export default function HistoryPage() {
             )}
           </>
         )}
-      </main>
-    </div>
+    </DashboardShell>
   );
 }

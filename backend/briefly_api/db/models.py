@@ -38,6 +38,7 @@ class SourceType:
     youtube = "youtube"
     reddit = "reddit"
     url = "url"
+    brain_dump = "brain_dump"
 
 class SourceStatus(str, enum.Enum):
     active   = "active"

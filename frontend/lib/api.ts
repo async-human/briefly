@@ -37,6 +37,34 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function requestFormData<T>(path: string, formData: FormData): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const detail = body.detail;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join(", ")
+          : res.statusText;
+    throw new ApiError(message || res.statusText, res.status);
+  }
+
+  return res.json() as Promise<T>;
+}
+
 export type User = {
   id: string;
   email: string;
@@ -187,6 +215,19 @@ export type Source = {
   created_at: string;
 };
 
+export type BrainDump = {
+  id: string;
+  title: string;
+  clean_summary: string;
+  intent_type: string;
+  action_items: string[];
+  relevance_keywords: string[];
+  should_inject_into_morning_brief: boolean;
+  raw_transcript: string;
+  input_mode: string;
+  created_at: string;
+};
+
 export const api = {
   getMe: () => request<MeResponse>("/api/v1/me"),
   getLatestDigest: () => request<Digest | null>("/api/v1/digests/latest"),
@@ -291,4 +332,17 @@ export const api = {
       body: JSON.stringify({ api_key }),
     }),
   disconnectReadwise: () => request<void>("/api/v1/auth/readwise", { method: "DELETE" }),
+
+  // Brain Dump
+  listBrainDumps: () => request<BrainDump[]>("/api/v1/brain-dumps"),
+  createBrainDump: (body: { text: string }) =>
+    request<BrainDump>("/api/v1/brain-dumps", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  createBrainDumpAudio: (blob: Blob, filename = "recording.webm") => {
+    const form = new FormData();
+    form.append("file", blob, filename);
+    return requestFormData<BrainDump>("/api/v1/brain-dumps/audio", form);
+  },
 };

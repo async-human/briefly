@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type Digest, type MeResponse, type Source } from "@/lib/api";
-import { DashboardNav } from "@/components/dashboard/DashboardNav";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { BriefingPanel, SourcesSidebar } from "@/components/dashboard/BriefingPanel";
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
 
@@ -135,10 +135,7 @@ export default function DashboardPage() {
   });
 
   return (
-    <div className="dash-shell">
-      <DashboardNav userName={me?.user.name ?? null} avatarUrl={me?.user.avatar_url} />
-
-      <main className="dash-main">
+    <DashboardShell userName={me?.user.name ?? null} avatarUrl={me?.user.avatar_url}>
         {loading ? (
           <DashboardSkeleton />
         ) : error || !me ? (
@@ -176,7 +173,6 @@ export default function DashboardPage() {
             </div>
           </>
         )}
-      </main>
-    </div>
+    </DashboardShell>
   );
 }
