@@ -360,6 +360,15 @@ export function BriefingPanel({
             ? "We're preparing today's items. This usually takes a few seconds."
             : "Add a source on the right — RSS, YouTube, Reddit, or any URL."}
         </p>
+        {sourcesCount > 0 && onRegenerate && !generating && (
+          <button
+            type="button"
+            className="briefing-refresh briefing-empty-regenerate"
+            onClick={onRegenerate}
+          >
+            Regenerate briefing
+          </button>
+        )}
         {generateError && <p className="form-error" style={{ marginTop: 16 }}>{generateError}</p>}
       </div>
     );
@@ -376,11 +385,23 @@ export function BriefingPanel({
           <p className="dash-card-label">Step 2</p>
           <h2 className="briefing-panel-title">Today&apos;s briefing</h2>
         </div>
-        {!generating && digest.items.length > 0 && (
-          <Link href={`/dashboard/read/${digest.id}`} className="briefing-panel-read-link">
-            Open reading mode →
-          </Link>
-        )}
+        <div className="briefing-panel-header-actions">
+          {sourcesCount > 0 && onRegenerate && (
+            <button
+              type="button"
+              className="briefing-refresh"
+              onClick={onRegenerate}
+              disabled={generating}
+            >
+              {generating ? "Regenerating…" : "Regenerate briefing"}
+            </button>
+          )}
+          {!generating && digest.items.length > 0 && (
+            <Link href={`/dashboard/read/${digest.id}`} className="briefing-panel-read-link">
+              Open reading mode →
+            </Link>
+          )}
+        </div>
       </div>
 
       {generating && (

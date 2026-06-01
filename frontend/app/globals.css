@@ -7151,10 +7151,19 @@ footer {
   color: var(--accent);
   text-decoration: none;
   white-space: nowrap;
-  padding-top: 8px;
 }
 .briefing-panel-read-link:hover {
   text-decoration: underline;
+}
+.briefing-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+.briefing-empty-regenerate {
+  margin-top: 16px;
 }
 .briefing-panel-sub {
   margin: 0;
