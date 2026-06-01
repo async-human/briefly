@@ -73,13 +73,15 @@ export function mergeSpeechResults(
   fromIndex: number,
 ): { final: string; interim: string } {
   let final = "";
-  let interim = "";
   for (let i = fromIndex; i < results.length; i++) {
-    const piece = results[i][0]?.transcript ?? "";
     if (results[i].isFinal) {
-      final += piece;
-    } else {
-      interim += piece;
+      final += results[i][0]?.transcript ?? "";
+    }
+  }
+  let interim = "";
+  for (let i = 0; i < results.length; i++) {
+    if (!results[i].isFinal) {
+      interim += results[i][0]?.transcript ?? "";
     }
   }
   return { final, interim };

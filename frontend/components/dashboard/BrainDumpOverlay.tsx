@@ -12,7 +12,7 @@ import {
   type SpeechRecognitionEvent,
 } from "@/lib/speechRecognition";
 
-type Phase = "capture" | "recording" | "processing" | "success";
+type Phase = "capture" | "starting" | "recording" | "processing" | "success";
 
 type BrainDumpOverlayProps = {
   open: boolean;
@@ -26,7 +26,9 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<BrainDump | null>(null);
   const [recordingSec, setRecordingSec] = useState(0);
-  const [liveCaptions, setLiveCaptions] = useState(isLiveSpeechSupported());
+  const [liveCaptions, setLiveCaptions] = useState(false);
+  const [speechActive, setSpeechActive] = useState(false);
+  const [processingLabel, setProcessingLabel] = useState("Saving your dump…");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -39,15 +41,22 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recordingMimeRef = useRef("");
   const recordingExtRef = useRef("webm");
+  const processingPreviewRef = useRef("");
+
+  useEffect(() => {
+    setLiveCaptions(isLiveSpeechSupported());
+  }, []);
 
   const stopSpeechRecognition = useCallback(() => {
     recordingActiveRef.current = false;
+    setSpeechActive(false);
     const recognition = speechRef.current;
     speechRef.current = null;
     if (recognition) {
       recognition.onresult = null;
       recognition.onerror = null;
       recognition.onend = null;
+      recognition.onstart = null;
       try {
         recognition.stop();
       } catch {
@@ -70,6 +79,8 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
     setError(null);
     setResult(null);
     setRecordingSec(0);
+    setProcessingLabel("Saving your dump…");
+    processingPreviewRef.current = "";
     liveTranscriptRef.current = "";
     liveInterimRef.current = "";
     chunksRef.current = [];
@@ -94,7 +105,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && phase !== "processing") onClose();
+      if (e.key === "Escape" && phase !== "processing" && phase !== "starting") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -109,10 +120,8 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
 
   useEffect(() => {
     const el = textareaRef.current;
-    if (phase === "recording" && el) {
+    if ((phase === "recording" || phase === "processing") && el) {
       el.scrollTop = el.scrollHeight;
-      const len = el.value.length;
-      el.setSelectionRange(len, len);
     }
   }, [text, liveInterim, phase]);
 
@@ -132,6 +141,8 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
     speechRef.current = recognition;
     recordingActiveRef.current = true;
 
+    recognition.onstart = () => setSpeechActive(true);
+
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       const { final, interim } = mergeSpeechResults(event.results, event.resultIndex);
       if (final) {
@@ -139,23 +150,21 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
         if (!final.endsWith(" ") && !final.endsWith("\n")) {
           liveTranscriptRef.current += " ";
         }
-        setText(liveTranscriptRef.current);
-        setLiveInterim("");
-        liveInterimRef.current = "";
-      } else {
-        setLiveInterim(interim);
-        liveInterimRef.current = interim;
       }
+      setText(liveTranscriptRef.current);
+      setLiveInterim(interim);
+      liveInterimRef.current = interim;
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
         setLiveCaptions(false);
+        setSpeechActive(false);
       }
-      // benign: no-speech, aborted — ignore
     };
 
     recognition.onend = () => {
+      setSpeechActive(false);
       if (recordingActiveRef.current && speechRef.current === recognition) {
         try {
           recognition.start();
@@ -169,10 +178,11 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
       recognition.start();
     } catch {
       setLiveCaptions(false);
+      setSpeechActive(false);
     }
   }, []);
 
-  async function submitTranscript(raw: string) {
+  async function submitTranscript(raw: string, viaAudio = false) {
     const trimmed = raw.trim();
     if (!trimmed) {
       setError("Nothing captured. Speak clearly or type your thoughts.");
@@ -180,6 +190,8 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
       return;
     }
     setError(null);
+    processingPreviewRef.current = trimmed;
+    setProcessingLabel(viaAudio ? "Transcribing & structuring…" : "Structuring your thoughts…");
     setPhase("processing");
     try {
       const dump = await api.createBrainDump({ text: trimmed });
@@ -191,13 +203,34 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
     }
   }
 
+  async function submitAudio(blob: Blob, filename: string) {
+    processingPreviewRef.current = (liveTranscriptRef.current + liveInterimRef.current).trim();
+    setProcessingLabel("Transcribing audio…");
+    setPhase("processing");
+    try {
+      setProcessingLabel("Structuring your thoughts…");
+      const dump = await api.createBrainDumpAudio(blob, filename);
+      setResult(dump);
+      setPhase("success");
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Voice processing failed. Try typing instead.");
+      setPhase("capture");
+    }
+  }
+
   async function submitText() {
+    if (phase === "recording") {
+      stopRecording();
+      return;
+    }
     await submitTranscript(text);
   }
 
   async function startRecording() {
     setError(null);
     setLiveInterim("");
+    setPhase("starting");
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
@@ -214,6 +247,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
         setError("Voice recording is not supported in this browser. Use text instead.");
         stream.getTracks().forEach((t) => t.stop());
         mediaStreamRef.current = null;
+        setPhase("capture");
         return;
       }
 
@@ -245,7 +279,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
         const blob = new Blob(chunksRef.current, { type: recordingMimeRef.current });
 
         if (spoken.length >= 8) {
-          await submitTranscript(spoken);
+          await submitTranscript(spoken, false);
           return;
         }
 
@@ -255,36 +289,32 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
           return;
         }
 
-        setPhase("processing");
-        try {
-          const dump = await api.createBrainDumpAudio(blob, `recording.${recordingExtRef.current}`);
-          setResult(dump);
-          setPhase("success");
-        } catch (e) {
-          setError(e instanceof ApiError ? e.message : "Voice processing failed. Try typing instead.");
-          setPhase("capture");
-        }
+        await submitAudio(blob, `recording.${recordingExtRef.current}`);
       };
 
       mediaRecorderRef.current = recorder;
-      recorder.start();
       setPhase("recording");
       setRecordingSec(0);
       timerRef.current = setInterval(() => setRecordingSec((s) => s + 1), 1000);
-      startSpeechRecognition(text);
+      recorder.start();
+      // Start live captions after mic is active (avoids race on some browsers)
+      window.setTimeout(() => startSpeechRecognition(text), 150);
     } catch {
       setError("Microphone access denied. Use text input instead.");
+      setPhase("capture");
     }
   }
 
   function stopRecording() {
     if (mediaRecorderRef.current?.state === "recording") {
+      setProcessingLabel("Finishing recording…");
+      setPhase("processing");
       mediaRecorderRef.current.stop();
     }
   }
 
   function handleClose() {
-    if (phase === "processing") return;
+    if (phase === "processing" || phase === "starting") return;
     onClose();
   }
 
@@ -295,6 +325,8 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
   };
 
   const displayText = phase === "recording" ? text + liveInterim : text;
+  const showListeningEmpty = phase === "recording" && !displayText.trim();
+  const isBusy = phase === "processing" || phase === "starting";
 
   return (
     <AnimatePresence>
@@ -323,14 +355,14 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
               <div>
                 <p className="brain-dump-eyebrow">Brain Dump</p>
                 <h2 id="brain-dump-title" className="brain-dump-title">
-                  {phase === "success" ? "Captured" : "Dump your thoughts"}
+                  {phase === "success" ? "Captured" : phase === "recording" ? "Speak freely" : "Dump your thoughts"}
                 </h2>
               </div>
               <button
                 type="button"
                 className="brain-dump-close"
                 onClick={handleClose}
-                disabled={phase === "processing"}
+                disabled={isBusy}
                 aria-label="Close"
               >
                 ×
@@ -370,41 +402,67 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                   Done
                 </button>
               </div>
-            ) : phase === "processing" ? (
-              <div className="brain-dump-processing">
-                <span className="btn-spinner brain-dump-spinner" aria-hidden />
-                <p>Structuring your thoughts…</p>
-              </div>
             ) : (
               <>
                 <p className="brain-dump-hint">
-                  Stream of consciousness is fine. Briefly cleans it up and feeds your second brain.
+                  {phase === "recording"
+                    ? "Talk naturally — your words appear below in real time."
+                    : "Stream of consciousness is fine. Briefly cleans it up and feeds your second brain."}
                 </p>
 
-                <div className="brain-dump-input-wrap">
-                  {phase === "recording" && (
-                    <div className="brain-dump-live-bar" aria-live="polite">
-                      <span className="brain-dump-live-dot" aria-hidden />
-                      <span>
-                        {liveCaptions ? "Listening — transcript updates as you speak" : "Recording audio…"}
-                      </span>
+                <div className={`brain-dump-input-wrap${isBusy ? " brain-dump-input-busy" : ""}`}>
+                  {phase === "starting" && (
+                    <div className="brain-dump-live-bar">
+                      <span className="btn-spinner brain-dump-live-spinner" aria-hidden />
+                      <span>Starting microphone…</span>
                     </div>
                   )}
+                  {phase === "recording" && (
+                    <div className="brain-dump-live-bar" aria-live="polite" aria-atomic="true">
+                      <span className="brain-dump-live-dot" aria-hidden />
+                      <span>
+                        {speechActive
+                          ? "Live transcript · speak now"
+                          : liveCaptions
+                            ? "Recording · live captions connecting…"
+                            : "Recording · will transcribe when you stop"}
+                      </span>
+                      <span className="brain-dump-live-timer">{recordingSec}s</span>
+                    </div>
+                  )}
+                  {isBusy && phase !== "starting" && (
+                    <div className="brain-dump-live-bar brain-dump-live-bar-processing">
+                      <span className="btn-spinner brain-dump-live-spinner" aria-hidden />
+                      <span>{processingLabel}</span>
+                    </div>
+                  )}
+
                   <div className="brain-dump-textarea-shell">
+                    {showListeningEmpty && (
+                      <div className="brain-dump-listening-placeholder" aria-hidden>
+                        <span className="brain-dump-listening-wave" />
+                        <span className="brain-dump-listening-wave" />
+                        <span className="brain-dump-listening-wave" />
+                        <p>Listening… start speaking</p>
+                      </div>
+                    )}
                     <textarea
                       ref={textareaRef}
-                      className={`brain-dump-textarea field-input${phase === "recording" ? " brain-dump-textarea-live" : ""}`}
+                      className={`brain-dump-textarea field-input${
+                        phase === "recording" ? " brain-dump-textarea-live" : ""
+                      }${showListeningEmpty ? " brain-dump-textarea-empty" : ""}`}
                       placeholder={
                         phase === "recording"
-                          ? "Your words will appear here…"
+                          ? ""
                           : "What's on your mind? Ideas, tasks, half-formed thoughts…"
                       }
-                      value={displayText}
+                      value={displayText || (isBusy ? processingPreviewRef.current : "")}
                       onChange={(e) => {
-                        if (phase !== "recording") setText(e.target.value);
+                        if (phase === "capture") setText(e.target.value);
                       }}
                       rows={6}
-                      readOnly={phase === "recording"}
+                      readOnly={phase !== "capture"}
+                      disabled={isBusy}
                       aria-label="Brain dump text"
                     />
                   </div>
@@ -418,36 +476,52 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                       onClick={stopRecording}
                     >
                       <span className="brain-dump-mic-pulse" aria-hidden />
-                      <span>Stop · {recordingSec}s</span>
+                      <span>Stop recording</span>
                     </button>
                   ) : (
                     <button
                       type="button"
                       className="brain-dump-mic"
                       onClick={startRecording}
+                      disabled={isBusy}
                     >
                       <span className="brain-dump-mic-icon" aria-hidden>🎙</span>
                       <span>Start voice dump</span>
                     </button>
                   )}
                   <span className="brain-dump-voice-hint">
-                    {phase === "recording" ? "Tap stop when done" : "or type above"}
+                    {phase === "recording"
+                      ? "Tap stop when done, or use Stop & save"
+                      : "or type above"}
                   </span>
                 </div>
 
                 {error && <p className="form-error brain-dump-error">{error}</p>}
 
                 <div className="brain-dump-actions">
-                  <button type="button" className="btn-ghost" onClick={handleClose}>
+                  <button type="button" className="btn-ghost" onClick={handleClose} disabled={isBusy}>
                     Cancel
                   </button>
                   <button
                     type="button"
-                    className="btn-primary"
+                    className="btn-primary brain-dump-save-btn"
                     onClick={submitText}
-                    disabled={phase === "recording" || !text.trim()}
+                    disabled={
+                      isBusy
+                      || (phase === "capture" && !text.trim())
+                      || phase === "starting"
+                    }
                   >
-                    Save dump
+                    {isBusy ? (
+                      <>
+                        <span className="btn-spinner brain-dump-btn-spinner" aria-hidden />
+                        Saving…
+                      </>
+                    ) : phase === "recording" ? (
+                      "Stop & save"
+                    ) : (
+                      "Save dump"
+                    )}
                   </button>
                 </div>
               </>
