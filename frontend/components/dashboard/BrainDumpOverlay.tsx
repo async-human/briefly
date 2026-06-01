@@ -379,7 +379,14 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                 disabled={isBusy}
                 aria-label="Close"
               >
-                ×
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M18 6L6 18M6 6l12 12"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </button>
             </header>
 
@@ -409,10 +416,12 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
             )}
 
             {view === "history" && phase !== "success" ? (
-              <BrainDumpHistory
-                refreshKey={historyRefresh}
-                onNewDump={() => setView("compose")}
-              />
+              <div className="brain-dump-history-panel">
+                <BrainDumpHistory
+                  refreshKey={historyRefresh}
+                  onNewDump={() => setView("compose")}
+                />
+              </div>
             ) : phase === "success" && result ? (
               <div className="brain-dump-success">
                 <p className="brain-dump-success-summary">{result.clean_summary}</p>
@@ -466,7 +475,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                 </div>
               </div>
             ) : (
-              <>
+              <div className="brain-dump-compose">
                 <p className="brain-dump-hint">
                   {phase === "recording"
                     ? "Talk naturally — your words appear below in real time."
@@ -511,7 +520,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                     )}
                     <textarea
                       ref={textareaRef}
-                      className={`brain-dump-textarea field-input${
+                      className={`brain-dump-textarea${
                         phase === "recording" ? " brain-dump-textarea-live" : ""
                       }${showListeningEmpty ? " brain-dump-textarea-empty" : ""}`}
                       placeholder={
@@ -539,6 +548,9 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                       onClick={stopRecording}
                     >
                       <span className="brain-dump-mic-pulse" aria-hidden />
+                      <svg className="brain-dump-mic-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <rect x="6" y="6" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.75" />
+                      </svg>
                       <span>Stop recording</span>
                     </button>
                   ) : (
@@ -548,10 +560,24 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                       onClick={startRecording}
                       disabled={isBusy}
                     >
-                      <span className="brain-dump-mic-icon" aria-hidden>🎙</span>
+                      <svg className="brain-dump-mic-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path
+                          d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Z"
+                          stroke="currentColor"
+                          strokeWidth="1.75"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M19 11v1a7 7 0 0 1-14 0v-1M12 18v3M8 21h8"
+                          stroke="currentColor"
+                          strokeWidth="1.75"
+                          strokeLinecap="round"
+                        />
+                      </svg>
                       <span>Start voice dump</span>
                     </button>
                   )}
+                  <span className="brain-dump-voice-divider" aria-hidden />
                   <span className="brain-dump-voice-hint">
                     {phase === "recording"
                       ? "Tap stop when done, or use Stop & save"
@@ -562,12 +588,12 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                 {error && <p className="form-error brain-dump-error">{error}</p>}
 
                 <div className="brain-dump-actions">
-                  <button type="button" className="btn-ghost" onClick={handleClose} disabled={isBusy}>
+                  <button type="button" className="brain-dump-cancel" onClick={handleClose} disabled={isBusy}>
                     Cancel
                   </button>
                   <button
                     type="button"
-                    className="btn-primary brain-dump-save-btn"
+                    className="brain-dump-save-btn"
                     onClick={submitText}
                     disabled={
                       isBusy
@@ -586,7 +612,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                     )}
                   </button>
                 </div>
-              </>
+              </div>
             )}
           </motion.div>
         </>
