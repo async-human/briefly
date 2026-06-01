@@ -191,3 +191,47 @@ async def fetch_newsletters(access_token: str, *, limit: int = 8) -> list[Normal
 
 async def count_newsletters(access_token: str) -> int:
     return await asyncio.to_thread(_count_newsletters_sync, access_token)
+
+
+def fetch_newsletters_from_sender_sync(
+    access_token: str,
+    sender_email: str,
+    *,
+    limit: int = 8,
+) -> list[NormalizedContent]:
+    """Fetch recent newsletter messages from a specific sender in the user's Gmail."""
+    sender = sender_email.strip().lower()
+    if not sender or "@" not in sender:
+        return []
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+    query = f"from:{sender} newer_than:60d"
+    params = {"q": query, "maxResults": str(min(limit, 20))}
+
+    with httpx.Client(timeout=45.0, headers=headers) as client:
+        resp = client.get(f"{GMAIL_API}/messages", params=params)
+        resp.raise_for_status()
+        message_ids = [m["id"] for m in resp.json().get("messages", [])]
+
+    articles: list[NormalizedContent] = []
+    for message_id in message_ids[:limit]:
+        try:
+            message = _get_message_sync(access_token, message_id)
+            content = _message_to_content(message)
+            if content:
+                content.author = sender
+                articles.append(content)
+        except Exception:
+            continue
+    return articles
+
+
+async def fetch_newsletters_from_sender(
+    access_token: str,
+    sender_email: str,
+    *,
+    limit: int = 8,
+) -> list[NormalizedContent]:
+    return await asyncio.to_thread(
+        fetch_newsletters_from_sender_sync, access_token, sender_email, limit=limit,
+    )

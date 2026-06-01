@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +21,10 @@ log = logging.getLogger(__name__)
 
 # OAuth account sources need a larger fetch pool (many channels / newsletters).
 _ACCOUNT_SOURCE_TYPES = {GMAIL, YOUTUBE_ACCOUNT, REDDIT_ACCOUNT}
+
+# Per-source fetch timeout — prevents one slow feed from blocking the whole briefing.
+_FETCH_TIMEOUT_SEC = 28.0
+_MAX_CONCURRENT_FETCHES = 8
 
 
 def _fetch_limit(
@@ -63,48 +68,75 @@ async def collect_from_sources(
     max_items: int = 8,
     expanded_fetch: bool = False,
 ) -> tuple[list[NormalizedContent], list[str]]:
-    """Fetch content from all supported sources via connector registry."""
+    """Fetch content from all supported sources via connector registry (parallel)."""
     active = [s for s in sources if s.source_type in FETCHABLE_SOURCE_TYPES]
     if not active:
         return [], []
 
     batches: list[list[NormalizedContent]] = []
     warnings: list[str] = []
+    sem = asyncio.Semaphore(_MAX_CONCURRENT_FETCHES)
 
-    for source in active:
+    async def _fetch_one(source: Source) -> tuple[Source, list[NormalizedContent] | None, str | None]:
+        from briefly_api.db.engine import SessionLocal
+
         connector = get_connector(source.source_type)
         if not connector:
-            warnings.append(f"Unsupported source type: {source.source_type}")
-            continue
+            return source, None, f"Unsupported source type: {source.source_type}"
 
         display_name = source.name
         source_limit = _fetch_limit(
             source.source_type, max_items, len(active), expanded=expanded_fetch,
         )
-        try:
-            fetched = await connector.fetch(
-                source.identifier,
-                settings,
-                limit=source_limit,
-                source_name=display_name,
-                meta={**(source.meta or {}), "user_id": user_id, "source_id": source.id},
-                db=db,
+        async with sem:
+            async with SessionLocal() as fetch_session:
+                try:
+                    fetched = await asyncio.wait_for(
+                        connector.fetch(
+                            source.identifier,
+                            settings,
+                            limit=source_limit,
+                            source_name=display_name,
+                            meta={
+                                **(source.meta or {}),
+                                "user_id": user_id,
+                                "source_id": source.id,
+                            },
+                            db=fetch_session,
+                        ),
+                        timeout=_FETCH_TIMEOUT_SEC,
+                    )
+                    await fetch_session.commit()
+                    for item in fetched:
+                        if display_name:
+                            item.source_name = display_name
+                        item.source_id = source.id
+                    return source, fetched, None
+                except asyncio.TimeoutError:
+                    label = display_name or source.identifier
+                    log.warning("Fetch timed out for source %s (%s)", source.identifier, source.source_type)
+                    return source, None, f"Timed out fetching {label}"
+                except Exception as exc:
+                    log.exception("Failed to fetch source %s (%s)", source.identifier, source.source_type)
+                    label = display_name or source.identifier
+                    return source, None, f"Could not fetch {label}: {exc}"
+
+    results = await asyncio.gather(*[_fetch_one(s) for s in active], return_exceptions=True)
+
+    for result in results:
+        if isinstance(result, Exception):
+            warnings.append(f"Fetch error: {result}")
+            continue
+        source, fetched, warning = result
+        if warning:
+            warnings.append(warning)
+        if fetched:
+            batches.append(fetched)
+        elif source.source_type in _ACCOUNT_SOURCE_TYPES:
+            warnings.append(
+                f"{source.name or source.source_type} returned no items — "
+                "check connection settings or privacy."
             )
-            for item in fetched:
-                if display_name:
-                    item.source_name = display_name
-                item.source_id = source.id
-            if fetched:
-                batches.append(fetched)
-            elif source.source_type in _ACCOUNT_SOURCE_TYPES:
-                warnings.append(
-                    f"{display_name or source.source_type} returned no items — "
-                    "check connection settings or privacy."
-                )
-        except Exception as exc:
-            log.exception("Failed to fetch source %s (%s)", source.identifier, source.source_type)
-            label = display_name or source.identifier
-            warnings.append(f"Could not fetch {label}: {exc}")
 
     if expanded_fetch:
         articles = [item for batch in batches for item in batch]

@@ -34,20 +34,26 @@ async def load_pool_as_raw_items(
     if not source_ids:
         return [], 0
 
-    result = await session.execute(
-        select(RawContent)
-        .options(selectinload(RawContent.embedding))
-        .where(
-            RawContent.user_id == user_id,
-            RawContent.source_id.in_(source_ids),
-            RawContent.ingested_at >= cutoff,
-            RawContent.status.in_([ContentStatus.pending, ContentStatus.processed]),
-        )
-        .order_by(RawContent.ingested_at.desc())
-        .limit(120)
-    )
-    rows = result.scalars().all()
     source_map = {src.id: src for src in sources}
+    per_source = max(4, min(12, 120 // max(len(source_ids), 1)))
+    rows: list[RawContent] = []
+
+    # Fair load: up to N recent items per source (not global newest-only)
+    for sid in source_ids:
+        result = await session.execute(
+            select(RawContent)
+            .options(selectinload(RawContent.embedding))
+            .where(
+                RawContent.user_id == user_id,
+                RawContent.source_id == sid,
+                RawContent.ingested_at >= cutoff,
+                RawContent.status.in_([ContentStatus.pending, ContentStatus.processed]),
+            )
+            .order_by(RawContent.ingested_at.desc())
+            .limit(per_source)
+        )
+        rows.extend(result.scalars().all())
+
     items: list[RawItem] = []
 
     for rank, row in enumerate(rows):

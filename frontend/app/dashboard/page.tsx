@@ -84,12 +84,7 @@ export default function DashboardPage() {
     ];
 
     try {
-      // Warm the content pool before first brief
-      try {
-        await api.runIngestion();
-      } catch {
-        /* non-blocking */
-      }
+      // Pipeline ingests inline when the pool is thin — avoid double-fetching all sources here
       const result = await api.generateDigest();
       setDigest(result.digest);
       setGenerateWarnings(result.warnings ?? []);

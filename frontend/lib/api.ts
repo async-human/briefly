@@ -9,7 +9,11 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  timeoutMs?: number,
+): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -19,22 +23,50 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const controller = timeoutMs ? new AbortController() : null;
+  const timeoutId = controller
+    ? setTimeout(() => controller.abort(), timeoutMs)
+    : null;
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    const detail = body.detail;
-    const message =
-      typeof detail === "string"
-        ? detail
-        : Array.isArray(detail)
-          ? detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join(", ")
-          : res.statusText;
-    throw new ApiError(message || res.statusText, res.status);
+  try {
+    const res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+      signal: controller?.signal ?? options.signal,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const detail = body.detail;
+      const message =
+        typeof detail === "string"
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join(", ")
+            : res.statusText;
+      throw new ApiError(message || res.statusText, res.status);
+    }
+
+    if (res.status === 204) return undefined as T;
+    return res.json() as Promise<T>;
+  } catch (err) {
+    if (controller?.signal.aborted) {
+      throw new ApiError(
+        "Request timed out — your briefing may still be generating. Try refreshing in a moment.",
+        408,
+      );
+    }
+    if (err instanceof ApiError) throw err;
+    if (err instanceof Error && err.message === "Failed to fetch") {
+      throw new ApiError(
+        "Could not reach the server — the briefing may have timed out with many sources connected. Try Regenerate.",
+        0,
+      );
+    }
+    throw err;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
-
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
 }
 
 async function requestFormData<T>(
@@ -322,7 +354,7 @@ export const api = {
   deleteSource: (id: string) =>
     request<void>(`/api/v1/sources/${id}`, { method: "DELETE" }),
   generateDigest: () =>
-    request<GenerateDigestResponse>("/api/v1/digests/generate", { method: "POST" }),
+    request<GenerateDigestResponse>("/api/v1/digests/generate", { method: "POST" }, 240_000),
   getIngestionSummary: () =>
     request<IngestionSummary>("/api/v1/ingestion/summary"),
   runIngestion: () =>
