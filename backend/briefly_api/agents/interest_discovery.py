@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, update
 
 from briefly_api.agents.context import PipelineContext
-from briefly_api.db.models import BehavioralSignal, DigestItem, SignalType, Source, UserProfile
+from briefly_api.db.models import BehavioralSignal, DigestItem, SignalType, UserProfile
 from briefly_api.services.profile_utils import cluster_label
 from briefly_api.services.source_catalog import get_interest_driven_suggestions
 
@@ -83,8 +83,6 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             .values(suggested_sources=merged)
         )
 
-        await _maybe_auto_expand_sources(ctx, session, fresh)
-
         log.info(
             "InterestDiscoveryAgent: stored %d new suggestion(s) for user %s (topics: %s)",
             len(fresh), ctx.user.user_id, ", ".join(inferred[:4]),
@@ -95,50 +93,6 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         ctx.log_error("InterestDiscoveryAgent", "Failed to compute suggestions")
 
     return ctx
-
-
-async def _maybe_auto_expand_sources(
-    ctx: PipelineContext,
-    session,
-    suggestions: list[dict],
-) -> None:
-    """When enabled, auto-add high-confidence catalog sources the user lacks."""
-    if not ctx.user.profile.get("auto_expand_sources"):
-        return
-    if not suggestions:
-        return
-
-    existing = {
-        s.identifier.lower()
-        for s in (ctx.user.sources or [])
-        if hasattr(s, "identifier") and s.identifier
-    }
-    added = 0
-    for sug in suggestions[:2]:
-        url = (sug.get("url") or "").strip()
-        if not url or url.lower() in existing:
-            continue
-        confidence = float(sug.get("confidence") or 0.7)
-        if confidence < 0.75:
-            continue
-        source = Source(
-            user_id=ctx.user.user_id,
-            source_type=sug.get("source_type") or "rss",
-            identifier=url,
-            name=sug.get("name") or url,
-            meta={
-                "auto_discovered": True,
-                "discovery_method": "interest_discovery",
-                "confidence": confidence,
-                "topic": sug.get("topic"),
-            },
-        )
-        session.add(source)
-        existing.add(url.lower())
-        added += 1
-
-    if added:
-        log.info("InterestDiscoveryAgent: auto-expanded %d source(s) for user %s", added, ctx.user.user_id)
 
 
 async def _extract_inferred_topics(ctx: PipelineContext, session) -> list[str]:

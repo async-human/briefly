@@ -25,7 +25,9 @@ _DISCOVERY_QUERY = (
     "has:list-unsubscribe OR "
     "from:substack.com OR from:beehiiv.com OR from:mail.beehiiv.com OR "
     "from:convertkit.com OR from:buttondown.email OR from:ghost.io OR "
-    "from:mailchimp.com OR from:constantcontact.com OR from:campaignmonitor.com"
+    "from:mailchimp.com OR from:constantcontact.com OR from:campaignmonitor.com OR "
+    "from:noreply@medium.com OR from:medium.com OR "
+    'subject:(digest OR weekly OR changelog OR roundup OR newsletter OR "this week")'
 )
 
 

@@ -91,11 +91,27 @@ async def init_db() -> None:
             "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS ingestion_meta JSONB DEFAULT '{}'::jsonb",
             "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS source_weights JSONB DEFAULT '{}'::jsonb",
             "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS activity_feed JSONB DEFAULT '[]'::jsonb",
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS pending_source_discoveries JSONB DEFAULT '[]'::jsonb",
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sources_discovery_confirmed_at TIMESTAMPTZ",
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS discovery_last_run_at TIMESTAMPTZ",
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS discovery_meta JSONB DEFAULT '{}'::jsonb",
         ):
             try:
                 await conn.execute(text(stmt))
             except Exception as exc:
                 logger.warning("profile migration: %s", exc)
+        try:
+            await conn.execute(text("""
+                UPDATE user_profiles
+                SET sources_discovery_confirmed_at = NOW()
+                WHERE sources_discovery_confirmed_at IS NULL
+                  AND onboarding_completed = TRUE
+                  AND EXISTS (
+                    SELECT 1 FROM sources WHERE sources.user_id = user_profiles.user_id LIMIT 1
+                  )
+            """))
+        except Exception as exc:
+            logger.warning("discovery backfill: %s", exc)
     logger.info("Database initialized")
 
 

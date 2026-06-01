@@ -146,7 +146,8 @@ async def get_me(
     db: AsyncSession = Depends(get_db),
 ) -> MeOut:
     ingestion_email = f"{user.email_token}@{settings.email_ingestion_domain}"
-    profile = ProfileOut.model_validate(user.profile) if user.profile else None
+    profile_orm = user.profile
+    profile_out = ProfileOut.model_validate(profile_orm) if profile_orm else None
     gmail = await get_gmail_connection(db, user.id)
     youtube = await get_youtube_connection(db, user.id)
     reddit = await get_reddit_connection(db, user.id)
@@ -154,14 +155,18 @@ async def get_me(
     auto_suggestions = await _auto_suggestions_for_user(user, db)
     return MeOut(
         user=UserOut.model_validate(user),
-        profile=profile,
+        profile=profile_out,
         ingestion_email=ingestion_email,
-        onboarding_completed=bool(user.profile and user.profile.onboarding_completed),
+        onboarding_completed=bool(profile_orm and profile_orm.onboarding_completed),
         gmail_connected=gmail is not None,
         youtube_connected=youtube is not None,
         reddit_connected=reddit is not None,
         reading_streak=streak,
         auto_suggestions=auto_suggestions,
+        sources_discovery_confirmed=bool(
+            profile_orm and profile_orm.sources_discovery_confirmed_at is not None
+        ),
+        pending_discovery_count=len(profile_orm.pending_source_discoveries or []) if profile_orm else 0,
     )
 
 
@@ -547,11 +552,11 @@ async def record_feedback(
 
     await db.commit()
 
-    # Click-to-discover: if the user has clicked articles from the same domain
-    # enough times, automatically probe for an RSS feed and add it as a source.
+    # Click-to-discover: suggest RSS feeds via pending discovery on next scan —
+    # no silent auto-add (user confirms sources before briefing).
     if body.signal_type == "clicked" and item.source_url:
         asyncio.create_task(
-            _maybe_discover_from_click(user.id, item.source_url)
+            _queue_click_discovery(user.id, item.source_url)
         )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -573,16 +578,8 @@ async def _bump_source_weight(
     user.profile.source_weights = weights
 
 
-async def _maybe_discover_from_click(user_id: str, source_url: str) -> None:
-    """
-    Confidence-gated click-to-discover:
-    Count how many times this user has clicked articles from the same domain
-    in the past _CLICK_WINDOW_DAYS days.  Once the count reaches
-    _CLICK_DISCOVERY_THRESHOLD, probe the domain for an RSS feed and
-    auto-create a Source record.
-
-    Runs as a fire-and-forget background task — never blocks the HTTP response.
-    """
+async def _queue_click_discovery(user_id: str, source_url: str) -> None:
+    """After enough clicks on a domain, refresh pending discoveries (no auto-add)."""
     try:
         parsed = urlparse(source_url)
         domain = parsed.netloc.lstrip("www.").lower()
@@ -593,7 +590,6 @@ async def _maybe_discover_from_click(user_id: str, source_url: str) -> None:
         cutoff = datetime.now(timezone.utc) - timedelta(days=_CLICK_WINDOW_DAYS)
 
         async with SessionLocal() as db:
-            # Count clicks for any URL containing this domain
             click_count = await db.scalar(
                 select(func.count())
                 .select_from(BehavioralSignal)
@@ -604,50 +600,24 @@ async def _maybe_discover_from_click(user_id: str, source_url: str) -> None:
                     BehavioralSignal.created_at >= cutoff,
                 )
             )
-
             if (click_count or 0) < _CLICK_DISCOVERY_THRESHOLD:
                 return
 
-            # Don't add if a source for this domain already exists
-            existing = await db.scalar(
-                select(func.count())
-                .select_from(Source)
-                .where(
-                    Source.user_id == user_id,
-                    Source.identifier.contains(domain),
-                )
+            prof = await db.execute(
+                select(UserProfile).where(UserProfile.user_id == user_id)
             )
-            if existing:
+            profile = prof.scalar_one_or_none()
+            if not profile or profile.sources_discovery_confirmed_at is not None:
                 return
 
-            # Probe the domain for an RSS feed
-            rss_url = await discover_rss_feed(f"https://{domain}")
-            if not rss_url:
-                log.debug("click_discover: no RSS found for %s (user %s)", domain, user_id)
-                return
+            from briefly_api.services.source_discovery import run_source_discovery
+            from briefly_api.config import get_settings
+            await run_source_discovery(db, user_id, settings=get_settings())
+            log.info("click_discover: refreshed pending discoveries for user %s (domain %s)", user_id, domain)
 
-            try:
-                source = Source(
-                    user_id=user_id,
-                    source_type="rss",
-                    identifier=rss_url,
-                    name=domain,
-                    meta={
-                        "auto_discovered": True,
-                        "discovery_method": "click_signal",
-                        "confidence": 0.6,
-                        "trigger_domain": domain,
-                        "click_count": click_count,
-                    },
-                )
-                db.add(source)
-                await db.commit()
-                log.info(
-                    "click_discover: auto-added RSS '%s' for user %s after %d click(s)",
-                    rss_url, user_id, click_count,
-                )
-            except IntegrityError:
-                await db.rollback()  # race condition — another task already added it
+    except Exception:
+        log.exception("click_discover: unexpected error for user %s url %s", user_id, source_url)
+
 
     except Exception:
         log.exception("click_discover: unexpected error for user %s url %s", user_id, source_url)

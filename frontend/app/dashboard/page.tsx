@@ -6,6 +6,7 @@ import { api, type Digest, type MeResponse, type Source } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { BriefingPanel, SourcesSidebar } from "@/components/dashboard/BriefingPanel";
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
+import { SourceDiscoveryWizard } from "@/components/dashboard/SourceDiscoveryWizard";
 
 const FETCHABLE_SOURCE_TYPES = new Set([
   "rss", "youtube", "youtube_account", "reddit", "reddit_account",
@@ -47,6 +48,7 @@ export default function DashboardPage() {
   const [digest, setDigest] = useState<Digest | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDiscovery, setShowDiscovery] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generatingPhase, setGeneratingPhase] = useState(0);
   const [error, setError] = useState("");
@@ -81,6 +83,12 @@ export default function DashboardPage() {
     ];
 
     try {
+      // Warm the content pool before first brief
+      try {
+        await api.runIngestion();
+      } catch {
+        /* non-blocking */
+      }
       const result = await api.generateDigest();
       setDigest(result.digest);
       setGenerateWarnings(result.warnings ?? []);
@@ -117,6 +125,11 @@ export default function DashboardPage() {
         setSources(sourcesData);
         setLoading(false);
 
+        if (!meData.sources_discovery_confirmed) {
+          setShowDiscovery(true);
+          return;
+        }
+
         const today = new Date().toISOString().split("T")[0];
         const needsDigest = !digestData || digestData.digest_date < today;
         const emptyToday =
@@ -138,11 +151,25 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
+  async function handleDiscoveryConfirmed(added: Source[]) {
+    setShowDiscovery(false);
+    const freshSources = await api.getSources();
+    setSources(freshSources);
+    setMe((prev) =>
+      prev ? { ...prev, sources_discovery_confirmed: true, pending_discovery_count: 0 } : prev,
+    );
+    if (added.length) {
+      /* merged via getSources */
+    }
+    void runGenerate();
+  }
+
   function handleSourceAdded(source: Source) {
     setSources((prev) => {
       if (prev.some((s) => s.id === source.id)) return prev;
       return [source, ...prev];
     });
+    if (showDiscovery) return;
     if (FETCHABLE_SOURCE_TYPES.has(source.source_type)) {
       void runGenerate();
     }
@@ -157,7 +184,7 @@ export default function DashboardPage() {
       }
       return prev.filter((s) => s.id !== sourceId);
     });
-    if (shouldRegenerate) {
+    if (shouldRegenerate && !showDiscovery) {
       void runGenerate();
     }
   }
@@ -174,6 +201,13 @@ export default function DashboardPage() {
           <DashboardSkeleton />
         ) : error || !me ? (
           <p className="form-error dash-error">{error || "Something went wrong"}</p>
+        ) : showDiscovery ? (
+          <SourceDiscoveryWizard
+            existingSources={fetchableSources}
+            gmailConnected={me.gmail_connected}
+            onConfirmed={handleDiscoveryConfirmed}
+            onSourceAdded={handleSourceAdded}
+          />
         ) : (
           <>
             <DashboardHero

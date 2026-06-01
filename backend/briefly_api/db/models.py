@@ -155,6 +155,12 @@ class UserProfile(Base):
     source_weights: Mapped[dict] = mapped_column(JSONB, default=dict)
     activity_feed: Mapped[list[dict]] = mapped_column(JSONB, default=list)
 
+    # Dynamic source discovery — confirm-before-add
+    pending_source_discoveries: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+    sources_discovery_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    discovery_last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    discovery_meta: Mapped[dict] = mapped_column(JSONB, default=dict)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

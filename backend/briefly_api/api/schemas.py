@@ -97,6 +97,8 @@ class MeOut(BaseModel):
     reddit_connected: bool = False
     reading_streak: int = 0  # consecutive days with a digest
     auto_suggestions: list["AutoSuggestionOut"] = Field(default_factory=list)
+    sources_discovery_confirmed: bool = False
+    pending_discovery_count: int = 0
 
 
 class DigestItemOut(BaseModel):
@@ -224,6 +226,35 @@ class AutoSuggestionOut(BaseModel):
     reason: str = ""
     discovered_at: str | None = None
     source: str = "catalog"  # catalog | medium
+
+
+class DiscoveryCandidateOut(BaseModel):
+    id: str
+    name: str
+    identifier: str
+    source_type: str
+    layer: str
+    confidence: float
+    relevance_score: float
+    selected: bool
+    reason: str
+    meta: dict = Field(default_factory=dict)
+
+
+class DiscoveryRunOut(BaseModel):
+    candidates: list[DiscoveryCandidateOut]
+    connected_accounts: list[str] = Field(default_factory=list)
+    meta: dict = Field(default_factory=dict)
+
+
+class DiscoveryConfirmIn(BaseModel):
+    candidate_ids: list[str] = Field(default_factory=list)
+
+
+class DiscoveryConfirmOut(BaseModel):
+    added: list[SourceOut]
+    total_sources: int
+    confirmed: bool
 
 
 class ReadwiseConnectIn(BaseModel):

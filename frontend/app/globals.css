@@ -7778,6 +7778,129 @@ footer {
 .ingestion-refresh-btn {
   width: 100%;
 }
+
+/* Source discovery wizard */
+.discovery-wizard {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 0 48px;
+}
+.discovery-wizard-inner {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  padding: 32px 28px;
+  box-shadow: 0 2px 12px rgba(28, 24, 18, 0.06);
+}
+.discovery-wizard-title {
+  font-size: 28px;
+  font-weight: 650;
+  margin: 8px 0 12px;
+  letter-spacing: -0.02em;
+}
+.discovery-wizard-desc {
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.55;
+  margin: 0;
+}
+.discovery-connected {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--accent);
+  font-family: var(--mono);
+}
+.discovery-scanning {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.discovery-section {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.discovery-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+.discovery-candidate-list,
+.discovery-existing-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.discovery-candidate-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.discovery-candidate-row input {
+  margin-top: 4px;
+  accent-color: var(--accent);
+}
+.discovery-candidate-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+.discovery-candidate-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.discovery-score {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--accent);
+  white-space: nowrap;
+}
+.discovery-candidate-reason {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+.discovery-candidate-id {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.75;
+  margin: 4px 0 0;
+  word-break: break-all;
+}
+.discovery-existing-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 6px 0;
+  color: var(--text-muted);
+}
+.discovery-empty {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-top: 16px;
+}
+.discovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+  align-items: center;
+}
+.discovery-confirm-btn {
+  flex: 1;
+  min-width: 220px;
+}
 .dash-card {
   padding: 24px;
   border: 1px solid var(--border);

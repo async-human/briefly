@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from briefly_api.api.routes import auth, capture, dashboard, onboarding
+from briefly_api.api.routes import auth, capture, dashboard, discovery, onboarding
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(auth.router)
 api_router.include_router(dashboard.router)
+api_router.include_router(discovery.router)
 api_router.include_router(onboarding.router)
 api_router.include_router(capture.router)

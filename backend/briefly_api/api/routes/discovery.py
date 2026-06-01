@@ -1,0 +1,125 @@
+"""Source discovery API — run, review, confirm before first briefing."""
+from __future__ import annotations
+
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from briefly_api.api.schemas import (
+    DiscoveryCandidateOut,
+    DiscoveryConfirmIn,
+    DiscoveryConfirmOut,
+    DiscoveryRunOut,
+    SourceOut,
+)
+from briefly_api.auth.deps import get_current_user
+from briefly_api.config import Settings, get_settings
+from briefly_api.db.engine import get_db
+from briefly_api.db.models import Source, User, UserProfile
+from briefly_api.services.connectors.types import FETCHABLE_SOURCE_TYPES
+from briefly_api.services.source_discovery import confirm_discoveries, run_source_discovery
+
+log = logging.getLogger(__name__)
+
+router = APIRouter(tags=["discovery"])
+
+
+async def _discovery_status(user: User, db: AsyncSession) -> dict:
+    profile = user.profile
+    if not profile:
+        return {
+            "confirmed": False,
+            "pending_count": 0,
+            "candidates": [],
+            "meta": {},
+        }
+    pending = list(profile.pending_source_discoveries or [])
+    return {
+        "confirmed": profile.sources_discovery_confirmed_at is not None,
+        "confirmed_at": profile.sources_discovery_confirmed_at,
+        "pending_count": len(pending),
+        "candidates": pending,
+        "meta": profile.discovery_meta or {},
+        "last_run_at": profile.discovery_last_run_at,
+    }
+
+
+@router.get("/sources/discover/status")
+async def get_discovery_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    result = await db.execute(
+        select(User).options(selectinload(User.profile)).where(User.id == user.id)
+    )
+    u = result.scalar_one_or_none()
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    return await _discovery_status(u, db)
+
+
+@router.post("/sources/discover/run", response_model=DiscoveryRunOut)
+async def run_discovery(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> DiscoveryRunOut:
+    result = await run_source_discovery(db, user.id, settings=settings)
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get("error", "Discovery failed"),
+        )
+    return DiscoveryRunOut(
+        candidates=[DiscoveryCandidateOut(**c) for c in result["candidates"]],
+        connected_accounts=result.get("connected_accounts", []),
+        meta=result.get("meta", {}),
+    )
+
+
+@router.post("/sources/discover/confirm", response_model=DiscoveryConfirmOut)
+async def confirm_discovery(
+    body: DiscoveryConfirmIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> DiscoveryConfirmOut:
+    # Allow confirm with zero candidates if user already has sources (skip discovery)
+    existing = await db.execute(select(Source).where(Source.user_id == user.id))
+    existing_sources = list(existing.scalars().all())
+    fetchable = [s for s in existing_sources if s.source_type in FETCHABLE_SOURCE_TYPES]
+
+    if not body.candidate_ids and not fetchable:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Select at least one source or add a feed manually before continuing.",
+        )
+
+    added_sources = []
+    if body.candidate_ids:
+        result = await confirm_discoveries(db, user.id, body.candidate_ids, settings=settings)
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error"))
+        added_sources = result.get("added", [])
+    else:
+        # Mark confirmed without adding discovery candidates
+        prof = await db.execute(select(UserProfile).where(UserProfile.user_id == user.id))
+        profile = prof.scalar_one_or_none()
+        if profile:
+            from datetime import datetime, timezone
+            profile.sources_discovery_confirmed_at = datetime.now(timezone.utc)
+            profile.pending_source_discoveries = []
+            await db.commit()
+
+    # Reload all sources after confirm
+    all_src = await db.execute(select(Source).where(Source.user_id == user.id))
+    sources = list(all_src.scalars().all())
+
+    return DiscoveryConfirmOut(
+        added=[SourceOut.model_validate(s) for s in added_sources],
+        total_sources=len(sources),
+        confirmed=True,
+    )

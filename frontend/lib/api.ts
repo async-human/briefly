@@ -100,6 +100,8 @@ export type MeResponse = {
   reddit_connected: boolean;
   reading_streak: number;
   auto_suggestions: AutoSuggestion[];
+  sources_discovery_confirmed: boolean;
+  pending_discovery_count: number;
 };
 
 export type OnboardingStatus = {
@@ -173,6 +175,31 @@ export type IngestionSummary = {
   };
   activity_feed: { type: string; message: string; at: string }[];
   pool_items_recent: number;
+};
+
+export type DiscoveryCandidate = {
+  id: string;
+  name: string;
+  identifier: string;
+  source_type: string;
+  layer: "inbound_footprint" | "deep_link" | "semantic_catalog" | string;
+  confidence: number;
+  relevance_score: number;
+  selected: boolean;
+  reason: string;
+  meta: Record<string, unknown>;
+};
+
+export type DiscoveryRunResponse = {
+  candidates: DiscoveryCandidate[];
+  connected_accounts: string[];
+  meta: Record<string, unknown>;
+};
+
+export type DiscoveryConfirmResponse = {
+  added: Source[];
+  total_sources: number;
+  confirmed: boolean;
 };
 
 export type DigestSummary = {
@@ -268,6 +295,19 @@ export const api = {
     request<IngestionSummary>("/api/v1/ingestion/summary"),
   runIngestion: () =>
     request<IngestionSummary>("/api/v1/ingestion/run", { method: "POST" }),
+  runSourceDiscovery: () =>
+    request<DiscoveryRunResponse>("/api/v1/sources/discover/run", { method: "POST" }),
+  confirmSourceDiscovery: (candidateIds: string[]) =>
+    request<DiscoveryConfirmResponse>("/api/v1/sources/discover/confirm", {
+      method: "POST",
+      body: JSON.stringify({ candidate_ids: candidateIds }),
+    }),
+  getDiscoveryStatus: () =>
+    request<{
+      confirmed: boolean;
+      pending_count: number;
+      candidates: DiscoveryCandidate[];
+    }>("/api/v1/sources/discover/status"),
   getOnboardingStatus: () => request<OnboardingStatus>("/api/v1/onboarding/status"),
   updateOnboardingProfile: (body: {
     role?: string;
