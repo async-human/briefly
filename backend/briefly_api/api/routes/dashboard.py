@@ -5,7 +5,9 @@ import logging
 from datetime import date, timedelta
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -18,6 +20,7 @@ from briefly_api.api.schemas import (
     DigestOut,
     DigestSummaryOut,
     FeedbackIn,
+    BriefingGenerationStatusOut,
     GenerateDigestOut,
     IngestionSummaryOut,
     GmailDiscoverOut,
@@ -333,24 +336,130 @@ async def delete_source(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/digests/generate", response_model=GenerateDigestOut)
-async def generate_digest_now(
+async def _briefing_worker(user_id: str) -> None:
+    from briefly_api.config import get_settings
+    from briefly_api.services.briefing import generate_briefing_now
+    from briefly_api.services.briefing_generation import report_briefing_progress
+
+    async with SessionLocal() as session:
+        try:
+            await report_briefing_progress(
+                user_id,
+                status="running",
+                step="start",
+                label="Starting briefing generation…",
+            )
+            result = await session.execute(
+                select(User)
+                .options(selectinload(User.profile))
+                .where(User.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+            if not user:
+                await report_briefing_progress(
+                    user_id,
+                    status="error",
+                    step="error",
+                    label="Briefing failed.",
+                    error="User not found",
+                )
+                return
+
+            digest, warnings = await generate_briefing_now(user, session, get_settings())
+            await report_briefing_progress(
+                user_id,
+                status="complete",
+                step="done",
+                label="Briefing ready!",
+                digest_id=digest.id,
+                warnings=warnings,
+            )
+        except ValueError as exc:
+            log.warning("Briefing worker failed for user %s: %s", user_id, exc)
+            await report_briefing_progress(
+                user_id,
+                status="error",
+                step="error",
+                label="Briefing failed.",
+                error=str(exc),
+            )
+        except Exception:
+            log.exception("Briefing worker failed for user %s", user_id)
+            await report_briefing_progress(
+                user_id,
+                status="error",
+                step="error",
+                label="Briefing failed.",
+                error="Briefing generation failed. Please try again.",
+            )
+
+
+@router.get("/digests/generate/status", response_model=BriefingGenerationStatusOut)
+async def get_briefing_generation_status(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    settings: Settings = Depends(get_settings),
-) -> GenerateDigestOut:
-    from briefly_api.services.briefing import generate_briefing_now
+) -> BriefingGenerationStatusOut:
+    profile = user.profile
+    if not profile:
+        return BriefingGenerationStatusOut(status="idle")
 
-    try:
-        digest, warnings = await generate_briefing_now(user, db, settings)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Briefing generation failed: {exc}",
-        ) from exc
-    return GenerateDigestOut(digest=DigestOut.model_validate(digest), warnings=warnings)
+    meta = profile.ingestion_meta or {}
+    gen = dict(meta.get("briefing_generation") or {"status": "idle"})
+
+    digest_out: DigestOut | None = None
+    digest_id = gen.get("digest_id")
+    if gen.get("status") == "complete" and digest_id:
+        result = await db.execute(
+            select(Digest)
+            .options(selectinload(Digest.items))
+            .where(Digest.id == digest_id, Digest.user_id == user.id)
+        )
+        digest = result.scalar_one_or_none()
+        if digest:
+            digest_out = DigestOut.model_validate(digest)
+
+    return BriefingGenerationStatusOut(
+        status=gen.get("status", "idle"),
+        step=gen.get("step"),
+        label=gen.get("label"),
+        digest_id=digest_id,
+        digest=digest_out,
+        warnings=list(gen.get("warnings") or []),
+        error=gen.get("error"),
+        started_at=gen.get("started_at"),
+        updated_at=gen.get("updated_at"),
+    )
+
+
+@router.post("/digests/generate", response_model=GenerateDigestOut)
+async def generate_digest_now(
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> GenerateDigestOut:
+    prof = await db.execute(select(UserProfile).where(UserProfile.user_id == user.id))
+    profile = prof.scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
+
+    meta = dict(profile.ingestion_meta or {})
+    gen = meta.get("briefing_generation") or {}
+    if gen.get("status") == "running":
+        return GenerateDigestOut(status="running", digest=None, warnings=[])
+
+    now = datetime.now(timezone.utc).isoformat()
+    meta["briefing_generation"] = {
+        "status": "running",
+        "step": "start",
+        "label": "Starting briefing generation…",
+        "started_at": now,
+        "updated_at": now,
+    }
+    profile.ingestion_meta = meta
+    await db.commit()
+
+    background_tasks.add_task(_briefing_worker, user.id)
+    return GenerateDigestOut(status="running", digest=None, warnings=[])
 
 
 @router.get("/ingestion/summary", response_model=IngestionSummaryOut)

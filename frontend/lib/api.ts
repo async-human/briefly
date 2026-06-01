@@ -193,8 +193,21 @@ export type Digest = {
 };
 
 export type GenerateDigestResponse = {
-  digest: Digest;
+  status: "running" | "complete";
+  digest: Digest | null;
   warnings: string[];
+};
+
+export type BriefingGenerationStatus = {
+  status: "idle" | "running" | "complete" | "error";
+  step?: string | null;
+  label?: string | null;
+  digest_id?: string | null;
+  digest?: Digest | null;
+  warnings?: string[];
+  error?: string | null;
+  started_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type IngestionSummary = {
@@ -354,7 +367,9 @@ export const api = {
   deleteSource: (id: string) =>
     request<void>(`/api/v1/sources/${id}`, { method: "DELETE" }),
   generateDigest: () =>
-    request<GenerateDigestResponse>("/api/v1/digests/generate", { method: "POST" }, 240_000),
+    request<GenerateDigestResponse>("/api/v1/digests/generate", { method: "POST" }),
+  getBriefingGenerationStatus: () =>
+    request<BriefingGenerationStatus>("/api/v1/digests/generate/status"),
   getIngestionSummary: () =>
     request<IngestionSummary>("/api/v1/ingestion/summary"),
   runIngestion: () =>

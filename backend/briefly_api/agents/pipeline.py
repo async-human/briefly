@@ -188,8 +188,37 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+_AGENT_PROGRESS_LABELS: dict[str, str] = {
+    "SourceCollectorAgent": "Collecting content from your sources…",
+    "ContentCleanerAgent": "Cleaning and normalizing content…",
+    "DeduplicationAgent": "Removing duplicate stories…",
+    "RelevanceAgent": "Scoring relevance to your interests…",
+    "NoveltyAgent": "Finding what's new for you…",
+    "MemoryAgent": "Connecting to your reading history…",
+    "BriefingPlannerAgent": "Planning your briefing…",
+    "BriefingWriterAgent": "Writing your briefing…",
+    "BrainDumpInjectorAgent": "Adding your saved notes…",
+    "CitationVerifierAgent": "Verifying sources…",
+    "DeliveryAgent": "Preparing delivery…",
+}
+
+
 async def _run_agent(name: str, fn, ctx: PipelineContext) -> PipelineContext:
     """Run a single agent with error isolation and stage timing."""
+    label = _AGENT_PROGRESS_LABELS.get(name)
+    if label and ctx.user.user_id:
+        try:
+            from briefly_api.services.briefing_generation import report_briefing_progress
+
+            await report_briefing_progress(
+                ctx.user.user_id,
+                status="running",
+                step=name,
+                label=label,
+            )
+        except Exception:
+            log.debug("Could not report briefing progress for %s", name, exc_info=True)
+
     started = time.perf_counter()
     try:
         log.debug("Running agent: %s", name)

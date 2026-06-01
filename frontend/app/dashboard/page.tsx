@@ -65,6 +65,35 @@ export default function DashboardPage() {
     phaseTimers.current = [];
   }
 
+  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  async function pollBriefingUntilDone(): Promise<{ digest: Digest; warnings: string[] }> {
+    const maxAttempts = 300;
+    for (let i = 0; i < maxAttempts; i++) {
+      await sleep(2000);
+      const status = await api.getBriefingGenerationStatus();
+      if (status.status === "complete") {
+        const digest =
+          status.digest ??
+          (status.digest_id ? await api.getDigest(status.digest_id) : null) ??
+          (await api.getLatestDigest());
+        if (digest) {
+          return { digest, warnings: status.warnings ?? [] };
+        }
+      }
+      if (status.status === "error") {
+        throw new Error(status.error || "Briefing generation failed");
+      }
+    }
+    const latest = await api.getLatestDigest();
+    if (latest) {
+      return { digest: latest, warnings: [] };
+    }
+    throw new Error(
+      "Briefing generation is taking longer than expected. Try refreshing in a moment.",
+    );
+  }
+
   async function runGenerate() {
     if (generatingRef.current) {
       pendingGenerateRef.current = true;
@@ -84,10 +113,21 @@ export default function DashboardPage() {
     ];
 
     try {
-      // Pipeline ingests inline when the pool is thin — avoid double-fetching all sources here
-      const result = await api.generateDigest();
+      const existing = await api.getBriefingGenerationStatus().catch(() => null);
+      const alreadyRunning = existing?.status === "running";
+
+      if (!alreadyRunning) {
+        const started = await api.generateDigest();
+        if (started.status === "complete" && started.digest) {
+          setDigest(started.digest);
+          setGenerateWarnings(started.warnings ?? []);
+          return;
+        }
+      }
+
+      const result = await pollBriefingUntilDone();
       setDigest(result.digest);
-      setGenerateWarnings(result.warnings ?? []);
+      setGenerateWarnings(result.warnings);
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : "Failed to generate briefing");
     } finally {
@@ -161,6 +201,12 @@ export default function DashboardPage() {
           digestData.total_items_shown === 0 &&
           (digestData.items?.length ?? 0) === 0;
         const hasSources = sourcesData.some((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
+
+        const genStatus = await api.getBriefingGenerationStatus().catch(() => null);
+        if (genStatus?.status === "running") {
+          void runGenerate();
+          return;
+        }
 
         if ((needsDigest || emptyToday) && hasSources) runGenerate();
       } catch (err) {

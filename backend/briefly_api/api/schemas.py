@@ -137,8 +137,21 @@ class DigestOut(BaseModel):
 
 
 class GenerateDigestOut(BaseModel):
-    digest: DigestOut
+    status: str = "complete"
+    digest: DigestOut | None = None
     warnings: list[str] = Field(default_factory=list)
+
+
+class BriefingGenerationStatusOut(BaseModel):
+    status: str = "idle"
+    step: str | None = None
+    label: str | None = None
+    digest_id: str | None = None
+    digest: DigestOut | None = None
+    warnings: list[str] = Field(default_factory=list)
+    error: str | None = None
+    started_at: str | None = None
+    updated_at: str | None = None
 
 
 class IngestionSummaryOut(BaseModel):
