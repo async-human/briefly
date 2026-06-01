@@ -13,7 +13,10 @@ from briefly_api.config import Settings
 from briefly_api.db.models import OAuthConnection
 from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.article_urls import resolve_article_url, strip_url_noise
-from briefly_api.services.medium_extractor import extract_article_urls, is_medium_sender
+from briefly_api.services.medium_extractor import (
+    detect_medium_digest,
+    extract_article_urls,
+)
 from briefly_api.services.newsletter_link_extractor import extract_outbound_links
 
 GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
@@ -129,7 +132,7 @@ def _message_to_content(message: dict) -> NormalizedContent | None:
     sender_domain = author.split("@")[-1].lower() if author and "@" in author else ""
 
     if raw_html:
-        if is_medium_sender(author):
+        if detect_medium_digest(raw_html, author):
             meta["is_medium_digest"] = True
             meta["raw_html"] = raw_html
             medium_urls = extract_article_urls(raw_html)

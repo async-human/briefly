@@ -122,7 +122,10 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         if len(selected) >= s.digest_max_items:
             break
         candidate = group[0]
-        if candidate.relevance_score < s.freshness_min_relevance:
+        min_rel = s.freshness_min_relevance
+        if priority_sort_key(source_id, priority_map) == 0:
+            min_rel = min(min_rel, 0.28)
+        if candidate.relevance_score < min_rel:
             continue
         _select(candidate, SECTION_WHATS_NEW, "fresh")
 

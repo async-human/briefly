@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from briefly_api.agents.context import RawItem
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.models import ContentStatus, RawContent, Source
+from briefly_api.services.source_priority import PRIORITY_HIGH, priority_from_source
 
 log = logging.getLogger(__name__)
 
@@ -35,11 +36,15 @@ async def load_pool_as_raw_items(
         return [], 0
 
     source_map = {src.id: src for src in sources}
-    per_source = max(4, min(12, 120 // max(len(source_ids), 1)))
+    per_source_default = max(4, min(12, 120 // max(len(source_ids), 1)))
     rows: list[RawContent] = []
 
-    # Fair load: up to N recent items per source (not global newest-only)
+    # Fair load: up to N recent items per source (more for starred sources)
     for sid in source_ids:
+        src = source_map.get(sid)
+        per_source = per_source_default
+        if src and priority_from_source(src) == PRIORITY_HIGH:
+            per_source = max(per_source, 16)
         result = await session.execute(
             select(RawContent)
             .options(selectinload(RawContent.embedding))

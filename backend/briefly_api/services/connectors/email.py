@@ -13,6 +13,7 @@ from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.connectors.base import BaseConnector, ConnectorValidation
 from briefly_api.services.connectors.types import EMAIL
 from briefly_api.services.gmail import fetch_newsletters_from_sender
+from briefly_api.services.medium_extractor import detect_medium_digest
 from briefly_api.services.medium_ingestion import expand_medium_digest_items
 
 log = logging.getLogger(__name__)
@@ -97,6 +98,11 @@ class EmailConnector(BaseConnector):
                         for item in items:
                             item.source_name = label
                             item.source_type = EMAIL
+                            raw_html = item.meta.get("raw_html", "")
+                            if detect_medium_digest(raw_html, item.author or normalized):
+                                item.meta["is_medium_digest"] = True
+                                if raw_html:
+                                    item.meta["raw_html"] = raw_html
                         items = await expand_medium_digest_items(
                             items,
                             source_name=label,

@@ -22,8 +22,9 @@ log = logging.getLogger(__name__)
 # OAuth account sources need a larger fetch pool (many channels / newsletters).
 _ACCOUNT_SOURCE_TYPES = {GMAIL, YOUTUBE_ACCOUNT, REDDIT_ACCOUNT}
 
-# Per-source fetch timeout — prevents one slow feed from blocking the whole briefing.
+# Per-source fetch timeout — email/Medium expansion needs more time.
 _FETCH_TIMEOUT_SEC = 28.0
+_FETCH_TIMEOUT_EMAIL_SEC = 90.0
 _MAX_CONCURRENT_FETCHES = 8
 
 
@@ -88,6 +89,11 @@ async def collect_from_sources(
         source_limit = _fetch_limit(
             source.source_type, max_items, len(active), expanded=expanded_fetch,
         )
+        fetch_timeout = (
+            _FETCH_TIMEOUT_EMAIL_SEC
+            if source.source_type == EMAIL
+            else _FETCH_TIMEOUT_SEC
+        )
         async with sem:
             async with SessionLocal() as fetch_session:
                 try:
@@ -104,7 +110,7 @@ async def collect_from_sources(
                             },
                             db=fetch_session,
                         ),
-                        timeout=_FETCH_TIMEOUT_SEC,
+                        timeout=fetch_timeout,
                     )
                     await fetch_session.commit()
                     for item in fetched:
