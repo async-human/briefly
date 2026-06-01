@@ -38,6 +38,7 @@ export type BrowserSpeechRecognition = EventTarget & {
   onresult: ((event: SpeechRecognitionEvent) => void) | null;
   onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
   onend: (() => void) | null;
+  onstart: (() => void) | null;
 };
 
 type SpeechRecognitionCtor = new () => BrowserSpeechRecognition;

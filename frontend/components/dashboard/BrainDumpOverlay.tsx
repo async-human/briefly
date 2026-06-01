@@ -572,7 +572,6 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                     disabled={
                       isBusy
                       || (phase === "capture" && !text.trim())
-                      || phase === "starting"
                     }
                   >
                     {isBusy ? (
