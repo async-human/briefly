@@ -13,10 +13,12 @@ export function SourceSuggestions({
   existingSources,
   onAdded,
   autoSuggestions = [],
+  embedded = false,
 }: {
   existingSources: Source[];
   onAdded: (s: Source) => void;
   autoSuggestions?: AutoSuggestion[];
+  embedded?: boolean;
 }) {
   const [catalogSuggestions, setCatalogSuggestions] = useState<SourceSuggestion[]>([]);
   const [adding, setAdding] = useState<string | null>(null);
@@ -45,7 +47,12 @@ export function SourceSuggestions({
       !autoSuggestions.some((a) => a.url.toLowerCase() === s.url.toLowerCase()),
   );
 
-  if (autoVisible.length === 0 && catalogVisible.length === 0) return null;
+  if (autoVisible.length === 0 && catalogVisible.length === 0) {
+    if (embedded) {
+      return <p className="dash-card-desc">No suggestions right now — check back after a few briefings.</p>;
+    }
+    return null;
+  }
 
   async function handleAdd(suggestion: SuggestionItem) {
     setAdding(suggestion.url);
@@ -99,6 +106,30 @@ export function SourceSuggestions({
           </button>
         </div>
       </li>
+    );
+  }
+
+  if (embedded) {
+    return (
+      <div className="suggestion-embedded">
+        {autoVisible.length > 0 && (
+          <>
+            <p className="dash-card-desc">Based on what you read and your interests.</p>
+            <ul className="suggestion-list">
+              {autoVisible.slice(0, 5).map((s) => renderRow(s, true))}
+            </ul>
+          </>
+        )}
+        {catalogVisible.length > 0 && (
+          <>
+            {autoVisible.length > 0 && <p className="suggestion-embedded-divider">From your interests</p>}
+            <ul className="suggestion-list">
+              {catalogVisible.slice(0, 5).map((s) => renderRow(s, false))}
+            </ul>
+          </>
+        )}
+        {addError && <p className="form-error suggestion-add-error">{addError}</p>}
+      </div>
     );
   }
 

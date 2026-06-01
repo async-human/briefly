@@ -39,6 +39,7 @@ export function SourcesSidebar({
   onRediscover,
 }: SourcesSidebarProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showAllSources, setShowAllSources] = useState(false);
 
   async function handleDelete(sourceId: string) {
     setDeletingId(sourceId);
@@ -53,70 +54,88 @@ export function SourcesSidebar({
   }
 
   const emailSources = sources.filter((s) => s.source_type === "email");
+  const SOURCE_PREVIEW = 8;
+  const visibleSources = showAllSources ? sources : sources.slice(0, SOURCE_PREVIEW);
+  const hiddenCount = sources.length - SOURCE_PREVIEW;
 
   return (
-    <aside className="dash-sidebar">
+    <aside className="dash-sidebar dash-aside-col">
       <div className="dash-card dash-card-primary">
         <div className="dash-card-head">
           <div>
-            <p className="dash-card-label">Step 1</p>
-            <h2 className="dash-card-title">Your sources</h2>
+            <h2 className="dash-card-title">Sources</h2>
+            <p className="dash-card-desc dash-card-desc-tight">
+              Add RSS, YouTube, Reddit, or any URL.
+            </p>
           </div>
           <span className="source-count">{sources.length}</span>
         </div>
-        <p className="dash-card-desc">
-          Paste a URL, channel, or RSS feed. Briefly detects the type automatically.
-        </p>
         <AddSourceForm onAdded={onSourceAdded} />
         {sources.length > 0 && (
-          <ul className="source-list source-list-connected source-list-compact">
-            {sources.map((source) => (
-              <li key={source.id} className="source-list-item">
-                <span className="source-type-icon">
-                  <SourceIcon
-                    type={source.source_type}
-                    name={source.name ?? undefined}
-                    url={source.identifier?.startsWith("http") ? source.identifier : undefined}
-                    size={18}
-                  />
-                </span>
-                <div className="source-info">
-                  <span className="source-name">{sourceDisplayName(source)}</span>
-                </div>
-                <button
-                  type="button"
-                  className="source-delete-btn"
-                  onClick={() => handleDelete(source.id)}
-                  disabled={deletingId === source.id}
-                  aria-label={`Remove ${sourceDisplayName(source)}`}
-                >
-                  {deletingId === source.id ? "…" : "×"}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="source-list source-list-connected source-list-compact">
+              {visibleSources.map((source) => (
+                <li key={source.id} className="source-list-item">
+                  <span className="source-type-icon">
+                    <SourceIcon
+                      type={source.source_type}
+                      name={source.name ?? undefined}
+                      url={source.identifier?.startsWith("http") ? source.identifier : undefined}
+                      size={18}
+                    />
+                  </span>
+                  <div className="source-info">
+                    <span className="source-name">{sourceDisplayName(source)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="source-delete-btn"
+                    onClick={() => handleDelete(source.id)}
+                    disabled={deletingId === source.id}
+                    aria-label={`Remove ${sourceDisplayName(source)}`}
+                  >
+                    {deletingId === source.id ? "…" : "×"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {hiddenCount > 0 && !showAllSources && (
+              <button
+                type="button"
+                className="source-list-expand"
+                onClick={() => setShowAllSources(true)}
+              >
+                Show all {sources.length} sources
+              </button>
+            )}
+          </>
         )}
         <p className="dash-sidebar-footnote">
-          Topic filters and delivery time are in{" "}
-          <Link href="/settings" className="dash-inline-link">Preferences</Link>.
+          Interests & delivery in{" "}
+          <Link href="/settings" className="dash-inline-link">Preferences</Link>
           {onRediscover && (
             <>
-              {" "}·{" "}
+              {" · "}
               <button type="button" className="dash-inline-link" onClick={onRediscover}>
-                Re-discover sources
+                Re-discover
               </button>
             </>
           )}
         </p>
       </div>
 
-      <SourceSuggestions
-        existingSources={sources}
-        onAdded={onSourceAdded}
-        autoSuggestions={autoSuggestions}
-      />
+      <CollapsibleCard label="Suggestions" title="Recommended sources" defaultOpen={false}>
+        <SourceSuggestions
+          existingSources={sources}
+          onAdded={onSourceAdded}
+          autoSuggestions={autoSuggestions}
+          embedded
+        />
+      </CollapsibleCard>
 
-      <IngestionPanel />
+      <CollapsibleCard label="Sync" title="Content pool" defaultOpen={false}>
+        <IngestionPanel embedded />
+      </CollapsibleCard>
 
       <CollapsibleCard
         label="Optional"
@@ -256,16 +275,35 @@ function ReadwiseCard({
 
 // ── Briefing preview item (dashboard — compact, no inline reading) ───────────
 
-function BriefingPreviewItem({ item, index }: { item: DigestItem; index: number }) {
-  return (
-    <article className="briefing-preview-item">
+function BriefingPreviewItem({
+  item,
+  index,
+  digestId,
+}: {
+  item: DigestItem;
+  index: number;
+  digestId?: string;
+}) {
+  const content = (
+    <>
       <span className="briefing-preview-index">{String(index + 1).padStart(2, "0")}</span>
       <div className="briefing-preview-body">
         <h3 className="briefing-preview-headline">{item.headline}</h3>
         <p className="briefing-preview-meta">{item.source_name}</p>
       </div>
-    </article>
+      {digestId && <span className="briefing-preview-chevron" aria-hidden>→</span>}
+    </>
   );
+
+  if (digestId) {
+    return (
+      <Link href={`/dashboard/read/${digestId}`} className="briefing-preview-item briefing-preview-link">
+        {content}
+      </Link>
+    );
+  }
+
+  return <article className="briefing-preview-item">{content}</article>;
 }
 
 function sectionSubtitle(section: string): string {
@@ -357,8 +395,8 @@ export function BriefingPanel({
         <h2 className="briefing-empty-title">Your briefing will appear here</h2>
         <p className="briefing-empty-desc">
           {sourcesCount > 0
-            ? "We're preparing today's items. This usually takes a few seconds."
-            : "Add a source on the right — RSS, YouTube, Reddit, or any URL."}
+            ? "We're preparing today's items. This usually takes a minute with many sources."
+            : "Add a source in the sidebar to get your first briefing."}
         </p>
         {sourcesCount > 0 && onRegenerate && !generating && (
           <button
@@ -380,27 +418,12 @@ export function BriefingPanel({
 
   return (
     <div className="briefing-panel">
-      <div className="briefing-panel-header">
+      <div className="briefing-panel-header briefing-panel-header-compact">
         <div>
-          <p className="dash-card-label">Step 2</p>
           <h2 className="briefing-panel-title">Today&apos;s briefing</h2>
-        </div>
-        <div className="briefing-panel-header-actions">
-          {sourcesCount > 0 && onRegenerate && (
-            <button
-              type="button"
-              className="briefing-refresh"
-              onClick={onRegenerate}
-              disabled={generating}
-            >
-              {generating ? "Regenerating…" : "Regenerate briefing"}
-            </button>
-          )}
-          {!generating && digest.items.length > 0 && (
-            <Link href={`/dashboard/read/${digest.id}`} className="briefing-panel-read-link">
-              Open reading mode →
-            </Link>
-          )}
+          <p className="briefing-panel-sub briefing-panel-sub-inline">
+            {digest.total_items_shown} curated items · {digest.digest_date}
+          </p>
         </div>
       </div>
 
@@ -418,11 +441,6 @@ export function BriefingPanel({
           ))}
         </ul>
       )}
-
-      <p className="briefing-panel-sub">
-        {digest.total_items_shown} curated items · {digest.digest_date}
-        {digest.items.length > 0 && " · Tap below to read with summaries and why-it-matters"}
-      </p>
 
       <div className="briefing-preview-list">
         {generating ? (
@@ -444,6 +462,7 @@ export function BriefingPanel({
                       key={item.id}
                       item={item}
                       index={previewIndex - 1}
+                      digestId={digest.id}
                     />
                   );
                 })}

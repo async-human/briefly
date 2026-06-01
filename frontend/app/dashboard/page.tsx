@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, type Digest, type MeResponse, type Source } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { BriefingPanel, SourcesSidebar } from "@/components/dashboard/BriefingPanel";
-import { DashboardHero } from "@/components/dashboard/DashboardHero";
+import { DashboardToolbar } from "@/components/dashboard/DashboardToolbar";
 import { SourceDiscoveryWizard } from "@/components/dashboard/SourceDiscoveryWizard";
 
 const FETCHABLE_SOURCE_TYPES = new Set([
@@ -25,17 +25,16 @@ function SkeletonBlock({ w, h, mb = 0 }: { w: number | string; h: number; mb?: n
 function DashboardSkeleton() {
   return (
     <>
-      <div className="dash-skeleton-hero">
+      <div className="dash-toolbar dash-toolbar-skeleton">
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <SkeletonBlock w={64} h={10} />
-          <SkeletonBlock w={240} h={34} />
-          <SkeletonBlock w={180} h={13} />
+          <SkeletonBlock w={120} h={10} />
+          <SkeletonBlock w={280} h={28} />
         </div>
       </div>
-      <div className="dash-skeleton-grid">
-        <div className="briefing-panel" style={{ overflow: "hidden", minHeight: 320 }} />
-        <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="dash-card" style={{ minHeight: 200 }} />
+      <div className="dash-skeleton-grid dash-layout-v3">
+        <div className="briefing-panel dash-main-col" style={{ overflow: "hidden", minHeight: 360 }} />
+        <aside className="dash-aside-col" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="dash-card" style={{ minHeight: 180 }} />
         </aside>
       </div>
     </>
@@ -286,17 +285,30 @@ export default function DashboardPage() {
           />
         ) : (
           <>
-            <DashboardHero
+            <DashboardToolbar
               name={greeting}
               dateLabel={today}
               itemCount={digest?.total_items_shown ?? null}
-              sourceCount={sources.length}
+              sourceCount={fetchableSources.length}
               streak={me.reading_streak ?? 0}
               digestId={digest?.id ?? null}
               generating={generating}
+              onRegenerate={() => void runGenerate()}
             />
 
-            <div className="dash-grid dash-grid-v2">
+            <div className="dash-layout-v3">
+              <div className="dash-main-col">
+                <BriefingPanel
+                  digest={digest}
+                  sources={fetchableSources}
+                  sourcesCount={fetchableSources.length}
+                  generating={generating}
+                  generatingPhase={generatingPhase}
+                  generateError={generateError}
+                  generateWarnings={generateWarnings}
+                  onRegenerate={() => void runGenerate()}
+                />
+              </div>
               <SourcesSidebar
                 ingestionEmail={me.ingestion_email}
                 sources={sources}
@@ -305,16 +317,6 @@ export default function DashboardPage() {
                 onSourceAdded={handleSourceAdded}
                 onSourceRemoved={handleSourceRemoved}
                 onRediscover={() => void handleRediscover()}
-              />
-              <BriefingPanel
-                digest={digest}
-                sources={fetchableSources}
-                sourcesCount={fetchableSources.length}
-                generating={generating}
-                generatingPhase={generatingPhase}
-                generateError={generateError}
-                generateWarnings={generateWarnings}
-                onRegenerate={() => void runGenerate()}
               />
             </div>
           </>

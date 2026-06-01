@@ -14,7 +14,7 @@ function formatRelativeTime(iso: string | null | undefined): string {
   return days === 1 ? "Yesterday" : `${days} days ago`;
 }
 
-export function IngestionPanel() {
+export function IngestionPanel({ embedded = false }: { embedded?: boolean }) {
   const [summary, setSummary] = useState<IngestionSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -43,6 +43,48 @@ export function IngestionPanel() {
   const last = summary?.last_summary;
   const feed = summary?.activity_feed?.slice(0, 3) ?? [];
 
+  const body = loading ? (
+    <p className="dash-card-desc">Loading sync status…</p>
+  ) : (
+    <>
+      <p className="dash-card-desc">
+        {summary?.pool_items_recent
+          ? `${summary.pool_items_recent} articles in your pool (last 48h)`
+          : "Briefly fetches sources overnight so briefings load quickly."}
+      </p>
+      {last && ((last.items_new ?? 0) > 0 || (last.items_updated ?? 0) > 0) && (
+        <ul className="ingestion-stats">
+          <li><strong>{last.items_new ?? 0}</strong> new</li>
+          <li><strong>{last.items_updated ?? 0}</strong> updated</li>
+          <li><strong>{last.sources_ok ?? 0}</strong> sources</li>
+        </ul>
+      )}
+      <p className="ingestion-last-run">
+        Last sync: {formatRelativeTime(summary?.last_ingestion_at ?? last?.ingested_at)}
+      </p>
+      {feed.length > 0 && (
+        <ul className="ingestion-feed">
+          {feed.map((entry, i) => (
+            <li key={`${entry.at}-${i}`}>{entry.message}</li>
+          ))}
+        </ul>
+      )}
+      <button
+        type="button"
+        className="onboard-chip-btn ingestion-refresh-btn"
+        onClick={handleRefresh}
+        disabled={running}
+      >
+        {running ? "Fetching sources…" : "Refresh sources now"}
+      </button>
+      {error && <p className="form-error" style={{ marginTop: 8 }}>{error}</p>}
+    </>
+  );
+
+  if (embedded) {
+    return <div className="ingestion-embedded">{body}</div>;
+  }
+
   return (
     <div className="dash-card dash-ingestion-card">
       <div className="dash-card-head">
@@ -51,43 +93,7 @@ export function IngestionPanel() {
           <h2 className="dash-card-title">What Briefly ingested</h2>
         </div>
       </div>
-      {loading ? (
-        <p className="dash-card-desc">Loading ingestion status…</p>
-      ) : (
-        <>
-          <p className="dash-card-desc">
-            {summary?.pool_items_recent
-              ? `${summary.pool_items_recent} items in your pool (last 48h)`
-              : "Briefly fetches your sources overnight so morning briefings are fast."}
-          </p>
-          {last && ((last.items_new ?? 0) > 0 || (last.items_updated ?? 0) > 0) && (
-            <ul className="ingestion-stats">
-              <li><strong>{last.items_new ?? 0}</strong> new</li>
-              <li><strong>{last.items_updated ?? 0}</strong> updated</li>
-              <li><strong>{last.sources_ok ?? 0}</strong> sources</li>
-            </ul>
-          )}
-          <p className="ingestion-last-run">
-            Last run: {formatRelativeTime(summary?.last_ingestion_at ?? last?.ingested_at)}
-          </p>
-          {feed.length > 0 && (
-            <ul className="ingestion-feed">
-              {feed.map((entry, i) => (
-                <li key={`${entry.at}-${i}`}>{entry.message}</li>
-              ))}
-            </ul>
-          )}
-          <button
-            type="button"
-            className="onboard-chip-btn ingestion-refresh-btn"
-            onClick={handleRefresh}
-            disabled={running}
-          >
-            {running ? "Fetching sources…" : "Refresh sources now"}
-          </button>
-          {error && <p className="form-error" style={{ marginTop: 8 }}>{error}</p>}
-        </>
-      )}
+      {body}
     </div>
   );
 }
