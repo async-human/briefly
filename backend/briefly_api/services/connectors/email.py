@@ -19,6 +19,19 @@ from briefly_api.services.medium_ingestion import expand_medium_digest_items
 log = logging.getLogger(__name__)
 
 
+def _resolve_sender_email(identifier: str, meta: dict | None) -> str:
+    """Email sources must query Gmail by sender address, not display name."""
+    normalized = identifier.strip().lower()
+    if "@" in normalized:
+        return normalized
+    extra = meta or {}
+    for key in ("sender_email", "sender", "from_email"):
+        candidate = str(extra.get(key) or "").strip().lower()
+        if "@" in candidate:
+            return candidate
+    return normalized
+
+
 class EmailConnector(BaseConnector):
     source_type = EMAIL
     label = "Email newsletter"
@@ -46,7 +59,7 @@ class EmailConnector(BaseConnector):
 
         source_id: str | None = (meta or {}).get("source_id")
         user_id: str | None = (meta or {}).get("user_id")
-        normalized = self.normalize_identifier(identifier)
+        normalized = _resolve_sender_email(identifier, meta)
 
         # 1) Forwarded mail ingested into the content pool
         if source_id:

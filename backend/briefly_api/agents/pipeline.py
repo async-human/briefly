@@ -59,7 +59,15 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
 
     log.info("Pipeline starting: user=%s date=%s", user_id, run_date)
 
-    async with get_session_factory()() as session:
+    try:
+        async with get_session_factory()() as session:
+            return await _run_pipeline(session, user_id, run_date, s)
+    except Exception as exc:
+        log.exception("Pipeline failed for user %s", user_id)
+        return {"success": False, "error": f"Briefing pipeline error: {exc}"}
+
+
+async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
         # Load user context from DB
         user_data = await get_user_with_profile(session, user_id)
         if not user_data:
@@ -150,7 +158,9 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
         content_ids = [
             d.content_id for d in ctx.digest_items
             if d.content_id and any(
-                i.id == d.content_id and i.meta.get("from_pool") for i in ctx.enriched_items
+                i.id == d.content_id
+                and (i.meta.get("from_pool") or i.meta.get("live_fetch"))
+                for i in ctx.enriched_items
             )
         ]
         if content_ids:
@@ -161,7 +171,10 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
         # ── Post-delivery learning & discovery (non-blocking) ────────────────
         ctx = await _run_agent("LearningAgent",          learning.run,          ctx)
         ctx = await _run_agent("InterestDiscoveryAgent", interest_discovery.run, ctx)
-        await session.commit()
+        try:
+            await session.commit()
+        except Exception as exc:
+            log.warning("Post-digest profile commit failed (digest already saved): %s", exc)
 
         duration_ms = ctx.pipeline_duration_ms
         log.info(
@@ -285,10 +298,13 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
     )
     session.add(digest)
 
+    pool_content_ids = {i.id for i in ctx.enriched_items}
+
     for draft in ctx.digest_items:
+        content_id = draft.content_id if draft.content_id in pool_content_ids else None
         item = DigestItem(
             digest_id=digest_id,
-            content_id=draft.content_id if draft.content_id else None,
+            content_id=content_id,
             position=draft.position,
             section=draft.section,
             headline=draft.headline,

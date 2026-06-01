@@ -138,7 +138,10 @@ async def run(ctx: PipelineContext) -> PipelineContext:
                 break
             if _source_at_cap(source_id):
                 break
-            if candidate.relevance_score < s.freshness_min_relevance:
+            min_rel = s.freshness_min_relevance
+            if priority_sort_key(source_id, priority_map) == 0:
+                min_rel = min(min_rel, 0.28)
+            if candidate.relevance_score < min_rel:
                 continue
             _select(candidate, SECTION_WHATS_NEW, "fresh")
 
@@ -189,10 +192,21 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         if i.meta.get("digest_pool") == "backfill" and i.meta.get("digest_section") == SECTION_HIGHLY_RELEVANT
     ]
 
-    fresh_items.sort(key=_freshness_key, reverse=True)
-    relevant_items.sort(key=lambda i: i.relevance_score, reverse=True)
-    backfill_whats_new.sort(key=combined_score, reverse=True)
-    backfill_relevant.sort(key=combined_score, reverse=True)
+    def _priority_freshness(item: RawItem) -> tuple:
+        fk = _freshness_key(item)
+        ts = fk[0].timestamp() if fk[0] != datetime.min.replace(tzinfo=timezone.utc) else 0.0
+        return (priority_sort_key(item.source_id, priority_map), -ts, fk[1])
+
+    fresh_items.sort(key=_priority_freshness)
+    relevant_items.sort(
+        key=lambda i: (priority_sort_key(i.source_id, priority_map), -i.relevance_score),
+    )
+    backfill_whats_new.sort(
+        key=lambda i: (priority_sort_key(i.source_id, priority_map), -combined_score(i)),
+    )
+    backfill_relevant.sort(
+        key=lambda i: (priority_sort_key(i.source_id, priority_map), -combined_score(i)),
+    )
 
     ordered = fresh_items + backfill_whats_new + relevant_items + backfill_relevant
     ctx.selected_item_ids = [i.id for i in ordered]

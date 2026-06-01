@@ -110,9 +110,13 @@ async def run(ctx: PipelineContext) -> PipelineContext:
 
     # Starred sources always get a fresh Gmail/RSS pull — pool alone misses new digests.
     if session:
-        raw_items = await _refresh_priority_source_items(
-            session, ctx, sources, s, raw_items,
-        )
+        try:
+            raw_items = await _refresh_priority_source_items(
+                session, ctx, sources, s, raw_items,
+            )
+        except Exception as exc:
+            log.exception("Priority source refresh failed for user %s", ctx.user.user_id)
+            ctx.log_error("SourceCollectorAgent", f"Priority refresh failed: {exc}")
         from_pool = sum(1 for i in raw_items if i.meta.get("from_pool"))
 
     min_needed = s.min_pool_items_before_live_fetch
@@ -149,6 +153,16 @@ async def run(ctx: PipelineContext) -> PipelineContext:
                     continue
                 existing_ids.add(content_hash)
                 raw_items.append(_article_to_raw_item(article, source_rank))
+
+    if session and raw_items:
+        try:
+            from briefly_api.services.live_content_pool import persist_live_raw_items
+
+            await persist_live_raw_items(session, ctx.user.user_id, raw_items)
+            await session.commit()
+        except Exception as exc:
+            log.warning("Could not persist live items to pool: %s", exc)
+            ctx.log_error("SourceCollectorAgent", f"Live pool persist failed: {exc}")
 
     ctx.raw_items = raw_items
     ctx.total_ingested = len(raw_items)

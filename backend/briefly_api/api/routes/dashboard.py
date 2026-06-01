@@ -415,14 +415,17 @@ async def _briefing_worker(user_id: str) -> None:
                 label="Briefing failed.",
                 error=str(exc),
             )
-        except Exception:
+        except Exception as exc:
             log.exception("Briefing worker failed for user %s", user_id)
+            message = str(exc).strip() or "Briefing generation failed. Please try again."
+            if len(message) > 300:
+                message = message[:297] + "..."
             await report_briefing_progress(
                 user_id,
                 status="error",
                 step="error",
                 label="Briefing failed.",
-                error="Briefing generation failed. Please try again.",
+                error=message,
             )
 
 
