@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
 import html2text
@@ -224,8 +224,8 @@ def fetch_newsletters_from_sender_sync(
         return []
 
     headers = {"Authorization": f"Bearer {access_token}"}
-    query = f"from:{sender} newer_than:60d"
-    params = {"q": query, "maxResults": str(min(limit, 20))}
+    query = f"from:{sender} newer_than:14d"
+    params = {"q": query, "maxResults": str(min(limit, 3))}
 
     with httpx.Client(timeout=45.0, headers=headers) as client:
         resp = client.get(f"{GMAIL_API}/messages", params=params)
@@ -242,6 +242,11 @@ def fetch_newsletters_from_sender_sync(
                 articles.append(content)
         except Exception:
             continue
+
+    articles.sort(
+        key=lambda a: a.published_at or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
     return articles
 
 

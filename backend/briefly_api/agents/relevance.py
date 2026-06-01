@@ -149,12 +149,16 @@ async def _semantic_score(
 def _topic_score(item: RawItem, interest_keywords: set[str]) -> float:
     """
     Check how many of the user's interest keywords appear in the item.
-    Simple but effective for explicit topic alignment.
+    Medium digest fallbacks are title-heavy — weight the title extra.
     """
     if not interest_keywords:
         return 0.5
 
-    text = f"{item.title} {item.summary} {item.clean_text[:1000]}".lower()
+    title = item.title or ""
+    if item.meta.get("from_medium_digest"):
+        text = f"{title} {title} {title} {item.summary or ''}".lower()
+    else:
+        text = f"{title} {item.summary} {item.clean_text[:1000]}".lower()
     matched = sum(1 for kw in interest_keywords if kw in text)
     if matched == 0:
         return 0.2

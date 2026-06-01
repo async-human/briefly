@@ -56,6 +56,13 @@ def _within_rescue_window(item: RawItem, max_age_days: int) -> bool:
     return age <= max_age_days
 
 
+def _within_briefing_age(item: RawItem, max_days: int) -> bool:
+    age = _age_days(item)
+    if age is None:
+        return True
+    return age <= max_days
+
+
 async def run(ctx: PipelineContext) -> PipelineContext:
     """
     Select items via dual-pool strategy and assign digest sections.
@@ -97,8 +104,13 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     selected_ids: set[str] = set()
     source_counts: dict[str, int] = defaultdict(int)
 
+    max_age = s.relevance_rescue_max_age_days
+
     def _select(item: RawItem, section: str, pool: str) -> None:
         if item.id in selected_ids:
+            return
+        if not _within_briefing_age(item, max_age):
+            item.drop_reason = "too_old"
             return
         item.meta["digest_section"] = section
         item.meta["digest_pool"] = pool
@@ -124,7 +136,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         candidate = group[0]
         min_rel = s.freshness_min_relevance
         if priority_sort_key(source_id, priority_map) == 0:
-            min_rel = min(min_rel, 0.28)
+            min_rel = max(min_rel, 0.42)
         if candidate.relevance_score < min_rel:
             continue
         _select(candidate, SECTION_WHATS_NEW, "fresh")
@@ -140,7 +152,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
                 break
             min_rel = s.freshness_min_relevance
             if priority_sort_key(source_id, priority_map) == 0:
-                min_rel = min(min_rel, 0.28)
+                min_rel = max(min_rel, 0.42)
             if candidate.relevance_score < min_rel:
                 continue
             _select(candidate, SECTION_WHATS_NEW, "fresh")

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -84,6 +85,24 @@ def _fetch_page_sync(url: str) -> tuple[str, str]:
     raise UrlFetchError(f"Could not reach {url}.")
 
 
+    raise UrlFetchError(f"Could not reach {url}.")
+
+
+def _parse_published_at(raw: str | None) -> datetime | None:
+    if not raw or not str(raw).strip():
+        return None
+    text = str(raw).strip()
+    try:
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        dt = datetime.fromisoformat(text)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (TypeError, ValueError):
+        return None
+
+
 def _extract_article_sync(url: str, html: str) -> NormalizedContent | None:
     extracted = trafilatura.extract(
         html,
@@ -110,6 +129,7 @@ def _extract_article_sync(url: str, html: str) -> NormalizedContent | None:
         source_type="url",
         section="Web",
         author=data.get("author"),
+        published_at=_parse_published_at(data.get("date")),
         clean_text=text,
         summary=text[:400],
     )
