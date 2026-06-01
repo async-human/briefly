@@ -10010,6 +10010,21 @@ footer {
   border-color: var(--accent-line);
   background: color-mix(in srgb, var(--accent-dim) 40%, var(--bg));
 }
+.brain-dump-live-transcript {
+  min-height: 168px;
+  max-height: min(220px, 32vh);
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.brain-dump-live-committed {
+  color: var(--text);
+}
+.brain-dump-live-interim {
+  color: var(--text-muted);
+  font-style: italic;
+  opacity: 0.88;
+}
 .brain-dump-interim {
   margin: 8px 2px 0;
   font-size: 15px;

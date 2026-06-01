@@ -21,6 +21,11 @@ from briefly_api.stt.audio_utils import convert_to_wav, normalize_upload
 
 log = logging.getLogger(__name__)
 
+_STT_PROMPT = (
+    "Transcribe with proper punctuation, capitalization, paragraph breaks, "
+    "and bullet points when the speaker lists multiple items."
+)
+
 
 class STTAdapter:
     """Single interface for speech-to-text providers."""
@@ -106,6 +111,7 @@ class STTAdapter:
             "model": model,
             "response_format": "json",
             "language": language or "en",
+            "prompt": _STT_PROMPT,
         }
 
         async with httpx.AsyncClient(timeout=120.0) as client:
@@ -145,7 +151,7 @@ class STTAdapter:
         if not self._s.openai_api_key:
             raise RuntimeError("OPENAI_API_KEY not set (required for STT provider=openai)")
 
-        data: dict[str, str] = {"model": model, "response_format": "json"}
+        data: dict[str, str] = {"model": model, "response_format": "json", "prompt": _STT_PROMPT}
         if language:
             data["language"] = language
 

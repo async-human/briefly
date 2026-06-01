@@ -41,7 +41,9 @@ _PROFILE_BLEND_ALPHA = 0.12
 _STRUCTURE_SYSTEM = (
     "You are the cognitive parsing agent for Briefly. Take a raw, chaotic "
     "stream-of-consciousness brain dump, fix structural flow without changing "
-    "technical intent, and extract actionable structural fields."
+    "technical intent, and extract actionable structural fields. "
+    "Always add proper punctuation, capitalization, paragraph breaks, and "
+    "bullet or numbered lists when the speaker enumerated items."
 )
 
 _STRUCTURE_PROMPT = """RAW USER BRAIN DUMP:
@@ -50,7 +52,8 @@ _STRUCTURE_PROMPT = """RAW USER BRAIN DUMP:
 Process this input and output a strict JSON object:
 {{
   "title": "string",              // Short headline, max 80 chars
-  "clean_summary": "string",      // Polished, readable version of their thought
+  "formatted_transcript": "string", // Full transcript with proper punctuation, paragraphs, and bullet/numbered lists where the speaker listed items. Preserve their exact meaning and wording — only fix structure and readability.
+  "clean_summary": "string",      // Polished, readable summary of their thought
   "intent_type": "project_idea" | "action_item" | "general_context",
   "action_items": ["string"],     // Explicit tasks found; empty array if none
   "relevance_keywords": ["string"], // Top 3-5 keywords for relevance matching
@@ -256,6 +259,7 @@ async def _structure_dump(raw_text: str, settings: Settings | None) -> dict:
 
     return {
         "title": str(data.get("title") or "Brain dump")[:120],
+        "formatted_transcript": str(data.get("formatted_transcript") or raw_text)[:10_000],
         "clean_summary": str(data.get("clean_summary") or raw_text[:2000]),
         "intent_type": str(data.get("intent_type") or "general_context"),
         "action_items": [str(a) for a in (data.get("action_items") or []) if a][:10],
@@ -288,6 +292,8 @@ async def _persist_dump(
     if existing.scalar_one_or_none():
         raise ValueError("This exact brain dump was already saved.")
 
+    display_transcript = structured.get("formatted_transcript") or raw_transcript
+
     meta = {
         "brain_dump": True,
         "input_mode": input_mode,
@@ -295,10 +301,11 @@ async def _persist_dump(
         "action_items": structured["action_items"],
         "relevance_keywords": structured["relevance_keywords"],
         "should_inject_into_morning_brief": structured["should_inject_into_morning_brief"],
-        "raw_transcript": raw_transcript[:10_000],
+        "raw_transcript": display_transcript[:10_000],
     }
     if audio_meta:
         meta["audio"] = audio_meta
+        meta["stt_transcript"] = raw_transcript[:10_000]
 
     row = RawContent(
         source_id=source.id,
@@ -306,7 +313,7 @@ async def _persist_dump(
         status=ContentStatus.processed,
         title=structured["title"],
         author="You",
-        raw_text=raw_transcript[:50_000],
+        raw_text=display_transcript[:50_000],
         clean_text=structured["clean_summary"],
         summary=structured["clean_summary"],
         content_hash=content_hash,
