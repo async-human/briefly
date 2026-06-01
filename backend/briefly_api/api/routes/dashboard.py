@@ -32,7 +32,11 @@ from briefly_api.api.schemas import (
     SourceSuggestionOut,
     UserOut,
 )
-from briefly_api.auth.gmail import get_gmail_connection, refresh_gmail_access_token
+from briefly_api.auth.gmail import (
+    get_gmail_connection,
+    refresh_gmail_access_token,
+    user_message_for_gmail_error,
+)
 from briefly_api.auth.youtube import get_youtube_connection
 from briefly_api.auth.reddit import get_reddit_connection
 from briefly_api.auth.deps import get_current_user
@@ -434,7 +438,14 @@ async def discover_gmail_newsletters(
     )
     already_added = {s.identifier for s in existing.scalars().all()}
 
-    senders, _ = await discover_newsletter_senders(access_token, already_added)
+    senders, _, access_error, access_error_message = await discover_newsletter_senders(
+        access_token, already_added,
+    )
+    if access_error:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=user_message_for_gmail_error(access_error, access_error_message),
+        )
     return GmailDiscoverOut(
         senders=[GmailSenderOut(**s) for s in senders]
     )

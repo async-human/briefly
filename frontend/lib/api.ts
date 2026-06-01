@@ -194,6 +194,8 @@ export type DiscoveryMeta = {
   last_run_at?: string;
   gmail_messages_scanned?: number;
   gmail_senders_found?: number;
+  gmail_scan_error?: string;
+  gmail_scan_error_message?: string;
   discovery_mode?: string;
   connected_accounts?: string[];
   layer_counts?: Record<string, number>;
@@ -344,9 +346,13 @@ export const api = {
       { method: "POST" },
     ),
   getGmailStatus: () =>
-    request<{ connected: boolean; email: string | null; newsletter_count: number | null }>(
-      "/api/v1/auth/gmail/status",
-    ),
+    request<{
+      connected: boolean;
+      email: string | null;
+      newsletter_count: number | null;
+      access_error?: string | null;
+      access_error_message?: string | null;
+    }>("/api/v1/auth/gmail/status"),
   disconnectGmail: () => request<void>("/api/v1/auth/gmail", { method: "DELETE" }),
 
   startYouTubeConnect: (redirectPath = "/onboarding") =>

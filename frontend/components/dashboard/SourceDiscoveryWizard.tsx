@@ -132,7 +132,7 @@ export function SourceDiscoveryWizard({
               ? "We scanned your Gmail inbox for newsletters you actually receive. Every source below was found in your email — not guessed from your profile keywords."
               : "We scanned your connected accounts for sources you follow. Confirm what to include — nothing is added without your approval."}
           </p>
-          {scanMeta?.gmail_messages_scanned != null && gmailConnected && (
+          {scanMeta?.gmail_messages_scanned != null && gmailConnected && !scanMeta.gmail_scan_error && (
             <p className="discovery-connected">
               Scanned {scanMeta.gmail_messages_scanned} emails · found {scanMeta.gmail_senders_found ?? 0} newsletter senders
             </p>
@@ -144,8 +144,41 @@ export function SourceDiscoveryWizard({
           )}
         </header>
 
-        {connectBanner && (
+        {connectBanner && !scanMeta.gmail_scan_error && (
           <div className="discovery-connect-banner">{connectBanner}</div>
+        )}
+
+        {gmailConnected && scanMeta.gmail_scan_error && (
+          <div className="discovery-gmail-error">
+            <div className="discovery-gmail-error-icon">
+              <SourceIcon type="gmail" size={22} />
+            </div>
+            <div className="discovery-gmail-error-body">
+              <p className="discovery-gmail-error-title">Couldn&apos;t read your Gmail inbox</p>
+              <p className="discovery-gmail-error-desc">
+                {scanMeta.gmail_scan_error_message ||
+                  "Google blocked inbox access. Reconnect and approve read access to scan newsletters."}
+              </p>
+              <button
+                type="button"
+                className="discovery-gmail-error-btn"
+                onClick={() => void handleConnectGmail()}
+                disabled={gmailLoading || phase === "confirming"}
+              >
+                {gmailLoading ? (
+                  <>
+                    <span className="btn-spinner btn-spinner-dark" />
+                    Redirecting to Google…
+                  </>
+                ) : (
+                  <>
+                    <SourceIcon type="gmail" size={16} />
+                    Reconnect Gmail
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         )}
 
         {!gmailConnected && (

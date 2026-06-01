@@ -13,6 +13,8 @@ from collections import Counter
 
 import httpx
 
+from briefly_api.auth.gmail import GmailAccessError, classify_gmail_http_error
+
 log = logging.getLogger(__name__)
 
 GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
@@ -102,6 +104,8 @@ def _list_messages(access_token: str, query: str, *, max_messages: int = 400) ->
             if page_token:
                 params["pageToken"] = page_token
             resp = client.get(f"{GMAIL_API}/messages", params=params)
+            if resp.status_code in {401, 403}:
+                raise classify_gmail_http_error(resp)
             resp.raise_for_status()
             data = resp.json()
             ids.extend(m["id"] for m in data.get("messages", []))
@@ -122,6 +126,8 @@ def _collect_message_ids(access_token: str, max_results: int) -> list[str]:
                 if mid not in seen:
                     seen.add(mid)
                     all_ids.append(mid)
+        except GmailAccessError:
+            raise
         except Exception as exc:
             log.debug("Gmail query failed (%s…): %s", query[:50], exc)
 
@@ -131,17 +137,34 @@ def _collect_message_ids(access_token: str, max_results: int) -> list[str]:
                 if mid not in seen:
                     seen.add(mid)
                     all_ids.append(mid)
+        except GmailAccessError:
+            raise
         except Exception as exc:
             log.debug("Gmail broad query failed: %s", exc)
 
     return all_ids
 
 
-def _discover_senders_sync(access_token: str, max_results: int = 400) -> list[dict]:
-    message_ids = _collect_message_ids(access_token, max_results)
+def _discover_senders_sync(access_token: str, max_results: int = 400) -> dict:
+    try:
+        message_ids = _collect_message_ids(access_token, max_results)
+    except GmailAccessError as exc:
+        log.warning("Gmail discovery access denied (%s): %s", exc.reason, exc)
+        return {
+            "senders": [],
+            "messages_scanned": 0,
+            "access_error": exc.reason,
+            "access_error_message": str(exc),
+        }
+
     if not message_ids:
         log.warning("Gmail discovery: 0 messages matched any query")
-        return {"senders": [], "messages_scanned": 0}  # type: ignore[return-value]
+        return {
+            "senders": [],
+            "messages_scanned": 0,
+            "access_error": None,
+            "access_error_message": None,
+        }
 
     counts: Counter[str] = Counter()
     meta: dict[str, dict] = {}
@@ -199,25 +222,31 @@ def _discover_senders_sync(access_token: str, max_results: int = 400) -> list[di
         "Gmail discovery: scanned %d messages → %d newsletter senders",
         len(message_ids), len(senders),
     )
-    return {"senders": senders, "messages_scanned": len(message_ids)}
+    return {
+        "senders": senders,
+        "messages_scanned": len(message_ids),
+        "access_error": None,
+        "access_error_message": None,
+    }
 
 
 async def discover_newsletter_senders(
     access_token: str,
     already_added: set[str],
     max_results: int = 400,
-) -> tuple[list[dict], int]:
+) -> tuple[list[dict], int, str | None, str | None]:
     """
-    Return (newsletter senders, messages_scanned).
-    Each sender was found in the user's real Gmail inbox.
+    Return (newsletter senders, messages_scanned, access_error_reason, access_error_message).
+    Each sender was found in the user's real Gmail inbox when access succeeds.
     """
     result = await asyncio.to_thread(_discover_senders_sync, access_token, max_results)
     if isinstance(result, list):
-        # backward compat
-        raw, scanned = result, 0
+        raw, scanned, err_reason, err_msg = result, 0, None, None
     else:
         raw = result["senders"]
         scanned = result["messages_scanned"]
+        err_reason = result.get("access_error")
+        err_msg = result.get("access_error_message")
 
     already_lower = {a.lower() for a in already_added}
     filtered = [s for s in raw if s["email"] not in already_lower]
@@ -225,4 +254,4 @@ async def discover_newsletter_senders(
         "Gmail discovery: %d senders (%d messages scanned), %d new after filter",
         len(raw), scanned, len(filtered),
     )
-    return filtered, scanned
+    return filtered, scanned, err_reason, err_msg

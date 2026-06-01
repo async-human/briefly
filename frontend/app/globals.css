@@ -7820,6 +7820,70 @@ footer {
   background: rgba(106, 171, 138, 0.12);
   border: 1px solid rgba(106, 171, 138, 0.28);
 }
+.discovery-gmail-error {
+  margin-top: 16px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(196, 92, 62, 0.22);
+  background: linear-gradient(
+    135deg,
+    rgba(196, 92, 62, 0.07) 0%,
+    rgba(234, 67, 53, 0.05) 100%
+  );
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.discovery-gmail-error-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid rgba(196, 92, 62, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.discovery-gmail-error-body {
+  flex: 1;
+  min-width: 0;
+}
+.discovery-gmail-error-title {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 500;
+  margin: 0 0 6px;
+  color: var(--text-primary);
+}
+.discovery-gmail-error-desc {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+.discovery-gmail-error-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(196, 92, 62, 0.35);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.discovery-gmail-error-btn:hover:not(:disabled) {
+  background: rgba(196, 92, 62, 0.06);
+  border-color: rgba(196, 92, 62, 0.5);
+}
+.discovery-gmail-error-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
 .discovery-gmail-callout {
   margin-top: 20px;
   padding: 20px 22px;

@@ -20,7 +20,7 @@ import numpy as np
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from briefly_api.auth.gmail import get_gmail_connection, refresh_gmail_access_token
+from briefly_api.auth.gmail import get_gmail_connection, refresh_gmail_access_token, user_message_for_gmail_error
 from briefly_api.auth.reddit import get_reddit_connection, refresh_reddit_access_token
 from briefly_api.auth.youtube import get_youtube_connection, refresh_youtube_access_token
 from briefly_api.config import Settings, get_settings
@@ -260,15 +260,40 @@ async def run_source_discovery(
     senders: list[dict] = []
     access_token: str | None = None
     gmail_messages_scanned = 0
+    gmail_scan_error: str | None = None
+    gmail_scan_error_message: str | None = None
 
     if gmail_connection:
         try:
             access_token = await refresh_gmail_access_token(gmail_connection, s)
             await session.commit()
-            senders, gmail_messages_scanned = await discover_newsletter_senders(
+            (
+                senders,
+                gmail_messages_scanned,
+                gmail_scan_error,
+                gmail_scan_error_message,
+            ) = await discover_newsletter_senders(
                 access_token, already_emails, max_results=400,
             )
-            if not senders:
+            if gmail_scan_error:
+                gmail_scan_error_message = user_message_for_gmail_error(
+                    gmail_scan_error, gmail_scan_error_message,
+                )
+                gmail_connection.meta = {
+                    **(gmail_connection.meta or {}),
+                    "access_error": gmail_scan_error,
+                    "access_error_message": gmail_scan_error_message,
+                }
+                log.warning(
+                    "Gmail discovery access error for user %s: %s — %s",
+                    user_id, gmail_scan_error, gmail_scan_error_message,
+                )
+            elif senders and gmail_connection:
+                meta = dict(gmail_connection.meta or {})
+                meta.pop("access_error", None)
+                meta.pop("access_error_message", None)
+                gmail_connection.meta = meta
+            elif not senders:
                 log.warning(
                     "Gmail discovery: 0 newsletter senders for user %s after scanning %d messages",
                     user_id, gmail_messages_scanned,
@@ -446,6 +471,8 @@ async def run_source_discovery(
         "connected_accounts": connected_accounts,
         "gmail_messages_scanned": gmail_messages_scanned,
         "gmail_senders_found": len(senders),
+        "gmail_scan_error": gmail_scan_error,
+        "gmail_scan_error_message": gmail_scan_error_message,
         "discovery_mode": "gmail_footprint" if gmail_connection else "oauth_only",
         "duration_ms": int((datetime.now(timezone.utc) - started).total_seconds() * 1000),
     }

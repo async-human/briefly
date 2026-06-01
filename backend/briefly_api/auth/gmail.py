@@ -14,6 +14,68 @@ from briefly_api.db.models import OAuthConnection, Source, User
 
 GMAIL_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GMAIL_SCOPES = "https://www.googleapis.com/auth/gmail.readonly openid email"
+GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
+
+GMAIL_ERROR_HINTS: dict[str, str] = {
+    "insufficient_scope": (
+        "Gmail is connected but inbox read access wasn't granted. "
+        "Reconnect and approve all requested permissions."
+    ),
+    "api_disabled": (
+        "The Gmail API isn't enabled for this app yet. "
+        "Enable it in Google Cloud Console or contact support."
+    ),
+    "forbidden": (
+        "Google blocked inbox access. If the app is in testing mode, "
+        "your Google account must be added as a test user in Cloud Console."
+    ),
+}
+
+
+class GmailAccessError(Exception):
+    def __init__(self, message: str, *, reason: str = "forbidden"):
+        self.reason = reason
+        super().__init__(message)
+
+
+def classify_gmail_http_error(response: httpx.Response) -> GmailAccessError:
+    try:
+        body = response.json()
+        msg = body.get("error", {}).get("message") or response.text
+    except Exception:
+        msg = response.text or f"HTTP {response.status_code}"
+    reason = "forbidden"
+    low = msg.lower()
+    if "insufficient" in low and "scope" in low:
+        reason = "insufficient_scope"
+    elif any(
+        phrase in low
+        for phrase in ("has not been used", "is disabled", "access not configured", "not enabled")
+    ):
+        reason = "api_disabled"
+    return GmailAccessError(msg, reason=reason)
+
+
+def user_message_for_gmail_error(reason: str, detail: str | None = None) -> str:
+    hint = GMAIL_ERROR_HINTS.get(reason, GMAIL_ERROR_HINTS["forbidden"])
+    if detail and reason == "forbidden":
+        return f"{hint} ({detail[:160]})"
+    return hint
+
+
+def probe_gmail_messages_access(access_token: str) -> None:
+    """Raise GmailAccessError if messages.list is not permitted."""
+    with httpx.Client(timeout=20.0) as client:
+        resp = client.get(
+            f"{GMAIL_API}/messages",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params={"maxResults": "1"},
+        )
+    if resp.status_code == 200:
+        return
+    if resp.status_code in {401, 403}:
+        raise classify_gmail_http_error(resp)
+    resp.raise_for_status()
 
 
 def build_gmail_auth_url(settings: Settings, state: str) -> str:
@@ -111,7 +173,10 @@ async def upsert_gmail_connection(
     user: User,
     tokens: dict,
     account_email: str | None,
+    *,
+    settings: Settings | None = None,
 ) -> OAuthConnection:
+    s = settings or get_settings()
     connection = await get_gmail_connection(db, user.id)
     expires_at = None
     if tokens.get("expires_in"):
@@ -124,6 +189,12 @@ async def upsert_gmail_connection(
         connection.token_expires_at = expires_at
         if account_email:
             connection.account_email = account_email
+        granted = (tokens.get("scope") or "").strip()
+        connection.scopes = granted or s.gmail_scopes
+        meta = dict(connection.meta or {})
+        meta.pop("access_error", None)
+        meta.pop("access_error_message", None)
+        connection.meta = meta
     else:
         connection = OAuthConnection(
             user_id=user.id,
@@ -132,7 +203,7 @@ async def upsert_gmail_connection(
             access_token=tokens["access_token"],
             refresh_token=tokens.get("refresh_token"),
             token_expires_at=expires_at,
-            scopes=GMAIL_SCOPES,
+            scopes=(tokens.get("scope") or "").strip() or s.gmail_scopes,
         )
         db.add(connection)
 

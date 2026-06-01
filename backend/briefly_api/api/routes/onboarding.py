@@ -21,11 +21,13 @@ from briefly_api.api.schemas import (
 )
 from briefly_api.auth.deps import get_current_user
 from briefly_api.auth.gmail import (
+    GmailAccessError,
     build_gmail_auth_url,
     decode_gmail_state,
     encode_gmail_state,
     exchange_gmail_code,
     get_gmail_connection,
+    probe_gmail_messages_access,
     refresh_gmail_access_token,
     upsert_gmail_connection,
 )
@@ -225,11 +227,18 @@ async def gmail_callback(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
     tokens = await exchange_gmail_code(code, settings)
-    connection = await upsert_gmail_connection(db, user, tokens, user.email)
+    connection = await upsert_gmail_connection(db, user, tokens, user.email, settings=settings)
     try:
         access_token = await refresh_gmail_access_token(connection, settings)
+        probe_gmail_messages_access(access_token)
         newsletter_count = await count_newsletters(access_token)
         connection.meta = {**(connection.meta or {}), "newsletter_count": newsletter_count}
+    except GmailAccessError as exc:
+        connection.meta = {
+            **(connection.meta or {}),
+            "access_error": exc.reason,
+            "access_error_message": str(exc),
+        }
     except Exception:
         pass
     await db.commit()
@@ -248,6 +257,8 @@ async def gmail_status(
         connected=True,
         email=connection.account_email,
         newsletter_count=(connection.meta or {}).get("newsletter_count"),
+        access_error=(connection.meta or {}).get("access_error"),
+        access_error_message=(connection.meta or {}).get("access_error_message"),
     )
 
 

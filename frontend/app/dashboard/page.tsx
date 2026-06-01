@@ -116,7 +116,16 @@ export default function DashboardPage() {
     window.history.replaceState({}, "", "/dashboard");
 
     if (gmail === "connected") {
-      setConnectBanner("Gmail connected — scanning your inbox for newsletters…");
+      void api.getGmailStatus().then((status) => {
+        if (status.access_error) {
+          setConnectBanner(
+            status.access_error_message ||
+              "Gmail connected but inbox read access was denied. Reconnect and approve all permissions.",
+          );
+        } else {
+          setConnectBanner("Gmail connected — scanning your inbox for newsletters…");
+        }
+      });
       void api.getMe().then(setMe);
     } else if (gmail === "denied") {
       setConnectBanner("Google blocked Gmail access. Add your email as a test user in Google Cloud Console, then try again.");

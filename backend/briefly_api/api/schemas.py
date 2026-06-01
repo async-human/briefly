@@ -65,6 +65,8 @@ class GmailStatusOut(BaseModel):
     connected: bool
     email: str | None = None
     newsletter_count: int | None = None
+    access_error: str | None = None
+    access_error_message: str | None = None
 
 
 class YouTubeConnectOut(BaseModel):
