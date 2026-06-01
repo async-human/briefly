@@ -191,7 +191,7 @@ function InlineTimer({
       }
     >
       <TimerRing progress={progress} size={compact ? 14 : 16} stroke={1.75} />
-      <span className="rm3-inline-timer-val">{paused ? "—" : `${remainingSec}s`}</span>
+      <span className="rm3-inline-timer-val">{remainingSec}s</span>
     </span>
   );
 }
@@ -332,6 +332,15 @@ function SpotlightPanel({
 
       <CountdownBar progress={progress} />
 
+      <div className="rm3-spotlight-timer">
+        <InlineTimer
+          progress={progress}
+          remainingSec={remainingSec}
+          paused={paused}
+          version={stage.version}
+        />
+      </div>
+
       <span className="rm3-watermark" aria-hidden>{stage.num}</span>
 
       <div className="rm3-spotlight-grid">
@@ -353,16 +362,8 @@ function SpotlightPanel({
           </motion.div>
 
           <div className="rm3-spotlight-meta">
-            <div className="rm3-spotlight-meta-main">
-              <span className="rm3-ver">{stage.version}</span>
-              <span className={`roadmap-badge ${cfg.cls}`}>{cfg.badge}</span>
-            </div>
-            <InlineTimer
-              progress={progress}
-              remainingSec={remainingSec}
-              paused={paused}
-              version={stage.version}
-            />
+            <span className="rm3-ver">{stage.version}</span>
+            <span className={`roadmap-badge ${cfg.cls}`}>{cfg.badge}</span>
           </div>
 
           <h3 className="rm3-name">{stage.name}</h3>
@@ -438,6 +439,17 @@ function StageStrip({
           layout
         >
           {i === active && (
+            <span className="rm3-strip-timer-corner">
+              <InlineTimer
+                progress={progress}
+                remainingSec={remainingSec}
+                paused={paused}
+                version={stage.version}
+                compact
+              />
+            </span>
+          )}
+          {i === active && (
             <span className="rm3-strip-timer" aria-hidden>
               <span
                 className="rm3-strip-timer-fill"
@@ -446,18 +458,7 @@ function StageStrip({
             </span>
           )}
           <span className="rm3-strip-icon">{stage.icon}</span>
-          <div className="rm3-strip-head">
-            <span className="rm3-strip-ver">{stage.version}</span>
-            {i === active && (
-              <InlineTimer
-                progress={progress}
-                remainingSec={remainingSec}
-                paused={paused}
-                version={stage.version}
-                compact
-              />
-            )}
-          </div>
+          <span className="rm3-strip-ver">{stage.version}</span>
           <span className="rm3-strip-name">{stage.name}</span>
         </motion.button>
       ))}
@@ -467,7 +468,7 @@ function StageStrip({
 
 export function Roadmap() {
   const sectionRef = useRef<HTMLElement>(null);
-  const inView = useInView(sectionRef, { once: false, margin: "-15% 0px" });
+  const inView = useInView(sectionRef, { once: false, margin: "-8% 0px" });
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const { progress, remainingSec } = useStageTimer(active, paused, inView);
@@ -491,10 +492,6 @@ export function Roadmap() {
       className="roadmap-section rm3-section"
       id="roadmap"
       ref={sectionRef}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocusCapture={() => setPaused(true)}
-      onBlurCapture={() => setPaused(false)}
     >
       <div className="rm3-bg-grid" aria-hidden />
 
@@ -524,7 +521,11 @@ export function Roadmap() {
           />
         </Reveal>
 
-        <div className="rm3-stage-wrap">
+        <div
+          className="rm3-stage-wrap"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+        >
           <AnimatePresence mode="wait">
             <SpotlightPanel
               key={stages[active].version}

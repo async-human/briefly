@@ -3646,15 +3646,20 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
 .rm3-spotlight-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 12px;
 }
-.rm3-spotlight-meta-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
+.rm3-spotlight-timer {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 5;
+  pointer-events: none;
+}
+.rm3-spotlight-timer .rm3-inline-timer {
+  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.12);
 }
 .rm3-ver {
   font-family: var(--mono);
@@ -3900,6 +3905,13 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   transform-origin: left center;
   background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, transparent));
   will-change: transform;
+}
+.rm3-strip-timer-corner {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  pointer-events: none;
 }
 
 /* Stage strip */
