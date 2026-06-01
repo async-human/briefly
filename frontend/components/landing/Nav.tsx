@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
+import { ThemeToggle } from "./ThemeToggle";
+
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 const NAV_LINKS = [
@@ -44,6 +46,9 @@ export function Nav() {
               <a href={l.href}>{l.label}</a>
             </li>
           ))}
+          <li>
+            <ThemeToggle compact />
+          </li>
           <li>
             <a href="/login">Sign in</a>
           </li>
@@ -133,6 +138,9 @@ export function Nav() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.28, duration: 0.25, ease: EASE }}
               >
+                <div className="nav-mobile-theme">
+                  <ThemeToggle />
+                </div>
                 <a href="/login" onClick={close} className="nav-mobile-signin">
                   Sign in
                 </a>

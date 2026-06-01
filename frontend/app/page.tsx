@@ -1,3 +1,4 @@
+import { LandingPageShell } from "@/components/landing/LandingPageShell";
 import { Nav } from "@/components/landing/Nav";
 import { Hero } from "@/components/landing/Hero";
 import { LiveDemo } from "@/components/landing/LiveDemo";
@@ -12,7 +13,7 @@ import { Footer } from "@/components/landing/Footer";
 
 export default function Home() {
   return (
-    <div className="light-page">
+    <LandingPageShell>
       <Nav />
       <Hero />
       <LiveDemo />
@@ -24,6 +25,6 @@ export default function Home() {
       <Pricing />
       <CTA />
       <Footer />
-    </div>
+    </LandingPageShell>
   );
 }
