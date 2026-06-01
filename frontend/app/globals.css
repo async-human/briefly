@@ -9777,7 +9777,44 @@ footer {
   resize: vertical;
   font-size: 15px;
   line-height: 1.55;
+  margin-bottom: 0;
+}
+.brain-dump-input-wrap {
   margin-bottom: 16px;
+}
+.brain-dump-live-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.brain-dump-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c44;
+  animation: brain-dump-pulse 1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.brain-dump-textarea-shell {
+  position: relative;
+}
+.brain-dump-textarea-live {
+  border-color: var(--accent-line);
+  background: color-mix(in srgb, var(--accent-dim) 40%, var(--bg));
+}
+.brain-dump-interim {
+  margin: 8px 2px 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  font-style: italic;
+  min-height: 1.4em;
 }
 .brain-dump-voice-row {
   display: flex;
