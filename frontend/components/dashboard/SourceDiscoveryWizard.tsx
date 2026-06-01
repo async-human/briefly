@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type DiscoveryCandidate, type DiscoveryMeta, type Source } from "@/lib/api";
 import { AddSourceForm } from "./AddSourceForm";
 import { SourceIcon } from "@/components/SourceIcon";
@@ -23,6 +23,7 @@ const LAYER_ORDER = [
 type SourceDiscoveryWizardProps = {
   existingSources: Source[];
   gmailConnected: boolean;
+  connectBanner?: string | null;
   onConfirmed: (sources: Source[]) => void;
   onSourceAdded: (source: Source) => void;
 };
@@ -30,6 +31,7 @@ type SourceDiscoveryWizardProps = {
 export function SourceDiscoveryWizard({
   existingSources,
   gmailConnected,
+  connectBanner,
   onConfirmed,
   onSourceAdded,
 }: SourceDiscoveryWizardProps) {
@@ -39,6 +41,8 @@ export function SourceDiscoveryWizard({
   const [connectedAccounts, setConnectedAccounts] = useState<string[]>([]);
   const [scanMeta, setScanMeta] = useState<DiscoveryMeta>({});
   const [error, setError] = useState("");
+  const [gmailLoading, setGmailLoading] = useState(false);
+  const prevGmailRef = useRef(gmailConnected);
 
   const runDiscovery = useCallback(async () => {
     setPhase("scanning");
@@ -59,6 +63,25 @@ export function SourceDiscoveryWizard({
   useEffect(() => {
     void runDiscovery();
   }, [runDiscovery]);
+
+  useEffect(() => {
+    if (gmailConnected && !prevGmailRef.current) {
+      void runDiscovery();
+    }
+    prevGmailRef.current = gmailConnected;
+  }, [gmailConnected, runDiscovery]);
+
+  async function handleConnectGmail() {
+    setGmailLoading(true);
+    setError("");
+    try {
+      const { url } = await api.startGmailConnect("/dashboard");
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start Gmail connection");
+      setGmailLoading(false);
+    }
+  }
 
   const grouped = useMemo(() => {
     const map = new Map<string, DiscoveryCandidate[]>();
@@ -117,10 +140,49 @@ export function SourceDiscoveryWizard({
           {connectedAccounts.length > 0 && (
             <p className="discovery-connected">
               Connected: {connectedAccounts.join(" · ")}
-              {!gmailConnected && " · Add Gmail for richer discovery"}
             </p>
           )}
         </header>
+
+        {connectBanner && (
+          <div className="discovery-connect-banner">{connectBanner}</div>
+        )}
+
+        {!gmailConnected && (
+          <div className="discovery-gmail-callout">
+            <div className="discovery-gmail-callout-icon">
+              <SourceIcon type="gmail" size={22} />
+            </div>
+            <div className="discovery-gmail-callout-body">
+              <p className="discovery-gmail-callout-title">Connect Gmail for richer discovery</p>
+              <p className="discovery-gmail-callout-desc">
+                We scan newsletter senders from your inbox — Substack, Beehiiv, and more — so your
+                briefing reflects what you actually read, not just keyword guesses.
+              </p>
+              <button
+                type="button"
+                className="discovery-gmail-callout-btn"
+                onClick={() => void handleConnectGmail()}
+                disabled={gmailLoading || phase === "confirming"}
+              >
+                {gmailLoading ? (
+                  <>
+                    <span className="btn-spinner btn-spinner-dark" />
+                    Redirecting to Google…
+                  </>
+                ) : (
+                  <>
+                    <SourceIcon type="gmail" size={16} />
+                    Connect Gmail
+                  </>
+                )}
+              </button>
+              <p className="discovery-gmail-callout-hint">
+                Read-only access to newsletter metadata — never your personal mail.
+              </p>
+            </div>
+          </div>
+        )}
 
         {phase === "scanning" && (
           <div className="discovery-scanning">

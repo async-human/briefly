@@ -54,6 +54,7 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [generateError, setGenerateError] = useState("");
   const [generateWarnings, setGenerateWarnings] = useState<string[]>([]);
+  const [connectBanner, setConnectBanner] = useState<string | null>(null);
 
   const generatingRef = useRef(false);
   const pendingGenerateRef = useRef(false);
@@ -105,6 +106,24 @@ export default function DashboardPage() {
       }
     }
   }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const gmail = params.get("gmail");
+    if (!gmail) return;
+
+    window.history.replaceState({}, "", "/dashboard");
+
+    if (gmail === "connected") {
+      setConnectBanner("Gmail connected — scanning your inbox for newsletters…");
+      void api.getMe().then(setMe);
+    } else if (gmail === "denied") {
+      setConnectBanner("Google blocked Gmail access. Add your email as a test user in Google Cloud Console, then try again.");
+    } else if (gmail === "error") {
+      setConnectBanner("Gmail connection was cancelled or failed. Please try again.");
+    }
+  }, []);
 
   useEffect(() => {
     async function init() {
@@ -211,6 +230,7 @@ export default function DashboardPage() {
           <SourceDiscoveryWizard
             existingSources={fetchableSources}
             gmailConnected={me.gmail_connected}
+            connectBanner={connectBanner}
             onConfirmed={handleDiscoveryConfirmed}
             onSourceAdded={handleSourceAdded}
           />
