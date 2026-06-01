@@ -144,7 +144,7 @@ class PipelineContext:
 
     @property
     def has_enough_items(self) -> bool:
-        return len(self.scored_items) >= 5
+        return len(self.scored_items) >= 3
 
     @property
     def pipeline_duration_ms(self) -> int:

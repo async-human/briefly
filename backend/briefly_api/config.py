@@ -90,6 +90,10 @@ class Settings(BaseSettings):
     digest_max_items: int = 14
     # Quality gate: if scored pool has fewer than this, relax relevance filter
     quality_gate_min_pool: int = 8
+    # Dual-pool planner: minimum relevance to rescue an older item into the briefing
+    relevance_rescue_threshold: float = 0.80
+    # Dual-pool planner: don't rescue items older than this many days
+    relevance_rescue_max_age_days: int = 14
 
     # ── Auth ─────────────────────────────────────────────────────────────────
     jwt_algorithm: str = "HS256"

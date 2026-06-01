@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from datetime import datetime, timezone
 
 import feedparser
 import httpx
@@ -55,6 +56,16 @@ def feed_has_entries(url: str) -> bool:
     return len(feed.entries) > 0
 
 
+def _entry_published_at(entry: object) -> datetime | None:
+    parsed = getattr(entry, "published_parsed", None) or getattr(entry, "updated_parsed", None)
+    if not parsed:
+        return None
+    try:
+        return datetime(*parsed[:6], tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return None
+
+
 def _fetch_rss_sync(url: str, limit: int = 5, source_name: str | None = None) -> list[FetchedArticle]:
     feed, final_url, status = _load_feed_sync(url)
 
@@ -79,6 +90,7 @@ def _fetch_rss_sync(url: str, limit: int = 5, source_name: str | None = None) ->
                 source_name=name,
                 source_type="rss",
                 section="News & feeds",
+                published_at=_entry_published_at(entry),
             )
         )
     return articles

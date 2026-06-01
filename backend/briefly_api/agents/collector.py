@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import uuid
+from collections import defaultdict
 
 from briefly_api.agents.context import PipelineContext, RawItem
 from briefly_api.config import get_settings
@@ -34,16 +35,20 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         s,
         db=ctx.db_session,
         user_id=ctx.user.user_id,
-        max_items=60,
+        max_items=80,
+        expanded_fetch=True,
     )
 
     for w in warnings:
         ctx.log_error("SourceCollectorAgent", w)
 
+    source_rank: dict[str, int] = defaultdict(int)
     raw_items: list[RawItem] = []
     for article in articles:
         text = article.clean_text or article.summary or article.title or ""
         content_hash = hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
+        rank = source_rank[article.source_id]
+        source_rank[article.source_id] += 1
 
         raw_items.append(
             RawItem(
@@ -58,6 +63,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
                 clean_text=text,
                 content_hash=content_hash,
                 summary=article.summary or "",
+                meta={"fetch_rank": rank, **(article.meta or {})},
             )
         )
 

@@ -97,15 +97,8 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         )
         final = round(min(1.0, max(0.0, final)), 4)
         item.relevance_score = final
+        scored.append(item)
 
-        if final >= s.relevance_threshold:
-            scored.append(item)
-        else:
-            item.drop_reason = "low_relevance"
-            dropped.append(item)
-            log.debug("Dropped (score=%.2f < %.2f): %s", final, s.relevance_threshold, item.title[:60])
-
-    # Sort by relevance score descending
     scored.sort(key=lambda x: x.relevance_score, reverse=True)
 
     ctx.scored_items = scored
@@ -113,18 +106,9 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     ctx.total_after_relevance = len(scored)
 
     log.info(
-        "RelevanceAgent: %d items → %d scored, %d dropped (threshold=%.2f)",
-        len(items), len(scored), len(dropped), s.relevance_threshold,
+        "RelevanceAgent: %d items scored, %d blocked by never-show",
+        len(scored), len(dropped),
     )
-
-    # Quality gate: if pool too small, relax threshold and retry
-    if len(scored) < s.quality_gate_min_pool and dropped:
-        log.info("Quality gate: pool too small (%d), relaxing threshold", len(scored))
-        relaxed_threshold = s.relevance_threshold * 0.75
-        rescued = [d for d in dropped if d.relevance_score >= relaxed_threshold]
-        rescued.sort(key=lambda x: x.relevance_score, reverse=True)
-        ctx.scored_items = scored + rescued
-        log.info("Quality gate: rescued %d items with relaxed threshold %.2f", len(rescued), relaxed_threshold)
 
     return ctx
 

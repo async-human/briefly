@@ -5,6 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type Digest, type DigestItem } from "@/lib/api";
 import { SourceIcon } from "@/components/SourceIcon";
+import {
+  SECTION_HIGHLY_RELEVANT,
+  SECTION_WHATS_NEW,
+  sectionBadgeClass,
+} from "@/lib/digestSections";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Mode = "quick" | "deep";
@@ -17,6 +22,12 @@ const CARD_VARIANTS = {
   center: { x: 0, opacity: 1, scale: 1 },
   exit:   (d: number) => ({ x: d * -64, opacity: 0, scale: 0.98 }),
 };
+
+function sectionHint(section: string): string | null {
+  if (section === SECTION_WHATS_NEW) return "Latest from your sources";
+  if (section === SECTION_HIGHLY_RELEVANT) return "Picked for your interests";
+  return null;
+}
 
 function fmtTime(s: number) {
   const m = Math.floor(s / 60);
@@ -455,6 +466,10 @@ export default function ReadingPage() {
   }
 
   const item = items[currentIndex];
+  const prevItem = currentIndex > 0 ? items[currentIndex - 1] : null;
+  const showSectionBanner = Boolean(
+    item.section && item.section !== prevItem?.section,
+  );
   const progress = (currentIndex / items.length) * 100;
 
   return (
@@ -506,6 +521,19 @@ export default function ReadingPage() {
 
       {/* ── Card area ──────────────────────────────────────────────────── */}
       <main className="read-card-area">
+        {showSectionBanner && item.section && (
+          <motion.div
+            className="read-section-banner"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: EASE }}
+          >
+            <span className={sectionBadgeClass(item.section)}>{item.section}</span>
+            {sectionHint(item.section) && (
+              <span className="read-section-hint">{sectionHint(item.section)}</span>
+            )}
+          </motion.div>
+        )}
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={currentIndex}

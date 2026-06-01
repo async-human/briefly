@@ -23,6 +23,10 @@ from datetime import datetime
 from briefly_api.agents.context import DigestItemDraft, PipelineContext, RawItem
 from briefly_api.config import get_settings
 from briefly_api.llm.adapter import Message, get_llm_adapter
+from briefly_api.services.digest_sections import (
+    SECTION_HIGHLY_RELEVANT,
+    SECTION_WHATS_NEW,
+)
 
 log = logging.getLogger(__name__)
 
@@ -56,15 +60,14 @@ Memory connections (stories the user has been tracking):
 {memory_connections}
 
 Write a personalized morning briefing. For each item, generate:
-- section: one of the sections below (assign based on topic)
+- section: MUST equal the item's pre-assigned digest_section exactly ({section_whats_new} or {section_highly_relevant})
 - headline: sharp, specific, active voice
 - summary: 2 sentences max, factual
 - why_it_matters_to_you: 1-2 sentences, MUST reference this user's specific context
 - source_name: publication name
 - source_url: direct URL to the content
 
-Sections to use (pick the 2-3 most relevant for this user's interests):
-{sections}
+Do NOT rename or reassign sections — the planner has already grouped items.
 
 Also generate:
 - subject_line: email subject that makes THIS user want to open it (reference a specific story they care about)
@@ -95,32 +98,33 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     Write the personalized briefing for all planned items.
     Populates ctx.digest_items, ctx.subject_line, ctx.preview_text.
     """
-    s = get_settings()
+    _ = get_settings()
     llm = get_llm_adapter()
 
     selected_ids = set(ctx.selected_item_ids)
-    items_to_write = [i for i in ctx.enriched_items if i.id in selected_ids]
+    item_map = {i.id: i for i in ctx.enriched_items if i.id in selected_ids}
+    items_to_write = [item_map[iid] for iid in ctx.selected_item_ids if iid in item_map]
 
     if not items_to_write:
         log.warning("BriefingWriterAgent: no items selected to write")
         ctx.log_error("BriefingWriterAgent", "No items to write")
         return ctx
 
-    # Build prompt context
     profile_summary = _build_profile_summary(ctx.user.profile, ctx.user.topic_clusters)
     recent_context = _build_recent_context(ctx.user.recent_digest_items)
     items_json = _build_items_json(items_to_write, ctx)
     memory_json = json.dumps(ctx.memory_connections, indent=2)
-    sections = _suggest_sections(ctx.user.profile, ctx.user.topic_clusters)
 
     prompt = _WRITER_PROMPT_TEMPLATE.format(
         profile_summary=profile_summary,
         recent_context=recent_context,
         items_json=items_json,
         memory_connections=memory_json,
-        sections=", ".join(sections),
+        section_whats_new=SECTION_WHATS_NEW,
+        section_highly_relevant=SECTION_HIGHLY_RELEVANT,
     )
 
+    result: dict | None = None
     try:
         result = await llm.complete_json(
             messages=[Message(role="user", content=prompt)],
@@ -129,51 +133,100 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     except Exception as e:
         log.exception("BriefingWriterAgent: LLM call failed")
         ctx.log_error("BriefingWriterAgent", str(e))
-        return ctx
 
-    # Parse response
-    ctx.subject_line = result.get("subject_line", f"Your Briefly for {ctx.run_date}")
-    ctx.preview_text = result.get("preview_text", "")
-    skipped_note = result.get("skipped_note", "")
+    if result and result.get("items"):
+        ctx.subject_line = result.get("subject_line", f"Your Briefly for {ctx.run_date}")
+        ctx.preview_text = result.get("preview_text", "")
+        skipped_note = result.get("skipped_note", "")
+        if skipped_note:
+            ctx.__dict__["skipped_note"] = skipped_note
 
-    # Build DigestItemDraft objects
-    item_map = {i.id: i for i in items_to_write}
-    drafts: list[DigestItemDraft] = []
-
-    for pos, written in enumerate(result.get("items", []), start=1):
-        content_id = written.get("content_id", "")
-        source_item = item_map.get(content_id)
-
-        draft = DigestItemDraft(
-            content_id=content_id,
-            position=pos,
-            section=written.get("section", "Today"),
-            headline=written.get("headline", ""),
-            summary=written.get("summary", ""),
-            why_it_matters=written.get("why_it_matters_to_you", ""),
-            source_name=written.get("source_name", source_item.source_name if source_item else ""),
-            source_url=written.get("source_url", source_item.url if source_item else None),
-            all_sources=source_item.duplicate_sources if source_item else [],
-            duplicate_count=len(source_item.duplicate_sources) + 1 if source_item else 1,
-            memory_connections=ctx.memory_connections.get(content_id, []),
-            relevance_score=source_item.relevance_score if source_item else 0.0,
-            novelty_score=source_item.novelty_score if source_item else 0.5,
-        )
-        drafts.append(draft)
+        written_by_id = {w.get("content_id"): w for w in result.get("items", [])}
+        drafts = _drafts_from_llm(items_to_write, written_by_id, ctx)
+    else:
+        ctx.subject_line = f"Your briefing — {ctx.run_date}"
+        ctx.preview_text = items_to_write[0].title[:120] if items_to_write else ""
+        drafts = _fallback_drafts(items_to_write, ctx)
 
     ctx.digest_items = drafts
     ctx.total_shown = len(drafts)
-
-    # Store skipped note in pipeline context for use in email template
-    ctx.pipeline_errors  # reuse as metadata carrier — store skipped note
-    if skipped_note:
-        ctx.__dict__["skipped_note"] = skipped_note
 
     log.info(
         "BriefingWriterAgent: wrote %d items, subject='%s'",
         len(drafts), ctx.subject_line[:60],
     )
     return ctx
+
+
+def _assigned_section(item: RawItem) -> str:
+    return item.meta.get("digest_section") or SECTION_WHATS_NEW
+
+
+def _fallback_drafts(items: list[RawItem], ctx: PipelineContext) -> list[DigestItemDraft]:
+    drafts: list[DigestItemDraft] = []
+    for pos, item in enumerate(items, start=1):
+        drafts.append(
+            DigestItemDraft(
+                content_id=item.id,
+                position=pos,
+                section=_assigned_section(item),
+                headline=item.title,
+                summary=(item.summary or item.clean_text[:300]),
+                why_it_matters=(
+                    f"This came from {item.source_name}, one of your sources. "
+                    "Worth a read based on what you follow."
+                ),
+                source_name=item.source_name,
+                source_url=item.url,
+                all_sources=item.duplicate_sources,
+                duplicate_count=len(item.duplicate_sources) + 1,
+                memory_connections=ctx.memory_connections.get(item.id, []),
+                relevance_score=item.relevance_score,
+                novelty_score=item.novelty_score,
+            )
+        )
+    return drafts
+
+
+def _drafts_from_llm(
+    items_to_write: list[RawItem],
+    written_by_id: dict,
+    ctx: PipelineContext,
+) -> list[DigestItemDraft]:
+    item_map = {i.id: i for i in items_to_write}
+    drafts: list[DigestItemDraft] = []
+
+    for pos, item in enumerate(items_to_write, start=1):
+        written = written_by_id.get(item.id, {})
+        source_item = item_map.get(item.id)
+        assigned = _assigned_section(item)
+
+        draft = DigestItemDraft(
+            content_id=item.id,
+            position=pos,
+            section=written.get("section") or assigned,
+            headline=written.get("headline") or item.title,
+            summary=written.get("summary") or (item.summary or item.clean_text[:300]),
+            why_it_matters=written.get(
+                "why_it_matters_to_you",
+                f"From {item.source_name}, in your briefing today.",
+            ),
+            source_name=written.get("source_name", source_item.source_name if source_item else item.source_name),
+            source_url=written.get("source_url", source_item.url if source_item else item.url),
+            all_sources=source_item.duplicate_sources if source_item else [],
+            duplicate_count=len(source_item.duplicate_sources) + 1 if source_item else 1,
+            memory_connections=ctx.memory_connections.get(item.id, []),
+            relevance_score=source_item.relevance_score if source_item else 0.0,
+            novelty_score=source_item.novelty_score if source_item else 0.5,
+        )
+        if draft.section not in (SECTION_WHATS_NEW, SECTION_HIGHLY_RELEVANT):
+            draft.section = assigned
+        drafts.append(draft)
+
+    return drafts
+
+
+# ── Legacy block removed — drafts built above ─────────────────────────────────
 
 
 # ── Context builders ──────────────────────────────────────────────────────────
@@ -219,6 +272,7 @@ def _build_items_json(items: list[RawItem], ctx: PipelineContext) -> str:
     for item in items:
         slim.append({
             "id": item.id,
+            "digest_section": _assigned_section(item),
             "title": item.title,
             "source": item.source_name,
             "source_type": item.source_type,

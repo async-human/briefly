@@ -22,9 +22,17 @@ log = logging.getLogger(__name__)
 _ACCOUNT_SOURCE_TYPES = {GMAIL, YOUTUBE_ACCOUNT, REDDIT_ACCOUNT}
 
 
-def _fetch_limit(source_type: str, max_items: int, num_sources: int) -> int:
+def _fetch_limit(
+    source_type: str,
+    max_items: int,
+    num_sources: int,
+    *,
+    expanded: bool = False,
+) -> int:
     if source_type in _ACCOUNT_SOURCE_TYPES:
         return min(40, max(max_items * 4, 16))
+    if expanded:
+        return min(12, max(8, max_items // max(num_sources, 1) + 4))
     return max(2, max_items // max(num_sources, 1))
 
 
@@ -53,6 +61,7 @@ async def collect_from_sources(
     *,
     user_id: str,
     max_items: int = 8,
+    expanded_fetch: bool = False,
 ) -> tuple[list[NormalizedContent], list[str]]:
     """Fetch content from all supported sources via connector registry."""
     active = [s for s in sources if s.source_type in FETCHABLE_SOURCE_TYPES]
@@ -69,7 +78,9 @@ async def collect_from_sources(
             continue
 
         display_name = source.name
-        source_limit = _fetch_limit(source.source_type, max_items, len(active))
+        source_limit = _fetch_limit(
+            source.source_type, max_items, len(active), expanded=expanded_fetch,
+        )
         try:
             fetched = await connector.fetch(
                 source.identifier,
@@ -95,5 +106,8 @@ async def collect_from_sources(
             label = display_name or source.identifier
             warnings.append(f"Could not fetch {label}: {exc}")
 
-    articles = _interleave(batches, max_items)
+    if expanded_fetch:
+        articles = [item for batch in batches for item in batch]
+    else:
+        articles = _interleave(batches, max_items)
     return articles, warnings

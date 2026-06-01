@@ -3,6 +3,12 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { api, type AutoSuggestion, type Digest, type DigestItem, type Source } from "@/lib/api";
+import {
+  groupDigestItemsBySection,
+  SECTION_HIGHLY_RELEVANT,
+  SECTION_WHATS_NEW,
+  sectionBadgeClass,
+} from "@/lib/digestSections";
 import { AddSourceForm, CopyEmailButton } from "./AddSourceForm";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { GmailDiscovery } from "./GmailDiscovery";
@@ -242,12 +248,30 @@ function BriefingPreviewItem({ item, index }: { item: DigestItem; index: number 
     <article className="briefing-preview-item">
       <span className="briefing-preview-index">{String(index + 1).padStart(2, "0")}</span>
       <div className="briefing-preview-body">
-        {item.section && <p className="briefing-preview-section">{item.section}</p>}
         <h3 className="briefing-preview-headline">{item.headline}</h3>
         <p className="briefing-preview-meta">{item.source_name}</p>
       </div>
     </article>
   );
+}
+
+function sectionSubtitle(section: string): string {
+  if (section === SECTION_WHATS_NEW) return "Latest from each of your sources";
+  if (section === SECTION_HIGHLY_RELEVANT) return "Matched to your interests and profile";
+  return "";
+}
+
+function buildGroupedPreview(items: DigestItem[], limit: number) {
+  const groups = groupDigestItemsBySection(items);
+  let shown = 0;
+  const result: { section: string; items: DigestItem[] }[] = [];
+  for (const group of groups) {
+    const take = Math.min(group.items.length, limit - shown);
+    if (take <= 0) break;
+    result.push({ section: group.section, items: group.items.slice(0, take) });
+    shown += take;
+  }
+  return { groups: result, shown };
 }
 
 // ── Main panel ────────────────────────────────────────────────────────────────
@@ -267,7 +291,8 @@ function BriefingItemSkeleton() {
 
 const GENERATING_PHASES = [
   "Fetching from your sources…",
-  "Scoring what matters to you…",
+  "Matching to your interests…",
+  "Building What's new & Highly relevant…",
   "Writing your briefing…",
 ];
 
@@ -325,8 +350,9 @@ export function BriefingPanel({
     );
   }
 
-  const previewItems = digest.items.slice(0, PREVIEW_LIMIT);
-  const remaining = digest.items.length - previewItems.length;
+  const preview = buildGroupedPreview(digest.items, PREVIEW_LIMIT);
+  const remaining = digest.items.length - preview.shown;
+  let previewIndex = 0;
 
   return (
     <div className="briefing-panel">
@@ -365,9 +391,28 @@ export function BriefingPanel({
       <div className="briefing-preview-list">
         {generating ? (
           Array.from({ length: 4 }).map((_, i) => <BriefingItemSkeleton key={i} />)
-        ) : previewItems.length > 0 ? (
-          previewItems.map((item, index) => (
-            <BriefingPreviewItem key={item.id} item={item} index={index} />
+        ) : preview.shown > 0 ? (
+          preview.groups.map((group) => (
+            <section key={group.section} className="briefing-section-group">
+              <header className="briefing-section-head">
+                <span className={sectionBadgeClass(group.section)}>{group.section}</span>
+                {sectionSubtitle(group.section) && (
+                  <p className="briefing-section-sub">{sectionSubtitle(group.section)}</p>
+                )}
+              </header>
+              <div className="briefing-section-items">
+                {group.items.map((item) => {
+                  previewIndex += 1;
+                  return (
+                    <BriefingPreviewItem
+                      key={item.id}
+                      item={item}
+                      index={previewIndex - 1}
+                    />
+                  );
+                })}
+              </div>
+            </section>
           ))
         ) : (
           <div className="briefing-tab-empty">

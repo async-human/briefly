@@ -69,6 +69,13 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
         seen_hashes    = await get_seen_content_hashes(session, user_id, days=30)
         story_threads  = await get_active_story_threads(session, user_id)
         sources        = await get_active_sources(session, user_id)
+        from briefly_api.services.connectors.types import FETCHABLE_SOURCE_TYPES
+        fetchable_sources = [s for s in sources if s.source_type in FETCHABLE_SOURCE_TYPES]
+        if not fetchable_sources:
+            return {
+                "success": False,
+                "error": "Add at least one source (RSS, YouTube, Reddit, or website URL) to generate a briefing.",
+            }
 
         user_ctx = UserContext(
             user_id=user_id,
@@ -79,7 +86,7 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
             seen_content_hashes=seen_hashes,
             active_story_threads=story_threads,
             topic_clusters=user_data.get("profile", {}).get("topic_clusters", []),
-            sources=sources,
+            sources=fetchable_sources,
         )
 
         ctx = PipelineContext(user=user_ctx, run_date=run_date)
@@ -123,6 +130,12 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
             user_id, ctx.total_shown, duration_ms, len(ctx.pipeline_errors),
         )
 
+        warnings = [
+            e["error"]
+            for e in ctx.pipeline_errors
+            if e.get("agent") == "SourceCollectorAgent" and e.get("error")
+        ]
+
         return {
             "success": True,
             "digest_id": digest_id,
@@ -130,6 +143,7 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
             "total_shown": ctx.total_shown,
             "duration_ms": duration_ms,
             "errors": ctx.pipeline_errors,
+            "warnings": warnings,
         }
 
 
@@ -149,6 +163,19 @@ async def _run_agent(name: str, fn, ctx: PipelineContext) -> PipelineContext:
 async def _persist_digest(session, ctx: PipelineContext) -> str:
     """Save the generated digest to the database."""
     import uuid
+
+    from sqlalchemy import select
+
+    existing = await session.execute(
+        select(Digest).where(
+            Digest.user_id == ctx.user.user_id,
+            Digest.digest_date == ctx.run_date,
+        )
+    )
+    old_digest = existing.scalar_one_or_none()
+    if old_digest:
+        await session.delete(old_digest)
+        await session.flush()
 
     digest_id = str(uuid.uuid4())
     resend_message_id = ctx.__dict__.get("resend_message_id")
