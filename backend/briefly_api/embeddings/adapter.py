@@ -38,8 +38,23 @@ class EmbeddingAdapter:
             return []
         provider = self._s.embedding_provider
         if provider == "voyage":
-            return await self._voyage(texts)
-        return await self._openai(texts)
+            vectors = await self._voyage(texts)
+        else:
+            vectors = await self._openai(texts)
+        return [self._fit_dim(v) for v in vectors]
+
+    def _fit_dim(self, vector: list[float]) -> list[float]:
+        """Ensure vector length matches configured embedding_dim (pgvector column size)."""
+        target = self._s.embedding_dim
+        n = len(vector)
+        if n == target:
+            return vector
+        if n > target:
+            return vector[:target]
+        raise ValueError(
+            f"Embedding provider returned {n} dimensions but EMBEDDING_DIM={target}. "
+            "Check your embedding provider and model configuration."
+        )
 
     def embed_text_for_content(self, title: str, summary: str, source_name: str = "") -> str:
         """
@@ -99,11 +114,15 @@ class EmbeddingAdapter:
         if not self._s.openai_api_key:
             raise RuntimeError("No embedding API key configured (set VOYAGE_API_KEY or OPENAI_API_KEY)")
         model = "text-embedding-3-small" if self._s.embedding_provider != "openai" else self._s.embedding_model
+        payload: dict = {"input": texts, "model": model}
+        # Matryoshka models support reduced dimensions — must match pgvector column (default 1024)
+        if model.startswith("text-embedding-3"):
+            payload["dimensions"] = self._s.embedding_dim
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 OPENAI_URL,
                 headers={"Authorization": f"Bearer {self._s.openai_api_key}", "Content-Type": "application/json"},
-                json={"input": texts, "model": model},
+                json=payload,
             )
             resp.raise_for_status()
             data = resp.json()

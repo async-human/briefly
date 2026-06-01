@@ -239,7 +239,7 @@ async def _persist_dump(
     db.add(ContentEmbedding(
         content_id=row.id,
         embedding=embedding,
-        model=s.embedding_model,
+        model=s.embedding_model if s.embedding_provider == "voyage" else "text-embedding-3-small",
     ))
 
     await _update_profile_from_dump(db, user_id, structured, embedder, s)
@@ -322,6 +322,16 @@ async def _update_profile_from_dump(
                 update(UserProfile)
                 .where(UserProfile.user_id == user_id)
                 .values(profile_embedding=blended, interests=profile.interests)
+            )
+        elif old_vec and len(old_vec) != len(new_vec):
+            log.warning(
+                "Profile embedding dim mismatch for user %s (%d vs %d) — replacing with new vector",
+                user_id, len(old_vec), len(new_vec),
+            )
+            await db.execute(
+                update(UserProfile)
+                .where(UserProfile.user_id == user_id)
+                .values(profile_embedding=new_vec, interests=profile.interests)
             )
         else:
             await db.execute(
