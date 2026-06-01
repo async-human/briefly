@@ -10,7 +10,7 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +32,10 @@ log = logging.getLogger(__name__)
 
 BRAIN_DUMP_SOURCE_TYPE = "brain_dump"
 BRAIN_DUMP_IDENTIFIER = "personal"
+BRAIN_DUMP_SECTION = "Your thoughts"
+BRAIN_DUMP_SOURCE_LABEL = "Your brain dump"
+_MAX_INJECT_PER_DIGEST = 3
+_INJECT_MAX_AGE_HOURS = 48
 _PROFILE_BLEND_ALPHA = 0.12
 
 _STRUCTURE_SYSTEM = (
@@ -127,6 +131,87 @@ async def process_audio_dump(
         settings=settings,
         audio_meta={"filename": filename, "content_type": content_type, "size_bytes": len(audio_bytes)},
     )
+
+
+async def get_pending_for_morning_brief(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    limit: int = _MAX_INJECT_PER_DIGEST,
+    max_age_hours: int = _INJECT_MAX_AGE_HOURS,
+) -> list[BrainDumpResult]:
+    """
+    Brain dumps flagged for the morning brief that have not yet been injected.
+    """
+    source = await _get_or_create_source(db, user_id)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+
+    result = await db.execute(
+        select(RawContent)
+        .where(
+            RawContent.user_id == user_id,
+            RawContent.source_id == source.id,
+            RawContent.ingested_at >= cutoff,
+        )
+        .order_by(RawContent.ingested_at.desc())
+        .limit(limit * 3)
+    )
+    rows = result.scalars().all()
+
+    pending: list[BrainDumpResult] = []
+    for row in rows:
+        meta = row.meta or {}
+        if not meta.get("brain_dump"):
+            continue
+        if not meta.get("should_inject_into_morning_brief"):
+            continue
+        if meta.get("injected_at") or meta.get("injected_digest_id"):
+            continue
+        pending.append(_raw_to_result(row))
+        if len(pending) >= limit:
+            break
+
+    return pending
+
+
+def dumps_to_digest_items(dumps: list[BrainDumpResult]) -> list[dict]:
+    """Convert pending brain dumps into digest item payloads (prepended to briefings)."""
+    items: list[dict] = []
+    for dump in dumps:
+        items.append({
+            "content_id": dump.id,
+            "headline": dump.title,
+            "summary": dump.clean_summary,
+            "why_it_matters": why_it_matters_for_dump(dump),
+            "source_name": BRAIN_DUMP_SOURCE_LABEL,
+            "source_url": None,
+            "section": BRAIN_DUMP_SECTION,
+            "relevance_score": 1.0,
+            "novelty_score": 1.0,
+        })
+    return items
+
+
+async def mark_dumps_injected(
+    db: AsyncSession,
+    dump_ids: list[str],
+    digest_id: str,
+) -> None:
+    """Record that these brain dumps were included in a digest."""
+    if not dump_ids:
+        return
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    result = await db.execute(
+        select(RawContent).where(RawContent.id.in_(dump_ids))
+    )
+    for row in result.scalars().all():
+        meta = dict(row.meta or {})
+        meta["injected_at"] = now_iso
+        meta["injected_digest_id"] = digest_id
+        row.meta = meta
+
+    await db.flush()
 
 
 async def list_recent_dumps(
@@ -341,6 +426,20 @@ async def _update_profile_from_dump(
             )
     except Exception:
         log.exception("Failed to update profile embedding from brain dump for user %s", user_id)
+
+
+def why_it_matters_for_dump(dump: BrainDumpResult) -> str:
+    parts: list[str] = []
+    if dump.action_items:
+        joined = "; ".join(dump.action_items[:5])
+        parts.append(f"Action items you noted: {joined}.")
+    intent_copy = {
+        "project_idea": "You saved this as a project idea to revisit in your morning brief.",
+        "action_item": "You flagged this as something to act on — surfacing it at the top of today.",
+        "general_context": "You asked Briefly to include this thought in today's briefing.",
+    }
+    parts.append(intent_copy.get(dump.intent_type, intent_copy["general_context"]))
+    return " ".join(parts)
 
 
 def _raw_to_result(row: RawContent) -> BrainDumpResult:

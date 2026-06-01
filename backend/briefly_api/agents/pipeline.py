@@ -26,6 +26,7 @@ from briefly_api.agents import (
     briefing_writer,
     citation_verifier,
     relevance,
+    brain_dump_injector,
 )
 from briefly_api.agents.context import PipelineContext, UserContext
 from briefly_api.config import get_settings
@@ -104,6 +105,7 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
         ctx = await _run_agent("MemoryAgent",            memory.run,           ctx)
         ctx = await _run_agent("BriefingPlannerAgent",   planner.run,          ctx)
         ctx = await _run_agent("BriefingWriterAgent",    briefing_writer.run,  ctx)
+        ctx = await _run_agent("BrainDumpInjectorAgent", brain_dump_injector.run, ctx)
         ctx = await _run_agent("CitationVerifierAgent",  citation_verifier.run, ctx)
         ctx = await _run_agent("DeliveryAgent",          delivery.run,         ctx)
 
@@ -204,4 +206,11 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
         session.add(item)
 
     await session.commit()
+
+    injected_ids = ctx.__dict__.get("injected_brain_dump_ids") or []
+    if injected_ids and ctx.db_session:
+        from briefly_api.services import brain_dump as brain_dump_service
+        await brain_dump_service.mark_dumps_injected(session, injected_ids, digest_id)
+        await session.commit()
+
     return digest_id

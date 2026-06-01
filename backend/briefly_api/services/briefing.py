@@ -15,6 +15,7 @@ from briefly_api.llm.adapter import Message, get_llm_adapter
 from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.collector import collect_from_sources
 from briefly_api.services.connectors.types import FETCHABLE_SOURCE_TYPES
+from briefly_api.services import brain_dump as brain_dump_service
 
 log = logging.getLogger(__name__)
 
@@ -135,6 +136,16 @@ async def generate_briefing_now(
         raise ValueError(detail)
 
     items_data = await _personalize_items(articles, user, settings)
+
+    pending_dumps = await brain_dump_service.get_pending_for_morning_brief(db, user.id)
+    brain_items = brain_dump_service.dumps_to_digest_items(pending_dumps)
+    if brain_items:
+        items_data = brain_items + items_data
+        log.info(
+            "Injecting %d brain dump(s) into briefing for user %s",
+            len(brain_items), user.id,
+        )
+
     today = date.today().isoformat()
 
     existing = await db.execute(
@@ -162,11 +173,13 @@ async def generate_briefing_now(
     db.add(digest)
     await db.flush()
 
+    brain_count = len(brain_items)
     for i, item in enumerate(items_data):
-        article = articles[i] if i < len(articles) else None
+        article = articles[i - brain_count] if i >= brain_count else None
         db.add(
             DigestItem(
                 digest_id=digest.id,
+                content_id=item.get("content_id"),
                 position=i + 1,
                 section=item.get("section") or (article.section if article else None),
                 headline=item["headline"],
@@ -174,7 +187,14 @@ async def generate_briefing_now(
                 why_it_matters=item["why_it_matters"],
                 source_name=(article.source_name if article else None) or item.get("source_name"),
                 source_url=(article.url if article else None) or item.get("source_url"),
+                relevance_score=item.get("relevance_score"),
+                novelty_score=item.get("novelty_score"),
             )
+        )
+
+    if pending_dumps:
+        await brain_dump_service.mark_dumps_injected(
+            db, [d.id for d in pending_dumps], digest.id,
         )
 
     await db.commit()
