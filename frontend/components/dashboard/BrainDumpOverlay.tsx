@@ -7,7 +7,6 @@ import { BrainDumpHistory } from "./BrainDumpHistory";
 import {
   buildTranscriptFromResults,
   createSpeechRecognition,
-  formatLiveTranscript,
   isLiveSpeechSupported,
   joinTranscriptParts,
   mergeTranscriptsForDisplay,
