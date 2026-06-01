@@ -226,6 +226,8 @@ export type BrainDump = {
   raw_transcript: string;
   input_mode: string;
   created_at: string;
+  injected_at?: string | null;
+  injected_digest_id?: string | null;
 };
 
 export const api = {

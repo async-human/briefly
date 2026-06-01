@@ -99,6 +99,11 @@ export function BrainDumpHistory({ refreshKey = 0, onNewDump }: BrainDumpHistory
                   <span className="brain-dump-badge">
                     {intentLabel[dump.intent_type] ?? dump.intent_type}
                   </span>
+                  {dump.injected_at ? (
+                    <span className="brain-dump-badge brain-dump-badge-muted">Included in briefing</span>
+                  ) : dump.should_inject_into_morning_brief ? (
+                    <span className="brain-dump-badge brain-dump-badge-accent">Queued for briefing</span>
+                  ) : null}
                 </div>
                 {dump.action_items.length > 0 && (
                   <ul className="brain-dump-actions-list">

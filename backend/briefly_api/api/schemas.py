@@ -238,4 +238,6 @@ class BrainDumpOut(BaseModel):
     raw_transcript: str
     input_mode: str
     created_at: datetime
+    injected_at: datetime | None = None
+    injected_digest_id: str | None = None
 

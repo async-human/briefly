@@ -41,6 +41,8 @@ def _to_out(result: brain_dump_service.BrainDumpResult) -> BrainDumpOut:
         raw_transcript=result.raw_transcript,
         input_mode=result.input_mode,
         created_at=result.created_at,
+        injected_at=result.injected_at,
+        injected_digest_id=result.injected_digest_id,
     )
 
 

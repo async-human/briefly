@@ -9966,6 +9966,11 @@ footer {
   background: var(--accent-dim);
   color: var(--accent);
 }
+.brain-dump-badge-muted {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+}
 .brain-dump-actions-block { margin-bottom: 16px; }
 .brain-dump-actions-label {
   font-family: var(--font-mono);

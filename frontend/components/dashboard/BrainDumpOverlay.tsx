@@ -419,7 +419,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                 <div className="brain-dump-meta-row">
                   <span className="brain-dump-badge">{intentLabel[result.intent_type] ?? result.intent_type}</span>
                   {result.should_inject_into_morning_brief && (
-                    <span className="brain-dump-badge brain-dump-badge-accent">In tomorrow&apos;s brief</span>
+                    <span className="brain-dump-badge brain-dump-badge-accent">Queued for your next briefing</span>
                   )}
                 </div>
                 {result.action_items.length > 0 && (

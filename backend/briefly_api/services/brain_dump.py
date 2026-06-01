@@ -70,6 +70,8 @@ class BrainDumpResult:
     raw_transcript: str
     input_mode: str  # "text" | "voice"
     created_at: datetime
+    injected_at: datetime | None = None
+    injected_digest_id: str | None = None
 
 
 async def process_text_dump(
@@ -444,6 +446,12 @@ def why_it_matters_for_dump(dump: BrainDumpResult) -> str:
 
 def _raw_to_result(row: RawContent) -> BrainDumpResult:
     meta = row.meta or {}
+    injected_at = None
+    if meta.get("injected_at"):
+        try:
+            injected_at = datetime.fromisoformat(str(meta["injected_at"]).replace("Z", "+00:00"))
+        except ValueError:
+            injected_at = None
     return BrainDumpResult(
         id=row.id,
         title=row.title or "Brain dump",
@@ -455,4 +463,6 @@ def _raw_to_result(row: RawContent) -> BrainDumpResult:
         raw_transcript=meta.get("raw_transcript") or row.raw_text or "",
         input_mode=meta.get("input_mode", "text"),
         created_at=row.ingested_at or datetime.now(timezone.utc),
+        injected_at=injected_at,
+        injected_digest_id=meta.get("injected_digest_id"),
     )
