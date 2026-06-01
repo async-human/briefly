@@ -27,6 +27,7 @@ from briefly_api.services.digest_sections import (
     SECTION_HIGHLY_RELEVANT,
     SECTION_WHATS_NEW,
 )
+from briefly_api.services.profile_utils import cluster_label
 
 log = logging.getLogger(__name__)
 
@@ -144,6 +145,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
 
             written_by_id = {w.get("content_id"): w for w in result.get("items", [])}
             drafts = _drafts_from_llm(items_to_write, written_by_id, ctx)
+            drafts = _ensure_personalized_why(drafts, items_to_write, ctx.user.profile)
         else:
             ctx.subject_line = f"Your briefing — {ctx.run_date}"
             ctx.preview_text = items_to_write[0].title[:120] if items_to_write else ""
@@ -195,6 +197,88 @@ def _fallback_drafts(items: list[RawItem], ctx: PipelineContext) -> list[DigestI
     return drafts
 
 
+def build_fallback_drafts(ctx: PipelineContext) -> list[DigestItemDraft]:
+    """Public fallback used by the pipeline when the writer returns no items."""
+    selected_ids = set(ctx.selected_item_ids)
+    items = [i for i in ctx.enriched_items if i.id in selected_ids]
+    if not items:
+        item_map = {i.id: i for i in ctx.enriched_items}
+        items = [item_map[iid] for iid in ctx.selected_item_ids if iid in item_map]
+    return _fallback_drafts(items, ctx)
+
+
+def _profile_anchor_terms(profile: dict) -> set[str]:
+    terms: set[str] = set()
+    role = (profile.get("role") or "").strip().lower()
+    goal = (profile.get("goal") or "").strip().lower()
+    if role:
+        terms.add(role)
+        terms.update(w for w in role.split() if len(w) > 3)
+    if goal:
+        terms.update(w for w in goal.split() if len(w) > 4)
+    for interest in profile.get("interests") or []:
+        topic = (interest.get("topic") or "").strip().lower()
+        if topic:
+            terms.add(topic)
+    for cluster in profile.get("topic_clusters") or []:
+        label = cluster_label(cluster)
+        if label:
+            terms.add(label.lower())
+    return terms
+
+
+def _why_is_personalized(text: str, profile: dict) -> bool:
+    if not text or len(text.strip()) < 24:
+        return False
+    lower = text.lower()
+    generic = (
+        "worth a read",
+        "one of your sources",
+        "in your briefing today",
+        "could apply to anyone",
+    )
+    if any(g in lower for g in generic):
+        return False
+    anchors = _profile_anchor_terms(profile)
+    if anchors and any(a in lower for a in anchors):
+        return True
+    # Accept if it references role/goal explicitly
+    role = (profile.get("role") or "").strip().lower()
+    goal = (profile.get("goal") or "").strip().lower()
+    if role and role in lower:
+        return True
+    if goal and any(w in lower for w in goal.split() if len(w) > 4):
+        return True
+    return len(text.split()) >= 12
+
+
+def _personalized_why_fallback(item: RawItem, profile: dict) -> str:
+    role = profile.get("role") or "your work"
+    interests = [i.get("topic") for i in (profile.get("interests") or []) if i.get("topic")]
+    topic_hint = interests[0] if interests else item.source_name
+    return (
+        f"As a {role}, this {item.source_name} story ties directly to {topic_hint} — "
+        f"worth scanning before your day gets busy."
+    )
+
+
+def _ensure_personalized_why(
+    drafts: list[DigestItemDraft],
+    items: list[RawItem],
+    profile: dict,
+) -> list[DigestItemDraft]:
+    item_by_id = {i.id: i for i in items}
+    for draft in drafts:
+        if _why_is_personalized(draft.why_it_matters, profile):
+            continue
+        source_item = item_by_id.get(draft.content_id) or next(
+            (i for i in items if i.title == draft.headline), None,
+        )
+        if source_item:
+            draft.why_it_matters = _personalized_why_fallback(source_item, profile)
+    return drafts
+
+
 def _drafts_from_llm(
     items_to_write: list[RawItem],
     written_by_id: dict,
@@ -238,16 +322,6 @@ def _drafts_from_llm(
 
 # ── Context builders ──────────────────────────────────────────────────────────
 
-def _cluster_label(entry: dict) -> str | None:
-    """Extract a human-readable topic label; skip internal meta entries."""
-    if entry.get("_type") in {"source_weight", "meta"}:
-        return None
-    label = entry.get("cluster") or entry.get("topic") or entry.get("section") or entry.get("name")
-    if isinstance(label, str) and label.strip():
-        return label.strip()
-    return None
-
-
 def _build_profile_summary(profile: dict, topic_clusters: list[dict]) -> str:
     parts = []
     if profile.get("role"):
@@ -261,7 +335,7 @@ def _build_profile_summary(profile: dict, topic_clusters: list[dict]) -> str:
     if topic_clusters:
         cluster_parts: list[str] = []
         for c in sorted(topic_clusters, key=lambda x: x.get("strength", 0), reverse=True):
-            label = _cluster_label(c)
+            label = cluster_label(c)
             if not label:
                 continue
             strength = c.get("strength", c.get("weight"))

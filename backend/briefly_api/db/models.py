@@ -147,6 +147,14 @@ class UserProfile(Base):
     #              "description": str, "reason": str, "discovered_at": str}]
     suggested_sources: Mapped[list[dict]] = mapped_column(JSONB, nullable=True, default=list, server_default="[]")
 
+    # V1.5 — passive ingestion
+    ingest_time: Mapped[str] = mapped_column(String(5), default="03:00")
+    auto_expand_sources: Mapped[bool] = mapped_column(Boolean, default=False)
+    last_ingestion_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ingestion_meta: Mapped[dict] = mapped_column(JSONB, default=dict)
+    source_weights: Mapped[dict] = mapped_column(JSONB, default=dict)
+    activity_feed: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

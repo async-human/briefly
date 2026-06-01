@@ -84,6 +84,18 @@ async def init_db() -> None:
             )
         except Exception as exc:
             logger.warning("suggested_sources migration: %s", exc)
+        for stmt in (
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS ingest_time VARCHAR(5) DEFAULT '03:00'",
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS auto_expand_sources BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_ingestion_at TIMESTAMPTZ",
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS ingestion_meta JSONB DEFAULT '{}'::jsonb",
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS source_weights JSONB DEFAULT '{}'::jsonb",
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS activity_feed JSONB DEFAULT '[]'::jsonb",
+        ):
+            try:
+                await conn.execute(text(stmt))
+            except Exception as exc:
+                logger.warning("profile migration: %s", exc)
     logger.info("Database initialized")
 
 

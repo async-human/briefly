@@ -148,8 +148,21 @@ async def complete_onboarding(
         "topic_clusters": user.profile.topic_clusters or [],
     }
     asyncio.create_task(_seed_profile_embedding(user.id, profile_snapshot, settings))
+    asyncio.create_task(_warm_start_user(user.id))
 
     return OnboardingCompleteOut(onboarding_completed=True)
+
+
+async def _warm_start_user(user_id: str) -> None:
+    """Background ingest so the content pool is warm before the first briefing."""
+    try:
+        from briefly_api.services.content_ingestion import ingest_user_sources
+
+        async with SessionLocal() as session:
+            await ingest_user_sources(session, user_id)
+        log.info("_warm_start_user: ingestion complete for user %s", user_id)
+    except Exception:
+        log.exception("_warm_start_user: failed for user %s", user_id)
 
 
 async def _seed_profile_embedding(

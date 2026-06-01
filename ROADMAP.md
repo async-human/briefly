@@ -36,13 +36,13 @@
 ### V1 must-ship (gaps to close)
 
 #### 1. Reliability & empty states
-- [ ] **Pipeline never saves 0-item digests** when planner selected items (writer fallbacks — started; add persist guard).
-- [ ] **Harden profile/topic_cluster parsing** across all agents (writer crash from `source_weight` entries — fixed; audit `learning.py`, `interest_discovery.py`).
+- [x] **Pipeline never saves 0-item digests** when planner selected items (writer fallbacks + persist guard).
+- [x] **Harden profile/topic_cluster parsing** across all agents (`profile_utils.py`, learning, interest_discovery, writer).
 - [ ] **Integration tests** for `run_for_user`: mock sources → non-empty digest with sections.
-- [ ] **Frontend:** clear "Regenerate briefing" when digest is empty but sources exist.
+- [x] **Frontend:** clear "Regenerate briefing" when digest is empty but sources exist.
 
 #### 2. Brief quality bar
-- [ ] **"Why this matters to you"** always references profile (role, interests, recent brain dumps) — enforce in `briefing_writer.py` prompt + validator.
+- [x] **"Why this matters to you"** always references profile — validator + rewrite in `briefing_writer.py`.
 - [ ] **Never-show & topic filters** respected end-to-end (relevance agent ✅; verify settings UI → DB → pipeline).
 - [ ] **RSS catalog audit** — all suggested sources validate; dead feeds removed (`scripts/audit_catalog_feeds.py` in CI).
 
@@ -52,13 +52,13 @@
 - [ ] Fallback path when final STT fails but preview transcript exists.
 
 #### 4. Zero-friction basics (V1 scope only)
-- [ ] Auto-regenerate brief on source add/remove (✅ dashboard).
-- [ ] **Stale landing roadmap** — update `Roadmap.tsx` (brain dump is shipped).
-- [ ] Onboarding: reduce to **profile + 1 source + first brief**; defer advanced integrations.
+- [x] Auto-regenerate brief on source add/remove (✅ dashboard).
+- [x] **Stale landing roadmap** — updated `Roadmap.tsx` (V1 + V1.5 shipped items).
+- [x] Onboarding: warm-start ingestion on complete; first brief on dashboard load.
 
 #### 5. Ops & economics (minimum)
-- [ ] Env checklist in deploy docs: `RESEND`, LLM, embeddings, STT, OAuth.
-- [ ] Log pipeline stage timings + item counts per run (observability).
+- [x] Env checklist in deploy docs: `.env.example` deploy section.
+- [x] Log pipeline stage timings + item counts per run (observability).
 - [ ] Target: **&lt; $0.50/user/day** at V1 scale (real-time APIs only; batch deferred to V1.5).
 
 ### V1 success metrics
@@ -88,12 +88,12 @@ User's digest_time ──► fetch+score   Overnight worker ──► RawContent
 
 ### 1. Decouple ingestion from generation
 
-| Work item | Detail |
-|-----------|--------|
-| **Ingestion worker** | New job: `workers/ingestion_worker.py` — per user, fetch all active sources → upsert `RawContent` → embed → score vs profile. |
-| **Job queue** | Wire **Redis** (already in config): Celery, ARQ, or Dramatiq. API + scheduler enqueue; worker(s) on Railway. |
-| **Generation worker** | Morning job reads **pre-ingested pool** (last 24–48h) instead of live fetch. `collector` agent becomes "load from DB" with optional incremental fetch. |
-| **Idempotency** | Content keyed by `content_hash`; skip re-embed if unchanged. |
+| Work item | Detail | Status |
+|-----------|--------|--------|
+| **Ingestion worker** | `services/content_ingestion.py` — fetch → upsert `RawContent` → embed → score. | ✅ |
+| **Job queue** | Redis lock via `workers/job_queue.py` (optional; no-op without Redis). | ✅ |
+| **Generation worker** | Pool-first `agents/collector.py` + `services/content_pool.py`. | ✅ |
+| **Idempotency** | Content keyed by `content_hash`; skip re-embed if unchanged. | ✅ |
 
 ### 2. True passive footprint
 
@@ -102,7 +102,7 @@ User's digest_time ──► fetch+score   Overnight worker ──► RawContent
 | **Expand footprint scanner** | Beyond RSS auto-add: track sender frequency, auto-create `email` sources for top newsletters without UI confirm (opt-out in settings). |
 | **Gmail incremental sync** | Store `historyId` / last sync; nightly pull **new** messages only → `RawContent` (not at brief time). |
 | **Click-to-discover v2** | Lower threshold; surface "Briefly found a feed for X — added automatically" toast. |
-| **Interest-driven auto-sources** | `interest_discovery.py` → auto-add catalog RSS when confidence &gt; threshold (user toggle: "Let Briefly expand my sources"). |
+| **Interest-driven auto-sources** | `interest_discovery.py` → auto-add when `auto_expand_sources` enabled. | ✅ |
 
 ### 3. Full-text strategy (honest, not magic)
 
@@ -116,7 +116,7 @@ Paywall automation is expensive and legally gray. V1.5 picks **lanes**:
 | **D. Publisher RSS only** | No paywall bypass; summarize abstract + link. |
 
 - [ ] **Ingest-time scrape** — move URL expansion from pipeline fetch to ingestion worker.
-- [ ] **Quality gate** — drop items with &lt; 200 chars clean text unless title+URL suffice.
+- [x] **Quality gate** — drop items with &lt; 200 chars clean text unless title+URL suffice (`content_ingestion.py`).
 - [ ] **Explicit UX copy** — "Briefly reads what you have access to; it doesn't break paywalls."
 
 ### 4. Batch APIs & cost (from `gemini_prod_strategy.md`)
@@ -127,15 +127,15 @@ Paywall automation is expensive and legally gray. V1.5 picks **lanes**:
 
 ### 5. Visible intelligence (deepen trust)
 
-- [ ] Dashboard tab: **"What Briefly ingested last night"** — counts by source, failures, auto-added sources.
-- [ ] **"Profile updated"** feed — "Brain dump added 3 keywords", "Learning shifted embedding after you saved X".
+- [x] Dashboard: **"What Briefly ingested last night"** — `IngestionPanel.tsx` + `GET /ingestion/summary`.
+- [x] **Activity feed** on profile — ingestion events in `activity_feed`.
 - [ ] Email preheader: skipped-note from writer (`skipped_note` already partially wired).
 
 ### 6. Friction removals
 
 - [ ] **Sources optional at onboarding** — Gmail connect alone can seed first brief via footprint.
-- [ ] **Silent first brief** — auto-generate after onboarding without button click.
-- [ ] **Digest time = delivery only** — ingestion decoupled from delivery time.
+- [x] **Silent first brief** — auto-generate after onboarding (dashboard load + warm-start ingest).
+- [x] **Digest time = delivery only** — ingestion at `ingest_time` (~03:00 local) via scheduler.
 
 ### V1.5 success metrics
 - ≥ **70%** of brief items come from content ingested **before** morning generate (not live fetch).

@@ -11,6 +11,7 @@ Any agent failure is caught, logged, and the pipeline continues
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timezone
 
 from briefly_api.agents import (
@@ -112,12 +113,50 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
         ctx = await _run_agent("MemoryAgent",            memory.run,           ctx)
         ctx = await _run_agent("BriefingPlannerAgent",   planner.run,          ctx)
         ctx = await _run_agent("BriefingWriterAgent",    briefing_writer.run,  ctx)
+
+        # Persist guard: planner selected items but writer produced none → fallback drafts
+        if ctx.selected_item_ids and not ctx.digest_items:
+            log.warning(
+                "Pipeline: writer returned 0 items despite %d selected — using fallback drafts",
+                len(ctx.selected_item_ids),
+            )
+            ctx.digest_items = briefing_writer.build_fallback_drafts(ctx)
+            ctx.total_shown = len(ctx.digest_items)
+            if not ctx.subject_line:
+                ctx.subject_line = f"Your briefing — {ctx.run_date}"
+            if not ctx.preview_text and ctx.digest_items:
+                ctx.preview_text = ctx.digest_items[0].headline[:120]
+
         ctx = await _run_agent("BrainDumpInjectorAgent", brain_dump_injector.run, ctx)
         ctx = await _run_agent("CitationVerifierAgent",  citation_verifier.run, ctx)
         ctx = await _run_agent("DeliveryAgent",          delivery.run,         ctx)
 
         # ── Persist digest to DB ──────────────────────────────────────────────
+        if ctx.selected_item_ids and not ctx.digest_items:
+            log.error(
+                "Pipeline: refusing to persist empty digest for user %s (%d items planned)",
+                user_id, len(ctx.selected_item_ids),
+            )
+            return {
+                "success": False,
+                "error": "Briefing writer failed to produce items",
+                "items": 0,
+                "errors": ctx.pipeline_errors,
+            }
+
         digest_id = await _persist_digest(session, ctx)
+
+        # Mark ingested pool rows as processed
+        content_ids = [
+            d.content_id for d in ctx.digest_items
+            if d.content_id and any(
+                i.id == d.content_id and i.meta.get("from_pool") for i in ctx.enriched_items
+            )
+        ]
+        if content_ids:
+            from briefly_api.services.content_ingestion import mark_contents_processed
+            await mark_contents_processed(session, content_ids)
+            await session.commit()
 
         # ── Post-delivery learning & discovery (non-blocking) ────────────────
         ctx = await _run_agent("LearningAgent",          learning.run,          ctx)
@@ -150,13 +189,17 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _run_agent(name: str, fn, ctx: PipelineContext) -> PipelineContext:
-    """Run a single agent with error isolation."""
+    """Run a single agent with error isolation and stage timing."""
+    started = time.perf_counter()
     try:
         log.debug("Running agent: %s", name)
         ctx = await fn(ctx)
     except Exception as e:
         log.exception("Agent %s failed: %s", name, e)
         ctx.log_error(name, str(e))
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+    log.info("Agent %s finished in %dms", name, elapsed_ms)
+    ctx.__dict__.setdefault("stage_timings", {})[name] = elapsed_ms
     return ctx
 
 
@@ -209,7 +252,7 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
         total_items_shown=ctx.total_shown,
         pipeline_duration_ms=ctx.pipeline_duration_ms,
         resend_message_id=resend_message_id,
-        meta={"skipped": skipped_preview},
+        meta={"skipped": skipped_preview, "stage_timings": ctx.__dict__.get("stage_timings", {})},
     )
     session.add(digest)
 

@@ -13,6 +13,7 @@ import { AddSourceForm, CopyEmailButton } from "./AddSourceForm";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { GmailDiscovery } from "./GmailDiscovery";
 import { SourceSuggestions } from "./SourceSuggestions";
+import { IngestionPanel } from "./IngestionPanel";
 import { sourceDisplayName } from "./sourceLabels";
 import { SourceIcon } from "@/components/SourceIcon";
 
@@ -104,6 +105,8 @@ export function SourcesSidebar({
         onAdded={onSourceAdded}
         autoSuggestions={autoSuggestions}
       />
+
+      <IngestionPanel />
 
       <CollapsibleCard
         label="Optional"
@@ -304,6 +307,7 @@ type BriefingPanelProps = {
   generatingPhase?: number;
   generateError: string;
   generateWarnings?: string[];
+  onRegenerate?: () => void;
 };
 
 export function BriefingPanel({
@@ -313,6 +317,7 @@ export function BriefingPanel({
   generatingPhase = 0,
   generateError,
   generateWarnings = [],
+  onRegenerate,
 }: BriefingPanelProps) {
   if (!digest) {
     if (generating) {
@@ -417,6 +422,15 @@ export function BriefingPanel({
         ) : (
           <div className="briefing-tab-empty">
             <p>No items in today&apos;s briefing.</p>
+            {sourcesCount > 0 && onRegenerate && (
+              <button
+                type="button"
+                className="briefing-tab-empty-btn btn-primary"
+                onClick={onRegenerate}
+              >
+                Regenerate briefing
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -19,6 +19,7 @@ from briefly_api.api.schemas import (
     DigestSummaryOut,
     FeedbackIn,
     GenerateDigestOut,
+    IngestionSummaryOut,
     GmailDiscoverOut,
     GmailSenderOut,
     AutoSuggestionOut,
@@ -38,7 +39,7 @@ from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import (
-    BehavioralSignal, Digest, DigestItem, SignalType, Source, User,
+    BehavioralSignal, Digest, DigestItem, SignalType, Source, User, UserProfile,
 )
 from briefly_api.db.engine import SessionLocal
 from briefly_api.services.connectors.registry import detect_source, get_connector
@@ -343,6 +344,63 @@ async def generate_digest_now(
     return GenerateDigestOut(digest=DigestOut.model_validate(digest), warnings=warnings)
 
 
+@router.get("/ingestion/summary", response_model=IngestionSummaryOut)
+async def get_ingestion_summary(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> IngestionSummaryOut:
+    from datetime import datetime, timedelta, timezone
+
+    from briefly_api.db.models import ContentStatus, RawContent
+
+    profile = user.profile
+    meta = dict(profile.ingestion_meta or {}) if profile else {}
+    last_summary = meta.get("last_summary") or {}
+    feed = list(profile.activity_feed or [])[:10] if profile else []
+
+    pool_count = 0
+    if profile:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=settings.pool_max_age_hours)
+        pool_count = await db.scalar(
+            select(func.count())
+            .select_from(RawContent)
+            .where(
+                RawContent.user_id == user.id,
+                RawContent.ingested_at >= cutoff,
+                RawContent.status.in_([ContentStatus.pending, ContentStatus.processed]),
+            )
+        ) or 0
+
+    return IngestionSummaryOut(
+        last_ingestion_at=profile.last_ingestion_at if profile else None,
+        last_summary=last_summary,
+        activity_feed=feed,
+        pool_items_recent=pool_count,
+    )
+
+
+@router.post("/ingestion/run", response_model=IngestionSummaryOut)
+async def run_ingestion_now(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> IngestionSummaryOut:
+    from briefly_api.services.content_ingestion import ingest_user_sources
+
+    summary = await ingest_user_sources(db, user.id, settings=settings)
+    prof = await db.execute(
+        select(UserProfile).where(UserProfile.user_id == user.id)
+    )
+    profile = prof.scalar_one_or_none()
+    return IngestionSummaryOut(
+        last_ingestion_at=profile.last_ingestion_at if profile else None,
+        last_summary=summary.to_dict(),
+        activity_feed=list(profile.activity_feed or [])[:10] if profile else [],
+        pool_items_recent=summary.items_new + summary.items_updated,
+    )
+
+
 # ── Gmail newsletter discovery ────────────────────────────────────────────────
 
 @router.get("/sources/discover/gmail", response_model=GmailDiscoverOut)
@@ -505,26 +563,14 @@ async def _bump_source_weight(
     signal_type: str,
     db: AsyncSession,
 ) -> None:
-    weights: dict = dict(user.profile.source_weights if hasattr(user.profile, "source_weights") else {})
-    # Use source_name as key since we don't always have source_id on the item
+    if not user.profile:
+        return
+    weights: dict = dict(user.profile.source_weights or {})
     key = source_name.lower()
     current = weights.get(key, 0.5)
     delta = 0.08 if signal_type == "liked" else -0.08 if signal_type == "disliked" else 0.02
     weights[key] = round(min(1.0, max(0.1, current + delta)), 3)
-
-    # source_weights lives inside the profile JSONB interests field indirectly;
-    # store it in the profile meta via a dedicated approach
-    if user.profile:
-        # We store source weights as a top-level key in interests JSONB for now
-        # (the profile has no dedicated column but we can carry it in topic_clusters meta)
-        existing_clusters = list(user.profile.topic_clusters or [])
-        # Find and update or append a synthetic "source_weight" marker
-        sw_entry = next((c for c in existing_clusters if c.get("_type") == "source_weight"), None)
-        if sw_entry:
-            sw_entry["weights"] = weights
-        else:
-            existing_clusters.append({"_type": "source_weight", "weights": weights})
-        user.profile.topic_clusters = existing_clusters
+    user.profile.source_weights = weights
 
 
 async def _maybe_discover_from_click(user_id: str, source_url: str) -> None:

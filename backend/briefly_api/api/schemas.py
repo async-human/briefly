@@ -137,6 +137,13 @@ class GenerateDigestOut(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class IngestionSummaryOut(BaseModel):
+    last_ingestion_at: datetime | None = None
+    last_summary: dict = Field(default_factory=dict)
+    activity_feed: list[dict] = Field(default_factory=list)
+    pool_items_recent: int = 0
+
+
 class DigestSummaryOut(BaseModel):
     id: str
     digest_date: str

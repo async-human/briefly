@@ -58,7 +58,12 @@ async def get_user_with_profile(session: AsyncSession, user_id: str) -> dict | N
             "avg_click_rate": p.avg_click_rate,
             "total_digests_received": p.total_digests_received,
             "suggested_sources": p.suggested_sources or [],
-            "source_weights": {},  # populated by LearningAgent over time
+            "source_weights": dict(p.source_weights or {}),
+            "ingestion_meta": dict(p.ingestion_meta or {}),
+            "last_ingestion_at": p.last_ingestion_at.isoformat() if p.last_ingestion_at else None,
+            "activity_feed": list(p.activity_feed or []),
+            "auto_expand_sources": bool(p.auto_expand_sources),
+            "ingest_time": p.ingest_time or "03:00",
         }
 
     return data

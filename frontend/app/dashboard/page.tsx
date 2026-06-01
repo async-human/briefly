@@ -119,9 +119,14 @@ export default function DashboardPage() {
 
         const today = new Date().toISOString().split("T")[0];
         const needsDigest = !digestData || digestData.digest_date < today;
+        const emptyToday =
+          digestData &&
+          digestData.digest_date === today &&
+          digestData.total_items_shown === 0 &&
+          (digestData.items?.length ?? 0) === 0;
         const hasSources = sourcesData.some((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
 
-        if (needsDigest && hasSources) runGenerate();
+        if ((needsDigest || emptyToday) && hasSources) runGenerate();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load dashboard");
         setLoading(false);
@@ -198,6 +203,7 @@ export default function DashboardPage() {
                 generatingPhase={generatingPhase}
                 generateError={generateError}
                 generateWarnings={generateWarnings}
+                onRegenerate={() => void runGenerate()}
               />
             </div>
           </>

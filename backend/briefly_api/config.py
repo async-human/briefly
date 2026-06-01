@@ -94,6 +94,13 @@ class Settings(BaseSettings):
     relevance_rescue_threshold: float = 0.80
     # Dual-pool planner: don't rescue items older than this many days
     relevance_rescue_max_age_days: int = 14
+    # V1.5 — pre-ingested content pool
+    use_preingested_pool: bool = True
+    pool_max_age_hours: int = 48
+    min_pool_items_before_live_fetch: int = 6
+    default_ingest_time: str = "03:00"
+    # On manual generate, run a quick ingest if pool is stale (hours)
+    live_fetch_if_pool_older_hours: int = 4
 
     # ── Auth ─────────────────────────────────────────────────────────────────
     jwt_algorithm: str = "HS256"

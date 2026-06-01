@@ -24,6 +24,7 @@ from sqlalchemy import select, update
 from briefly_api.agents.context import PipelineContext
 from briefly_api.db.models import BehavioralSignal, DigestItem, SignalType, UserProfile
 from briefly_api.embeddings.adapter import get_embedding_adapter
+from briefly_api.services.profile_utils import cluster_label
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         )
 
         # ── 2. Lightweight topic-cluster counter update ────────────────────────
-        _update_topic_clusters(ctx)
+        await _update_topic_clusters(ctx, session)
 
         await session.flush()
 
@@ -71,20 +72,52 @@ async def run(ctx: PipelineContext) -> PipelineContext:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _update_topic_clusters(ctx: PipelineContext) -> None:
+async def _update_topic_clusters(ctx: PipelineContext, session) -> None:
     """
-    Increment occurrence_count for sections seen in this digest.
-    Full cluster inference happens via behavioral signals in _evolve_profile_embedding.
+    Increment item_count for digest sections seen today.
+    Persists to UserProfile.topic_clusters (skips meta rows).
     """
     section_counts: dict[str, int] = {}
     for item in ctx.digest_items:
-        section = item.section or "General"
-        section_counts[section] = section_counts.get(section, 0) + 1
+        section = (item.section or "General").strip()
+        if section:
+            section_counts[section] = section_counts.get(section, 0) + 1
 
-    existing = {c.get("cluster"): c for c in (ctx.user.profile.get("topic_clusters") or [])}
+    if not section_counts:
+        return
+
+    result = await session.execute(
+        select(UserProfile).where(UserProfile.user_id == ctx.user.user_id)
+    )
+    profile = result.scalar_one_or_none()
+    if not profile:
+        return
+
+    clusters = list(profile.topic_clusters or [])
+    meta_rows = [c for c in clusters if c.get("_type") in {"source_weight", "meta"}]
+    real_clusters = [c for c in clusters if cluster_label(c)]
+
+    by_label: dict[str, dict] = {}
+    for entry in real_clusters:
+        label = cluster_label(entry)
+        if label:
+            by_label[label.lower()] = dict(entry)
+
     for section, count in section_counts.items():
-        if section in existing:
-            existing[section]["item_count"] = existing[section].get("item_count", 0) + count
+        key = section.lower()
+        if key in by_label:
+            by_label[key]["item_count"] = by_label[key].get("item_count", 0) + count
+            by_label[key]["section"] = section
+        else:
+            by_label[key] = {
+                "cluster": section,
+                "section": section,
+                "item_count": count,
+                "strength": 0.3,
+            }
+
+    profile.topic_clusters = meta_rows + list(by_label.values())
+    await session.flush()
 
 
 async def _evolve_profile_embedding(ctx: PipelineContext, session) -> None:

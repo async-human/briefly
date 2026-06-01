@@ -163,6 +163,18 @@ export type GenerateDigestResponse = {
   warnings: string[];
 };
 
+export type IngestionSummary = {
+  last_ingestion_at: string | null;
+  last_summary: {
+    items_new?: number;
+    items_updated?: number;
+    sources_ok?: number;
+    ingested_at?: string;
+  };
+  activity_feed: { type: string; message: string; at: string }[];
+  pool_items_recent: number;
+};
+
 export type DigestSummary = {
   id: string;
   digest_date: string;
@@ -252,6 +264,10 @@ export const api = {
     request<void>(`/api/v1/sources/${id}`, { method: "DELETE" }),
   generateDigest: () =>
     request<GenerateDigestResponse>("/api/v1/digests/generate", { method: "POST" }),
+  getIngestionSummary: () =>
+    request<IngestionSummary>("/api/v1/ingestion/summary"),
+  runIngestion: () =>
+    request<IngestionSummary>("/api/v1/ingestion/run", { method: "POST" }),
   getOnboardingStatus: () => request<OnboardingStatus>("/api/v1/onboarding/status"),
   updateOnboardingProfile: (body: {
     role?: string;

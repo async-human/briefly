@@ -7750,6 +7750,34 @@ footer {
   position: sticky;
   top: 88px;
 }
+.dash-ingestion-card .ingestion-stats {
+  display: flex;
+  gap: 16px;
+  margin: 12px 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.dash-ingestion-card .ingestion-stats strong {
+  color: var(--text);
+}
+.ingestion-last-run {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 10px;
+}
+.ingestion-feed {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.ingestion-feed li + li {
+  margin-top: 4px;
+}
+.ingestion-refresh-btn {
+  width: 100%;
+}
 .dash-card {
   padding: 24px;
   border: 1px solid var(--border);
