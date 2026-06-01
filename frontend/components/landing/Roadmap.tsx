@@ -216,13 +216,11 @@ function JourneyTrack({
   onSelect,
   inView,
   progress,
-  paused,
 }: {
   active: number;
   onSelect: (i: number) => void;
   inView: boolean;
   progress: number;
-  paused: boolean;
 }) {
   const fillPercent = (active / (stages.length - 1)) * 100;
 
@@ -404,12 +402,10 @@ function StageStrip({
   active,
   onSelect,
   progress,
-  paused,
 }: {
   active: number;
   onSelect: (i: number) => void;
   progress: number;
-  paused: boolean;
 }) {
   return (
     <div className="rm3-strip">
@@ -494,7 +490,6 @@ export function Roadmap() {
             onSelect={selectStage}
             inView={inView}
             progress={progress}
-            paused={paused}
           />
         </Reveal>
 
@@ -515,7 +510,6 @@ export function Roadmap() {
             active={active}
             onSelect={selectStage}
             progress={progress}
-            paused={paused}
           />
         </Reveal>
 
