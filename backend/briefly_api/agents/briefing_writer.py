@@ -174,7 +174,7 @@ def _fallback_drafts(items: list[RawItem], ctx: PipelineContext) -> list[DigestI
     for pos, item in enumerate(items, start=1):
         drafts.append(
             DigestItemDraft(
-                content_id=item.id,
+                content_id="",
                 position=pos,
                 section=_assigned_section(item),
                 headline=item.title,
