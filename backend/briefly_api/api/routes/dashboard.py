@@ -434,7 +434,7 @@ async def discover_gmail_newsletters(
     )
     already_added = {s.identifier for s in existing.scalars().all()}
 
-    senders = await discover_newsletter_senders(access_token, already_added)
+    senders, _ = await discover_newsletter_senders(access_token, already_added)
     return GmailDiscoverOut(
         senders=[GmailSenderOut(**s) for s in senders]
     )
@@ -647,7 +647,10 @@ async def get_source_suggestions(
             "topic_clusters": user.profile.topic_clusters or [],
         }
 
-    suggestions = await discover_interest_suggestions_light(profile_dict, settings, limit=8)
+    gmail = await get_gmail_connection(db, user.id)
+    suggestions = await discover_interest_suggestions_light(
+        profile_dict, settings, limit=8, gmail_connected=gmail is not None,
+    )
     filtered = [s for s in suggestions if s["url"].lower() not in already_added]
     return [SourceSuggestionOut(**s) for s in filtered[:8]]
 

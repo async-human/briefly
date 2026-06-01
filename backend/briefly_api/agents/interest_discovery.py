@@ -57,6 +57,8 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         existing_suggestions: list[dict] = ctx.user.profile.get("suggested_sources") or []
 
         from briefly_api.config import get_settings
+        from briefly_api.auth.gmail import get_gmail_connection
+
         profile_for_discovery = {
             "interests": ctx.user.profile.get("interests") or [],
             "role": ctx.user.profile.get("role"),
@@ -71,8 +73,12 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             ):
                 profile_for_discovery["interests"].append({"topic": topic, "weight": 0.7, "source": "inferred"})
 
+        gmail = await get_gmail_connection(session, ctx.user.user_id)
         raw_suggestions = await discover_interest_suggestions_light(
-            profile_for_discovery, get_settings(), limit=_SUGGEST_PER_RUN + 2,
+            profile_for_discovery,
+            get_settings(),
+            limit=_SUGGEST_PER_RUN + 2,
+            gmail_connected=gmail is not None,
         )
         new_suggestions = [
             s for s in raw_suggestions

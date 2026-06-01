@@ -18,7 +18,6 @@ const LAYER_ORDER = [
   "deep_link",
   "youtube_subscription",
   "reddit_subscription",
-  "interest_feed",
 ];
 
 type SourceDiscoveryWizardProps = {
@@ -38,6 +37,7 @@ export function SourceDiscoveryWizard({
   const [candidates, setCandidates] = useState<DiscoveryCandidate[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [connectedAccounts, setConnectedAccounts] = useState<string[]>([]);
+  const [scanMeta, setScanMeta] = useState<Record<string, unknown>>({});
   const [error, setError] = useState("");
 
   const runDiscovery = useCallback(async () => {
@@ -47,6 +47,7 @@ export function SourceDiscoveryWizard({
       const result = await api.runSourceDiscovery();
       setCandidates(result.candidates);
       setConnectedAccounts(result.connected_accounts);
+      setScanMeta(result.meta ?? {});
       setSelected(new Set(result.candidates.filter((c) => c.selected).map((c) => c.id)));
       setPhase("review");
     } catch (err) {
@@ -104,10 +105,15 @@ export function SourceDiscoveryWizard({
           <p className="dash-card-label">Before your first briefing</p>
           <h1 className="discovery-wizard-title">Review your sources</h1>
           <p className="discovery-wizard-desc">
-            Briefly scanned your connected accounts and interests to find sources you
-            already follow or care about. Confirm what to include — nothing is added
-            without your approval.
+            {gmailConnected
+              ? "We scanned your Gmail inbox for newsletters you actually receive. Every source below was found in your email — not guessed from your profile keywords."
+              : "We scanned your connected accounts for sources you follow. Confirm what to include — nothing is added without your approval."}
           </p>
+          {scanMeta?.gmail_messages_scanned != null && gmailConnected && (
+            <p className="discovery-connected">
+              Scanned {scanMeta.gmail_messages_scanned} emails · found {scanMeta.gmail_senders_found ?? 0} newsletter senders
+            </p>
+          )}
           {connectedAccounts.length > 0 && (
             <p className="discovery-connected">
               Connected: {connectedAccounts.join(" · ")}
@@ -174,7 +180,9 @@ export function SourceDiscoveryWizard({
 
             {candidates.length === 0 && !error && (
               <p className="discovery-empty">
-                No new sources discovered automatically. Add feeds manually below, then continue.
+                {gmailConnected
+                  ? "No newsletters were detected in your Gmail yet. Try forwarding a few to your ingestion address, or add a feed manually below."
+                  : "No sources discovered automatically. Connect Gmail for the richest scan, or add feeds manually below."}
               </p>
             )}
 

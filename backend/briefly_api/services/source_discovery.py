@@ -255,15 +255,24 @@ async def run_source_discovery(
         seen_keys.add(key)
         candidates.append(candidate)
 
-    # ── Layer 1: Inbound email footprint ────────────────────────────────────
+    # ── Layer 1: Inbound email footprint (real Gmail data) ──────────────────
     gmail_connection = await get_gmail_connection(session, user_id)
     senders: list[dict] = []
     access_token: str | None = None
+    gmail_messages_scanned = 0
 
     if gmail_connection:
         try:
             access_token = await refresh_gmail_access_token(gmail_connection, s)
-            senders = await discover_newsletter_senders(access_token, already_emails)
+            await session.commit()
+            senders, gmail_messages_scanned = await discover_newsletter_senders(
+                access_token, already_emails, max_results=400,
+            )
+            if not senders:
+                log.warning(
+                    "Gmail discovery: 0 newsletter senders for user %s after scanning %d messages",
+                    user_id, gmail_messages_scanned,
+                )
         except Exception as exc:
             log.warning("Discovery layer 1 failed for %s: %s", user_id, exc)
 
@@ -273,11 +282,15 @@ async def run_source_discovery(
         email = sender.get("email", "")
         name = sender.get("name", email)
         count = sender.get("count", 1)
+        sample_subject = (sender.get("sample_subject") or "").strip()
         async with sem:
-            rss_url = await _rss_for_sender(email)
-        score_text = f"{name} {email} newsletter"
+            rss_url = sender.get("substack_feed") or await _rss_for_sender(email)
+        score_text = f"{name} {email} {sample_subject}"
         relevance = await _score_text(score_text, profile_dict, profile_embedding)
         confidence = min(0.95, 0.55 + 0.03 * min(count, 12))
+
+        subject_hint = f' — e.g. "{sample_subject[:70]}"' if sample_subject else ""
+        base_reason = f"Found in your Gmail ({count} email{'s' if count != 1 else ''}){subject_hint}"
 
         if rss_url:
             _add({
@@ -288,9 +301,14 @@ async def run_source_discovery(
                 "layer": "inbound_footprint",
                 "confidence": round(confidence, 3),
                 "relevance_score": relevance,
-                "selected": relevance >= RELEVANCE_AUTO_SELECT or count >= 4,
-                "reason": f"You receive ~{count} emails from this sender — RSS feed found",
-                "meta": {"sender_email": email, "email_count": count},
+                "selected": relevance >= RELEVANCE_AUTO_SELECT or count >= 3,
+                "reason": f"{base_reason} · RSS feed detected",
+                "meta": {
+                    "sender_email": email,
+                    "email_count": count,
+                    "sample_subject": sample_subject,
+                    "from_gmail": True,
+                },
             })
         else:
             _add({
@@ -301,9 +319,14 @@ async def run_source_discovery(
                 "layer": "inbound_footprint",
                 "confidence": round(confidence, 3),
                 "relevance_score": relevance,
-                "selected": count >= 3,
-                "reason": f"You receive ~{count} emails/month from this newsletter",
-                "meta": {"sender_email": email, "email_count": count},
+                "selected": count >= 2,
+                "reason": base_reason,
+                "meta": {
+                    "sender_email": email,
+                    "email_count": count,
+                    "sample_subject": sample_subject,
+                    "from_gmail": True,
+                },
             })
 
     if senders:
@@ -317,7 +340,7 @@ async def run_source_discovery(
                 url = item["url"]
                 title_text = f"{item['name']} {url} linked from {item['from_newsletter']}"
                 relevance = await _score_text(title_text, profile_dict, profile_embedding)
-                if relevance < RELEVANCE_SHOW_LINK:
+                if relevance < 0.35:
                     continue
                 rss = None
                 try:
@@ -336,9 +359,8 @@ async def run_source_discovery(
                     "relevance_score": relevance,
                     "selected": relevance >= RELEVANCE_AUTO_SELECT,
                     "reason": (
-                        f"Linked {item['link_count']}× in {item['from_newsletter']} "
-                        "— matches your interests" if relevance >= RELEVANCE_AUTO_SELECT
-                        else f"Found in {item['from_newsletter']} (lower relevance — review optional)"
+                        f"Linked {item['link_count']}× in your Gmail newsletter "
+                        f"“{item['from_newsletter']}”"
                     ),
                     "meta": {
                         "original_url": url,
@@ -372,6 +394,7 @@ async def run_source_discovery(
         s,
         youtube_token=yt_token,
         reddit_token=reddit_token,
+        gmail_connected=gmail_connection is not None,
     )
     for item in external_raw:
         score_text = f"{item.get('name', '')} {item.get('reason', '')}"
@@ -421,6 +444,9 @@ async def run_source_discovery(
             "interest_feed": sum(1 for c in candidates if c["layer"] == "interest_feed"),
         },
         "connected_accounts": connected_accounts,
+        "gmail_messages_scanned": gmail_messages_scanned,
+        "gmail_senders_found": len(senders),
+        "discovery_mode": "gmail_footprint" if gmail_connection else "oauth_only",
         "duration_ms": int((datetime.now(timezone.utc) - started).total_seconds() * 1000),
     }
     await session.commit()

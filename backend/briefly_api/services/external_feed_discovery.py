@@ -258,25 +258,29 @@ async def discover_all_external(
     *,
     youtube_token: str | None = None,
     reddit_token: str | None = None,
+    gmail_connected: bool = False,
 ) -> list[dict]:
     """
-    Run all dynamic external discovery paths and return raw candidate dicts.
-    Caller applies relevance scoring and deduplication.
+    OAuth-based external discovery only.
+    Interest-keyword feeds (Google News / Medium tags) are skipped when Gmail
+    is connected — those are not derived from the user's inbox.
     """
-    interests = _interest_phrases(profile)
-    if not interests:
-        interests = ["technology", "news"]
-
-    tasks = [
-        discover_google_news_feeds(interests),
-        discover_medium_tag_feeds(interests),
-        discover_reddit_subreddits_for_interests(interests, settings),
-        discover_youtube_channels_for_interests(interests, settings),
-    ]
+    tasks = []
     if youtube_token:
         tasks.append(discover_youtube_subscriptions(youtube_token, settings))
     if reddit_token:
         tasks.append(discover_reddit_subscriptions(reddit_token, settings))
+
+    if not gmail_connected:
+        interests = _interest_phrases(profile)
+        if not interests:
+            interests = ["technology"]
+        tasks.extend([
+            discover_google_news_feeds(interests),
+            discover_medium_tag_feeds(interests),
+            discover_reddit_subreddits_for_interests(interests, settings),
+            discover_youtube_channels_for_interests(interests, settings),
+        ])
 
     batches = await asyncio.gather(*tasks, return_exceptions=True)
     out: list[dict] = []
@@ -293,13 +297,17 @@ async def discover_interest_suggestions_light(
     settings: Settings,
     *,
     limit: int = 5,
+    gmail_connected: bool = False,
 ) -> list[dict]:
     """
     Lightweight suggestions for sidebar / interest agent — no static catalog.
+    Skips keyword-based feeds when Gmail is connected (inbox-derived discovery only).
     Returns [{name, url, source_type, topic, description, reason, ...}]
     """
     interests = _interest_phrases(profile)
-    raw = await discover_all_external(profile, settings)
+    raw = await discover_all_external(
+        profile, settings, gmail_connected=gmail_connected,
+    )
     now = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).strftime("%Y-%m-%d")
     results: list[dict] = []
     for item in raw[:limit]:
