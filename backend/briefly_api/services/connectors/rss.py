@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import re
-
-import feedparser
 
 from briefly_api.config import Settings
 from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.connectors.base import BaseConnector, ConnectorValidation
 from briefly_api.services.connectors.types import RSS
-from briefly_api.services.rss import fetch_rss_articles
+from briefly_api.services.rss import feed_has_entries, fetch_rss_articles
 
 
 def _looks_like_feed_url(value: str) -> bool:
@@ -18,8 +15,7 @@ def _looks_like_feed_url(value: str) -> bool:
 
 
 def _probe_rss_sync(url: str) -> bool:
-    feed = feedparser.parse(url)
-    return len(feed.entries) > 0
+    return feed_has_entries(url)
 
 
 class RssConnector(BaseConnector):

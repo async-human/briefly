@@ -103,7 +103,7 @@ _CATALOG: list[dict] = [
      "topic": "saas", "description": "Scaling SaaS from $0 to $100M ARR"},
     {"name": "The Information (free)", "url": "https://www.theinformation.com/feed",
      "topic": "startups", "description": "Premium tech startup coverage"},
-    {"name": "First Round Review", "url": "https://review.firstround.com/feed.xml",
+    {"name": "First Round Review", "url": "https://review.firstround.com/articles/feed",
      "topic": "startups", "description": "Tactical advice from First Round portfolio companies"},
     {"name": "a16z Blog", "url": "https://a16z.com/feed/",
      "topic": "venture capital", "description": "Andreessen Horowitz on tech trends and investing"},
