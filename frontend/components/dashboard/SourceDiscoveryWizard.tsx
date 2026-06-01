@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type DiscoveryCandidate, type Source } from "@/lib/api";
+import { api, type DiscoveryCandidate, type DiscoveryMeta, type Source } from "@/lib/api";
 import { AddSourceForm } from "./AddSourceForm";
 import { SourceIcon } from "@/components/SourceIcon";
 
@@ -37,7 +37,7 @@ export function SourceDiscoveryWizard({
   const [candidates, setCandidates] = useState<DiscoveryCandidate[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [connectedAccounts, setConnectedAccounts] = useState<string[]>([]);
-  const [scanMeta, setScanMeta] = useState<Record<string, unknown>>({});
+  const [scanMeta, setScanMeta] = useState<DiscoveryMeta>({});
   const [error, setError] = useState("");
 
   const runDiscovery = useCallback(async () => {

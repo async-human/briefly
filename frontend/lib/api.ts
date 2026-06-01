@@ -190,10 +190,20 @@ export type DiscoveryCandidate = {
   meta: Record<string, unknown>;
 };
 
+export type DiscoveryMeta = {
+  last_run_at?: string;
+  gmail_messages_scanned?: number;
+  gmail_senders_found?: number;
+  discovery_mode?: string;
+  connected_accounts?: string[];
+  layer_counts?: Record<string, number>;
+  duration_ms?: number;
+};
+
 export type DiscoveryRunResponse = {
   candidates: DiscoveryCandidate[];
   connected_accounts: string[];
-  meta: Record<string, unknown>;
+  meta: DiscoveryMeta;
 };
 
 export type DiscoveryConfirmResponse = {
