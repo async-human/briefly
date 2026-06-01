@@ -110,7 +110,7 @@ async def transcribe_audio_preview(
     settings: Settings | None = None,
 ) -> str:
     """Transcribe audio without persisting — used for live preview while recording."""
-    if not audio_bytes or len(audio_bytes) < 1000:
+    if not audio_bytes or len(audio_bytes) < 800:
         return ""
     if len(audio_bytes) > 25 * 1024 * 1024:
         raise ValueError("Audio file exceeds 25 MB limit.")

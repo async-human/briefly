@@ -58,6 +58,7 @@ def convert_to_wav(audio_bytes: bytes, *, input_suffix: str = ".webm") -> bytes 
                     ffmpeg,
                     "-y",
                     "-i", str(src),
+                    "-af", "highpass=f=80,lowpass=f=8000,volume=1.2",
                     "-ac", "1",
                     "-ar", "16000",
                     "-f", "wav",

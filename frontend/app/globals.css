@@ -10789,6 +10789,16 @@ footer {
   font-style: italic;
   opacity: 0.88;
 }
+.brain-dump-stt-warning {
+  margin: -8px 0 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+}
 .brain-dump-interim {
   margin: 8px 2px 0;
   font-size: 15px;

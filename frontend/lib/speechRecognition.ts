@@ -135,3 +135,44 @@ export function joinTranscriptParts(committed: string, interim: string): string 
   const needsSpace = !base.endsWith(" ") && !base.endsWith("\n");
   return `${base}${needsSpace ? " " : ""}${interim}`;
 }
+
+export function countWords(text: string): number {
+  const t = text.trim();
+  if (!t) return 0;
+  return t.split(/\s+/).filter(Boolean).length;
+}
+
+/** Pick the richest transcript from multiple STT sources (word count, then length). */
+export function pickBestTranscript(...candidates: string[]): string {
+  const cleaned = candidates
+    .map((c) => formatLiveTranscript(c.trim()))
+    .filter((c) => c.length >= 2);
+  if (!cleaned.length) return "";
+
+  return cleaned.reduce((best, cur) => {
+    const bestWords = countWords(best);
+    const curWords = countWords(cur);
+    if (curWords > bestWords) return cur;
+    if (curWords === bestWords && cur.length > best.length) return cur;
+    return best;
+  });
+}
+
+/**
+ * Merge browser live captions with backend Whisper output.
+ * Prefer Whisper when it has comparable word count (more accurate punctuation).
+ */
+export function mergeTranscriptsForDisplay(live: string, backend: string): string {
+  const a = live.trim();
+  const b = backend.trim();
+  if (!a) return formatLiveTranscript(b);
+  if (!b) return formatLiveTranscript(a);
+
+  const aWords = countWords(a);
+  const bWords = countWords(b);
+
+  if (bWords >= Math.max(3, Math.floor(aWords * 0.8))) {
+    return formatLiveTranscript(b);
+  }
+  return formatLiveTranscript(a);
+}

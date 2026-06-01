@@ -4,7 +4,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { api, ApiError, type BrainDump } from "@/lib/api";
 import { BrainDumpHistory } from "./BrainDumpHistory";
-import { formatLiveTranscript } from "@/lib/speechRecognition";
+import {
+  buildTranscriptFromResults,
+  createSpeechRecognition,
+  formatLiveTranscript,
+  isLiveSpeechSupported,
+  joinTranscriptParts,
+  mergeTranscriptsForDisplay,
+  pickBestTranscript,
+  RECOVERABLE_SPEECH_ERRORS,
+  type BrowserSpeechRecognition,
+  type SpeechRecognitionErrorEvent,
+  type SpeechRecognitionEvent,
+} from "@/lib/speechRecognition";
 
 type Phase = "capture" | "starting" | "recording" | "processing" | "success";
 
@@ -15,24 +27,37 @@ type BrainDumpOverlayProps = {
   onClose: () => void;
 };
 
-const PARTIAL_STT_INTERVAL_MS = 12_000;
-const PARTIAL_STT_FIRST_MS = 6_000;
-const PARTIAL_STT_MIN_BYTES = 6_000;
-const CHUNK_POLL_MS = 3_000;
+const PARTIAL_STT_INTERVAL_MS = 5_000;
+const PARTIAL_STT_FIRST_MS = 3_000;
+const PARTIAL_STT_MIN_BYTES = 2_500;
+const CHUNK_POLL_MS = 1_500;
+const RECORDER_TIMESLICE_MS = 1_000;
+
+const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+  channelCount: 1,
+  sampleRate: { ideal: 48_000 },
+};
 
 export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
   const [phase, setPhase] = useState<Phase>("capture");
   const [text, setText] = useState("");
+  const [interimText, setInterimText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [sttWarning, setSttWarning] = useState<string | null>(null);
   const [result, setResult] = useState<BrainDump | null>(null);
   const [recordingSec, setRecordingSec] = useState(0);
   const [transcribingLive, setTranscribingLive] = useState(false);
+  const [liveSpeechActive, setLiveSpeechActive] = useState(false);
   const [processingLabel, setProcessingLabel] = useState("Saving your dump…");
   const [view, setView] = useState<OverlayView>("compose");
   const [historyRefresh, setHistoryRefresh] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const partialSttTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -40,14 +65,48 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
   const chunkPollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const partialSttInFlightRef = useRef(false);
   const partialSttAbortRef = useRef<AbortController | null>(null);
+  const partialSttFailCountRef = useRef(0);
   const recordingActiveRef = useRef(false);
   const backendTranscriptRef = useRef("");
+  const webSpeechCommittedRef = useRef("");
+  const webSpeechInterimRef = useRef("");
   const liveTranscriptRef = useRef("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const liveTranscriptElRef = useRef<HTMLDivElement>(null);
   const recordingMimeRef = useRef("");
   const recordingExtRef = useRef("webm");
   const processingPreviewRef = useRef("");
+
+  const refreshDisplay = useCallback(() => {
+    const liveFull = joinTranscriptParts(
+      webSpeechCommittedRef.current,
+      webSpeechInterimRef.current,
+    );
+    const liveCommitted = joinTranscriptParts(webSpeechCommittedRef.current, "");
+    const merged = mergeTranscriptsForDisplay(liveFull, backendTranscriptRef.current);
+    liveTranscriptRef.current = pickBestTranscript(
+      liveFull,
+      backendTranscriptRef.current,
+      merged,
+    );
+    setText(mergeTranscriptsForDisplay(liveCommitted, backendTranscriptRef.current));
+    setInterimText(webSpeechInterimRef.current);
+  }, []);
+
+  const stopLiveSpeech = useCallback(() => {
+    const recognition = speechRecognitionRef.current;
+    if (!recognition) return;
+    recognition.onresult = null;
+    recognition.onerror = null;
+    recognition.onend = null;
+    try {
+      recognition.stop();
+    } catch {
+      /* ignore */
+    }
+    speechRecognitionRef.current = null;
+    setLiveSpeechActive(false);
+  }, []);
 
   const stopPartialStt = useCallback(() => {
     recordingActiveRef.current = false;
@@ -65,8 +124,9 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
     }
     partialSttAbortRef.current?.abort();
     partialSttAbortRef.current = null;
+    stopLiveSpeech();
     setTranscribingLive(false);
-  }, []);
+  }, [stopLiveSpeech]);
 
   const runPartialTranscription = useCallback(async () => {
     if (!recordingActiveRef.current || partialSttInFlightRef.current) return;
@@ -87,24 +147,32 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
       );
       if (!recordingActiveRef.current || abort.signal.aborted) return;
 
-      const next = formatLiveTranscript(raw.trim());
-      if (next && next.length >= backendTranscriptRef.current.length) {
+      const next = raw.trim();
+      if (next) {
+        partialSttFailCountRef.current = 0;
+        setSttWarning(null);
         backendTranscriptRef.current = next;
-        liveTranscriptRef.current = next;
-        setText(next);
+        refreshDisplay();
       }
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;
-      // Retry on the next interval — recording continues regardless.
+      partialSttFailCountRef.current += 1;
+      if (partialSttFailCountRef.current >= 2) {
+        const msg = e instanceof ApiError
+          ? e.message
+          : "Cloud transcription slow — live captions still active.";
+        setSttWarning(msg);
+      }
     } finally {
       partialSttInFlightRef.current = false;
       if (recordingActiveRef.current) setTranscribingLive(false);
       if (partialSttAbortRef.current === abort) partialSttAbortRef.current = null;
     }
-  }, []);
+  }, [refreshDisplay]);
 
   const startPartialSttLoop = useCallback(() => {
     recordingActiveRef.current = true;
+    partialSttFailCountRef.current = 0;
 
     chunkPollTimerRef.current = setInterval(() => {
       if (mediaRecorderRef.current?.state === "recording") {
@@ -127,17 +195,67 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
     }, PARTIAL_STT_FIRST_MS);
   }, [runPartialTranscription]);
 
+  const startLiveSpeech = useCallback(() => {
+    if (!isLiveSpeechSupported()) return;
+
+    const attachHandlers = (recognition: BrowserSpeechRecognition) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        if (!recordingActiveRef.current) return;
+        const { committed, interim } = buildTranscriptFromResults(event.results);
+        webSpeechCommittedRef.current = committed;
+        webSpeechInterimRef.current = interim;
+        refreshDisplay();
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        if (!recordingActiveRef.current) return;
+        if (!RECOVERABLE_SPEECH_ERRORS.has(event.error)) {
+          setSttWarning("Live captions interrupted — audio is still being recorded.");
+        }
+      };
+
+      recognition.onend = () => {
+        if (!recordingActiveRef.current || speechRecognitionRef.current !== recognition) return;
+        try {
+          recognition.start();
+        } catch {
+          /* session may already be restarting */
+        }
+      };
+    };
+
+    const launch = () => {
+      const recognition = createSpeechRecognition();
+      if (!recognition) return;
+      speechRecognitionRef.current = recognition;
+      attachHandlers(recognition);
+      try {
+        recognition.start();
+        setLiveSpeechActive(true);
+      } catch {
+        speechRecognitionRef.current = null;
+        setLiveSpeechActive(false);
+      }
+    };
+
+    launch();
+  }, [refreshDisplay]);
+
   const reset = useCallback(() => {
     stopPartialStt();
     setPhase("capture");
     setText("");
+    setInterimText("");
     setError(null);
+    setSttWarning(null);
     setResult(null);
     setRecordingSec(0);
     setProcessingLabel("Saving your dump…");
     setView("compose");
     processingPreviewRef.current = "";
     backendTranscriptRef.current = "";
+    webSpeechCommittedRef.current = "";
+    webSpeechInterimRef.current = "";
     liveTranscriptRef.current = "";
     chunksRef.current = [];
     if (timerRef.current) {
@@ -181,7 +299,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
     if (el && (phase === "recording" || phase === "processing")) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [text, phase]);
+  }, [text, interimText, phase]);
 
   async function submitTranscript(raw: string, viaAudio = false) {
     const trimmed = raw.trim();
@@ -206,12 +324,22 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
   }
 
   async function submitAudio(blob: Blob, filename: string, fallbackTranscript = "") {
-    const preview = (fallbackTranscript || backendTranscriptRef.current).trim();
+    const live = joinTranscriptParts(
+      webSpeechCommittedRef.current,
+      webSpeechInterimRef.current,
+    );
+    const preview = pickBestTranscript(
+      fallbackTranscript,
+      backendTranscriptRef.current,
+      live,
+      liveTranscriptRef.current,
+    ).trim();
     processingPreviewRef.current = preview || liveTranscriptRef.current.trim();
     setProcessingLabel("Transcribing full recording…");
     setPhase("processing");
     if (preview) {
       setText(preview);
+      setInterimText("");
     }
     try {
       setProcessingLabel("Structuring your thoughts…");
@@ -239,12 +367,15 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
 
   async function startRecording() {
     setError(null);
+    setSttWarning(null);
     setPhase("starting");
     backendTranscriptRef.current = "";
+    webSpeechCommittedRef.current = "";
+    webSpeechInterimRef.current = "";
     liveTranscriptRef.current = "";
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
       mediaStreamRef.current = stream;
 
       const mimeCandidates = [
@@ -267,7 +398,10 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
       recordingMimeRef.current = mimeType.split(";")[0];
       recordingExtRef.current = ext;
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = new MediaRecorder(stream, {
+        mimeType,
+        audioBitsPerSecond: 128_000,
+      });
       chunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
@@ -289,8 +423,17 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
           waitMs += 200;
         }
 
-        const preview = backendTranscriptRef.current.trim();
+        const live = joinTranscriptParts(
+          webSpeechCommittedRef.current,
+          webSpeechInterimRef.current,
+        );
+        const preview = pickBestTranscript(
+          backendTranscriptRef.current,
+          live,
+          liveTranscriptRef.current,
+        ).trim();
         setText(preview);
+        setInterimText("");
         processingPreviewRef.current = preview;
 
         const blob = new Blob(chunksRef.current, { type: recordingMimeRef.current });
@@ -312,8 +455,10 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
       setPhase("recording");
       setRecordingSec(0);
       setText("");
+      setInterimText("");
       timerRef.current = setInterval(() => setRecordingSec((s) => s + 1), 1000);
-      recorder.start();
+      recorder.start(RECORDER_TIMESLICE_MS);
+      startLiveSpeech();
       startPartialSttLoop();
     } catch {
       setError("Microphone access denied. Use text input instead.");
@@ -345,8 +490,9 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
     general_context: "Context",
   };
 
-  const showLiveTranscript = phase === "recording" && Boolean(text.trim());
-  const showListeningEmpty = phase === "recording" && !text.trim() && !transcribingLive;
+  const hasLiveContent = Boolean(text.trim() || interimText.trim());
+  const showLiveTranscript = phase === "recording" && hasLiveContent;
+  const showListeningEmpty = phase === "recording" && !hasLiveContent && !transcribingLive;
   const displayText = text;
   const isBusy = phase === "processing" || phase === "starting";
 
@@ -493,7 +639,9 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
               <div className="brain-dump-compose">
                 <p className="brain-dump-hint">
                   {phase === "recording"
-                    ? "We transcribe from your audio — take your time, pauses won't lose words."
+                    ? liveSpeechActive
+                      ? "Live captions appear as you speak — cloud transcription refines in the background."
+                      : "Recording your audio — cloud transcription will appear shortly."
                     : "Stream of consciousness is fine. Briefly cleans it up and feeds your second brain."}
                 </p>
 
@@ -509,8 +657,10 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                       <span className="brain-dump-live-dot" aria-hidden />
                       <span>
                         {transcribingLive
-                          ? "Updating transcript from audio…"
-                          : "Recording · pauses are fine"}
+                          ? "Refining transcript…"
+                          : liveSpeechActive
+                            ? "Listening · live captions on"
+                            : "Recording · pauses are fine"}
                       </span>
                       <span className="brain-dump-live-timer">{recordingSec}s</span>
                     </div>
@@ -531,7 +681,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                         <p>Listening… start speaking</p>
                       </div>
                     )}
-                    {transcribingLive && !text.trim() && phase === "recording" && (
+                    {transcribingLive && !hasLiveContent && phase === "recording" && (
                       <div className="brain-dump-listening-placeholder" aria-hidden>
                         <span className="btn-spinner brain-dump-live-spinner" aria-hidden />
                         <p>Transcribing your audio…</p>
@@ -546,6 +696,9 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                         aria-label="Live transcript"
                       >
                         <span className="brain-dump-live-committed">{text}</span>
+                        {interimText ? (
+                          <span className="brain-dump-live-interim">{interimText}</span>
+                        ) : null}
                       </div>
                     ) : (
                       <textarea
@@ -570,6 +723,10 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                     )}
                   </div>
                 </div>
+
+                {sttWarning && phase === "recording" && (
+                  <p className="brain-dump-stt-warning" role="status">{sttWarning}</p>
+                )}
 
                 <div className="brain-dump-voice-row">
                   {phase === "recording" ? (
