@@ -28,6 +28,7 @@ from briefly_api.services.digest_sections import (
     SECTION_WHATS_NEW,
 )
 from briefly_api.services.profile_utils import cluster_label
+from briefly_api.services.article_urls import resolve_article_url
 
 log = logging.getLogger(__name__)
 
@@ -150,12 +151,14 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             ctx.subject_line = f"Your briefing — {ctx.run_date}"
             ctx.preview_text = items_to_write[0].title[:120] if items_to_write else ""
             drafts = _fallback_drafts(items_to_write, ctx)
+            drafts = _ensure_personalized_why(drafts, items_to_write, ctx.user.profile)
     except Exception as e:
         log.exception("BriefingWriterAgent: failed — using fallback drafts")
         ctx.log_error("BriefingWriterAgent", str(e))
         ctx.subject_line = f"Your briefing — {ctx.run_date}"
         ctx.preview_text = items_to_write[0].title[:120] if items_to_write else ""
         drafts = _fallback_drafts(items_to_write, ctx)
+        drafts = _ensure_personalized_why(drafts, items_to_write, ctx.user.profile)
 
     ctx.digest_items = drafts
     ctx.total_shown = len(drafts)
@@ -171,22 +174,28 @@ def _assigned_section(item: RawItem) -> str:
     return item.meta.get("digest_section") or SECTION_WHATS_NEW
 
 
+def _draft_url(item: RawItem, written_url: str | None = None) -> str | None:
+    for candidate in (written_url, item.url):
+        resolved = resolve_article_url(candidate, item.meta)
+        if resolved:
+            return resolved
+    return None
+
+
 def _fallback_drafts(items: list[RawItem], ctx: PipelineContext) -> list[DigestItemDraft]:
     drafts: list[DigestItemDraft] = []
     for pos, item in enumerate(items, start=1):
+        summary = item.summary or item.clean_text[:300]
         drafts.append(
             DigestItemDraft(
-                content_id="",
+                content_id=item.id,
                 position=pos,
                 section=_assigned_section(item),
                 headline=item.title,
-                summary=(item.summary or item.clean_text[:300]),
-                why_it_matters=(
-                    f"This came from {item.source_name}, one of your sources. "
-                    "Worth a read based on what you follow."
-                ),
+                summary=summary,
+                why_it_matters=_personalized_why_fallback(item, ctx.user.profile),
                 source_name=item.source_name,
-                source_url=item.url,
+                source_url=_draft_url(item),
                 all_sources=item.duplicate_sources,
                 duplicate_count=len(item.duplicate_sources) + 1,
                 memory_connections=ctx.memory_connections.get(item.id, []),
@@ -235,7 +244,8 @@ def _why_is_personalized(text: str, profile: dict) -> bool:
         "worth a read",
         "one of your sources",
         "in your briefing today",
-        "could apply to anyone",
+        "worth scanning before your day gets busy",
+        "ties directly to startup",
     )
     if any(g in lower for g in generic):
         return False
@@ -253,12 +263,34 @@ def _why_is_personalized(text: str, profile: dict) -> bool:
 
 
 def _personalized_why_fallback(item: RawItem, profile: dict) -> str:
-    role = profile.get("role") or "your work"
-    interests = [i.get("topic") for i in (profile.get("interests") or []) if i.get("topic")]
-    topic_hint = interests[0] if interests else item.source_name
+    role = profile.get("role") or "your role"
+    interests = [
+        (i.get("topic") or "").strip()
+        for i in (profile.get("interests") or [])
+        if i.get("topic")
+    ]
+    blob = f"{item.title} {item.summary or item.clean_text[:600]}".lower()
+    matched = [t for t in interests if t.lower() in blob]
+    if not matched:
+        for t in interests:
+            for word in t.lower().split():
+                if len(word) > 4 and word in blob:
+                    matched.append(t)
+                    break
+
+    if matched:
+        topics = ", ".join(matched[:2])
+        return (
+            f"As a {role}, this {item.source_name} piece lines up with your interests "
+            f"in {topics}."
+        )
+    if interests:
+        return (
+            f"From {item.source_name} — one of your subscribed sources. "
+            f"It didn't strongly match {interests[0]}, but it's the latest from that feed."
+        )
     return (
-        f"As a {role}, this {item.source_name} story ties directly to {topic_hint} — "
-        f"worth scanning before your day gets busy."
+        f"Latest from {item.source_name}, which you added to your briefing sources."
     )
 
 
@@ -303,7 +335,7 @@ def _drafts_from_llm(
                 f"From {item.source_name}, in your briefing today.",
             ),
             source_name=written.get("source_name", source_item.source_name if source_item else item.source_name),
-            source_url=written.get("source_url", source_item.url if source_item else item.url),
+            source_url=_draft_url(source_item or item, written.get("source_url")),
             all_sources=source_item.duplicate_sources if source_item else [],
             duplicate_count=len(source_item.duplicate_sources) + 1 if source_item else 1,
             memory_connections=ctx.memory_connections.get(item.id, []),

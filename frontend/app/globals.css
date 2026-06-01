@@ -5934,7 +5934,8 @@ footer {
   flex-direction: column;
   padding: 16px 32px 20px;
   gap: 14px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   position: relative;
   /* Warm ambient tint at top */
   background: linear-gradient(180deg, rgba(158, 123, 63, 0.05) 0%, transparent 28%);
@@ -5999,14 +6000,14 @@ footer {
 
 /* Headline zone — vertically centers headline in available space */
 .read-headline-zone {
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 18px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   padding: 8px 0;
 }
 /* Large editorial background number */
@@ -6043,6 +6044,8 @@ footer {
   border-left: 2px solid rgba(212, 170, 106, 0.38);
   position: relative;
   z-index: 1;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Why This Matters V2 */
@@ -7137,6 +7140,7 @@ footer {
   justify-content: space-between;
   gap: 16px;
   padding: 20px 22px 0;
+  flex-wrap: wrap;
 }
 .briefing-panel-title {
   font-family: var(--serif);
@@ -7160,7 +7164,9 @@ footer {
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+  flex-wrap: wrap;
   padding-top: 4px;
+  max-width: 100%;
 }
 .briefing-empty-regenerate {
   margin-top: 16px;

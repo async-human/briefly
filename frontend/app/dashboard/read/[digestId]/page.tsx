@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type Digest, type DigestItem } from "@/lib/api";
 import { SourceIcon } from "@/components/SourceIcon";
+import { isReadableArticleUrl } from "@/lib/articleUrls";
 import {
   SECTION_HIGHLY_RELEVANT,
   SECTION_WHATS_NEW,
@@ -57,6 +58,7 @@ function ReadingCard({
     ? `Also covered by ${item.duplicate_count - 1} other source${item.duplicate_count > 2 ? "s" : ""}`
     : null;
   const hasDeepSummary = mode === "deep" && !!item.summary;
+  const articleUrl = isReadableArticleUrl(item.source_url) ? item.source_url : null;
 
   return (
     <div className="read-stage">
@@ -135,9 +137,9 @@ function ReadingCard({
           <span className="read-why-v2-label">Why this matters to you</span>
         </div>
         <p className="read-why-v2-text">{item.why_it_matters}</p>
-        {item.source_url && mode === "deep" && (
+        {articleUrl && mode === "deep" && (
           <motion.a
-            href={item.source_url}
+            href={articleUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="read-article-link"

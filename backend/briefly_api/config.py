@@ -94,6 +94,8 @@ class Settings(BaseSettings):
     relevance_rescue_threshold: float = 0.80
     # Dual-pool planner: don't rescue items older than this many days
     relevance_rescue_max_age_days: int = 14
+    # Pool A (What's new): skip newest-from-source if below this relevance
+    freshness_min_relevance: float = 0.40
     # V1.5 — pre-ingested content pool
     use_preingested_pool: bool = True
     pool_max_age_hours: int = 48

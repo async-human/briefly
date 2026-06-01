@@ -101,11 +101,14 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     for group in by_source.values():
         group.sort(key=_freshness_key, reverse=True)
 
-    # Pool A — one newest item per source (protected freshness slots)
+    # Pool A — one newest item per source (freshness), if relevant enough
     for group in by_source.values():
         if len(selected) >= s.digest_max_items:
             break
-        _select(group[0], SECTION_WHATS_NEW, "fresh")
+        candidate = group[0]
+        if candidate.relevance_score < s.freshness_min_relevance:
+            continue
+        _select(candidate, SECTION_WHATS_NEW, "fresh")
 
     # Pool B — highly relevant rescues from the remainder
     rescue_candidates = [

@@ -12,7 +12,9 @@ import httpx
 from briefly_api.config import Settings
 from briefly_api.db.models import OAuthConnection
 from briefly_api.services.articles import NormalizedContent
-from briefly_api.services.medium_extractor import is_medium_sender
+from briefly_api.services.article_urls import resolve_article_url, strip_url_noise
+from briefly_api.services.medium_extractor import extract_article_urls, is_medium_sender
+from briefly_api.services.newsletter_link_extractor import extract_outbound_links
 
 GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
 
@@ -102,7 +104,8 @@ def _message_to_content(message: dict) -> NormalizedContent | None:
     subject = _header_value(headers, "Subject") or "Newsletter"
     from_header = _header_value(headers, "From") or "Newsletter"
     sender_name, author = _parse_sender(from_header)
-    body = _extract_body(payload)
+    raw_html = _extract_raw_html(payload)
+    body = strip_url_noise(_extract_body(payload))
     if not body:
         return None
 
@@ -119,19 +122,32 @@ def _message_to_content(message: dict) -> NormalizedContent | None:
                 pass
 
     msg_id = message.get("id", "")
+    gmail_url = f"https://mail.google.com/mail/u/0/#inbox/{msg_id}"
 
-    # For Medium digest emails, stash the raw HTML so the connector can
-    # extract individual article URLs before handing off to the pipeline.
-    meta: dict = {}
-    if is_medium_sender(author):
-        raw_html = _extract_raw_html(payload)
-        if raw_html:
+    article_url: str | None = None
+    meta: dict = {"gmail_url": gmail_url}
+    sender_domain = author.split("@")[-1].lower() if author and "@" in author else ""
+
+    if raw_html:
+        if is_medium_sender(author):
             meta["is_medium_digest"] = True
             meta["raw_html"] = raw_html
+            medium_urls = extract_article_urls(raw_html)
+            if medium_urls:
+                article_url = medium_urls[0]
+        else:
+            outbound = extract_outbound_links(raw_html, sender_domain=sender_domain)
+            if outbound:
+                article_url = outbound[0]
+
+    if article_url:
+        meta["article_url"] = article_url
+
+    public_url = resolve_article_url(article_url, meta) or article_url
 
     return NormalizedContent(
         title=subject.strip(),
-        url=f"https://mail.google.com/mail/u/0/#inbox/{msg_id}",
+        url=public_url or gmail_url,
         source_name=sender_name,
         source_type="gmail",
         section="Newsletters",
