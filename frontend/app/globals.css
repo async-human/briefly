@@ -3449,6 +3449,7 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   border-radius: 12px;
 }
 .rm3-track-dot {
+  position: relative;
   width: 56px;
   height: 56px;
   border-radius: 50%;
@@ -3776,6 +3777,119 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   opacity: 0.45;
 }
 
+/* Stage auto-advance timers */
+.rm3-timer-ring-svg {
+  display: block;
+  flex-shrink: 0;
+}
+.rm3-timer-ring-track {
+  stroke: var(--border);
+}
+.rm3-timer-ring-progress {
+  stroke: var(--accent);
+  transition: stroke-dashoffset 0.05s linear;
+}
+
+.rm3-card-timer {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 8px 8px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px -8px rgba(0, 0, 0, 0.18);
+}
+.rm3-card-timer.is-paused {
+  border-color: var(--border-strong);
+}
+.rm3-card-timer-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 52px;
+}
+.rm3-card-timer-label {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  line-height: 1;
+}
+.rm3-card-timer-sec {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.rm3-card-timer.is-paused .rm3-card-timer-label {
+  color: var(--text-secondary);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.rm3-countdown-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+.rm3-countdown-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  opacity: 0.55;
+}
+.rm3-countdown-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #e8c88a));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 40%, transparent);
+  will-change: transform;
+}
+
+.rm3-track-timer {
+  position: absolute;
+  inset: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.rm3-track-timer-ring {
+  opacity: 0.95;
+}
+
+.rm3-strip-timer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--border);
+  pointer-events: none;
+}
+.rm3-strip-timer-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, transparent));
+  will-change: transform;
+}
+
 /* Stage strip */
 .rm3-strip {
   display: grid;
@@ -3784,6 +3898,8 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   margin-top: 20px;
 }
 .rm3-strip-card {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -3902,6 +4018,21 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   .rm3-spotlight {
     padding: 28px 22px;
     border-radius: 22px;
+  }
+  .rm3-card-timer {
+    top: 14px;
+    right: 14px;
+    padding: 6px 10px 6px 6px;
+    gap: 8px;
+  }
+  .rm3-card-timer-copy {
+    min-width: 44px;
+  }
+  .rm3-card-timer-sec {
+    font-size: 12px;
+  }
+  .rm3-track-timer {
+    inset: -6px;
   }
   .rm3-spotlight-grid {
     grid-template-columns: 1fr;
