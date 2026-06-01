@@ -10,12 +10,14 @@ Supported providers:
 """
 from __future__ import annotations
 
+import json
 import logging
 
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from briefly_api.config import Settings, get_settings
+from briefly_api.stt.audio_utils import convert_to_wav, normalize_upload
 
 log = logging.getLogger(__name__)
 
@@ -45,8 +47,12 @@ class STTAdapter:
         """
         provider = self._s.stt_provider
         model = self._s.stt_model
+        content_type, filename = normalize_upload(content_type, filename)
 
-        log.debug("STT call: provider=%s model=%s bytes=%d", provider, model, len(audio_bytes))
+        log.debug(
+            "STT call: provider=%s model=%s bytes=%d type=%s file=%s",
+            provider, model, len(audio_bytes), content_type, filename,
+        )
 
         if provider == "groq":
             return await self._groq(audio_bytes, filename, content_type, model, language)
@@ -54,13 +60,38 @@ class STTAdapter:
             return await self._openai(audio_bytes, filename, content_type, model, language)
         raise ValueError(f"Unknown STT provider: {provider}")
 
+    async def _groq(
+        self,
+        audio_bytes: bytes,
+        filename: str,
+        content_type: str,
+        model: str,
+        language: str | None,
+    ) -> str:
+        try:
+            return await self._groq_request(
+                audio_bytes, filename, content_type, model, language,
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 400:
+                raise
+            # Browser WebM is often rejected — retry as WAV when ffmpeg is available
+            suffix = "." + filename.rsplit(".", 1)[-1] if "." in filename else ".webm"
+            wav_bytes = convert_to_wav(audio_bytes, input_suffix=suffix)
+            if wav_bytes:
+                log.info("STT: retrying Groq transcription with ffmpeg WAV conversion")
+                return await self._groq_request(
+                    wav_bytes, "recording.wav", "audio/wav", model, language,
+                )
+            raise
+
     @retry(
-        retry=retry_if_exception_type((httpx.HTTPStatusError, httpx.TimeoutException)),
+        retry=retry_if_exception_type((httpx.TimeoutException,)),
         wait=wait_exponential(multiplier=1, min=2, max=20),
         stop=stop_after_attempt(3),
         reraise=True,
     )
-    async def _groq(
+    async def _groq_request(
         self,
         audio_bytes: bytes,
         filename: str,
@@ -71,9 +102,11 @@ class STTAdapter:
         if not self._s.groq_api_key:
             raise RuntimeError("GROQ_API_KEY not set (required for STT provider=groq)")
 
-        data: dict[str, str] = {"model": model, "response_format": "text"}
-        if language:
-            data["language"] = language
+        data: dict[str, str] = {
+            "model": model,
+            "response_format": "json",
+            "language": language or "en",
+        }
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(
@@ -82,11 +115,21 @@ class STTAdapter:
                 data=data,
                 files={"file": (filename, audio_bytes, content_type)},
             )
+            if resp.status_code >= 400:
+                log.error(
+                    "Groq STT error %s: %s",
+                    resp.status_code,
+                    resp.text[:800],
+                )
             resp.raise_for_status()
-            return resp.text.strip()
+            body = resp.text.strip()
+            if body.startswith("{"):
+                parsed = json.loads(body)
+                return str(parsed.get("text") or "").strip()
+            return body
 
     @retry(
-        retry=retry_if_exception_type((httpx.HTTPStatusError, httpx.TimeoutException)),
+        retry=retry_if_exception_type((httpx.TimeoutException,)),
         wait=wait_exponential(multiplier=1, min=2, max=20),
         stop=stop_after_attempt(3),
         reraise=True,
@@ -102,7 +145,7 @@ class STTAdapter:
         if not self._s.openai_api_key:
             raise RuntimeError("OPENAI_API_KEY not set (required for STT provider=openai)")
 
-        data: dict[str, str] = {"model": model, "response_format": "text"}
+        data: dict[str, str] = {"model": model, "response_format": "json"}
         if language:
             data["language"] = language
 
@@ -113,8 +156,18 @@ class STTAdapter:
                 data=data,
                 files={"file": (filename, audio_bytes, content_type)},
             )
+            if resp.status_code >= 400:
+                log.error(
+                    "OpenAI STT error %s: %s",
+                    resp.status_code,
+                    resp.text[:800],
+                )
             resp.raise_for_status()
-            return resp.text.strip()
+            body = resp.text.strip()
+            if body.startswith("{"):
+                parsed = json.loads(body)
+                return str(parsed.get("text") or "").strip()
+            return body
 
 
 def get_stt_adapter(settings: Settings | None = None) -> STTAdapter:

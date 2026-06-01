@@ -87,6 +87,16 @@ async def create_audio_brain_dump(
 
     audio_bytes = await file.read()
     filename = file.filename or "recording.webm"
+    if content_type == "video/webm":
+        content_type = "audio/webm"
+        if not filename.endswith(".webm"):
+            filename = "recording.webm"
+
+    if len(audio_bytes) < 500:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Recording too short or empty. Please record for at least one second.",
+        )
 
     try:
         result = await brain_dump_service.process_audio_dump(
@@ -105,7 +115,7 @@ async def create_audio_brain_dump(
         log.exception("Audio brain dump failed for user %s", user.id)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to process voice note. Check STT configuration.",
+            detail="Failed to transcribe voice note. Try typing your thoughts instead.",
         ) from exc
 
     return _to_out(result)

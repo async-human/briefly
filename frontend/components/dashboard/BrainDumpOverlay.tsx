@@ -82,9 +82,21 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
     setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : "audio/webm";
+      const mimeCandidates = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+        "audio/ogg;codecs=opus",
+        "audio/ogg",
+      ];
+      const mimeType = mimeCandidates.find((t) => MediaRecorder.isTypeSupported(t));
+      if (!mimeType) {
+        setError("Voice recording is not supported in this browser. Use text instead.");
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      const ext = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
       const recorder = new MediaRecorder(stream, { mimeType });
       chunksRef.current = [];
 
@@ -98,15 +110,15 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
           clearInterval(timerRef.current);
           timerRef.current = null;
         }
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        if (blob.size < 500) {
-          setError("Recording too short. Hold the mic a bit longer.");
+        const blob = new Blob(chunksRef.current, { type: mimeType.split(";")[0] });
+        if (blob.size < 1000) {
+          setError("Recording too short. Speak for at least a second, then stop.");
           setPhase("capture");
           return;
         }
         setPhase("processing");
         try {
-          const dump = await api.createBrainDumpAudio(blob, "recording.webm");
+          const dump = await api.createBrainDumpAudio(blob, `recording.${ext}`);
           setResult(dump);
           setPhase("success");
         } catch (e) {
@@ -116,7 +128,8 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
       };
 
       mediaRecorderRef.current = recorder;
-      recorder.start(250);
+      // Single complete file on stop — timeslice fragments produce invalid WebM for STT APIs
+      recorder.start();
       setPhase("recording");
       setRecordingSec(0);
       timerRef.current = setInterval(() => setRecordingSec((s) => s + 1), 1000);
