@@ -32,6 +32,7 @@ from briefly_api.api.schemas import (
     SourceCreate,
     SourceDetectOut,
     SourceOut,
+    SourcePriorityIn,
     SourceSuggestionOut,
     UserOut,
 )
@@ -315,6 +316,37 @@ async def create_source(
             status_code=status.HTTP_409_CONFLICT,
             detail="This source is already connected.",
         ) from exc
+    await db.refresh(source)
+    return SourceOut.model_validate(source)
+
+
+@router.patch("/sources/{source_id}/priority", response_model=SourceOut)
+async def set_source_priority(
+    source_id: str,
+    body: SourcePriorityIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SourceOut:
+    from briefly_api.services.source_priority import VALID_PRIORITIES, normalize_priority
+
+    priority = normalize_priority(body.priority.strip().lower())
+    if priority not in VALID_PRIORITIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Priority must be high, normal, or low.",
+        )
+
+    result = await db.execute(
+        select(Source).where(Source.id == source_id, Source.user_id == user.id)
+    )
+    source = result.scalar_one_or_none()
+    if not source:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source not found.")
+
+    meta = dict(source.meta or {})
+    meta["priority"] = priority
+    source.meta = meta
+    await db.commit()
     await db.refresh(source)
     return SourceOut.model_validate(source)
 
@@ -667,8 +699,18 @@ async def record_feedback(
     ))
 
     # Update source weight in user profile for immediate effect on next briefing
+    source_id: str | None = None
+    if item.content_id:
+        from briefly_api.db.models import RawContent
+
+        rc = await db.get(RawContent, item.content_id)
+        if rc:
+            source_id = rc.source_id
+
     if item.source_name and user.profile:
-        await _bump_source_weight(user, item.source_name, body.signal_type, db)
+        await _bump_source_weight(
+            user, item.source_name, body.signal_type, db, source_id=source_id,
+        )
 
     await db.commit()
 
@@ -687,11 +729,13 @@ async def _bump_source_weight(
     source_name: str,
     signal_type: str,
     db: AsyncSession,
+    *,
+    source_id: str | None = None,
 ) -> None:
     if not user.profile:
         return
     weights: dict = dict(user.profile.source_weights or {})
-    key = source_name.lower()
+    key = source_id or source_name.lower()
     current = weights.get(key, 0.5)
     delta = 0.08 if signal_type == "liked" else -0.08 if signal_type == "disliked" else 0.02
     weights[key] = round(min(1.0, max(0.1, current + delta)), 3)

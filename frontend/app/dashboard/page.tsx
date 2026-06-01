@@ -316,6 +316,11 @@ export default function DashboardPage() {
                 autoSuggestions={me.auto_suggestions ?? []}
                 onSourceAdded={handleSourceAdded}
                 onSourceRemoved={handleSourceRemoved}
+                onSourceUpdated={(updated) =>
+                  setSources((prev) =>
+                    prev.map((s) => (s.id === updated.id ? updated : s)),
+                  )
+                }
                 onRediscover={() => void handleRediscover()}
               />
             </div>

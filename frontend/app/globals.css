@@ -7217,6 +7217,31 @@ footer {
 .source-list-expand:hover {
   text-decoration: underline;
 }
+.source-priority-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.source-priority-btn:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+.source-priority-btn.is-high {
+  color: var(--accent);
+}
+.source-priority-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
 
 .briefing-panel-header-compact {
   padding-bottom: 4px;

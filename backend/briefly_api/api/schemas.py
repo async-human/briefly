@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class UserOut(BaseModel):
@@ -181,8 +181,32 @@ class SourceOut(BaseModel):
     identifier: str
     last_fetched_at: datetime | None
     created_at: datetime
+    priority: str = "normal"
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _extract_priority(cls, data: object) -> object:
+        if not hasattr(data, "meta"):
+            return data
+        from briefly_api.services.source_priority import normalize_priority
+
+        meta = data.meta or {}
+        return {
+            "id": data.id,
+            "source_type": data.source_type,
+            "status": data.status.value if hasattr(data.status, "value") else data.status,
+            "name": data.name,
+            "identifier": data.identifier,
+            "last_fetched_at": data.last_fetched_at,
+            "created_at": data.created_at,
+            "priority": normalize_priority(meta.get("priority")),
+        }
+
+
+class SourcePriorityIn(BaseModel):
+    priority: str = Field(description="high | normal | low")
 
 
 class SourceCreate(BaseModel):

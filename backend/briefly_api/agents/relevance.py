@@ -218,14 +218,24 @@ def _recency_score(item: RawItem) -> float:
 
 def _source_score(item: RawItem, ctx: PipelineContext) -> float:
     """
-    Weight based on user's historical engagement with this source.
-    Falls back to neutral 0.5 if no signal data.
-    This is updated by the LearningAgent over time.
+    Weight based on user's historical engagement with this source,
+    explicit source priority (high/normal/low), and learned weights.
     """
-    # Source engagement weights live in user profile
+    from briefly_api.services.source_priority import (
+        PRIORITY_NORMAL,
+        apply_priority_to_source_score,
+        build_priority_map,
+    )
+
+    priority_map = build_priority_map(ctx.user.sources or [])
     source_weights: dict = ctx.user.profile.get("source_weights", {})
-    weight = source_weights.get(item.source_id, 0.5)
-    return float(weight)
+
+    # Prefer source_id key; fall back to source name for legacy weights
+    weight = source_weights.get(item.source_id)
+    if weight is None:
+        weight = source_weights.get(item.source_name.lower(), 0.5)
+
+    return apply_priority_to_source_score(float(weight), item.source_id, priority_map)
 
 
 # ── Helper functions ──────────────────────────────────────────────────────────

@@ -20,9 +20,13 @@ from briefly_api.services.digest_sections import (
     SECTION_WHATS_NEW,
 )
 
-log = logging.getLogger(__name__)
+from briefly_api.services.source_priority import (
+    build_priority_map,
+    max_items_for_source,
+    priority_sort_key,
+)
 
-_MAX_PER_SOURCE = 3
+log = logging.getLogger(__name__)
 
 
 def _freshness_key(item: RawItem) -> tuple:
@@ -59,13 +63,21 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     """
     s = get_settings()
     items = ctx.enriched_items
+    priority_map = build_priority_map(ctx.user.sources or [])
 
     if not items:
         log.warning("BriefingPlannerAgent: no enriched items to plan")
         return ctx
 
     def combined_score(item: RawItem) -> float:
-        return 0.55 * item.relevance_score + 0.25 * item.novelty_score + 0.20 * _recency_component(item)
+        base = 0.55 * item.relevance_score + 0.25 * item.novelty_score + 0.20 * _recency_component(item)
+        # Slight boost so starred sources win tie-breakers in backfill
+        if priority_sort_key(item.source_id, priority_map) == 0:
+            base += 0.04
+        return base
+
+    def _source_at_cap(source_id: str) -> bool:
+        return source_counts[source_id] >= max_items_for_source(source_id, priority_map)
 
     def _recency_component(item: RawItem) -> float:
         age = _age_days(item)
@@ -101,14 +113,31 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     for group in by_source.values():
         group.sort(key=_freshness_key, reverse=True)
 
-    # Pool A — one newest item per source (freshness), if relevant enough
-    for group in by_source.values():
+    # Pool A — newest item per source; high-priority sources fill slots first
+    pool_a_sources = sorted(
+        by_source.items(),
+        key=lambda pair: priority_sort_key(pair[0], priority_map),
+    )
+    for source_id, group in pool_a_sources:
         if len(selected) >= s.digest_max_items:
             break
         candidate = group[0]
         if candidate.relevance_score < s.freshness_min_relevance:
             continue
         _select(candidate, SECTION_WHATS_NEW, "fresh")
+
+    # Pool A+ — extra slots for high-priority sources (2nd–3rd newest)
+    for source_id, group in pool_a_sources:
+        if priority_sort_key(source_id, priority_map) != 0:
+            continue
+        for candidate in group[1:3]:
+            if len(selected) >= s.digest_max_items:
+                break
+            if _source_at_cap(source_id):
+                break
+            if candidate.relevance_score < s.freshness_min_relevance:
+                continue
+            _select(candidate, SECTION_WHATS_NEW, "fresh")
 
     # Pool B — highly relevant rescues from the remainder
     rescue_candidates = [
@@ -122,7 +151,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     for item in rescue_candidates:
         if len(selected) >= s.digest_max_items:
             break
-        if source_counts[item.source_id] >= _MAX_PER_SOURCE:
+        if source_counts[item.source_id] >= max_items_for_source(item.source_id, priority_map):
             continue
         _select(item, SECTION_HIGHLY_RELEVANT, "relevant")
 
@@ -136,7 +165,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         for item in remaining:
             if len(selected) >= s.digest_max_items:
                 break
-            if source_counts[item.source_id] >= _MAX_PER_SOURCE:
+            if _source_at_cap(item.source_id):
                 continue
             section = (
                 SECTION_HIGHLY_RELEVANT

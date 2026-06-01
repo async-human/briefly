@@ -26,6 +26,7 @@ type SourcesSidebarProps = {
   autoSuggestions?: AutoSuggestion[];
   onSourceAdded: (source: Source) => void;
   onSourceRemoved: (sourceId: string) => void;
+  onSourceUpdated?: (source: Source) => void;
   onRediscover?: () => void;
 };
 
@@ -36,9 +37,11 @@ export function SourcesSidebar({
   autoSuggestions = [],
   onSourceAdded,
   onSourceRemoved,
+  onSourceUpdated,
   onRediscover,
 }: SourcesSidebarProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [priorityId, setPriorityId] = useState<string | null>(null);
   const [showAllSources, setShowAllSources] = useState(false);
 
   async function handleDelete(sourceId: string) {
@@ -50,6 +53,20 @@ export function SourcesSidebar({
       // keep in list on failure
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleTogglePriority(source: Source) {
+    const current = source.priority ?? "normal";
+    const next = current === "high" ? "normal" : "high";
+    setPriorityId(source.id);
+    try {
+      const updated = await api.setSourcePriority(source.id, next);
+      onSourceUpdated?.(updated);
+    } catch {
+      // keep previous state
+    } finally {
+      setPriorityId(null);
     }
   }
 
@@ -65,7 +82,7 @@ export function SourcesSidebar({
           <div>
             <h2 className="dash-card-title">Sources</h2>
             <p className="dash-card-desc dash-card-desc-tight">
-              Add RSS, YouTube, Reddit, or any URL.
+              Star sources you always want in your briefing (Medium, YC, etc.).
             </p>
           </div>
           <span className="source-count">{sources.length}</span>
@@ -87,6 +104,24 @@ export function SourcesSidebar({
                   <div className="source-info">
                     <span className="source-name">{sourceDisplayName(source)}</span>
                   </div>
+                  <button
+                    type="button"
+                    className={`source-priority-btn${(source.priority ?? "normal") === "high" ? " is-high" : ""}`}
+                    onClick={() => void handleTogglePriority(source)}
+                    disabled={priorityId === source.id}
+                    aria-label={
+                      (source.priority ?? "normal") === "high"
+                        ? `Unstar ${sourceDisplayName(source)}`
+                        : `Star ${sourceDisplayName(source)} for priority`
+                    }
+                    title={
+                      (source.priority ?? "normal") === "high"
+                        ? "Priority source — click to unstar"
+                        : "Star to prioritize in briefings"
+                    }
+                  >
+                    {priorityId === source.id ? "…" : (source.priority ?? "normal") === "high" ? "★" : "☆"}
+                  </button>
                   <button
                     type="button"
                     className="source-delete-btn"

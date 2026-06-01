@@ -334,6 +334,7 @@ export type Source = {
   identifier: string;
   last_fetched_at: string | null;
   created_at: string;
+  priority?: "high" | "normal" | "low";
 };
 
 export type BrainDump = {
@@ -366,6 +367,11 @@ export const api = {
     request<Source>("/api/v1/sources", { method: "POST", body: JSON.stringify(body) }),
   deleteSource: (id: string) =>
     request<void>(`/api/v1/sources/${id}`, { method: "DELETE" }),
+  setSourcePriority: (id: string, priority: "high" | "normal" | "low") =>
+    request<Source>(`/api/v1/sources/${id}/priority`, {
+      method: "PATCH",
+      body: JSON.stringify({ priority }),
+    }),
   generateDigest: () =>
     request<GenerateDigestResponse>("/api/v1/digests/generate", { method: "POST" }),
   getBriefingGenerationStatus: () =>
