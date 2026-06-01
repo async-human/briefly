@@ -8,10 +8,18 @@ import { SourceIcon } from "@/components/SourceIcon";
 const LAYER_LABELS: Record<string, string> = {
   inbound_footprint: "Newsletters you subscribe to",
   deep_link: "Articles linked in your digests",
-  semantic_catalog: "Recommended for your interests",
+  youtube_subscription: "Your YouTube subscriptions",
+  reddit_subscription: "Your Reddit subscriptions",
+  interest_feed: "Live feeds for your interests",
 };
 
-const LAYER_ORDER = ["inbound_footprint", "deep_link", "semantic_catalog"];
+const LAYER_ORDER = [
+  "inbound_footprint",
+  "deep_link",
+  "youtube_subscription",
+  "reddit_subscription",
+  "interest_feed",
+];
 
 type SourceDiscoveryWizardProps = {
   existingSources: Source[];
@@ -96,8 +104,9 @@ export function SourceDiscoveryWizard({
           <p className="dash-card-label">Before your first briefing</p>
           <h1 className="discovery-wizard-title">Review your sources</h1>
           <p className="discovery-wizard-desc">
-            Briefly scanned your digital footprint to find what you already follow.
-            Confirm what to include — nothing is added without your approval.
+            Briefly scanned your connected accounts and interests to find sources you
+            already follow or care about. Confirm what to include — nothing is added
+            without your approval.
           </p>
           {connectedAccounts.length > 0 && (
             <p className="discovery-connected">
@@ -194,6 +203,17 @@ export function SourceDiscoveryWizard({
                 onClick={() => void runDiscovery()}
               >
                 Re-scan
+              </button>
+              <button
+                type="button"
+                className="onboard-ghost"
+                disabled={phase === "confirming"}
+                onClick={async () => {
+                  await api.resetSourceDiscovery();
+                  await runDiscovery();
+                }}
+              >
+                Full refresh
               </button>
             </div>
           </>

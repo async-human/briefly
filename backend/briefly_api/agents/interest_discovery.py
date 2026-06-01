@@ -23,7 +23,7 @@ from sqlalchemy import select, update
 from briefly_api.agents.context import PipelineContext
 from briefly_api.db.models import BehavioralSignal, DigestItem, SignalType, UserProfile
 from briefly_api.services.profile_utils import cluster_label
-from briefly_api.services.source_catalog import get_interest_driven_suggestions
+from briefly_api.services.external_feed_discovery import discover_interest_suggestions_light
 
 log = logging.getLogger(__name__)
 
@@ -49,11 +49,6 @@ async def run(ctx: PipelineContext) -> PipelineContext:
 
     try:
         inferred = await _extract_inferred_topics(ctx, session)
-        declared = [
-            i.get("topic", "")
-            for i in (ctx.user.profile.get("interests") or [])
-            if i.get("topic")
-        ]
         already_added = {
             s.identifier.lower()
             for s in (ctx.user.sources or [])
@@ -61,13 +56,29 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         }
         existing_suggestions: list[dict] = ctx.user.profile.get("suggested_sources") or []
 
-        new_suggestions = get_interest_driven_suggestions(
-            inferred_topics=inferred,
-            declared_interests=declared,
-            already_added_urls=already_added,
-            existing_suggestions=existing_suggestions,
-            limit=_SUGGEST_PER_RUN,
+        from briefly_api.config import get_settings
+        profile_for_discovery = {
+            "interests": ctx.user.profile.get("interests") or [],
+            "role": ctx.user.profile.get("role"),
+            "goal": ctx.user.profile.get("goal"),
+            "topic_clusters": ctx.user.profile.get("topic_clusters") or [],
+        }
+        # Merge inferred topics into interests for richer external search
+        for topic in inferred:
+            if topic and not any(
+                (i.get("topic") or "").lower() == topic.lower()
+                for i in profile_for_discovery["interests"]
+            ):
+                profile_for_discovery["interests"].append({"topic": topic, "weight": 0.7, "source": "inferred"})
+
+        raw_suggestions = await discover_interest_suggestions_light(
+            profile_for_discovery, get_settings(), limit=_SUGGEST_PER_RUN + 2,
         )
+        new_suggestions = [
+            s for s in raw_suggestions
+            if s["url"].lower() not in already_added
+            and s["url"].lower() not in {x["url"].lower() for x in existing_suggestions}
+        ][: _SUGGEST_PER_RUN]
 
         if not new_suggestions:
             return ctx

@@ -26,6 +26,7 @@ type SourcesSidebarProps = {
   autoSuggestions?: AutoSuggestion[];
   onSourceAdded: (source: Source) => void;
   onSourceRemoved: (sourceId: string) => void;
+  onRediscover?: () => void;
 };
 
 export function SourcesSidebar({
@@ -35,6 +36,7 @@ export function SourcesSidebar({
   autoSuggestions = [],
   onSourceAdded,
   onSourceRemoved,
+  onRediscover,
 }: SourcesSidebarProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -97,6 +99,14 @@ export function SourcesSidebar({
         <p className="dash-sidebar-footnote">
           Topic filters and delivery time are in{" "}
           <Link href="/settings" className="dash-inline-link">Preferences</Link>.
+          {onRediscover && (
+            <>
+              {" "}·{" "}
+              <button type="button" className="dash-inline-link" onClick={onRediscover}>
+                Re-discover sources
+              </button>
+            </>
+          )}
         </p>
       </div>
 

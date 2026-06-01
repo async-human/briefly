@@ -629,20 +629,27 @@ async def _queue_click_discovery(user_id: str, source_url: str) -> None:
 async def get_source_suggestions(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
 ) -> list[SourceSuggestionOut]:
-    from briefly_api.services.source_catalog import get_suggestions
+    from briefly_api.services.external_feed_discovery import discover_interest_suggestions_light
 
     existing = await db.execute(
         select(Source).where(Source.user_id == user.id)
     )
-    already_added = {s.identifier for s in existing.scalars().all()}
+    already_added = {s.identifier.lower() for s in existing.scalars().all()}
 
-    interests = []
-    if user.profile and user.profile.interests:
-        interests = [i.get("topic", "") for i in user.profile.interests]
+    profile_dict = {}
+    if user.profile:
+        profile_dict = {
+            "interests": user.profile.interests or [],
+            "role": user.profile.role,
+            "goal": user.profile.goal,
+            "topic_clusters": user.profile.topic_clusters or [],
+        }
 
-    suggestions = get_suggestions(interests, already_added, limit=8)
-    return [SourceSuggestionOut(**s) for s in suggestions]
+    suggestions = await discover_interest_suggestions_light(profile_dict, settings, limit=8)
+    filtered = [s for s in suggestions if s["url"].lower() not in already_added]
+    return [SourceSuggestionOut(**s) for s in filtered[:8]]
 
 
 # ── Readwise integration ──────────────────────────────────────────────────────

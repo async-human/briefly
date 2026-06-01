@@ -26,8 +26,16 @@ _DISCOVERY_QUERY = (
     "from:substack.com OR from:beehiiv.com OR from:mail.beehiiv.com OR "
     "from:convertkit.com OR from:buttondown.email OR from:ghost.io OR "
     "from:mailchimp.com OR from:constantcontact.com OR from:campaignmonitor.com OR "
-    "from:noreply@medium.com OR from:medium.com OR "
-    'subject:(digest OR weekly OR changelog OR roundup OR newsletter OR "this week")'
+    "from:noreply@medium.com OR from:medium.com OR from:newsletter OR "
+    'subject:(digest OR weekly OR changelog OR roundup OR newsletter OR "this week" OR briefing) OR '
+    "label:newsletters OR category:promotions"
+)
+
+# Broader fallback when the strict query returns nothing
+_DISCOVERY_QUERY_FALLBACK = (
+    "newer_than:365d "
+    "(from:substack OR from:beehiiv OR from:medium OR has:list-unsubscribe OR "
+    'subject:(newsletter OR digest OR weekly))'
 )
 
 
@@ -43,7 +51,7 @@ def _parse_sender(from_header: str) -> tuple[str, str] | None:
     return name, email
 
 
-def _discover_senders_sync(access_token: str, max_results: int = 200) -> list[dict]:
+def _discover_senders_sync(access_token: str, max_results: int = 200, query: str | None = None) -> list[dict]:
     """
     Fetch up to max_results newsletter message headers, extract unique senders,
     return [{name, email, count}] sorted by count desc.
@@ -52,7 +60,7 @@ def _discover_senders_sync(access_token: str, max_results: int = 200) -> list[di
 
     # Step 1: list message IDs (metadata format — no body, very fast)
     params = {
-        "q": _DISCOVERY_QUERY,
+        "q": query or _DISCOVERY_QUERY,
         "maxResults": str(max_results),
         "format": "metadata",
     }
@@ -113,5 +121,9 @@ async def discover_newsletter_senders(
     Returns [{email, name, count}] ready for the API response.
     """
     raw = await asyncio.to_thread(_discover_senders_sync, access_token, max_results)
+    if not raw:
+        raw = await asyncio.to_thread(
+            _discover_senders_sync, access_token, max_results, _DISCOVERY_QUERY_FALLBACK,
+        )
     already_lower = {a.lower() for a in already_added}
     return [s for s in raw if s["email"] not in already_lower]

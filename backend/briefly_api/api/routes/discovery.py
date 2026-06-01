@@ -61,6 +61,22 @@ async def get_discovery_status(
     return await _discovery_status(u, db)
 
 
+@router.post("/sources/discover/reset")
+async def reset_discovery(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Allow re-running the source discovery wizard (clears confirmation gate)."""
+    prof = await db.execute(select(UserProfile).where(UserProfile.user_id == user.id))
+    profile = prof.scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    profile.sources_discovery_confirmed_at = None
+    profile.pending_source_discoveries = []
+    await db.commit()
+    return {"reset": True}
+
+
 @router.post("/sources/discover/run", response_model=DiscoveryRunOut)
 async def run_discovery(
     user: User = Depends(get_current_user),

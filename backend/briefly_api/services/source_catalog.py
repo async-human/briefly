@@ -1,11 +1,8 @@
 """
 briefly_api/services/source_catalog.py
 
-Curated RSS feed catalog, organised by topic.
-Used to suggest sources to users based on their declared interests.
-
-To add a new feed: add an entry to _CATALOG. Source type is always "rss"
-unless explicitly set to "url" for sites that need full-page scraping.
+DEPRECATED for runtime discovery — kept only for audit_catalog_feeds.py.
+Live discovery uses external_feed_discovery.py (no static feed list).
 """
 from __future__ import annotations
 

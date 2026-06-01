@@ -1,12 +1,12 @@
 """
-Unified dynamic source discovery — three layers, confirm-before-add.
+Unified dynamic source discovery — confirm-before-add. No static catalogs.
 
 Layer 1: Inbound email footprint (Gmail metadata → RSS / email sources)
 Layer 2: Deep link hydration (newsletter HTML → outbound article URLs)
-Layer 3: Semantic alignment (Personal Relevance Vector gatekeeper)
+Layer 3: Connected accounts (YouTube / Reddit OAuth subscriptions)
+Layer 4: Interest-driven external feeds (Google News RSS, Medium tags, Reddit/YouTube search)
 
-Candidates are stored on UserProfile.pending_source_discoveries for user review.
-Nothing is auto-added until POST /sources/discover/confirm.
+All candidates pass through Personal Relevance Vector scoring before display.
 """
 from __future__ import annotations
 
@@ -21,15 +21,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.auth.gmail import get_gmail_connection, refresh_gmail_access_token
-from briefly_api.auth.reddit import get_reddit_connection
-from briefly_api.auth.youtube import get_youtube_connection
+from briefly_api.auth.reddit import get_reddit_connection, refresh_reddit_access_token
+from briefly_api.auth.youtube import get_youtube_connection, refresh_youtube_access_token
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.models import Source, UserProfile
 from briefly_api.embeddings.adapter import get_embedding_adapter
+from briefly_api.services.external_feed_discovery import discover_all_external
 from briefly_api.services.gmail_discovery import discover_newsletter_senders
 from briefly_api.services.newsletter_link_extractor import extract_outbound_links, merge_link_candidates
 from briefly_api.services.profile_utils import cluster_label
-from briefly_api.services.source_catalog import get_suggestions
 from briefly_api.services.url_scraper import discover_rss_feed
 
 log = logging.getLogger(__name__)
@@ -349,30 +349,52 @@ async def run_source_discovery(
         except Exception as exc:
             log.warning("Discovery layer 2 failed for %s: %s", user_id, exc)
 
-    # ── Layer 3: Semantic catalog alignment ─────────────────────────────────
-    interests = [i.get("topic", "") for i in (profile.interests or []) if i.get("topic")]
-    catalog = get_suggestions(interests, existing_ids, limit=6)
-    for item in catalog:
-        text = f"{item.get('name', '')} {item.get('topic', '')} {item.get('description', '')}"
-        relevance = await _score_text(text, profile_dict, profile_embedding)
-        if relevance < RELEVANCE_SHOW_LINK:
-            continue
-        _add({
-            "id": _candidate_id(),
-            "name": item.get("name", item.get("url", "")),
-            "identifier": item["url"],
-            "source_type": item.get("source_type", "rss"),
-            "layer": "semantic_catalog",
-            "confidence": 0.65,
-            "relevance_score": relevance,
-            "selected": relevance >= RELEVANCE_AUTO_SELECT,
-            "reason": f"Matches your interest in {item.get('topic', 'your topics')}",
-            "meta": {"topic": item.get("topic", "")},
-        })
-
-    # Connected accounts hint (YouTube/Reddit already added in onboarding — informational)
+    # ── Layer 3 & 4: OAuth subscriptions + interest-driven external feeds ───
+    yt_token: str | None = None
+    reddit_token: str | None = None
     yt = await get_youtube_connection(session, user_id)
     reddit = await get_reddit_connection(session, user_id)
+    if yt:
+        try:
+            yt_token = await refresh_youtube_access_token(yt, s)
+            await session.commit()
+        except Exception as exc:
+            log.warning("YouTube token refresh for discovery failed: %s", exc)
+    if reddit:
+        try:
+            reddit_token = await refresh_reddit_access_token(reddit, s)
+            await session.commit()
+        except Exception as exc:
+            log.warning("Reddit token refresh for discovery failed: %s", exc)
+
+    external_raw = await discover_all_external(
+        profile_dict,
+        s,
+        youtube_token=yt_token,
+        reddit_token=reddit_token,
+    )
+    for item in external_raw:
+        score_text = f"{item.get('name', '')} {item.get('reason', '')}"
+        relevance = await _score_text(score_text, profile_dict, profile_embedding)
+        layer = item.get("layer", "interest_feed")
+        # OAuth subscriptions are high-trust — always show if relevance passes bar
+        min_show = 0.35 if layer in {"youtube_subscription", "reddit_subscription"} else RELEVANCE_SHOW_LINK
+        if relevance < min_show:
+            continue
+        base_confidence = float(item.get("confidence", 0.65))
+        _add({
+            "id": _candidate_id(),
+            "name": item["name"],
+            "identifier": item["identifier"],
+            "source_type": item.get("source_type", "rss"),
+            "layer": layer,
+            "confidence": base_confidence,
+            "relevance_score": relevance,
+            "selected": relevance >= RELEVANCE_AUTO_SELECT or layer in {"youtube_subscription", "reddit_subscription"},
+            "reason": item.get("reason", "Discovered from your profile"),
+            "meta": item.get("meta", {}),
+        })
+
     connected_accounts = []
     if yt:
         connected_accounts.append("YouTube")
@@ -394,7 +416,9 @@ async def run_source_discovery(
         "layer_counts": {
             "inbound_footprint": sum(1 for c in candidates if c["layer"] == "inbound_footprint"),
             "deep_link": sum(1 for c in candidates if c["layer"] == "deep_link"),
-            "semantic_catalog": sum(1 for c in candidates if c["layer"] == "semantic_catalog"),
+            "youtube_subscription": sum(1 for c in candidates if c["layer"] == "youtube_subscription"),
+            "reddit_subscription": sum(1 for c in candidates if c["layer"] == "reddit_subscription"),
+            "interest_feed": sum(1 for c in candidates if c["layer"] == "interest_feed"),
         },
         "connected_accounts": connected_accounts,
         "duration_ms": int((datetime.now(timezone.utc) - started).total_seconds() * 1000),
@@ -402,12 +426,14 @@ async def run_source_discovery(
     await session.commit()
 
     log.info(
-        "Source discovery user=%s candidates=%d (L1=%d L2=%d L3=%d)",
+        "Source discovery user=%s candidates=%d (footprint=%d links=%d yt=%d reddit=%d interest=%d)",
         user_id,
         len(candidates),
         profile.discovery_meta["layer_counts"]["inbound_footprint"],
         profile.discovery_meta["layer_counts"]["deep_link"],
-        profile.discovery_meta["layer_counts"]["semantic_catalog"],
+        profile.discovery_meta["layer_counts"]["youtube_subscription"],
+        profile.discovery_meta["layer_counts"]["reddit_subscription"],
+        profile.discovery_meta["layer_counts"]["interest_feed"],
     )
 
     return {

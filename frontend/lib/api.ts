@@ -182,7 +182,7 @@ export type DiscoveryCandidate = {
   name: string;
   identifier: string;
   source_type: string;
-  layer: "inbound_footprint" | "deep_link" | "semantic_catalog" | string;
+  layer: "inbound_footprint" | "deep_link" | "youtube_subscription" | "reddit_subscription" | "interest_feed" | string;
   confidence: number;
   relevance_score: number;
   selected: boolean;
@@ -308,6 +308,8 @@ export const api = {
       pending_count: number;
       candidates: DiscoveryCandidate[];
     }>("/api/v1/sources/discover/status"),
+  resetSourceDiscovery: () =>
+    request<{ reset: boolean }>("/api/v1/sources/discover/reset", { method: "POST" }),
   getOnboardingStatus: () => request<OnboardingStatus>("/api/v1/onboarding/status"),
   updateOnboardingProfile: (body: {
     role?: string;

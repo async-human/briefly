@@ -151,6 +151,12 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
+  async function handleRediscover() {
+    await api.resetSourceDiscovery();
+    setShowDiscovery(true);
+    setMe((prev) => (prev ? { ...prev, sources_discovery_confirmed: false } : prev));
+  }
+
   async function handleDiscoveryConfirmed(added: Source[]) {
     setShowDiscovery(false);
     const freshSources = await api.getSources();
@@ -228,6 +234,7 @@ export default function DashboardPage() {
                 autoSuggestions={me.auto_suggestions ?? []}
                 onSourceAdded={handleSourceAdded}
                 onSourceRemoved={handleSourceRemoved}
+                onRediscover={() => void handleRediscover()}
               />
               <BriefingPanel
                 digest={digest}
