@@ -247,7 +247,9 @@ def _build_keyword_set(
                     keywords.add(word)
 
     for cluster in topic_clusters:
-        cluster_name = cluster.get("cluster", "").lower()
+        if cluster.get("_type") in {"source_weight", "meta"}:
+            continue
+        cluster_name = (cluster.get("cluster") or cluster.get("topic") or cluster.get("section") or "").lower()
         if cluster_name:
             keywords.add(cluster_name)
             for word in cluster_name.split():

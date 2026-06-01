@@ -110,40 +110,47 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         ctx.log_error("BriefingWriterAgent", "No items to write")
         return ctx
 
-    profile_summary = _build_profile_summary(ctx.user.profile, ctx.user.topic_clusters)
-    recent_context = _build_recent_context(ctx.user.recent_digest_items)
-    items_json = _build_items_json(items_to_write, ctx)
-    memory_json = json.dumps(ctx.memory_connections, indent=2)
-
-    prompt = _WRITER_PROMPT_TEMPLATE.format(
-        profile_summary=profile_summary,
-        recent_context=recent_context,
-        items_json=items_json,
-        memory_connections=memory_json,
-        section_whats_new=SECTION_WHATS_NEW,
-        section_highly_relevant=SECTION_HIGHLY_RELEVANT,
-    )
-
-    result: dict | None = None
     try:
-        result = await llm.complete_json(
-            messages=[Message(role="user", content=prompt)],
-            system=_WRITER_SYSTEM,
+        profile_summary = _build_profile_summary(ctx.user.profile, ctx.user.topic_clusters)
+        recent_context = _build_recent_context(ctx.user.recent_digest_items)
+        items_json = _build_items_json(items_to_write, ctx)
+        memory_json = json.dumps(ctx.memory_connections, indent=2)
+
+        prompt = _WRITER_PROMPT_TEMPLATE.format(
+            profile_summary=profile_summary,
+            recent_context=recent_context,
+            items_json=items_json,
+            memory_connections=memory_json,
+            section_whats_new=SECTION_WHATS_NEW,
+            section_highly_relevant=SECTION_HIGHLY_RELEVANT,
         )
+
+        result: dict | None = None
+        try:
+            result = await llm.complete_json(
+                messages=[Message(role="user", content=prompt)],
+                system=_WRITER_SYSTEM,
+            )
+        except Exception as e:
+            log.exception("BriefingWriterAgent: LLM call failed")
+            ctx.log_error("BriefingWriterAgent", str(e))
+
+        if result and result.get("items"):
+            ctx.subject_line = result.get("subject_line", f"Your Briefly for {ctx.run_date}")
+            ctx.preview_text = result.get("preview_text", "")
+            skipped_note = result.get("skipped_note", "")
+            if skipped_note:
+                ctx.__dict__["skipped_note"] = skipped_note
+
+            written_by_id = {w.get("content_id"): w for w in result.get("items", [])}
+            drafts = _drafts_from_llm(items_to_write, written_by_id, ctx)
+        else:
+            ctx.subject_line = f"Your briefing — {ctx.run_date}"
+            ctx.preview_text = items_to_write[0].title[:120] if items_to_write else ""
+            drafts = _fallback_drafts(items_to_write, ctx)
     except Exception as e:
-        log.exception("BriefingWriterAgent: LLM call failed")
+        log.exception("BriefingWriterAgent: failed — using fallback drafts")
         ctx.log_error("BriefingWriterAgent", str(e))
-
-    if result and result.get("items"):
-        ctx.subject_line = result.get("subject_line", f"Your Briefly for {ctx.run_date}")
-        ctx.preview_text = result.get("preview_text", "")
-        skipped_note = result.get("skipped_note", "")
-        if skipped_note:
-            ctx.__dict__["skipped_note"] = skipped_note
-
-        written_by_id = {w.get("content_id"): w for w in result.get("items", [])}
-        drafts = _drafts_from_llm(items_to_write, written_by_id, ctx)
-    else:
         ctx.subject_line = f"Your briefing — {ctx.run_date}"
         ctx.preview_text = items_to_write[0].title[:120] if items_to_write else ""
         drafts = _fallback_drafts(items_to_write, ctx)
@@ -231,6 +238,16 @@ def _drafts_from_llm(
 
 # ── Context builders ──────────────────────────────────────────────────────────
 
+def _cluster_label(entry: dict) -> str | None:
+    """Extract a human-readable topic label; skip internal meta entries."""
+    if entry.get("_type") in {"source_weight", "meta"}:
+        return None
+    label = entry.get("cluster") or entry.get("topic") or entry.get("section") or entry.get("name")
+    if isinstance(label, str) and label.strip():
+        return label.strip()
+    return None
+
+
 def _build_profile_summary(profile: dict, topic_clusters: list[dict]) -> str:
     parts = []
     if profile.get("role"):
@@ -242,11 +259,20 @@ def _build_profile_summary(profile: dict, topic_clusters: list[dict]) -> str:
         topics = ", ".join(i.get("topic", "") for i in interests[:8] if i.get("topic"))
         parts.append(f"Interests: {topics}")
     if topic_clusters:
-        clusters = ", ".join(
-            f"{c['cluster']} (strength {c.get('strength', 0):.0%})"
-            for c in sorted(topic_clusters, key=lambda x: x.get("strength", 0), reverse=True)[:5]
-        )
-        parts.append(f"Inferred topics: {clusters}")
+        cluster_parts: list[str] = []
+        for c in sorted(topic_clusters, key=lambda x: x.get("strength", 0), reverse=True):
+            label = _cluster_label(c)
+            if not label:
+                continue
+            strength = c.get("strength", c.get("weight"))
+            if isinstance(strength, (int, float)) and strength > 0:
+                cluster_parts.append(f"{label} (strength {strength:.0%})")
+            else:
+                cluster_parts.append(label)
+            if len(cluster_parts) >= 5:
+                break
+        if cluster_parts:
+            parts.append(f"Inferred topics: {', '.join(cluster_parts)}")
     if profile.get("never_show"):
         never = ", ".join(profile["never_show"][:5])
         parts.append(f"Never show: {never}")
