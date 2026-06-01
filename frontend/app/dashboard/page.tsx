@@ -143,6 +143,20 @@ export default function DashboardPage() {
     }
   }
 
+  function handleSourceRemoved(sourceId: string) {
+    let shouldRegenerate = false;
+    setSources((prev) => {
+      const removed = prev.find((s) => s.id === sourceId);
+      if (removed && FETCHABLE_SOURCE_TYPES.has(removed.source_type)) {
+        shouldRegenerate = true;
+      }
+      return prev.filter((s) => s.id !== sourceId);
+    });
+    if (shouldRegenerate) {
+      void runGenerate();
+    }
+  }
+
   const fetchableSources = sources.filter((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
   const greeting = me?.user.name?.split(" ")[0] ?? "there";
   const today = new Date().toLocaleDateString("en-US", {
@@ -174,7 +188,7 @@ export default function DashboardPage() {
                 gmailConnected={me.gmail_connected}
                 autoSuggestions={me.auto_suggestions ?? []}
                 onSourceAdded={handleSourceAdded}
-                onSourceRemoved={(id) => setSources((prev) => prev.filter((s) => s.id !== id))}
+                onSourceRemoved={handleSourceRemoved}
               />
               <BriefingPanel
                 digest={digest}
