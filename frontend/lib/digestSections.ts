@@ -29,9 +29,9 @@ export function groupDigestItemsBySection<T extends { section?: string | null }>
       groups.delete(section);
     }
   }
-  for (const [section, batch] of groups) {
+  Array.from(groups.entries()).forEach(([section, batch]) => {
     if (batch.length) ordered.push({ section, items: batch });
-  }
+  });
   return ordered;
 }
 
