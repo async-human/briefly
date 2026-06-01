@@ -3646,8 +3646,15 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
 .rm3-spotlight-meta {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 12px;
+}
+.rm3-spotlight-meta-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 .rm3-ver {
   font-family: var(--mono);
@@ -3783,96 +3790,101 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   flex-shrink: 0;
 }
 .rm3-timer-ring-track {
-  stroke: var(--border);
+  stroke: color-mix(in srgb, var(--border-strong) 80%, transparent);
 }
 .rm3-timer-ring-progress {
   stroke: var(--accent);
   transition: stroke-dashoffset 0.05s linear;
 }
 
-.rm3-card-timer {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 3;
+.rm3-inline-timer {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px 8px 8px;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 3px 8px 3px 4px;
   border-radius: 100px;
   border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 4px 20px -8px rgba(0, 0, 0, 0.18);
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
 }
-.rm3-card-timer.is-paused {
-  border-color: var(--border-strong);
+.rm3-inline-timer-compact {
+  padding: 2px 6px 2px 3px;
+  gap: 4px;
 }
-.rm3-card-timer-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 52px;
+.rm3-inline-timer.is-paused {
+  opacity: 0.72;
 }
-.rm3-card-timer-label {
+.rm3-inline-timer-val {
   font-family: var(--mono);
-  font-size: 8px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  line-height: 1;
-}
-.rm3-card-timer-sec {
-  font-family: var(--mono);
-  font-size: 13px;
-  letter-spacing: 0.02em;
+  font-size: 10px;
+  letter-spacing: 0.04em;
   color: var(--accent);
-  line-height: 1;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
+  min-width: 1.6em;
 }
-.rm3-card-timer.is-paused .rm3-card-timer-label {
-  color: var(--text-secondary);
-  font-size: 9px;
-  letter-spacing: 0.08em;
+.rm3-inline-timer.is-paused .rm3-inline-timer-val {
+  color: var(--text-muted);
 }
 
 .rm3-countdown-bar {
   position: absolute;
-  bottom: 0;
+  top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  z-index: 2;
+  height: 2px;
+  z-index: 4;
   pointer-events: none;
   overflow: hidden;
-}
-.rm3-countdown-track {
-  position: absolute;
-  inset: 0;
-  background: var(--border);
-  opacity: 0.55;
+  background: color-mix(in srgb, var(--border) 65%, transparent);
 }
 .rm3-countdown-fill {
   position: absolute;
   inset: 0;
   transform-origin: left center;
-  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #e8c88a));
-  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 40%, transparent);
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 75%, #e8c88a));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 35%, transparent);
   will-change: transform;
 }
 
-.rm3-track-timer {
+.rm3-dot-progress {
   position: absolute;
-  inset: -8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from -90deg,
+    var(--accent) 0deg,
+    var(--accent) var(--rm3-progress, 0deg),
+    transparent var(--rm3-progress, 0deg)
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
   pointer-events: none;
-}
-.rm3-track-timer-ring {
-  opacity: 0.95;
+  opacity: 0.9;
 }
 
+.rm3-track-ver-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.rm3-track-sec {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.rm3-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+}
 .rm3-strip-timer {
   position: absolute;
   left: 0;
@@ -4019,20 +4031,11 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
     padding: 28px 22px;
     border-radius: 22px;
   }
-  .rm3-card-timer {
-    top: 14px;
-    right: 14px;
-    padding: 6px 10px 6px 6px;
-    gap: 8px;
+  .rm3-inline-timer-val {
+    font-size: 9px;
   }
-  .rm3-card-timer-copy {
-    min-width: 44px;
-  }
-  .rm3-card-timer-sec {
-    font-size: 12px;
-  }
-  .rm3-track-timer {
-    inset: -6px;
+  .rm3-track-sec {
+    font-size: 8px;
   }
   .rm3-spotlight-grid {
     grid-template-columns: 1fr;

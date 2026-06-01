@@ -166,43 +166,39 @@ function TimerRing({
   );
 }
 
-function CardTimerBadge({
+function InlineTimer({
   progress,
   remainingSec,
   paused,
   version,
+  compact,
 }: {
   progress: number;
   remainingSec: number;
   paused: boolean;
   version: string;
+  compact?: boolean;
 }) {
   return (
-    <div
-      className={`rm3-card-timer${paused ? " is-paused" : ""}`}
+    <span
+      className={`rm3-inline-timer${compact ? " rm3-inline-timer-compact" : ""}${paused ? " is-paused" : ""}`}
       role="timer"
       aria-live="off"
       aria-label={
         paused
           ? `Auto-advance paused on ${version}`
-          : `Advancing to next version in ${remainingSec} seconds`
+          : `Advancing in ${remainingSec} seconds`
       }
     >
-      <TimerRing progress={progress} size={30} stroke={2.5} />
-      <div className="rm3-card-timer-copy">
-        <span className="rm3-card-timer-label">{paused ? "Paused" : "Next in"}</span>
-        {!paused && (
-          <span className="rm3-card-timer-sec">{remainingSec}s</span>
-        )}
-      </div>
-    </div>
+      <TimerRing progress={progress} size={compact ? 14 : 16} stroke={1.75} />
+      <span className="rm3-inline-timer-val">{paused ? "—" : `${remainingSec}s`}</span>
+    </span>
   );
 }
 
 function CountdownBar({ progress }: { progress: number }) {
   return (
     <div className="rm3-countdown-bar" aria-hidden>
-      <div className="rm3-countdown-track" />
       <div
         className="rm3-countdown-fill"
         style={{ transform: `scaleX(${progress})` }}
@@ -211,16 +207,30 @@ function CountdownBar({ progress }: { progress: number }) {
   );
 }
 
+function DotProgressRing({ progress }: { progress: number }) {
+  return (
+    <span
+      className="rm3-dot-progress"
+      style={{ "--rm3-progress": `${progress * 360}deg` } as React.CSSProperties}
+      aria-hidden
+    />
+  );
+}
+
 function JourneyTrack({
   active,
   onSelect,
   inView,
   progress,
+  remainingSec,
+  paused,
 }: {
   active: number;
   onSelect: (i: number) => void;
   inView: boolean;
   progress: number;
+  remainingSec: number;
+  paused: boolean;
 }) {
   const fillPercent = (active / (stages.length - 1)) * 100;
 
@@ -264,11 +274,7 @@ function JourneyTrack({
               }
               transition={{ duration: 2.2, repeat: isActive ? Infinity : 0, ease: "easeInOut" }}
             >
-              {isActive && (
-                <span className="rm3-track-timer" aria-hidden>
-                  <TimerRing progress={progress} size={52} stroke={2} className="rm3-track-timer-ring" />
-                </span>
-              )}
+              {isActive && <DotProgressRing progress={progress} />}
               <motion.span
                 className="rm3-track-icon"
                 animate={isActive ? { y: [0, -3, 0], rotate: [0, 8, -6, 0] } : { y: 0, rotate: 0 }}
@@ -277,7 +283,14 @@ function JourneyTrack({
                 {stage.icon}
               </motion.span>
             </motion.span>
-            <span className="rm3-track-ver">{stage.version}</span>
+            <span className="rm3-track-ver-row">
+              <span className="rm3-track-ver">{stage.version}</span>
+              {isActive && (
+                <span className="rm3-track-sec" aria-hidden>
+                  {paused ? "—" : `${remainingSec}s`}
+                </span>
+              )}
+            </span>
             <span className={`roadmap-badge ${cfg.cls} rm3-track-badge`}>{cfg.badge}</span>
           </button>
         );
@@ -317,14 +330,9 @@ function SpotlightPanel({
         </>
       )}
 
-      <span className="rm3-watermark" aria-hidden>{stage.num}</span>
+      <CountdownBar progress={progress} />
 
-      <CardTimerBadge
-        progress={progress}
-        remainingSec={remainingSec}
-        paused={paused}
-        version={stage.version}
-      />
+      <span className="rm3-watermark" aria-hidden>{stage.num}</span>
 
       <div className="rm3-spotlight-grid">
         <div className="rm3-spotlight-left">
@@ -345,8 +353,16 @@ function SpotlightPanel({
           </motion.div>
 
           <div className="rm3-spotlight-meta">
-            <span className="rm3-ver">{stage.version}</span>
-            <span className={`roadmap-badge ${cfg.cls}`}>{cfg.badge}</span>
+            <div className="rm3-spotlight-meta-main">
+              <span className="rm3-ver">{stage.version}</span>
+              <span className={`roadmap-badge ${cfg.cls}`}>{cfg.badge}</span>
+            </div>
+            <InlineTimer
+              progress={progress}
+              remainingSec={remainingSec}
+              paused={paused}
+              version={stage.version}
+            />
           </div>
 
           <h3 className="rm3-name">{stage.name}</h3>
@@ -392,8 +408,6 @@ function SpotlightPanel({
           </details>
         </div>
       </div>
-
-      <CountdownBar progress={progress} />
     </motion.article>
   );
 }
@@ -402,10 +416,14 @@ function StageStrip({
   active,
   onSelect,
   progress,
+  remainingSec,
+  paused,
 }: {
   active: number;
   onSelect: (i: number) => void;
   progress: number;
+  remainingSec: number;
+  paused: boolean;
 }) {
   return (
     <div className="rm3-strip">
@@ -428,7 +446,18 @@ function StageStrip({
             </span>
           )}
           <span className="rm3-strip-icon">{stage.icon}</span>
-          <span className="rm3-strip-ver">{stage.version}</span>
+          <div className="rm3-strip-head">
+            <span className="rm3-strip-ver">{stage.version}</span>
+            {i === active && (
+              <InlineTimer
+                progress={progress}
+                remainingSec={remainingSec}
+                paused={paused}
+                version={stage.version}
+                compact
+              />
+            )}
+          </div>
           <span className="rm3-strip-name">{stage.name}</span>
         </motion.button>
       ))}
@@ -490,6 +519,8 @@ export function Roadmap() {
             onSelect={selectStage}
             inView={inView}
             progress={progress}
+            remainingSec={remainingSec}
+            paused={paused}
           />
         </Reveal>
 
@@ -510,6 +541,8 @@ export function Roadmap() {
             active={active}
             onSelect={selectStage}
             progress={progress}
+            remainingSec={remainingSec}
+            paused={paused}
           />
         </Reveal>
 
