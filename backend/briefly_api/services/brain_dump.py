@@ -102,6 +102,27 @@ async def process_text_dump(
     )
 
 
+async def transcribe_audio_preview(
+    audio_bytes: bytes,
+    *,
+    filename: str = "recording.webm",
+    content_type: str = "audio/webm",
+    settings: Settings | None = None,
+) -> str:
+    """Transcribe audio without persisting — used for live preview while recording."""
+    if not audio_bytes or len(audio_bytes) < 1000:
+        return ""
+    if len(audio_bytes) > 25 * 1024 * 1024:
+        raise ValueError("Audio file exceeds 25 MB limit.")
+
+    stt = get_stt_adapter(settings)
+    return await stt.transcribe(
+        audio_bytes,
+        filename=filename,
+        content_type=content_type,
+    )
+
+
 async def process_audio_dump(
     db: AsyncSession,
     user_id: str,

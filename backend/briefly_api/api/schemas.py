@@ -227,6 +227,10 @@ class BrainDumpTextIn(BaseModel):
     text: str = Field(..., min_length=1, max_length=50_000)
 
 
+class BrainDumpTranscribeOut(BaseModel):
+    text: str
+
+
 class BrainDumpOut(BaseModel):
     id: str
     title: str

@@ -73,6 +73,22 @@ class STTAdapter:
         model: str,
         language: str | None,
     ) -> str:
+        suffix = "." + filename.rsplit(".", 1)[-1] if "." in filename else ".webm"
+        ct = (content_type or "").split(";")[0].strip().lower()
+
+        # Browser WebM (especially in-progress recordings) is more reliable via ffmpeg WAV.
+        if ct in {"audio/webm", "video/webm"} or suffix == ".webm":
+            wav_bytes = convert_to_wav(audio_bytes, input_suffix=suffix)
+            if wav_bytes:
+                try:
+                    return await self._groq_request(
+                        wav_bytes, "recording.wav", "audio/wav", model, language,
+                    )
+                except httpx.HTTPStatusError as exc:
+                    if exc.response.status_code != 400:
+                        raise
+                    log.info("STT: Groq rejected ffmpeg WAV, retrying raw WebM")
+
         try:
             return await self._groq_request(
                 audio_bytes, filename, content_type, model, language,
@@ -80,8 +96,6 @@ class STTAdapter:
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code != 400:
                 raise
-            # Browser WebM is often rejected — retry as WAV when ffmpeg is available
-            suffix = "." + filename.rsplit(".", 1)[-1] if "." in filename else ".webm"
             wav_bytes = convert_to_wav(audio_bytes, input_suffix=suffix)
             if wav_bytes:
                 log.info("STT: retrying Groq transcription with ffmpeg WAV conversion")

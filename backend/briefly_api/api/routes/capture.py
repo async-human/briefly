@@ -5,7 +5,7 @@ import logging
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from briefly_api.api.schemas import BrainDumpOut, BrainDumpTextIn
+from briefly_api.api.schemas import BrainDumpOut, BrainDumpTextIn, BrainDumpTranscribeOut
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
@@ -71,6 +71,52 @@ async def create_text_brain_dump(
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     return _to_out(result)
+
+
+@router.post("/brain-dumps/transcribe-preview", response_model=BrainDumpTranscribeOut)
+async def transcribe_brain_dump_preview(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> BrainDumpTranscribeOut:
+    """Live transcription of in-progress recording (audio is source of truth)."""
+    _ = user  # auth gate only
+    content_type = (file.content_type or "audio/webm").split(";")[0].strip().lower()
+    if content_type not in ALLOWED_AUDIO_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported audio type: {content_type}.",
+        )
+
+    audio_bytes = await file.read()
+    filename = file.filename or "recording.webm"
+    if content_type == "video/webm":
+        content_type = "audio/webm"
+        if not filename.endswith(".webm"):
+            filename = "recording.webm"
+
+    if len(audio_bytes) < 1000:
+        return BrainDumpTranscribeOut(text="")
+
+    try:
+        text = await brain_dump_service.transcribe_audio_preview(
+            audio_bytes,
+            filename=filename,
+            content_type=content_type,
+            settings=settings,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except Exception as exc:
+        log.exception("Transcribe preview failed")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Live transcription failed. Recording continues — try again when you stop.",
+        ) from exc
+
+    return BrainDumpTranscribeOut(text=text.strip())
 
 
 @router.post("/brain-dumps/audio", response_model=BrainDumpOut, status_code=status.HTTP_201_CREATED)

@@ -37,7 +37,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function requestFormData<T>(path: string, formData: FormData): Promise<T> {
+async function requestFormData<T>(
+  path: string,
+  formData: FormData,
+  signal?: AbortSignal,
+): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {};
   if (token) {
@@ -48,6 +52,7 @@ async function requestFormData<T>(path: string, formData: FormData): Promise<T> 
     method: "POST",
     headers,
     body: formData,
+    signal,
   });
 
   if (!res.ok) {
@@ -346,5 +351,18 @@ export const api = {
     const form = new FormData();
     form.append("file", blob, filename);
     return requestFormData<BrainDump>("/api/v1/brain-dumps/audio", form);
+  },
+  transcribeBrainDumpPreview: (
+    blob: Blob,
+    filename = "recording.webm",
+    signal?: AbortSignal,
+  ) => {
+    const form = new FormData();
+    form.append("file", blob, filename);
+    return requestFormData<{ text: string }>(
+      "/api/v1/brain-dumps/transcribe-preview",
+      form,
+      signal,
+    );
   },
 };
