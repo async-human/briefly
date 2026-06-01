@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { api, ApiError, type BrainDump } from "@/lib/api";
+import { BrainDumpHistory } from "./BrainDumpHistory";
 import {
   createSpeechRecognition,
   isLiveSpeechSupported,
@@ -13,6 +14,8 @@ import {
 } from "@/lib/speechRecognition";
 
 type Phase = "capture" | "starting" | "recording" | "processing" | "success";
+
+type OverlayView = "compose" | "history";
 
 type BrainDumpOverlayProps = {
   open: boolean;
@@ -29,6 +32,8 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
   const [liveCaptions, setLiveCaptions] = useState(false);
   const [speechActive, setSpeechActive] = useState(false);
   const [processingLabel, setProcessingLabel] = useState("Saving your dump…");
+  const [view, setView] = useState<OverlayView>("compose");
+  const [historyRefresh, setHistoryRefresh] = useState(0);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -80,6 +85,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
     setResult(null);
     setRecordingSec(0);
     setProcessingLabel("Saving your dump…");
+    setView("compose");
     processingPreviewRef.current = "";
     liveTranscriptRef.current = "";
     liveInterimRef.current = "";
@@ -196,6 +202,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
     try {
       const dump = await api.createBrainDump({ text: trimmed });
       setResult(dump);
+      setHistoryRefresh((k) => k + 1);
       setPhase("success");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to save. Try again.");
@@ -211,6 +218,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
       setProcessingLabel("Structuring your thoughts…");
       const dump = await api.createBrainDumpAudio(blob, filename);
       setResult(dump);
+      setHistoryRefresh((k) => k + 1);
       setPhase("success");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Voice processing failed. Try typing instead.");
@@ -355,7 +363,13 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
               <div>
                 <p className="brain-dump-eyebrow">Brain Dump</p>
                 <h2 id="brain-dump-title" className="brain-dump-title">
-                  {phase === "success" ? "Captured" : phase === "recording" ? "Speak freely" : "Dump your thoughts"}
+                  {phase === "success"
+                    ? "Captured"
+                    : view === "history"
+                      ? "Past dumps"
+                      : phase === "recording"
+                        ? "Speak freely"
+                        : "Dump your thoughts"}
                 </h2>
               </div>
               <button
@@ -369,7 +383,37 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
               </button>
             </header>
 
-            {phase === "success" && result ? (
+            {phase !== "success" && (
+              <div className="brain-dump-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={view === "compose"}
+                  className={`brain-dump-tab${view === "compose" ? " active" : ""}`}
+                  onClick={() => setView("compose")}
+                  disabled={isBusy || phase === "recording"}
+                >
+                  New dump
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={view === "history"}
+                  className={`brain-dump-tab${view === "history" ? " active" : ""}`}
+                  onClick={() => setView("history")}
+                  disabled={isBusy || phase === "recording"}
+                >
+                  Past dumps
+                </button>
+              </div>
+            )}
+
+            {view === "history" && phase !== "success" ? (
+              <BrainDumpHistory
+                refreshKey={historyRefresh}
+                onNewDump={() => setView("compose")}
+              />
+            ) : phase === "success" && result ? (
               <div className="brain-dump-success">
                 <p className="brain-dump-success-summary">{result.clean_summary}</p>
                 <div className="brain-dump-meta-row">
@@ -395,12 +439,31 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                     ))}
                   </div>
                 )}
+                {result.raw_transcript && (
+                  <details className="brain-dump-raw-details" open>
+                    <summary>Original transcript</summary>
+                    <p className="brain-dump-raw-text">{result.raw_transcript}</p>
+                  </details>
+                )}
                 <p className="brain-dump-footnote">
                   Briefly updated your relevance profile. This will shape what surfaces in future briefings.
                 </p>
-                <button type="button" className="btn-primary brain-dump-done-btn" onClick={onClose}>
-                  Done
-                </button>
+                <div className="brain-dump-success-actions">
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => {
+                      setPhase("capture");
+                      setResult(null);
+                      setView("history");
+                    }}
+                  >
+                    View all dumps
+                  </button>
+                  <button type="button" className="btn-primary brain-dump-done-btn" onClick={onClose}>
+                    Done
+                  </button>
+                </div>
               </div>
             ) : (
               <>
