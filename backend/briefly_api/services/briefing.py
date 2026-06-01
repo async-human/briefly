@@ -124,8 +124,10 @@ async def generate_briefing_now(
             "Add at least one source (RSS, YouTube, Reddit, or website URL) to generate a briefing."
         )
 
+    item_limit = min(14, max(max_items, 4 + len(fetchable)))
+
     articles, warnings = await collect_from_sources(
-        sources, settings, db, user_id=user.id, max_items=max_items
+        sources, settings, db, user_id=user.id, max_items=item_limit
     )
     if not articles:
         detail = "Could not fetch content from your sources."

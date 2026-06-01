@@ -20,6 +20,7 @@ export function SourceSuggestions({
 }) {
   const [catalogSuggestions, setCatalogSuggestions] = useState<SourceSuggestion[]>([]);
   const [adding, setAdding] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -48,12 +49,13 @@ export function SourceSuggestions({
 
   async function handleAdd(suggestion: SuggestionItem) {
     setAdding(suggestion.url);
+    setAddError(null);
     try {
       const src = await api.addSource({ identifier: suggestion.url, name: suggestion.name });
       onAdded(src);
       setDismissed((prev) => new Set(Array.from(prev).concat(suggestion.url)));
-    } catch {
-      setDismissed((prev) => new Set(Array.from(prev).concat(suggestion.url)));
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : "Could not add source.");
     } finally {
       setAdding(null);
     }
@@ -112,6 +114,7 @@ export function SourceSuggestions({
           <ul className="suggestion-list">
             {autoVisible.slice(0, 6).map((s) => renderRow(s, true))}
           </ul>
+          {addError && <p className="form-error suggestion-add-error">{addError}</p>}
         </div>
       )}
 
@@ -123,6 +126,7 @@ export function SourceSuggestions({
           <ul className="suggestion-list">
             {catalogVisible.slice(0, 6).map((s) => renderRow(s, false))}
           </ul>
+          {addError && <p className="form-error suggestion-add-error">{addError}</p>}
         </div>
       )}
     </>

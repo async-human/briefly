@@ -8,7 +8,8 @@ import { BriefingPanel, SourcesSidebar } from "@/components/dashboard/BriefingPa
 import { DashboardHero } from "@/components/dashboard/DashboardHero";
 
 const FETCHABLE_SOURCE_TYPES = new Set([
-  "rss", "youtube", "youtube_account", "reddit", "reddit_account", "url", "gmail",
+  "rss", "youtube", "youtube_account", "reddit", "reddit_account",
+  "url", "gmail", "email", "readwise",
 ]);
 
 function SkeletonBlock({ w, h, mb = 0 }: { w: number | string; h: number; mb?: number }) {
@@ -53,6 +54,7 @@ export default function DashboardPage() {
   const [generateWarnings, setGenerateWarnings] = useState<string[]>([]);
 
   const generatingRef = useRef(false);
+  const pendingGenerateRef = useRef(false);
   const phaseTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   function clearPhaseTimers() {
@@ -61,8 +63,12 @@ export default function DashboardPage() {
   }
 
   async function runGenerate() {
-    if (generatingRef.current) return;
+    if (generatingRef.current) {
+      pendingGenerateRef.current = true;
+      return;
+    }
     generatingRef.current = true;
+    pendingGenerateRef.current = false;
     setGenerating(true);
     setGeneratingPhase(0);
     setGenerateError("");
@@ -85,6 +91,10 @@ export default function DashboardPage() {
       setGenerating(false);
       setGeneratingPhase(0);
       generatingRef.current = false;
+      if (pendingGenerateRef.current) {
+        pendingGenerateRef.current = false;
+        void runGenerate();
+      }
     }
   }
 
@@ -124,8 +134,13 @@ export default function DashboardPage() {
   }, [router]);
 
   function handleSourceAdded(source: Source) {
-    setSources((prev) => [source, ...prev]);
-    runGenerate();
+    setSources((prev) => {
+      if (prev.some((s) => s.id === source.id)) return prev;
+      return [source, ...prev];
+    });
+    if (FETCHABLE_SOURCE_TYPES.has(source.source_type)) {
+      void runGenerate();
+    }
   }
 
   const fetchableSources = sources.filter((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
