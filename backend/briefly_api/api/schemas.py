@@ -244,6 +244,7 @@ class DiscoveryCandidateOut(BaseModel):
 
 
 class DiscoveryRunOut(BaseModel):
+    status: str = "complete"
     candidates: list[DiscoveryCandidateOut]
     connected_accounts: list[str] = Field(default_factory=list)
     meta: dict = Field(default_factory=dict)

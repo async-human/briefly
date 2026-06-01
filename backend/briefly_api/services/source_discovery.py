@@ -34,6 +34,16 @@ from briefly_api.services.url_scraper import discover_rss_feed
 
 log = logging.getLogger(__name__)
 
+DISCOVERY_PROGRESS_STEPS = (
+    "start",
+    "gmail_scan",
+    "rss_probe",
+    "deep_links",
+    "oauth",
+    "scoring",
+    "done",
+)
+
 GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
 
 RELEVANCE_AUTO_SELECT = 0.75
@@ -132,6 +142,36 @@ async def _score_text(
 
 def _candidate_id() -> str:
     return str(uuid.uuid4())
+
+
+async def report_discovery_progress(
+    user_id: str,
+    *,
+    status: str = "running",
+    step: str,
+    label: str,
+    **stats: int | str | None,
+) -> None:
+    """Persist live discovery progress for frontend polling (separate DB session)."""
+    from briefly_api.db.engine import SessionLocal
+
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(UserProfile).where(UserProfile.user_id == user_id)
+        )
+        profile = result.scalar_one_or_none()
+        if not profile:
+            return
+        meta = dict(profile.discovery_meta or {})
+        meta["progress"] = {
+            "status": status,
+            "step": step,
+            "label": label,
+            **{k: v for k, v in stats.items() if v is not None},
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        profile.discovery_meta = meta
+        await session.commit()
 
 
 async def _fetch_newsletter_html_links(
@@ -243,6 +283,10 @@ async def run_source_discovery(
         list(profile.profile_embedding) if profile.profile_embedding is not None else None
     )
 
+    await report_discovery_progress(user_id, step="start", label="Starting discovery…")
+    profile.pending_source_discoveries = []
+    await session.commit()
+
     candidates: list[dict] = []
     seen_keys: set[str] = set()
 
@@ -265,15 +309,42 @@ async def run_source_discovery(
 
     if gmail_connection:
         try:
+            await report_discovery_progress(
+                user_id, step="gmail_scan", label="Scanning Gmail inbox…",
+            )
             access_token = await refresh_gmail_access_token(gmail_connection, s)
             await session.commit()
+            loop = asyncio.get_running_loop()
+
+            def on_gmail_progress(data: dict) -> None:
+                msgs = int(data.get("messages_scanned") or 0)
+                found = int(data.get("senders_found") or 0)
+                if found:
+                    label = f"Scanned {msgs} emails · found {found} newsletter senders"
+                else:
+                    label = f"Scanned {msgs} emails…"
+                loop.call_soon_threadsafe(
+                    lambda m=msgs, f=found, lbl=label: asyncio.create_task(
+                        report_discovery_progress(
+                            user_id,
+                            step="gmail_scan",
+                            label=lbl,
+                            messages_scanned=m,
+                            senders_found=f,
+                        )
+                    )
+                )
+
             (
                 senders,
                 gmail_messages_scanned,
                 gmail_scan_error,
                 gmail_scan_error_message,
             ) = await discover_newsletter_senders(
-                access_token, already_emails, max_results=400,
+                access_token,
+                already_emails,
+                max_results=400,
+                on_progress=on_gmail_progress,
             )
             if gmail_scan_error:
                 gmail_scan_error_message = user_message_for_gmail_error(
@@ -355,11 +426,21 @@ async def run_source_discovery(
             })
 
     if senders:
+        await report_discovery_progress(
+            user_id,
+            step="rss_probe",
+            label=f"Checking RSS feeds for {len(senders)} senders…",
+            senders_found=len(senders),
+            messages_scanned=gmail_messages_scanned,
+        )
         await asyncio.gather(*[_probe_sender(s) for s in senders[:25]], return_exceptions=True)
 
     # ── Layer 2: Deep link hydration ────────────────────────────────────────
     if access_token and senders:
         try:
+            await report_discovery_progress(
+                user_id, step="deep_links", label="Extracting links from newsletters…",
+            )
             raw_links = await _fetch_newsletter_html_links(access_token, senders)
             for item in merge_link_candidates(raw_links):
                 url = item["url"]
@@ -397,6 +478,9 @@ async def run_source_discovery(
             log.warning("Discovery layer 2 failed for %s: %s", user_id, exc)
 
     # ── Layer 3 & 4: OAuth subscriptions + interest-driven external feeds ───
+    await report_discovery_progress(
+        user_id, step="oauth", label="Loading YouTube & Reddit subscriptions…",
+    )
     yt_token: str | None = None
     reddit_token: str | None = None
     yt = await get_youtube_connection(session, user_id)
@@ -420,6 +504,12 @@ async def run_source_discovery(
         youtube_token=yt_token,
         reddit_token=reddit_token,
         gmail_connected=gmail_connection is not None,
+    )
+    await report_discovery_progress(
+        user_id,
+        step="scoring",
+        label="Matching sources to your profile…",
+        candidates_found=len(candidates),
     )
     for item in external_raw:
         score_text = f"{item.get('name', '')} {item.get('reason', '')}"
@@ -475,6 +565,15 @@ async def run_source_discovery(
         "gmail_scan_error_message": gmail_scan_error_message,
         "discovery_mode": "gmail_footprint" if gmail_connection else "oauth_only",
         "duration_ms": int((datetime.now(timezone.utc) - started).total_seconds() * 1000),
+        "progress": {
+            "status": "complete",
+            "step": "done",
+            "label": f"Found {len(candidates)} source{'s' if len(candidates) != 1 else ''}",
+            "candidates_found": len(candidates),
+            "messages_scanned": gmail_messages_scanned,
+            "senders_found": len(senders),
+            "updated_at": now.isoformat(),
+        },
     }
     await session.commit()
 

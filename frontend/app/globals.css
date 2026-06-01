@@ -7975,6 +7975,115 @@ footer {
   color: var(--text-muted);
   font-size: 14px;
 }
+.discovery-scanning-panel {
+  margin-top: 24px;
+  padding: 24px 22px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(
+    180deg,
+    rgba(158, 123, 63, 0.04) 0%,
+    var(--bg-elevated) 100%
+  );
+}
+.discovery-scanning-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.discovery-spinner {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    #ea4335 0deg 90deg,
+    #fbbc04 90deg 180deg,
+    #34a853 180deg 270deg,
+    #4285f4 270deg 360deg
+  );
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+  animation: discovery-spin 0.85s linear infinite;
+}
+@keyframes discovery-spin {
+  to { transform: rotate(360deg); }
+}
+.discovery-scanning-live {
+  flex: 1;
+  min-width: 0;
+}
+.discovery-scanning-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+.discovery-scanning-stats {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-family: var(--mono);
+  color: var(--accent);
+}
+.discovery-step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.discovery-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  transition: color 0.2s;
+}
+.discovery-step-active {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.discovery-step-done {
+  color: var(--text-secondary);
+}
+.discovery-step-marker {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.discovery-step-done .discovery-step-marker {
+  color: #34a853;
+}
+.discovery-step-active .discovery-step-marker {
+  color: var(--accent);
+}
+.discovery-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: discovery-pulse 1.2s ease-in-out infinite;
+}
+.discovery-step-dot-muted {
+  background: var(--border-strong);
+  animation: none;
+}
+@keyframes discovery-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+.discovery-step-icon {
+  margin-left: auto;
+  opacity: 0.85;
+}
 .discovery-section {
   margin-top: 28px;
   padding-top: 24px;

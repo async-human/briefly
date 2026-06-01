@@ -190,6 +190,17 @@ export type DiscoveryCandidate = {
   meta: Record<string, unknown>;
 };
 
+export type DiscoveryProgress = {
+  status: "running" | "complete" | "error";
+  step: string;
+  label: string;
+  messages_scanned?: number;
+  senders_found?: number;
+  candidates_found?: number;
+  updated_at?: string;
+  error?: string;
+};
+
 export type DiscoveryMeta = {
   last_run_at?: string;
   gmail_messages_scanned?: number;
@@ -200,11 +211,20 @@ export type DiscoveryMeta = {
   connected_accounts?: string[];
   layer_counts?: Record<string, number>;
   duration_ms?: number;
+  progress?: DiscoveryProgress;
 };
 
 export type DiscoveryRunResponse = {
+  status: "running" | "complete" | "error";
   candidates: DiscoveryCandidate[];
   connected_accounts: string[];
+  meta: DiscoveryMeta;
+};
+
+export type DiscoveryStatusResponse = {
+  confirmed: boolean;
+  pending_count: number;
+  candidates: DiscoveryCandidate[];
   meta: DiscoveryMeta;
 };
 
@@ -315,11 +335,7 @@ export const api = {
       body: JSON.stringify({ candidate_ids: candidateIds }),
     }),
   getDiscoveryStatus: () =>
-    request<{
-      confirmed: boolean;
-      pending_count: number;
-      candidates: DiscoveryCandidate[];
-    }>("/api/v1/sources/discover/status"),
+    request<DiscoveryStatusResponse>("/api/v1/sources/discover/status"),
   resetSourceDiscovery: () =>
     request<{ reset: boolean }>("/api/v1/sources/discover/reset", { method: "POST" }),
   getOnboardingStatus: () => request<OnboardingStatus>("/api/v1/onboarding/status"),

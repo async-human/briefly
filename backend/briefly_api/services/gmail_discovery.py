@@ -10,6 +10,7 @@ import asyncio
 import logging
 import re
 from collections import Counter
+from typing import Callable
 
 import httpx
 
@@ -145,9 +146,15 @@ def _collect_message_ids(access_token: str, max_results: int) -> list[str]:
     return all_ids
 
 
-def _discover_senders_sync(access_token: str, max_results: int = 400) -> dict:
+def _discover_senders_sync(
+    access_token: str,
+    max_results: int = 400,
+    on_progress: Callable[[dict], None] | None = None,
+) -> dict:
     try:
         message_ids = _collect_message_ids(access_token, max_results)
+        if on_progress and message_ids:
+            on_progress({"messages_scanned": 0, "senders_found": 0, "phase": "listed", "total": len(message_ids)})
     except GmailAccessError as exc:
         log.warning("Gmail discovery access denied (%s): %s", exc.reason, exc)
         return {
@@ -171,7 +178,7 @@ def _discover_senders_sync(access_token: str, max_results: int = 400) -> dict:
     headers_auth = {"Authorization": f"Bearer {access_token}"}
 
     with httpx.Client(timeout=120.0, headers=headers_auth) as client:
-        for msg_id in message_ids:
+        for idx, msg_id in enumerate(message_ids):
             try:
                 resp = client.get(
                     f"{GMAIL_API}/messages/{msg_id}",
@@ -206,6 +213,22 @@ def _discover_senders_sync(access_token: str, max_results: int = 400) -> dict:
             except Exception:
                 continue
 
+            if on_progress and (idx + 1) % 20 == 0:
+                on_progress({
+                    "messages_scanned": idx + 1,
+                    "senders_found": len(counts),
+                    "phase": "scanning",
+                    "total": len(message_ids),
+                })
+
+    if on_progress and message_ids:
+        on_progress({
+            "messages_scanned": len(message_ids),
+            "senders_found": len(counts),
+            "phase": "done",
+            "total": len(message_ids),
+        })
+
     senders = [
         {
             "email": email,
@@ -234,12 +257,15 @@ async def discover_newsletter_senders(
     access_token: str,
     already_added: set[str],
     max_results: int = 400,
+    on_progress: Callable[[dict], None] | None = None,
 ) -> tuple[list[dict], int, str | None, str | None]:
     """
     Return (newsletter senders, messages_scanned, access_error_reason, access_error_message).
     Each sender was found in the user's real Gmail inbox when access succeeds.
     """
-    result = await asyncio.to_thread(_discover_senders_sync, access_token, max_results)
+    result = await asyncio.to_thread(
+        _discover_senders_sync, access_token, max_results, on_progress,
+    )
     if isinstance(result, list):
         raw, scanned, err_reason, err_msg = result, 0, None, None
     else:

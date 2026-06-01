@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -17,10 +18,14 @@ from briefly_api.api.schemas import (
 )
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
-from briefly_api.db.engine import get_db
+from briefly_api.db.engine import SessionLocal, get_db
 from briefly_api.db.models import Source, User, UserProfile
 from briefly_api.services.connectors.types import FETCHABLE_SOURCE_TYPES
-from briefly_api.services.source_discovery import confirm_discoveries, run_source_discovery
+from briefly_api.services.source_discovery import (
+    confirm_discoveries,
+    report_discovery_progress,
+    run_source_discovery,
+)
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +50,20 @@ async def _discovery_status(user: User, db: AsyncSession) -> dict:
         "meta": profile.discovery_meta or {},
         "last_run_at": profile.discovery_last_run_at,
     }
+
+
+async def _discovery_worker(user_id: str) -> None:
+    async with SessionLocal() as session:
+        try:
+            await run_source_discovery(session, user_id, settings=get_settings())
+        except Exception:
+            log.exception("Discovery worker failed for user %s", user_id)
+            await report_discovery_progress(
+                user_id,
+                status="error",
+                step="error",
+                label="Discovery failed. Please try again.",
+            )
 
 
 @router.get("/sources/discover/status")
@@ -73,26 +92,54 @@ async def reset_discovery(
         raise HTTPException(status_code=404, detail="Profile not found")
     profile.sources_discovery_confirmed_at = None
     profile.pending_source_discoveries = []
+    meta = dict(profile.discovery_meta or {})
+    meta.pop("progress", None)
+    profile.discovery_meta = meta
     await db.commit()
     return {"reset": True}
 
 
 @router.post("/sources/discover/run", response_model=DiscoveryRunOut)
 async def run_discovery(
+    background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    settings: Settings = Depends(get_settings),
 ) -> DiscoveryRunOut:
-    result = await run_source_discovery(db, user.id, settings=settings)
-    if not result.get("success"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result.get("error", "Discovery failed"),
+    prof = await db.execute(select(UserProfile).where(UserProfile.user_id == user.id))
+    profile = prof.scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    progress = (profile.discovery_meta or {}).get("progress") or {}
+    if progress.get("status") == "running":
+        return DiscoveryRunOut(
+            status="running",
+            candidates=[],
+            connected_accounts=(profile.discovery_meta or {}).get("connected_accounts", []),
+            meta=profile.discovery_meta or {},
         )
+
+    profile.pending_source_discoveries = []
+    now = datetime.now(timezone.utc).isoformat()
+    profile.discovery_meta = {
+        **(profile.discovery_meta or {}),
+        "progress": {
+            "status": "running",
+            "step": "start",
+            "label": "Starting discovery…",
+            "updated_at": now,
+        },
+    }
+    await db.commit()
+
+    background_tasks.add_task(_discovery_worker, user.id)
+
+    await db.refresh(profile)
     return DiscoveryRunOut(
-        candidates=[DiscoveryCandidateOut(**c) for c in result["candidates"]],
-        connected_accounts=result.get("connected_accounts", []),
-        meta=result.get("meta", {}),
+        status="running",
+        candidates=[],
+        connected_accounts=[],
+        meta=profile.discovery_meta or {},
     )
 
 
@@ -125,7 +172,6 @@ async def confirm_discovery(
         prof = await db.execute(select(UserProfile).where(UserProfile.user_id == user.id))
         profile = prof.scalar_one_or_none()
         if profile:
-            from datetime import datetime, timezone
             profile.sources_discovery_confirmed_at = datetime.now(timezone.utc)
             profile.pending_source_discoveries = []
             await db.commit()

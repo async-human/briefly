@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, type DiscoveryCandidate, type DiscoveryMeta, type Source } from "@/lib/api";
+import { api, type DiscoveryCandidate, type DiscoveryMeta, type DiscoveryProgress, type Source } from "@/lib/api";
 import { AddSourceForm } from "./AddSourceForm";
+import { DiscoveryScanning } from "./DiscoveryScanning";
 import { SourceIcon } from "@/components/SourceIcon";
 
 const LAYER_LABELS: Record<string, string> = {
@@ -42,23 +43,49 @@ export function SourceDiscoveryWizard({
   const [scanMeta, setScanMeta] = useState<DiscoveryMeta>({});
   const [error, setError] = useState("");
   const [gmailLoading, setGmailLoading] = useState(false);
+  const [scanProgress, setScanProgress] = useState<DiscoveryProgress | null>(null);
   const prevGmailRef = useRef(gmailConnected);
+
+  const pollDiscovery = useCallback(async () => {
+    for (let i = 0; i < 180; i++) {
+      await new Promise((r) => setTimeout(r, 700));
+      const status = await api.getDiscoveryStatus();
+      if (status.meta?.progress) {
+        setScanProgress(status.meta.progress);
+      }
+      const ps = status.meta?.progress?.status;
+      if (ps === "complete" || ps === "error") {
+        return status;
+      }
+      if (status.candidates.length > 0 && ps !== "running") {
+        return status;
+      }
+    }
+    throw new Error("Discovery timed out. Try Re-scan.");
+  }, []);
 
   const runDiscovery = useCallback(async () => {
     setPhase("scanning");
+    setScanProgress({ status: "running", step: "start", label: "Starting discovery…" });
     setError("");
     try {
-      const result = await api.runSourceDiscovery();
-      setCandidates(result.candidates);
-      setConnectedAccounts(result.connected_accounts);
-      setScanMeta(result.meta ?? {});
-      setSelected(new Set(result.candidates.filter((c) => c.selected).map((c) => c.id)));
+      await api.runSourceDiscovery();
+      const status = await pollDiscovery();
+      if (status.meta?.progress?.status === "error") {
+        setError(status.meta.progress.label || "Discovery failed");
+      }
+      setCandidates(status.candidates);
+      setConnectedAccounts(status.meta?.connected_accounts ?? []);
+      setScanMeta(status.meta ?? {});
+      setSelected(new Set(status.candidates.filter((c) => c.selected).map((c) => c.id)));
       setPhase("review");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Discovery failed");
       setPhase("review");
+    } finally {
+      setScanProgress(null);
     }
-  }, []);
+  }, [pollDiscovery]);
 
   useEffect(() => {
     void runDiscovery();
@@ -218,10 +245,7 @@ export function SourceDiscoveryWizard({
         )}
 
         {phase === "scanning" && (
-          <div className="discovery-scanning">
-            <span className="btn-spinner" />
-            <p>Scanning inbox metadata and matching to your profile…</p>
-          </div>
+          <DiscoveryScanning progress={scanProgress} gmailConnected={gmailConnected} />
         )}
 
         {phase !== "scanning" && (
