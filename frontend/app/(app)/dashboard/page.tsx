@@ -68,7 +68,10 @@ function DashboardContent() {
   const [connectBanner, setConnectBanner] = useState<string | null>(null);
   const [showSources, setShowSources] = useState(false);
   const [discoveryRunning, setDiscoveryRunning] = useState(false);
+  // Session-level generation guard — persists across navigation within the same browser tab.
+  // Unlike useRef, sessionStorage survives component unmount/remount (tab switches, Back/Forward).
   const autoGenerateChecked = useRef(false);
+  const sessionGenKey = useRef<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -113,7 +116,12 @@ function DashboardContent() {
         }
 
         setMe(meData);
-        if (digestData) setDigest(digestData);
+        // Only update context digest if the API returned something newer than what we already have.
+        // Prevents init() from overwriting a freshly-generated digest with a stale API response
+        // when the user navigates away and back mid-generation or right after it completes.
+        if (digestData && (!digest || digestData.digest_date >= digest.digest_date)) {
+          setDigest(digestData);
+        }
         setSources(sourcesData);
         setLoading(false);
 
@@ -138,9 +146,6 @@ function DashboardContent() {
           }
         }
 
-        if (autoGenerateChecked.current) return;
-        autoGenerateChecked.current = true;
-
         if (genStatus?.status === "running") {
           resumePolling();
           return;
@@ -149,7 +154,26 @@ function DashboardContent() {
         const digestTimezone = meData.profile?.digest_timezone;
         const hasSources = sourcesData.some((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
 
-        if (needsBriefingForToday(digestData, digestTimezone) && hasSources && !generating) {
+        // Build a session-scoped key — one auto-generation attempt per user per calendar day.
+        // sessionStorage persists across SPA navigations but clears on tab close / new session.
+        const todayKey = `briefly_autogen_${meData.user.id}_${new Date().toISOString().slice(0, 10)}`;
+        sessionGenKey.current = todayKey;
+        const alreadyTriggeredThisSession =
+          typeof sessionStorage !== "undefined" && !!sessionStorage.getItem(todayKey);
+
+        if (autoGenerateChecked.current || alreadyTriggeredThisSession) return;
+        autoGenerateChecked.current = true;
+
+        // Don't generate if EITHER the context digest OR the freshly-fetched digest is valid.
+        // The context may already have a brand-new digest that digestData hasn't caught up to yet.
+        const ctxDigestOk = digest && !needsBriefingForToday(digest, digestTimezone);
+        const apiDigestOk = digestData && !needsBriefingForToday(digestData, digestTimezone);
+        if (ctxDigestOk || apiDigestOk) return;
+
+        if (hasSources && !generating) {
+          if (typeof sessionStorage !== "undefined") {
+            sessionStorage.setItem(todayKey, "1");
+          }
           ensureBriefing();
         }
       } catch (err) {
