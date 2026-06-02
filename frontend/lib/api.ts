@@ -59,7 +59,7 @@ async function request<T>(
     if (err instanceof ApiError) throw err;
     if (err instanceof Error && err.message === "Failed to fetch") {
       throw new ApiError(
-        "Could not reach the server — the briefing may have timed out with many sources connected. Try Regenerate.",
+        "Could not reach the server — your brief may still be generating. Try Refresh brief in a moment.",
         0,
       );
     }
@@ -163,8 +163,20 @@ export type SkippedItem = {
   score: number;
 };
 
+export type DigestOutcome = {
+  saved_minutes?: number;
+  filtered_count?: number;
+  top_priority_content_ids?: string[];
+  catch_up_topics?: string[];
+  goal?: string | null;
+  skipped_note?: string;
+  items_shown?: number;
+  items_scanned?: number;
+};
+
 export type DigestItem = {
   id: string;
+  content_id?: string | null;
   position: number;
   section: string | null;
   headline: string;
@@ -189,7 +201,10 @@ export type Digest = {
   total_items_shown: number;
   created_at: string;
   items: DigestItem[];
-  meta: { skipped?: SkippedItem[] };
+  meta: {
+    skipped?: SkippedItem[];
+    outcome?: DigestOutcome;
+  };
 };
 
 export type GenerateDigestResponse = {
@@ -345,6 +360,7 @@ export type BrainDump = {
   action_items: string[];
   relevance_keywords: string[];
   should_inject_into_morning_brief: boolean;
+  tomorrow_brief_preview?: string;
   raw_transcript: string;
   input_mode: string;
   created_at: string;

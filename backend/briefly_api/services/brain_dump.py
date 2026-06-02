@@ -57,7 +57,8 @@ Process this input and output a strict JSON object:
   "intent_type": "project_idea" | "action_item" | "general_context",
   "action_items": ["string"],     // Explicit tasks found; empty array if none
   "relevance_keywords": ["string"], // Top 3-5 keywords for relevance matching
-  "should_inject_into_morning_brief": boolean
+  "should_inject_into_morning_brief": boolean,
+  "tomorrow_brief_preview": "string"  // One sentence telling the user how tomorrow's briefing will change based on this dump (e.g. "Tomorrow's brief will prioritize your notes on the fundraise and surface more AI infrastructure stories.")
 }}"""
 
 
@@ -70,6 +71,7 @@ class BrainDumpResult:
     action_items: list[str]
     relevance_keywords: list[str]
     should_inject_into_morning_brief: bool
+    tomorrow_brief_preview: str
     raw_transcript: str
     input_mode: str  # "text" | "voice"
     created_at: datetime
@@ -286,7 +288,24 @@ async def _structure_dump(raw_text: str, settings: Settings | None) -> dict:
         "action_items": [str(a) for a in (data.get("action_items") or []) if a][:10],
         "relevance_keywords": [str(k) for k in (data.get("relevance_keywords") or []) if k][:8],
         "should_inject_into_morning_brief": bool(data.get("should_inject_into_morning_brief")),
+        "tomorrow_brief_preview": _build_tomorrow_preview(data, raw_text),
     }
+
+
+def _build_tomorrow_preview(data: dict, raw_text: str) -> str:
+    preview = str(data.get("tomorrow_brief_preview") or "").strip()
+    if preview:
+        return preview[:400]
+    keywords = [str(k) for k in (data.get("relevance_keywords") or []) if k][:3]
+    if keywords:
+        joined = ", ".join(keywords)
+        return f"Tomorrow's brief will prioritize your notes on {joined} and surface more stories in those areas."
+    if data.get("action_items"):
+        return "Tomorrow's brief will highlight the action items you captured and related follow-up stories."
+    snippet = raw_text.strip()[:60]
+    if snippet:
+        return f"Tomorrow's brief will reflect what you shared about \"{snippet}…\"."
+    return "Tomorrow's brief will reflect what you shared today."
 
 
 async def _persist_dump(
@@ -322,6 +341,7 @@ async def _persist_dump(
         "action_items": structured["action_items"],
         "relevance_keywords": structured["relevance_keywords"],
         "should_inject_into_morning_brief": structured["should_inject_into_morning_brief"],
+        "tomorrow_brief_preview": structured.get("tomorrow_brief_preview", ""),
         "raw_transcript": display_transcript[:10_000],
     }
     if audio_meta:
@@ -488,6 +508,7 @@ def _raw_to_result(row: RawContent) -> BrainDumpResult:
         action_items=meta.get("action_items") or [],
         relevance_keywords=meta.get("relevance_keywords") or [],
         should_inject_into_morning_brief=bool(meta.get("should_inject_into_morning_brief")),
+        tomorrow_brief_preview=str(meta.get("tomorrow_brief_preview") or ""),
         raw_transcript=meta.get("raw_transcript") or row.raw_text or "",
         input_mode=meta.get("input_mode", "text"),
         created_at=row.ingested_at or datetime.now(timezone.utc),

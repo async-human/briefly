@@ -13,6 +13,7 @@ import logging
 from collections import defaultdict
 
 from briefly_api.agents.context import DigestItemDraft, PipelineContext
+from briefly_api.services.outcome_metrics import build_outcome_meta
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             log.warning("CitationVerifier: no source_url for '%s'", item.headline[:60])
 
     ctx.verification_warnings = warnings
+    ctx.__dict__["outcome"] = build_outcome_meta(ctx)
 
     # Render HTML email body
     ctx.html_body = _render_html(ctx)
@@ -65,52 +67,43 @@ def _build_skipped_log(ctx: PipelineContext) -> dict:
 def _render_html(ctx: PipelineContext) -> str:
     """Render the digest as an inline-CSS HTML email."""
     user_name = ctx.user.name or "there"
+    outcome = ctx.__dict__.get("outcome") or {}
+    top_ids = set(outcome.get("top_priority_content_ids") or [])
 
-    # Group items by section
+    top_items = [i for i in ctx.digest_items if i.content_id in top_ids]
+    if not top_items:
+        top_items = sorted(
+            ctx.digest_items,
+            key=lambda d: d.relevance_score,
+            reverse=True,
+        )[:3]
+    rest_items = [i for i in ctx.digest_items if i not in top_items]
+
+    saved = outcome.get("saved_minutes")
+    filtered = outcome.get("filtered_count", 0)
+    outcome_banner = ""
+    if saved:
+        outcome_banner = f"""
+          <div style="margin:0 0 28px 0;padding:16px 18px;background:#f4f1ff;border-radius:10px;border-left:4px solid #5b47e0;">
+            <p style="margin:0;font-size:14px;color:#444;line-height:1.55;">
+              <strong style="color:#5b47e0;">~{saved} min saved</strong> — Briefly scanned
+              {outcome.get("items_scanned", ctx.total_ingested)} stories and filtered
+              {filtered} you can safely skip today.
+            </p>
+          </div>"""
+
+    top_html = ""
+    if top_items:
+        top_html = _render_items_block(top_items, "Your top 3 for today")
+
+    # Group remaining items by section
     sections: dict[str, list[DigestItemDraft]] = defaultdict(list)
-    for item in ctx.digest_items:
+    for item in rest_items:
         sections[item.section or "Today"].append(item)
 
-    sections_html = ""
+    sections_html = top_html
     for section_name, items in sections.items():
-        items_html = ""
-        for item in items:
-            dupe_note = ""
-            if item.duplicate_count > 1:
-                dupe_note = (
-                    f'<p style="font-size:12px;color:#888;margin:4px 0 0 0;">'
-                    f"Also covered by {item.duplicate_count - 1} other source(s).</p>"
-                )
-            memory_note = ""
-            if item.memory_connections:
-                desc = item.memory_connections[0].get("description", "")
-                if desc:
-                    memory_note = (
-                        f'<p style="font-size:12px;color:#7c6ff7;margin:4px 0 0 0;">'
-                        f"&#128279; {desc}</p>"
-                    )
-            items_html += f"""
-            <div style="margin-bottom:28px;padding-bottom:24px;border-bottom:1px solid #f0f0f0;">
-              <h3 style="margin:0 0 8px 0;font-size:17px;line-height:1.4;font-weight:600;color:#1a1a1a;">
-                <a href="{item.source_url or '#'}" style="color:#1a1a1a;text-decoration:none;">{_esc(item.headline)}</a>
-              </h3>
-              <p style="margin:0 0 8px 0;font-size:14px;color:#444;line-height:1.6;">{_esc(item.summary)}</p>
-              <p style="margin:0 0 8px 0;font-size:14px;color:#5b47e0;line-height:1.5;font-style:italic;">
-                <strong style="font-style:normal;">Why this matters:</strong> {_esc(item.why_it_matters)}
-              </p>
-              <p style="margin:0;font-size:12px;color:#888;">
-                <a href="{item.source_url or '#'}" style="color:#888;">{_esc(item.source_name or '')}</a>
-              </p>
-              {dupe_note}{memory_note}
-            </div>"""
-
-        sections_html += f"""
-          <div style="margin-bottom:32px;">
-            <h2 style="margin:0 0 20px 0;font-size:13px;font-weight:700;letter-spacing:1.5px;
-                        text-transform:uppercase;color:#5b47e0;border-bottom:2px solid #5b47e0;
-                        padding-bottom:8px;">{_esc(section_name)}</h2>
-            {items_html}
-          </div>"""
+        sections_html += _render_items_block(items, section_name)
 
     sl = _build_skipped_log(ctx)
     n_skipped = sl["n_ingested"] - sl["n_shown"]
@@ -162,6 +155,7 @@ def _render_html(ctx: PipelineContext) -> str:
         <!-- Body -->
         <tr><td style="padding:32px;">
           <p style="margin:0 0 24px 0;font-size:15px;color:#555;">Hey {_esc(user_name)},</p>
+          {outcome_banner}
           {sections_html}
           {skipped_html}
         </td></tr>
@@ -179,6 +173,47 @@ def _render_html(ctx: PipelineContext) -> str:
   </table>
 </body>
 </html>"""
+
+
+def _render_items_block(items: list[DigestItemDraft], section_name: str) -> str:
+    items_html = ""
+    for item in items:
+        dupe_note = ""
+        if item.duplicate_count > 1:
+            dupe_note = (
+                f'<p style="font-size:12px;color:#888;margin:4px 0 0 0;">'
+                f"Also covered by {item.duplicate_count - 1} other source(s).</p>"
+            )
+        memory_note = ""
+        if item.memory_connections:
+            desc = item.memory_connections[0].get("description", "")
+            if desc:
+                memory_note = (
+                    f'<p style="font-size:12px;color:#7c6ff7;margin:4px 0 0 0;">'
+                    f"&#128279; {desc}</p>"
+                )
+        items_html += f"""
+            <div style="margin-bottom:28px;padding-bottom:24px;border-bottom:1px solid #f0f0f0;">
+              <h3 style="margin:0 0 8px 0;font-size:17px;line-height:1.4;font-weight:600;color:#1a1a1a;">
+                <a href="{item.source_url or '#'}" style="color:#1a1a1a;text-decoration:none;">{_esc(item.headline)}</a>
+              </h3>
+              <p style="margin:0 0 8px 0;font-size:14px;color:#444;line-height:1.6;">{_esc(item.summary)}</p>
+              <p style="margin:0 0 8px 0;font-size:14px;color:#5b47e0;line-height:1.5;font-style:italic;">
+                <strong style="font-style:normal;">Why this matters:</strong> {_esc(item.why_it_matters)}
+              </p>
+              <p style="margin:0;font-size:12px;color:#888;">
+                <a href="{item.source_url or '#'}" style="color:#888;">{_esc(item.source_name or '')}</a>
+              </p>
+              {dupe_note}{memory_note}
+            </div>"""
+
+    return f"""
+          <div style="margin-bottom:32px;">
+            <h2 style="margin:0 0 20px 0;font-size:13px;font-weight:700;letter-spacing:1.5px;
+                        text-transform:uppercase;color:#5b47e0;border-bottom:2px solid #5b47e0;
+                        padding-bottom:8px;">{_esc(section_name)}</h2>
+            {items_html}
+          </div>"""
 
 
 def _render_web(ctx: PipelineContext) -> str:

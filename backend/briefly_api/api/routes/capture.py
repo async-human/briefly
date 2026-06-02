@@ -38,6 +38,7 @@ def _to_out(result: brain_dump_service.BrainDumpResult) -> BrainDumpOut:
         action_items=result.action_items,
         relevance_keywords=result.relevance_keywords,
         should_inject_into_morning_brief=result.should_inject_into_morning_brief,
+        tomorrow_brief_preview=result.tomorrow_brief_preview,
         raw_transcript=result.raw_transcript,
         input_mode=result.input_mode,
         created_at=result.created_at,

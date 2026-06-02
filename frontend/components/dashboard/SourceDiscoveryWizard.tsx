@@ -152,12 +152,12 @@ export function SourceDiscoveryWizard({
     <div className="discovery-wizard">
       <div className="discovery-wizard-inner">
         <header className="discovery-wizard-head">
-          <p className="dash-card-label">Before your first briefing</p>
-          <h1 className="discovery-wizard-title">Review your sources</h1>
+          <p className="dash-card-label">Get your first brief</p>
+          <h1 className="discovery-wizard-title">Connect your inbox</h1>
           <p className="discovery-wizard-desc">
             {gmailConnected
-              ? "We scanned your Gmail inbox for newsletters you actually receive. Every source below was found in your email — not guessed from your profile keywords."
-              : "We scanned your connected accounts for sources you follow. Confirm what to include — nothing is added without your approval."}
+              ? "Briefly reads the newsletters you already receive — no feeds to manage. Confirm what to include and we'll deliver your first brief."
+              : "Connect Gmail so Briefly can learn what you follow and deliver your personalized brief — no manual source setup."}
           </p>
           {scanMeta?.gmail_messages_scanned != null && gmailConnected && !scanMeta.gmail_scan_error && (
             <p className="discovery-connected">

@@ -614,8 +614,17 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                     <p className="brain-dump-raw-text">{result.raw_transcript}</p>
                   </details>
                 )}
+                {(result.tomorrow_brief_preview || result.should_inject_into_morning_brief) && (
+                  <div className="brain-dump-tomorrow-preview">
+                    <p className="brain-dump-tomorrow-label">What happens next</p>
+                    <p className="brain-dump-tomorrow-text">
+                      {result.tomorrow_brief_preview ||
+                        "Tomorrow's brief will reflect what you shared and prioritize related stories."}
+                    </p>
+                  </div>
+                )}
                 <p className="brain-dump-footnote">
-                  Briefly updated your relevance profile. This will shape what surfaces in future briefings.
+                  Briefly updated your relevance profile from this dump.
                 </p>
                 <div className="brain-dump-success-actions">
                   <button

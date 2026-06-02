@@ -8,6 +8,8 @@ import { BriefingPanel, SourcesSidebar } from "@/components/dashboard/BriefingPa
 import { DashboardToolbar } from "@/components/dashboard/DashboardToolbar";
 import { SourceDiscoveryWizard } from "@/components/dashboard/SourceDiscoveryWizard";
 import { useBriefingGeneration } from "@/components/dashboard/BriefingGenerationProvider";
+import { getDigestOutcome } from "@/lib/digestOutcome";
+import { runSilentSourceDiscovery } from "@/lib/silentDiscovery";
 
 const FETCHABLE_SOURCE_TYPES = new Set([
   "rss", "youtube", "youtube_account", "reddit", "reddit_account",
@@ -62,6 +64,8 @@ function DashboardContent() {
   const [showDiscovery, setShowDiscovery] = useState(false);
   const [error, setError] = useState("");
   const [connectBanner, setConnectBanner] = useState<string | null>(null);
+  const [showSources, setShowSources] = useState(false);
+  const [discoveryRunning, setDiscoveryRunning] = useState(false);
   const autoGenerateChecked = useRef(false);
 
   useEffect(() => {
@@ -112,8 +116,24 @@ function DashboardContent() {
         setLoading(false);
 
         if (!meData.sources_discovery_confirmed) {
-          setShowDiscovery(true);
-          return;
+          const hasFetchable = sourcesData.some((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
+          if (meData.gmail_connected || hasFetchable) {
+            setDiscoveryRunning(true);
+            try {
+              await runSilentSourceDiscovery();
+              const freshSources = await api.getSources();
+              setSources(freshSources);
+              setMe({ ...meData, sources_discovery_confirmed: true, pending_discovery_count: 0 });
+            } catch {
+              setShowDiscovery(true);
+              setDiscoveryRunning(false);
+              return;
+            }
+            setDiscoveryRunning(false);
+          } else {
+            setShowDiscovery(true);
+            return;
+          }
         }
 
         if (autoGenerateChecked.current) return;
@@ -191,6 +211,7 @@ function DashboardContent() {
   }
 
   const fetchableSources = sources.filter((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
+  const outcome = getDigestOutcome(digest);
   const greeting = me?.user.name?.split(" ")[0] ?? "there";
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric",
@@ -202,6 +223,15 @@ function DashboardContent() {
 
   if (error || !me) {
     return <p className="form-error dash-error">{error || "Something went wrong"}</p>;
+  }
+
+  if (discoveryRunning) {
+    return (
+      <div className="outcome-discovery-loading">
+        <span className="btn-spinner" aria-hidden />
+        <p>Briefly is learning your sources — your first brief is on the way…</p>
+      </div>
+    );
   }
 
   if (showDiscovery) {
@@ -222,11 +252,12 @@ function DashboardContent() {
         name={greeting}
         dateLabel={today}
         itemCount={digest?.total_items_shown ?? null}
+        savedMinutes={outcome?.saved_minutes ?? null}
         sourceCount={fetchableSources.length}
         streak={me.reading_streak ?? 0}
         digestId={digest?.id ?? null}
         generating={generating}
-        onRegenerate={runGenerate}
+        onRefresh={runGenerate}
       />
 
       <div className="dash-layout-v3">
@@ -242,20 +273,34 @@ function DashboardContent() {
             onRegenerate={runGenerate}
           />
         </div>
-        <SourcesSidebar
-          ingestionEmail={me.ingestion_email}
-          sources={sources}
-          gmailConnected={me.gmail_connected}
-          autoSuggestions={me.auto_suggestions ?? []}
-          onSourceAdded={handleSourceAdded}
-          onSourceRemoved={handleSourceRemoved}
-          onSourceUpdated={(updated) =>
-            setSources((prev) =>
-              prev.map((s) => (s.id === updated.id ? updated : s)),
-            )
-          }
-          onRediscover={() => void handleRediscover()}
-        />
+        <aside className="dash-aside-col">
+          {showSources ? (
+            <SourcesSidebar
+              ingestionEmail={me.ingestion_email}
+              sources={sources}
+              gmailConnected={me.gmail_connected}
+              autoSuggestions={me.auto_suggestions ?? []}
+              onSourceAdded={handleSourceAdded}
+              onSourceRemoved={handleSourceRemoved}
+              onSourceUpdated={(updated) =>
+                setSources((prev) =>
+                  prev.map((s) => (s.id === updated.id ? updated : s)),
+                )
+              }
+              onRediscover={() => void handleRediscover()}
+              onClose={() => setShowSources(false)}
+            />
+          ) : (
+            <button
+              type="button"
+              className="outcome-sources-toggle"
+              onClick={() => setShowSources(true)}
+            >
+              <span className="outcome-sources-toggle-label">Briefly&apos;s sources</span>
+              <span className="outcome-sources-toggle-hint">Optional — Briefly reads in the background</span>
+            </button>
+          )}
+        </aside>
       </div>
     </>
   );

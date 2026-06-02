@@ -16,6 +16,8 @@ import { SourceSuggestions } from "./SourceSuggestions";
 import { IngestionPanel } from "./IngestionPanel";
 import { sourceDisplayName } from "./sourceLabels";
 import { SourceIcon } from "@/components/SourceIcon";
+import { OutcomeBriefHeader, SafeToIgnorePanel } from "./OutcomeBriefHeader";
+import { getDigestOutcome, splitTopPriorityItems } from "@/lib/digestOutcome";
 
 const PREVIEW_LIMIT = 5;
 
@@ -28,6 +30,7 @@ type SourcesSidebarProps = {
   onSourceRemoved: (sourceId: string) => void;
   onSourceUpdated?: (source: Source) => void;
   onRediscover?: () => void;
+  onClose?: () => void;
 };
 
 export function SourcesSidebar({
@@ -39,6 +42,7 @@ export function SourcesSidebar({
   onSourceRemoved,
   onSourceUpdated,
   onRediscover,
+  onClose,
 }: SourcesSidebarProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [priorityId, setPriorityId] = useState<string | null>(null);
@@ -80,12 +84,19 @@ export function SourcesSidebar({
       <div className="dash-card dash-card-primary">
         <div className="dash-card-head">
           <div>
-            <h2 className="dash-card-title">Sources</h2>
+            <h2 className="dash-card-title">Briefly&apos;s sources</h2>
             <p className="dash-card-desc dash-card-desc-tight">
-              Star sources you always want in your briefing (Medium, YC, etc.).
+              Optional. Briefly discovers and reads sources automatically — adjust only if you want to.
             </p>
           </div>
-          <span className="source-count">{sources.length}</span>
+          <div className="dash-card-head-actions">
+            <span className="source-count">{sources.length}</span>
+            {onClose && (
+              <button type="button" className="outcome-sources-close" onClick={onClose} aria-label="Close sources">
+                ×
+              </button>
+            )}
+          </div>
         </div>
         <AddSourceForm onAdded={onSourceAdded} />
         {sources.length > 0 && (
@@ -428,11 +439,11 @@ export function BriefingPanel({
         <div className="briefing-empty-icon">
           <span className="briefing-empty-ring" />
         </div>
-        <h2 className="briefing-empty-title">Your briefing will appear here</h2>
+        <h2 className="briefing-empty-title">Briefly is preparing your outcome</h2>
         <p className="briefing-empty-desc">
           {sourcesCount > 0
-            ? "We're preparing today's items. This usually takes a minute with many sources."
-            : "Add a source in the sidebar to get your first briefing."}
+            ? "We read your sources overnight — your personalized brief will arrive shortly."
+            : "Connect Gmail and Briefly will deliver your first brief — no source management needed."}
         </p>
         {sourcesCount > 0 && onRegenerate && !generating && (
           <button
@@ -440,7 +451,7 @@ export function BriefingPanel({
             className="briefing-refresh briefing-empty-regenerate"
             onClick={onRegenerate}
           >
-            Regenerate briefing
+            Refresh today&apos;s brief
           </button>
         )}
         {generateError && <p className="form-error" style={{ marginTop: 16 }}>{generateError}</p>}
@@ -448,25 +459,26 @@ export function BriefingPanel({
     );
   }
 
-  const preview = buildGroupedPreview(digest.items, PREVIEW_LIMIT);
-  const remaining = digest.items.length - preview.shown;
+  const outcome = getDigestOutcome(digest);
+  const { topItems, restItems } = splitTopPriorityItems(digest, outcome);
+  const restPreview = buildGroupedPreview(restItems, PREVIEW_LIMIT);
+  const remaining = restItems.length - restPreview.shown;
   let previewIndex = 0;
+  const skipped = digest.meta?.skipped ?? [];
 
   return (
-    <div className="briefing-panel">
-      <div className="briefing-panel-header briefing-panel-header-compact">
-        <div>
-          <h2 className="briefing-panel-title">Today&apos;s briefing</h2>
-          <p className="briefing-panel-sub briefing-panel-sub-inline">
-            {digest.total_items_shown} curated items · {digest.digest_date}
-          </p>
-        </div>
-      </div>
+    <div className="briefing-panel briefing-panel-outcome">
+      <OutcomeBriefHeader
+        outcome={outcome}
+        generating={generating}
+        itemCount={digest.total_items_shown}
+        digestDate={digest.digest_date}
+      />
 
       {generating && (
         <div className="briefing-generating-bar">
           <span className="briefing-generating-dot" />
-          {generatingLabel || "Updating your briefing…"}
+          {generatingLabel || "Updating your brief…"}
         </div>
       )}
 
@@ -479,55 +491,78 @@ export function BriefingPanel({
       )}
 
       <div className="briefing-preview-list">
-        {generating && !digest ? (
-          Array.from({ length: 4 }).map((_, i) => <BriefingItemSkeleton key={i} />)
-        ) : preview.shown > 0 ? (
-          <div className={generating ? "briefing-preview-list-updating" : undefined}>
-          {preview.groups.map((group) => (
-            <section key={group.section} className="briefing-section-group">
+        <div className={generating ? "briefing-preview-list-updating" : undefined}>
+          {topItems.length > 0 && (
+            <section className="briefing-section-group briefing-section-top3">
               <header className="briefing-section-head">
-                <span className={sectionBadgeClass(group.section)}>{group.section}</span>
-                {sectionSubtitle(group.section) && (
-                  <p className="briefing-section-sub">{sectionSubtitle(group.section)}</p>
-                )}
+                <span className="briefing-section-badge briefing-section-badge-top">Top 3 for today</span>
+                <p className="briefing-section-sub">What deserves your attention first</p>
               </header>
               <div className="briefing-section-items">
-                {group.items.map((item) => {
-                  previewIndex += 1;
-                  return (
-                    <BriefingPreviewItem
-                      key={item.id}
-                      item={item}
-                      index={previewIndex - 1}
-                      digestId={digest.id}
-                    />
-                  );
-                })}
+                {topItems.map((item, index) => (
+                  <BriefingPreviewItem
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    digestId={digest.id}
+                  />
+                ))}
               </div>
             </section>
-          ))}
-          </div>
-        ) : (
-          <div className="briefing-tab-empty">
-            <p>No items in today&apos;s briefing.</p>
-            {sourcesCount > 0 && onRegenerate && (
-              <button
-                type="button"
-                className="briefing-tab-empty-btn btn-primary"
-                onClick={onRegenerate}
-              >
-                Regenerate briefing
-              </button>
-            )}
-          </div>
-        )}
+          )}
+
+          {restPreview.shown > 0 ? (
+            restPreview.groups.map((group) => (
+              <section key={group.section} className="briefing-section-group">
+                <header className="briefing-section-head">
+                  <span className={sectionBadgeClass(group.section)}>{group.section}</span>
+                  {sectionSubtitle(group.section) && (
+                    <p className="briefing-section-sub">{sectionSubtitle(group.section)}</p>
+                  )}
+                </header>
+                <div className="briefing-section-items">
+                  {group.items.map((item) => {
+                    previewIndex += 1;
+                    return (
+                      <BriefingPreviewItem
+                        key={item.id}
+                        item={item}
+                        index={topItems.length + previewIndex - 1}
+                        digestId={digest.id}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
+            ))
+          ) : topItems.length === 0 ? (
+            <div className="briefing-tab-empty">
+              <p>No items in today&apos;s brief yet.</p>
+              {sourcesCount > 0 && onRegenerate && (
+                <button
+                  type="button"
+                  className="briefing-tab-empty-btn btn-primary"
+                  onClick={onRegenerate}
+                >
+                  Refresh today&apos;s brief
+                </button>
+              )}
+            </div>
+          ) : null}
+        </div>
       </div>
+
+      <SafeToIgnorePanel
+        skippedNote={outcome?.skipped_note}
+        skippedItems={skipped}
+        filteredCount={outcome?.filtered_count ?? 0}
+      />
 
       {digest.items.length > 0 && (
         <div className={`briefing-preview-footer${generating ? " briefing-preview-footer-dimmed" : ""}`}>
           {remaining > 0 && (
             <p className="briefing-preview-more">
-              +{remaining} more item{remaining === 1 ? "" : "s"} in reading mode
+              +{remaining} more in reading mode
             </p>
           )}
           <Link href={`/dashboard/read/${digest.id}`} className="briefing-preview-cta">

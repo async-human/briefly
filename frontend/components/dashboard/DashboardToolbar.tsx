@@ -8,22 +8,24 @@ type DashboardToolbarProps = {
   name: string;
   dateLabel: string;
   itemCount: number | null;
+  savedMinutes?: number | null;
   sourceCount: number;
   streak: number;
   digestId: string | null;
   generating: boolean;
-  onRegenerate?: () => void;
+  onRefresh?: () => void;
 };
 
 export function DashboardToolbar({
   name,
   dateLabel,
   itemCount,
+  savedMinutes,
   sourceCount,
   streak,
   digestId,
   generating,
-  onRegenerate,
+  onRefresh,
 }: DashboardToolbarProps) {
   const [greeting, setGreeting] = useState<TimeGreeting | null>(null);
 
@@ -37,7 +39,7 @@ export function DashboardToolbar({
   return (
     <header className="dash-toolbar">
       <div className="dash-toolbar-intro">
-        <p className="dash-toolbar-eyebrow">{greeting?.briefingLabel ?? "Your briefing"}</p>
+        <p className="dash-toolbar-eyebrow">{greeting?.briefingLabel ?? "Your outcome"}</p>
         <div className="dash-toolbar-heading-row">
           <h1 className="dash-toolbar-title">
             {greeting?.label ?? "Hello"}, {name}
@@ -47,7 +49,7 @@ export function DashboardToolbar({
         {generating && (
           <p className="dash-toolbar-status">
             <span className="briefing-generating-dot" aria-hidden />
-            Preparing your briefing…
+            Delivering your brief in the background…
           </p>
         )}
       </div>
@@ -58,10 +60,16 @@ export function DashboardToolbar({
             {itemCount != null && (
               <li>
                 <span className="dash-toolbar-stat-value">{itemCount}</span>
-                <span className="dash-toolbar-stat-label">items</span>
+                <span className="dash-toolbar-stat-label">curated</span>
               </li>
             )}
-            <li>
+            {savedMinutes != null && savedMinutes > 0 && (
+              <li>
+                <span className="dash-toolbar-stat-value">~{savedMinutes}m</span>
+                <span className="dash-toolbar-stat-label">saved</span>
+              </li>
+            )}
+            <li className="dash-toolbar-stat-hidden-mobile">
               <span className="dash-toolbar-stat-value">{sourceCount}</span>
               <span className="dash-toolbar-stat-label">sources</span>
             </li>
@@ -81,14 +89,14 @@ export function DashboardToolbar({
               <span className="dash-toolbar-primary-arrow" aria-hidden>→</span>
             </Link>
           )}
-          {onRegenerate && sourceCount > 0 && (
+          {onRefresh && sourceCount > 0 && (
             <button
               type="button"
               className="dash-toolbar-secondary"
-              onClick={onRegenerate}
+              onClick={onRefresh}
               disabled={generating}
             >
-              {generating ? "Regenerating…" : "Regenerate"}
+              {generating ? "Refreshing…" : "Refresh brief"}
             </button>
           )}
         </div>

@@ -105,6 +105,7 @@ class MeOut(BaseModel):
 
 class DigestItemOut(BaseModel):
     id: str
+    content_id: str | None = None
     position: int
     section: str | None
     headline: str
@@ -317,6 +318,7 @@ class BrainDumpOut(BaseModel):
     action_items: list[str] = Field(default_factory=list)
     relevance_keywords: list[str] = Field(default_factory=list)
     should_inject_into_morning_brief: bool = False
+    tomorrow_brief_preview: str = ""
     raw_transcript: str
     input_mode: str
     created_at: datetime
