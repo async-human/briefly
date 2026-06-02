@@ -12,7 +12,6 @@ import {
 import { AddSourceForm, CopyEmailButton } from "./AddSourceForm";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { GmailDiscovery } from "./GmailDiscovery";
-import { SourceSuggestions } from "./SourceSuggestions";
 import { IngestionPanel } from "./IngestionPanel";
 import { sourceDisplayName } from "./sourceLabels";
 import { SourceIcon } from "@/components/SourceIcon";
