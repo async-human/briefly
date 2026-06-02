@@ -526,14 +526,16 @@ export function Roadmap() {
         </Reveal>
 
         <Reveal delay={0.1}>
-          <JourneyTrack
-            active={active}
-            onSelect={selectStage}
-            inView={inView}
-            progress={progress}
-            remainingSec={remainingSec}
-            paused={paused}
-          />
+          <div className="rm3-track-wrap">
+            <JourneyTrack
+              active={active}
+              onSelect={selectStage}
+              inView={inView}
+              progress={progress}
+              remainingSec={remainingSec}
+              paused={paused}
+            />
+          </div>
         </Reveal>
 
         <div
@@ -553,13 +555,15 @@ export function Roadmap() {
         </div>
 
         <Reveal delay={0.15}>
-          <StageStrip
-            active={active}
-            onSelect={selectStage}
-            progress={progress}
-            remainingSec={remainingSec}
-            paused={paused}
-          />
+          <div className="rm3-strip-wrap">
+            <StageStrip
+              active={active}
+              onSelect={selectStage}
+              progress={progress}
+              remainingSec={remainingSec}
+              paused={paused}
+            />
+          </div>
         </Reveal>
 
         <Reveal delay={0.25}>

@@ -3469,21 +3469,23 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   font-size: 15px;
 }
 
-/* Interactive track */
+/* Interactive track — all versions in one row */
 .rm3-track {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  max-width: 720px;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: 920px;
   margin: 48px auto 0;
   padding: 0 8px;
 }
 .rm3-track-rail {
   position: absolute;
   top: 28px;
-  left: 12.5%;
-  right: 12.5%;
+  left: 10%;
+  right: 10%;
   height: 2px;
   background: var(--border);
   border-radius: 2px;
@@ -3517,6 +3519,8 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   cursor: pointer;
   position: relative;
   z-index: 1;
+  flex: 1 1 0;
+  min-width: 0;
   transition: transform 0.2s ease;
 }
 .rm3-track-node:hover { transform: translateY(-2px); }
@@ -3574,6 +3578,10 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   opacity: 0;
   transform: translateY(4px);
   transition: opacity 0.25s, transform 0.25s;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .rm3-track-node.active .rm3-track-badge {
   opacity: 1;
@@ -3991,11 +3999,14 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   pointer-events: none;
 }
 
-/* Stage strip */
+.rm3-track-wrap,
+.rm3-strip-wrap {
+  width: 100%;
+}
 .rm3-strip {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
   margin-top: 20px;
 }
 .rm3-strip-card {
@@ -4005,7 +4016,9 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  padding: 16px 18px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 14px 12px;
   border-radius: 16px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -4035,9 +4048,13 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
 }
 .rm3-strip-card.active .rm3-strip-ver { color: var(--accent); }
 .rm3-strip-name {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
   line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
 }
 .rm3-footnote {
   margin-top: 36px;
@@ -4099,11 +4116,31 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   .rm2-watermark { font-size: 100px; }
   .rm2-track { max-width: 320px; }
 
+  .rm3-track-wrap,
+  .rm3-strip-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-left: -20px;
+    margin-right: -20px;
+    padding: 0 20px;
+    scrollbar-width: none;
+  }
+  .rm3-track-wrap::-webkit-scrollbar,
+  .rm3-strip-wrap::-webkit-scrollbar {
+    display: none;
+  }
+
   .rm3-track {
-    grid-template-columns: repeat(4, 1fr);
-    max-width: 100%;
-    gap: 4px;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 8px;
+    max-width: none;
+    min-width: min(100%, 520px);
     margin-top: 36px;
+  }
+  .rm3-track-node {
+    flex: 0 0 88px;
   }
   .rm3-track-dot {
     width: 44px;
@@ -4113,8 +4150,8 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   .rm3-track-badge { display: none; }
   .rm3-track-rail {
     top: 22px;
-    left: 10%;
-    right: 10%;
+    left: 44px;
+    right: 44px;
   }
   .rm3-spotlight {
     padding: 28px 22px;
@@ -4131,10 +4168,15 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
     gap: 28px;
   }
   .rm3-strip {
-    grid-template-columns: repeat(2, 1fr);
+    display: flex;
+    flex-wrap: nowrap;
     gap: 10px;
+    min-width: 640px;
   }
-  .rm3-strip-name { font-size: 11px; }
+  .rm3-strip-card {
+    flex: 0 0 120px;
+  }
+  .rm3-strip-name { font-size: 10px; }
   .rm3-stage-wrap { min-height: 420px; }
 }
 
