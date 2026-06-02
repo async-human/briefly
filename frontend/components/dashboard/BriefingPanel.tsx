@@ -509,6 +509,103 @@ function fmtElapsed(sec: number): string {
   return `${m}m ${s.toString().padStart(2, "0")}s`;
 }
 
+// Map backend label text to a step index (0-3) so we don't do fragile string matching everywhere
+function labelToStepIndex(lbl: string): number {
+  const l = lbl.toLowerCase();
+  if (l.includes("collect") || l.includes("source") || l.includes("fetch") ||
+      l.includes("ingest") || l.includes("clean") || l.includes("normaliz")) return 0;
+  if (l.includes("relev") || l.includes("scor") || l.includes("novel") ||
+      l.includes("dedup") || l.includes("duplic")) return 1;
+  if (l.includes("memory") || l.includes("plann") || l.includes("history") ||
+      l.includes("thread") || l.includes("verif")) return 2;
+  if (l.includes("writ") || l.includes("dump") || l.includes("deliver") ||
+      l.includes("ready") || l.includes("done")) return 3;
+  return 0; // default to first step
+}
+
+const PIPELINE_STEPS = [
+  { label: "Reading your sources",      hint: "Fetching & cleaning content" },
+  { label: "Scoring relevance",         hint: "Matching to your interests" },
+  { label: "Connecting to your history",hint: "Memory, threads, dedup" },
+  { label: "Writing your briefing",     hint: "Personalised with Haiku" },
+];
+
+function GeneratingPanel({
+  statusLabel,
+  elapsedSec,
+  isUpdate,
+}: {
+  statusLabel: string;
+  elapsedSec: number;
+  isUpdate: boolean; // true = updating existing digest, false = first time
+}) {
+  const activeStep = labelToStepIndex(statusLabel);
+
+  return (
+    <div className="bgl-panel">
+      {/* ── Header ── */}
+      <div className="bgl-panel-header">
+        <span className="bgl-pulse-ring" aria-hidden />
+        <div className="bgl-panel-header-text">
+          <h2 className="bgl-panel-title">
+            {isUpdate ? "Generating today's brief" : "Building your first briefing"}
+          </h2>
+          <p className="bgl-panel-subtitle">
+            {elapsedSec > 0
+              ? `${fmtElapsed(elapsedSec)}${elapsedSec < 45 ? " · usually under a minute" : ""}`
+              : "Starting up…"}
+          </p>
+        </div>
+      </div>
+
+      {/* ── Current label from backend ── */}
+      <p className="bgl-panel-live-label">
+        <span className="bgl-panel-live-dot" aria-hidden />
+        {statusLabel}
+      </p>
+
+      {/* ── Pipeline steps ── */}
+      <div className="bgl-panel-steps">
+        {PIPELINE_STEPS.map((step, i) => {
+          const state =
+            i < activeStep ? "done" :
+            i === activeStep ? "active" :
+            "pending";
+          return (
+            <div key={step.label} className={`bgl-panel-step bgl-panel-step--${state}`}>
+              <div className="bgl-panel-step-indicator">
+                {state === "done" ? (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5"
+                      strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : state === "active" ? (
+                  <span className="bgl-panel-step-pulse" aria-hidden />
+                ) : (
+                  <span className="bgl-panel-step-empty" aria-hidden />
+                )}
+              </div>
+              <div className="bgl-panel-step-body">
+                <span className="bgl-panel-step-label">{step.label}</span>
+                {state === "active" && (
+                  <span className="bgl-panel-step-hint">{step.hint}</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Ghost skeleton items ── */}
+      <div className="bgl-panel-ghost">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <BriefingItemSkeleton key={i} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function BriefingPanel({
   digest,
   sourcesCount,
@@ -520,55 +617,22 @@ export function BriefingPanel({
   onRegenerate,
 }: BriefingPanelProps) {
   const statusLabel = generatingLabel || GENERATING_PHASES[0];
-  if (!digest) {
-    if (generating) {
-      return (
-        <div className="briefing-panel">
-          <div className="briefing-generating-live">
-            <div className="briefing-generating-live-header">
-              <span className="briefing-generating-dot briefing-generating-dot-lg" />
-              <div>
-                <h2 className="briefing-generating-live-title">Building your briefing</h2>
-                {generatingElapsedSec > 0 && (
-                  <p className="briefing-generating-live-elapsed">
-                    {fmtElapsed(generatingElapsedSec)}
-                    {generatingElapsedSec < 30 && " · usually under a minute"}
-                  </p>
-                )}
-              </div>
-            </div>
-            <p className="briefing-generating-live-label">{statusLabel}</p>
-            <div className="briefing-generating-live-steps">
-              {(["Collecting sources", "Scoring relevance", "Removing duplicates", "Writing briefing"] as const).map((step, i) => {
-                const lbl = statusLabel.toLowerCase();
-                const isActive =
-                  (i === 0 && (lbl.includes("collect") || lbl.includes("source") || lbl.includes("fetch") || lbl.includes("clean") || lbl.includes("ingest"))) ||
-                  (i === 1 && (lbl.includes("relev") || lbl.includes("scor") || lbl.includes("novel"))) ||
-                  (i === 2 && (lbl.includes("dedup") || lbl.includes("memory") || lbl.includes("plann"))) ||
-                  (i === 3 && (lbl.includes("writ") || lbl.includes("deliver") || lbl.includes("verif") || lbl.includes("dump")));
-                const isDone =
-                  (i === 0 && !lbl.includes("collect") && !lbl.includes("source") && !lbl.includes("fetch") && !lbl.includes("clean") && !lbl.includes("ingest")) ||
-                  (i === 1 && (lbl.includes("dedup") || lbl.includes("memory") || lbl.includes("plann") || lbl.includes("writ") || lbl.includes("deliver"))) ||
-                  (i === 2 && (lbl.includes("writ") || lbl.includes("deliver") || lbl.includes("verif")));
-                return (
-                  <div key={step} className={`bgl-step${isActive ? " bgl-step-active" : isDone ? " bgl-step-done" : ""}`}>
-                    <span className="bgl-step-dot" />
-                    <span className="bgl-step-label">{step}</span>
-                    {isDone && <span className="bgl-step-check" aria-hidden>✓</span>}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="briefing-generating-live-ghost">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <BriefingItemSkeleton key={i} />
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-    }
 
+  // ── Generating state — shown ALWAYS when generating, regardless of prior digest ──
+  if (generating) {
+    return (
+      <div className="briefing-panel">
+        <GeneratingPanel
+          statusLabel={statusLabel}
+          elapsedSec={generatingElapsedSec}
+          isUpdate={!!digest}
+        />
+      </div>
+    );
+  }
+
+  // ── Error state — no digest and generation failed ──
+  if (!digest) {
     return (
       <div className="briefing-empty">
         <div className="briefing-empty-icon">
@@ -580,7 +644,7 @@ export function BriefingPanel({
             ? "We read your sources overnight — your personalized brief will arrive shortly."
             : "Connect Gmail and Briefly will deliver your first brief — no source management needed."}
         </p>
-        {sourcesCount > 0 && onRegenerate && !generating && (
+        {sourcesCount > 0 && onRegenerate && (
           <button
             type="button"
             className="briefing-refresh briefing-empty-regenerate"
@@ -600,31 +664,20 @@ export function BriefingPanel({
   const remaining = restItems.length - restPreview.shown;
   let previewIndex = 0;
   const skipped = digest.meta?.skipped ?? [];
-  const blocked = digest.meta?.blocked;       // explicitly rejected items (new field)
-  const moreToday = digest.meta?.more_today;  // good-fit items cut for length (new field)
+  const blocked = digest.meta?.blocked;
+  const moreToday = digest.meta?.more_today;
 
   return (
     <div className="briefing-panel briefing-panel-outcome">
       <OutcomeBriefHeader
         outcome={outcome}
-        generating={generating}
+        generating={false}
         itemCount={digest.total_items_shown}
         digestDate={digest.digest_date}
       />
 
-      {generating && (
-        <div className="briefing-updating-banner">
-          <div className="briefing-updating-left">
-            <span className="briefing-generating-dot" />
-            <div className="briefing-updating-text">
-              <span className="briefing-updating-title">Generating today&apos;s brief</span>
-              <span className="briefing-updating-label">{generatingLabel || "Working…"}</span>
-            </div>
-          </div>
-          {generatingElapsedSec > 0 && (
-            <span className="briefing-updating-elapsed">{fmtElapsed(generatingElapsedSec)}</span>
-          )}
-        </div>
+      {generateError && (
+        <p className="form-error briefing-error">{generateError}</p>
       )}
 
       {generateWarnings.length > 0 && (
@@ -636,7 +689,7 @@ export function BriefingPanel({
       )}
 
       <div className="briefing-preview-list">
-        <div className={generating ? "briefing-preview-list-updating" : undefined}>
+        <div>
           {topItems.length > 0 && (
             <section className="briefing-section-group briefing-section-top3">
               <header className="briefing-section-head">
