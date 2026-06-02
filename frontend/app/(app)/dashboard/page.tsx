@@ -9,7 +9,7 @@ import { DashboardToolbar } from "@/components/dashboard/DashboardToolbar";
 import { SourceDiscoveryWizard } from "@/components/dashboard/SourceDiscoveryWizard";
 import { useBriefingGeneration } from "@/components/dashboard/BriefingGenerationProvider";
 import { getDigestOutcome } from "@/lib/digestOutcome";
-import { needsBriefingForToday } from "@/lib/localDate";
+import { needsBriefingForToday, localDateString } from "@/lib/localDate";
 import { runSilentSourceDiscovery } from "@/lib/silentDiscovery";
 
 const FETCHABLE_SOURCE_TYPES = new Set([
@@ -68,10 +68,8 @@ function DashboardContent() {
   const [connectBanner, setConnectBanner] = useState<string | null>(null);
   const [showSources, setShowSources] = useState(false);
   const [discoveryRunning, setDiscoveryRunning] = useState(false);
-  // Session-level generation guard — persists across navigation within the same browser tab.
-  // Unlike useRef, sessionStorage survives component unmount/remount (tab switches, Back/Forward).
+  // In-render guard — prevents double-trigger within one mount lifecycle.
   const autoGenerateChecked = useRef(false);
-  const sessionGenKey = useRef<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -154,25 +152,36 @@ function DashboardContent() {
         const digestTimezone = meData.profile?.digest_timezone;
         const hasSources = sourcesData.some((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
 
-        // Build a session-scoped key — one auto-generation attempt per user per calendar day.
-        // sessionStorage persists across SPA navigations but clears on tab close / new session.
-        const todayKey = `briefly_autogen_${meData.user.id}_${new Date().toISOString().slice(0, 10)}`;
-        sessionGenKey.current = todayKey;
-        const alreadyTriggeredThisSession =
-          typeof sessionStorage !== "undefined" && !!sessionStorage.getItem(todayKey);
-
-        if (autoGenerateChecked.current || alreadyTriggeredThisSession) return;
+        // ── Auto-generation guard ────────────────────────────────────────────
+        // Rules:
+        //  1. Never generate if today's digest already exists and has items.
+        //  2. Generate at most once per local calendar day per user, regardless
+        //     of login/logout cycles, browser restarts, or tab switches.
+        //     Uses localStorage (not sessionStorage) so the flag persists
+        //     across page reloads and new browser sessions.
+        //  3. Manual "Refresh brief" always works — it bypasses this guard by
+        //     calling runGenerate() directly.
+        if (autoGenerateChecked.current) return;
         autoGenerateChecked.current = true;
 
-        // Don't generate if EITHER the context digest OR the freshly-fetched digest is valid.
-        // The context may already have a brand-new digest that digestData hasn't caught up to yet.
+        // Rule 1 — valid digest already in context or just fetched from API
+        const localToday = localDateString(digestTimezone);
         const ctxDigestOk = digest && !needsBriefingForToday(digest, digestTimezone);
         const apiDigestOk = digestData && !needsBriefingForToday(digestData, digestTimezone);
         if (ctxDigestOk || apiDigestOk) return;
 
+        // Rule 2 — one attempt per day, stored in localStorage
+        const lsKey = `briefly_gen_${meData.user.id}`;
+        const lastGenDate = typeof localStorage !== "undefined"
+          ? localStorage.getItem(lsKey)
+          : null;
+        if (lastGenDate === localToday) return;
+
         if (hasSources && !generating) {
-          if (typeof sessionStorage !== "undefined") {
-            sessionStorage.setItem(todayKey, "1");
+          // Record the attempt BEFORE triggering so tab-switches during generation
+          // don't fire a second attempt.
+          if (typeof localStorage !== "undefined") {
+            localStorage.setItem(lsKey, localToday);
           }
           ensureBriefing();
         }
@@ -282,7 +291,7 @@ function DashboardContent() {
 
       <div className="dash-layout-v3">
         <div className="dash-main-col">
-          <BriefingPanel
+            <BriefingPanel
             digest={digest}
             sources={fetchableSources}
             sourcesCount={fetchableSources.length}
@@ -291,7 +300,13 @@ function DashboardContent() {
             generatingElapsedSec={generatingElapsedSec}
             generateError={generateError}
             generateWarnings={generateWarnings}
-            onRegenerate={runGenerate}
+            onRegenerate={() => {
+              // Clear the daily guard so a manual refresh always works
+              if (me && typeof localStorage !== "undefined") {
+                localStorage.removeItem(`briefly_gen_${me.user.id}`);
+              }
+              runGenerate();
+            }}
           />
         </div>
         <aside className="dash-aside-col">
