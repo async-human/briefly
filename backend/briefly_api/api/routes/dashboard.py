@@ -481,7 +481,21 @@ async def generate_digest_now(
     meta = dict(profile.ingestion_meta or {})
     gen = meta.get("briefing_generation") or {}
     if gen.get("status") == "running":
-        return GenerateDigestOut(status="running", digest=None, warnings=[])
+        # Guard against stale "running" state left by a crashed worker.
+        # If started_at is older than 15 minutes, the worker is gone — clear it.
+        started_raw = gen.get("started_at", "")
+        is_stale = True
+        if started_raw:
+            try:
+                started_dt = datetime.fromisoformat(started_raw.replace("Z", "+00:00"))
+                if started_dt.tzinfo is None:
+                    started_dt = started_dt.replace(tzinfo=timezone.utc)
+                age_minutes = (datetime.now(timezone.utc) - started_dt).total_seconds() / 60
+                is_stale = age_minutes > 15
+            except Exception:
+                is_stale = True
+        if not is_stale:
+            return GenerateDigestOut(status="running", digest=None, warnings=[])
 
     if not force:
         from briefly_api.utils.dates import local_date_string

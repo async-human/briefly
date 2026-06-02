@@ -264,21 +264,37 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
 
     digest_id = str(uuid.uuid4())
     resend_message_id = ctx.__dict__.get("resend_message_id")
-    # Build human-readable skipped-item list for the reading-mode transparency layer
-    _REASON_LABELS = {
+    # Truly filtered: failed relevance or matched never-show list
+    _BLOCKED_LABELS = {
         "never_show":    "Topic you've blocked",
         "low_relevance": "Low relevance score",
-        "crowded_out":   "Good fit — cut for length",
+        "too_old":       "Too old for today's digest",
     }
-    skipped_preview = [
+    blocked_items = [
         {
             "title":  item.title,
             "source": item.source_name or "",
-            "reason": _REASON_LABELS.get(item.drop_reason, item.drop_reason or "Filtered"),
+            "reason": _BLOCKED_LABELS.get(item.drop_reason, item.drop_reason or "Filtered"),
             "score":  round(item.relevance_score, 2),
         }
-        for item in (list(getattr(ctx, "dropped_items", [])) + list(getattr(ctx, "crowded_out_items", [])))[:25]
+        for item in list(getattr(ctx, "dropped_items", []))[:30]
     ]
+
+    # Good fit but cut for length — these are bonus reading, not rejections
+    crowded_out = list(getattr(ctx, "crowded_out_items", []))
+    more_today = sorted(crowded_out, key=lambda i: i.relevance_score, reverse=True)
+    more_today_preview = [
+        {
+            "title":  item.title,
+            "source": item.source_name or "",
+            "url":    item.url or "",
+            "score":  round(item.relevance_score, 2),
+        }
+        for item in more_today[:50]
+    ]
+
+    # Kept for backward compat — merged list used by older email renderer
+    skipped_preview = blocked_items[:25]
 
     outcome = ctx.__dict__.get("outcome") or {}
 
@@ -298,6 +314,8 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
         resend_message_id=resend_message_id,
         meta={
             "skipped": skipped_preview,
+            "blocked": blocked_items,
+            "more_today": more_today_preview,
             "stage_timings": ctx.__dict__.get("stage_timings", {}),
             "outcome": outcome,
         },

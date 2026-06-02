@@ -163,6 +163,13 @@ export type SkippedItem = {
   score: number;
 };
 
+export type BonusItem = {
+  title: string;
+  source: string;
+  url: string;
+  score: number;
+};
+
 export type DigestOutcome = {
   saved_minutes?: number;
   filtered_count?: number;
@@ -206,7 +213,9 @@ export type Digest = {
   created_at: string;
   items: DigestItem[];
   meta: {
-    skipped?: SkippedItem[];
+    skipped?: SkippedItem[];      // backward compat: truly filtered items
+    blocked?: SkippedItem[];      // explicitly rejected: never_show, low_relevance
+    more_today?: BonusItem[];     // good fit but cut for daily length cap
     outcome?: DigestOutcome;
   };
 };

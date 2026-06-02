@@ -19,7 +19,8 @@ export function needsBriefingForToday(
   if (!digest) return true;
   if (digest.digest_date < today) return true;
   if (digest.digest_date === today) {
-    const count = digest.total_items_shown ?? digest.items?.length ?? 0;
+    // Use || not ?? — total_items_shown can be 0 (falsy integer), not just null/undefined
+    const count = digest.total_items_shown || digest.items?.length || 0;
     if (count === 0) return true;
   }
   return false;

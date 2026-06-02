@@ -243,9 +243,13 @@ function ReadingCard({
 function CompletionScreen({
   digest, savedCount, elapsed, streak, onBack,
 }: { digest: Digest; savedCount: number; elapsed: number; streak: number; onBack: () => void }) {
-  const [skippedOpen, setSkippedOpen] = useState(false);
-  const skipped = digest.meta?.skipped ?? [];
-  const filtered = digest.total_items_ingested - digest.total_items_shown;
+  const [moreTodayOpen, setMoreTodayOpen] = useState(false);
+  const [blockedOpen, setBlockedOpen] = useState(false);
+
+  // Good-fit articles cut for length — bonus reading, not rejections
+  const moreToday = digest.meta?.more_today ?? [];
+  // Truly filtered: never_show, low_relevance, too_old
+  const blocked = digest.meta?.blocked ?? digest.meta?.skipped ?? [];
 
   return (
     <div className="read-complete">
@@ -287,19 +291,19 @@ function CompletionScreen({
           <strong>{fmtTime(elapsed)}</strong>.
         </p>
 
-        {/* ⑥ Skipped items transparency layer */}
-        {(skipped.length > 0 || filtered > 0) && (
-          <div className="read-skipped">
+        {/* ── More from today — good fit, cut for length cap ── */}
+        {moreToday.length > 0 && (
+          <div className="read-more-today">
             <button
               className="read-skipped-toggle"
-              onClick={() => setSkippedOpen((v) => !v)}
+              onClick={() => setMoreTodayOpen((v) => !v)}
             >
-              <span>
-                What I filtered today
-                {filtered > 0 ? ` (${filtered} items)` : ""}
+              <span className="read-more-today-label">
+                More from today
+                <span className="read-more-today-count"> · {moreToday.length} articles</span>
               </span>
               <motion.span
-                animate={{ rotate: skippedOpen ? 180 : 0 }}
+                animate={{ rotate: moreTodayOpen ? 180 : 0 }}
                 transition={{ duration: 0.2 }}
               >
                 ▾
@@ -307,7 +311,76 @@ function CompletionScreen({
             </button>
 
             <AnimatePresence>
-              {skippedOpen && (
+              {moreTodayOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <p className="read-more-today-desc">
+                    Briefly caps your daily digest at {digest.items.length} items to keep it
+                    scannable. These {moreToday.length} articles also scored well today — open
+                    any you want to read.
+                  </p>
+                  <div className="read-more-today-list">
+                    {moreToday.map((item, i) => (
+                      <div key={i} className="read-more-today-item">
+                        <div className="read-more-today-body">
+                          {item.url ? (
+                            <a
+                              href={item.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="read-more-today-title"
+                            >
+                              {item.title}
+                            </a>
+                          ) : (
+                            <span className="read-more-today-title">{item.title}</span>
+                          )}
+                          {item.source && (
+                            <span className="read-more-today-source">{item.source}</span>
+                          )}
+                        </div>
+                        {item.url && (
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="read-more-today-link"
+                            aria-label={`Read ${item.title}`}
+                          >
+                            →
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {/* ── What Briefly actually filtered ── */}
+        {blocked.length > 0 && (
+          <div className="read-skipped">
+            <button
+              className="read-skipped-toggle"
+              onClick={() => setBlockedOpen((v) => !v)}
+            >
+              <span>What Briefly filtered ({blocked.length} items)</span>
+              <motion.span
+                animate={{ rotate: blockedOpen ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                ▾
+              </motion.span>
+            </button>
+
+            <AnimatePresence>
+              {blockedOpen && (
                 <motion.div
                   className="read-skipped-list"
                   initial={{ height: 0, opacity: 0 }}
@@ -315,20 +388,17 @@ function CompletionScreen({
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  {skipped.slice(0, 12).map((s, i) => (
-                    <div key={i} className="read-skipped-item">
-                      <span className="read-skipped-reason">{s.reason}</span>
-                      <span className="read-skipped-title">{s.title}</span>
-                      {s.source && (
-                        <span className="read-skipped-source">{s.source}</span>
-                      )}
-                    </div>
-                  ))}
-                  {filtered > skipped.length && (
-                    <p className="read-skipped-more">
-                      +{filtered - skipped.length} more items filtered
-                    </p>
-                  )}
+                  <div className="read-skipped-scroll">
+                    {blocked.map((s, i) => (
+                      <div key={i} className="read-skipped-item">
+                        <span className="read-skipped-reason">{s.reason}</span>
+                        <span className="read-skipped-title">{s.title}</span>
+                        {s.source && (
+                          <span className="read-skipped-source">{s.source}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
