@@ -168,13 +168,13 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
             await mark_contents_processed(session, content_ids)
             await session.commit()
 
-        # ── Post-delivery learning & discovery (non-blocking) ────────────────
-        ctx = await _run_agent("LearningAgent",          learning.run,          ctx)
-        ctx = await _run_agent("InterestDiscoveryAgent", interest_discovery.run, ctx)
-        try:
-            await session.commit()
-        except Exception as exc:
-            log.warning("Post-digest profile commit failed (digest already saved): %s", exc)
+        # ── Post-delivery learning & discovery ───────────────────────────────
+        # These agents improve future digests but have zero effect on what the
+        # user is about to read RIGHT NOW.  Run them in a separate background
+        # task so the pipeline can return the digest_id immediately.
+        import asyncio as _asyncio
+        _asyncio.create_task(_run_post_pipeline_agents(user_id))
+        log.info("Pipeline: scheduled post-pipeline agents for user %s", user_id)
 
         duration_ms = ctx.pipeline_duration_ms
         log.info(
@@ -356,3 +356,45 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
         await session.commit()
 
     return digest_id
+
+
+async def _run_post_pipeline_agents(user_id: str) -> None:
+    """
+    Learning and discovery agents run after the digest is already persisted
+    and the user can see their brief.  They improve the next digest, not this one.
+    Opens its own DB session so the main pipeline session can be closed first.
+    """
+    try:
+        async with get_session_factory()() as session:
+            # Minimal context — only what these agents need
+            from briefly_api.agents.context import PipelineContext, UserContext
+            from briefly_api.db.queries import get_user_with_profile
+
+            user_data = await get_user_with_profile(session, user_id)
+            if not user_data:
+                return
+
+            ctx = PipelineContext(
+                user=UserContext(
+                    user_id=user_id,
+                    email=user_data["email"],
+                    name=user_data.get("name"),
+                    profile=user_data.get("profile", {}),
+                    recent_digest_items=[],
+                    seen_content_hashes=set(),
+                    active_story_threads=[],
+                    topic_clusters=user_data.get("profile", {}).get("topic_clusters", []),
+                ),
+                run_date="",
+            )
+            ctx.db_session = session
+
+            ctx = await _run_agent("LearningAgent",          learning.run,          ctx)
+            ctx = await _run_agent("InterestDiscoveryAgent", interest_discovery.run, ctx)
+            try:
+                await session.commit()
+            except Exception as exc:
+                log.warning("Post-pipeline commit failed for user %s: %s", user_id, exc)
+
+    except Exception:
+        log.exception("Post-pipeline agents failed for user %s — digest is unaffected", user_id)

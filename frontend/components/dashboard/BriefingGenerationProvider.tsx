@@ -131,6 +131,19 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
           if (existing?.label) {
             setGeneratingLabel(existing.label);
           }
+          // Resume elapsed timer from the backend's started_at so it shows
+          // real elapsed time even when the user navigates back mid-generation.
+          if (existing?.started_at) {
+            const startedMs = new Date(existing.started_at).getTime();
+            if (!isNaN(startedMs)) {
+              generatingStartRef.current = startedMs;
+              setGeneratingElapsedSec(Math.floor((Date.now() - startedMs) / 1000));
+              if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+              elapsedTimerRef.current = setInterval(() => {
+                setGeneratingElapsedSec(Math.floor((Date.now() - generatingStartRef.current) / 1000));
+              }, 1000);
+            }
+          }
         }
 
         const result = await pollBriefingUntilDone();

@@ -8377,24 +8377,27 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   font-size: 14px;
 }
 
-/* ── GeneratingPanel — full-panel live progress, shown ALWAYS when generating ─── */
+/* ══════════════════════════════════════════════════════════════════════════════
+   GeneratingPanel — full-panel live progress view
+   Works in both light and dark mode by using solid CSS variables only.
+   ══════════════════════════════════════════════════════════════════════════════ */
 .bgl-panel {
-  padding: 32px 24px 28px;
+  padding: 32px 28px 28px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  min-height: 360px;
+  gap: 24px;
 }
+
+/* ── Header row ── */
 .bgl-panel-header {
   display: flex;
   align-items: center;
   gap: 14px;
 }
-/* Pulsing ring around the dot */
 .bgl-pulse-ring {
   position: relative;
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
 }
 .bgl-pulse-ring::before {
@@ -8408,28 +8411,25 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
 .bgl-pulse-ring::after {
   content: "";
   position: absolute;
-  inset: -5px;
+  inset: -6px;
   border-radius: 50%;
   border: 1.5px solid var(--accent);
   opacity: 0;
-  animation: ring-expand 1.4s ease-out infinite;
+  animation: bgl-ring-expand 1.4s ease-out infinite;
 }
-@keyframes ring-expand {
-  0%   { opacity: 0.6; transform: scale(0.7); }
-  100% { opacity: 0;   transform: scale(1.8); }
+@keyframes bgl-ring-expand {
+  0%   { opacity: 0.5; transform: scale(0.6); }
+  100% { opacity: 0;   transform: scale(1.9); }
 }
-.bgl-panel-header-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+.bgl-panel-header-text { display: flex; flex-direction: column; gap: 3px; }
 .bgl-panel-title {
   font-family: var(--serif);
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 400;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   color: var(--text);
   margin: 0;
+  line-height: 1.2;
 }
 .bgl-panel-subtitle {
   font-family: var(--mono);
@@ -8438,17 +8438,18 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   letter-spacing: 0.04em;
   margin: 0;
 }
-/* Live backend label — the actual current agent message */
+
+/* ── Live agent label ── */
 .bgl-panel-live-label {
   display: flex;
   align-items: center;
   gap: 8px;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
   color: var(--accent);
-  letter-spacing: 0.04em;
-  margin: 0;
-  min-height: 18px;
+  margin: -8px 0 0;
+  min-height: 16px;
 }
 .bgl-panel-live-dot {
   width: 5px;
@@ -8456,89 +8457,107 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   border-radius: 50%;
   background: var(--accent);
   flex-shrink: 0;
-  animation: dot-pulse 1.2s ease-in-out infinite;
+  animation: dot-pulse 1s ease-in-out infinite;
 }
-/* 4-step pipeline */
+
+/* ── 4-step pipeline ── */
 .bgl-panel-steps {
   display: flex;
   flex-direction: column;
-  gap: 0;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
 }
 .bgl-panel-step {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 11px 16px;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--border);
-  transition: background 0.25s;
+  transition: background 0.3s;
+  position: relative;
 }
 .bgl-panel-step:last-child { border-bottom: none; }
-.bgl-panel-step--done    { background: transparent; opacity: 0.5; }
-.bgl-panel-step--active  { background: color-mix(in srgb, var(--accent) 5%, var(--bg-elevated)); }
-.bgl-panel-step--pending { background: transparent; opacity: 0.3; }
+
+/* Done: muted, de-emphasized */
+.bgl-panel-step--done {
+  background: transparent;
+  opacity: 0.45;
+}
+/* Active: highlighted row */
+.bgl-panel-step--active {
+  background: var(--accent-dim);
+}
+/* Pending: very faded */
+.bgl-panel-step--pending {
+  background: transparent;
+  opacity: 0.25;
+}
+
+/* Step circle indicator */
 .bgl-panel-step-indicator {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: 1px;
+  transition: background 0.3s, border-color 0.3s;
 }
 .bgl-panel-step--done .bgl-panel-step-indicator {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  background: var(--accent-dim);
+  border: 1.5px solid var(--accent-line);
   color: var(--accent);
 }
 .bgl-panel-step--active .bgl-panel-step-indicator {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  background: var(--accent-dim);
+  border: 1.5px solid var(--accent);
 }
 .bgl-panel-step--pending .bgl-panel-step-indicator {
-  background: var(--bg-elevated);
+  background: transparent;
+  border: 1.5px solid var(--border);
 }
 .bgl-panel-step-pulse {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--accent);
   animation: dot-pulse 1.2s ease-in-out infinite;
 }
 .bgl-panel-step-empty {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--border);
 }
+
+/* Step text */
 .bgl-panel-step-body {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1;
 }
 .bgl-panel-step-label {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
-  font-weight: 500;
   line-height: 1.3;
 }
-.bgl-panel-step--pending .bgl-panel-step-label,
-.bgl-panel-step--done .bgl-panel-step-label {
-  font-weight: 400;
-  color: var(--text-secondary);
-}
+.bgl-panel-step--active .bgl-panel-step-label  { font-weight: 600; }
+.bgl-panel-step--done .bgl-panel-step-label    { font-weight: 400; color: var(--text-secondary); }
+.bgl-panel-step--pending .bgl-panel-step-label { font-weight: 400; color: var(--text-secondary); }
 .bgl-panel-step-hint {
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.05em;
   color: var(--accent);
-  opacity: 0.75;
 }
-/* Ghost skeleton items — give a sense of content arriving */
+
+/* Ghost skeleton items */
 .bgl-panel-ghost {
-  opacity: 0.35;
+  opacity: 0.3;
   pointer-events: none;
 }
 
