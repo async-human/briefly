@@ -40,35 +40,35 @@ async def _profiles_for_scheduling() -> list[UserProfile]:
 
 async def _get_due_users(now_utc: datetime) -> list[dict]:
     """Users due for digest at this minute (local digest_time)."""
-    today_utc = now_utc.strftime("%Y-%m-%d")
+    profiles = await _profiles_for_scheduling()
+    due: list[dict] = []
 
     async with SessionLocal() as session:
-        result = await session.execute(
-            select(UserProfile, Digest)
-            .outerjoin(
-                Digest,
-                (Digest.user_id == UserProfile.user_id) & (Digest.digest_date == today_utc),
+        for profile in profiles:
+            tz_name = profile.digest_timezone or "UTC"
+            digest_time = profile.digest_time or "07:00"
+
+            try:
+                tz = pytz.timezone(tz_name)
+                local = now_utc.astimezone(tz)
+                local_hhmm = local.strftime("%H:%M")
+                local_date = local.strftime("%Y-%m-%d")
+            except Exception:
+                log.warning("Scheduler: unknown timezone '%s' for user %s", tz_name, profile.user_id)
+                continue
+
+            if local_hhmm != digest_time:
+                continue
+
+            existing = await session.execute(
+                select(Digest).where(
+                    Digest.user_id == profile.user_id,
+                    Digest.digest_date == local_date,
+                )
             )
-            .where(UserProfile.onboarding_completed == True)
-        )
-        rows = result.all()
+            if existing.scalar_one_or_none():
+                continue
 
-    due = []
-    for profile, existing_digest in rows:
-        if existing_digest is not None:
-            continue
-
-        tz_name = profile.digest_timezone or "UTC"
-        digest_time = profile.digest_time or "07:00"
-
-        try:
-            tz = pytz.timezone(tz_name)
-            local_hhmm = now_utc.astimezone(tz).strftime("%H:%M")
-        except Exception:
-            log.warning("Scheduler: unknown timezone '%s' for user %s", tz_name, profile.user_id)
-            continue
-
-        if local_hhmm == digest_time:
             due.append({"user_id": profile.user_id, "digest_time": digest_time, "tz": tz_name})
 
     return due

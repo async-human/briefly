@@ -388,8 +388,11 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ priority }),
     }),
-  generateDigest: () =>
-    request<GenerateDigestResponse>("/api/v1/digests/generate", { method: "POST" }),
+  generateDigest: (options?: { force?: boolean }) =>
+    request<GenerateDigestResponse>(
+      `/api/v1/digests/generate${options?.force ? "?force=true" : ""}`,
+      { method: "POST" },
+    ),
   getBriefingGenerationStatus: () =>
     request<BriefingGenerationStatus>("/api/v1/digests/generate/status"),
   getIngestionSummary: () =>

@@ -469,6 +469,7 @@ async def get_briefing_generation_status(
 @router.post("/digests/generate", response_model=GenerateDigestOut)
 async def generate_digest_now(
     background_tasks: BackgroundTasks,
+    force: bool = False,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> GenerateDigestOut:
@@ -481,6 +482,27 @@ async def generate_digest_now(
     gen = meta.get("briefing_generation") or {}
     if gen.get("status") == "running":
         return GenerateDigestOut(status="running", digest=None, warnings=[])
+
+    if not force:
+        from briefly_api.utils.dates import local_date_string
+
+        local_today = local_date_string(profile.digest_timezone or "UTC")
+        existing = await db.execute(
+            select(Digest)
+            .options(selectinload(Digest.items))
+            .where(
+                Digest.user_id == user.id,
+                Digest.digest_date == local_today,
+            )
+        )
+        digest = existing.scalar_one_or_none()
+        item_count = (digest.total_items_shown if digest else 0) or len(digest.items if digest else [])
+        if digest and item_count > 0:
+            return GenerateDigestOut(
+                status="complete",
+                digest=DigestOut.model_validate(digest),
+                warnings=[],
+            )
 
     now = datetime.now(timezone.utc).isoformat()
     meta["briefing_generation"] = {

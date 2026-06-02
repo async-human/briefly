@@ -101,7 +101,7 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
             setGeneratingLabel(existing.label);
           }
           if (existing?.status !== "running") {
-            const started = await api.generateDigest();
+            const started = await api.generateDigest({ force: userTriggeredRef.current });
             if (started.status === "complete" && started.digest) {
               setDigest(started.digest);
               setGenerateWarnings(started.warnings ?? []);

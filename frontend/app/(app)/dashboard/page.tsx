@@ -9,6 +9,7 @@ import { DashboardToolbar } from "@/components/dashboard/DashboardToolbar";
 import { SourceDiscoveryWizard } from "@/components/dashboard/SourceDiscoveryWizard";
 import { useBriefingGeneration } from "@/components/dashboard/BriefingGenerationProvider";
 import { getDigestOutcome } from "@/lib/digestOutcome";
+import { needsBriefingForToday } from "@/lib/localDate";
 import { runSilentSourceDiscovery } from "@/lib/silentDiscovery";
 
 const FETCHABLE_SOURCE_TYPES = new Set([
@@ -144,16 +145,10 @@ function DashboardContent() {
           return;
         }
 
-        const today = new Date().toISOString().split("T")[0];
-        const needsDigest = !digestData || digestData.digest_date < today;
-        const emptyToday =
-          digestData &&
-          digestData.digest_date === today &&
-          digestData.total_items_shown === 0 &&
-          (digestData.items?.length ?? 0) === 0;
+        const digestTimezone = meData.profile?.digest_timezone;
         const hasSources = sourcesData.some((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
 
-        if ((needsDigest || emptyToday) && hasSources && !generating) {
+        if (needsBriefingForToday(digestData, digestTimezone) && hasSources && !generating) {
           ensureBriefing();
         }
       } catch (err) {

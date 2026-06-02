@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,8 +9,16 @@ from sqlalchemy.orm import selectinload
 
 from briefly_api.config import Settings
 from briefly_api.db.models import Digest, User
+from briefly_api.utils.dates import local_date_string
 
 log = logging.getLogger(__name__)
+
+
+def user_local_date(user: User, now_utc: datetime | None = None) -> str:
+    tz_name = "UTC"
+    if user.profile and user.profile.digest_timezone:
+        tz_name = user.profile.digest_timezone
+    return local_date_string(tz_name, now_utc)
 
 
 async def generate_briefing_now(
@@ -26,7 +34,7 @@ async def generate_briefing_now(
     _ = settings  # pipeline reads settings via get_settings()
     _ = max_items  # digest size controlled by Settings.digest_max_items
 
-    today = date.today().isoformat()
+    today = user_local_date(user)
     result = await run_for_user(user.id, run_date=today)
 
     if not result.get("success"):
@@ -56,9 +64,17 @@ async def run_briefing_for_scheduled_user(user_id: str) -> dict:
     """
     from briefly_api.db.engine import get_session_factory
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
     async with get_session_factory()() as session:
+        result = await session.execute(
+            select(User)
+            .options(selectinload(User.profile))
+            .where(User.id == user_id, User.is_active == True)
+        )
+        user = result.scalar_one_or_none()
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        today = user_local_date(user)
         existing = await session.execute(
             select(Digest).where(
                 Digest.user_id == user_id,
@@ -68,15 +84,6 @@ async def run_briefing_for_scheduled_user(user_id: str) -> dict:
         if existing.scalar_one_or_none():
             log.info("Scheduler: digest already exists for user %s on %s — skipping", user_id, today)
             return {"success": True, "skipped": True}
-
-        result = await session.execute(
-            select(User)
-            .options(selectinload(User.profile))
-            .where(User.id == user_id, User.is_active == True)
-        )
-        user = result.scalar_one_or_none()
-        if not user:
-            return {"success": False, "error": "User not found"}
 
         from briefly_api.config import get_settings
         try:
