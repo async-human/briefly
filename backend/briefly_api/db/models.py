@@ -143,6 +143,8 @@ class UserProfile(Base):
     # Profile embedding — used for semantic matching
     # Updated when interests change significantly
     profile_embedding: Mapped[list[float] | None] = mapped_column(Vector(1024))
+    # When the embedding was last regenerated (triggers every 7 days)
+    profile_embedding_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Auto-discovered source suggestions — written by InterestDiscoveryAgent
     # Structure: [{"name": str, "url": str, "source_type": str, "topic": str,
@@ -414,11 +416,17 @@ class DigestItem(Base):
     relevance_score: Mapped[float | None] = mapped_column(Float)
     novelty_score: Mapped[float | None] = mapped_column(Float)
 
+    # Compounding intelligence fields — written by BriefingWriterAgent
+    memory_reference: Mapped[str | None] = mapped_column(Text)    # "You've been tracking this for 6 weeks..."
+    confidence_signal: Mapped[str | None] = mapped_column(Text)   # "94% match to your top interest cluster"
+    evolution_note: Mapped[str | None] = mapped_column(Text)      # surfaces behavior diverging from stated interests
+
     # User interaction (updated by LearningAgent)
     was_clicked: Mapped[bool] = mapped_column(Boolean, default=False)
     was_saved: Mapped[bool] = mapped_column(Boolean, default=False)
     was_disliked: Mapped[bool] = mapped_column(Boolean, default=False)
     had_follow_up: Mapped[bool] = mapped_column(Boolean, default=False)
+    follow_up_depth: Mapped[int] = mapped_column(Integer, default=0)  # count of follow-up turns on this item
 
     digest: Mapped["Digest"] = relationship(back_populates="items")
 

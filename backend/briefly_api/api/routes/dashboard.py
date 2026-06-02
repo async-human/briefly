@@ -674,13 +674,122 @@ async def bulk_create_sources(
     )
 
 
+# ── Profile intelligence ──────────────────────────────────────────────────────
+
+@router.get("/profile/intelligence")
+async def get_profile_intelligence(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Returns the accumulated intelligence Briefly has built about the user:
+    strongest interests, moved-away-from topics, active story threads,
+    prioritised and deprioritised sources.
+    This is the data behind the 'Your Briefly Knows' card in settings.
+    """
+    from briefly_api.db.models import UserMemory
+    from briefly_api.services.profile_utils import cluster_label
+
+    profile = user.profile
+    if not profile:
+        return {"digest_day": 0, "strongest_interests": [], "moved_away_from": [],
+                "active_threads": [], "top_sources": [], "deprioritized_sources": []}
+
+    # Digest day count
+    digest_day = profile.total_digests_received or 0
+
+    # Strongest interests from topic_clusters
+    clusters = profile.topic_clusters or []
+    strong = sorted(
+        [c for c in clusters if cluster_label(c) and c.get("strength", 0) >= 0.5],
+        key=lambda x: x.get("strength", 0),
+        reverse=True,
+    )
+    strongest_interests = [cluster_label(c) for c in strong[:6] if cluster_label(c)]
+
+    # Topics the user has moved away from (low strength, was once higher)
+    faded = sorted(
+        [c for c in clusters if cluster_label(c) and c.get("strength", 1.0) < 0.2 and c.get("item_count", 0) > 0],
+        key=lambda x: x.get("item_count", 0),
+        reverse=True,
+    )
+    moved_away_from = [cluster_label(c) for c in faded[:3] if cluster_label(c)]
+
+    # Active story threads
+    thread_result = await db.execute(
+        select(UserMemory)
+        .where(
+            UserMemory.user_id == user.id,
+            UserMemory.memory_type == "story_thread",
+        )
+        .order_by(UserMemory.occurrence_count.desc())
+        .limit(8)
+    )
+    threads = thread_result.scalars().all()
+    active_threads = []
+    for t in threads:
+        val = t.value or {}
+        from briefly_api.agents.learning import _days_since
+        from datetime import datetime, timezone
+        first_seen = val.get("first_seen", "")
+        # Estimate weeks
+        days = _days_since(first_seen) if first_seen else 0
+        weeks = max(1, round(days / 7))
+        active_threads.append({
+            "topic": val.get("topic") or t.key,
+            "weeks": weeks,
+            "appearances": t.occurrence_count,
+            "latest": val.get("latest_headline", "")[:100],
+        })
+
+    # Source weights — top and bottom
+    source_weights = dict(profile.source_weights or {})
+    sorted_sources = sorted(source_weights.items(), key=lambda x: x[1], reverse=True)
+    top_sources = [k for k, v in sorted_sources[:4] if v >= 0.6]
+    deprioritized_sources = [k for k, v in sorted_sources if v < 0.35][:3]
+
+    return {
+        "digest_day": digest_day,
+        "strongest_interests": strongest_interests,
+        "moved_away_from": moved_away_from,
+        "active_threads": active_threads,
+        "top_sources": top_sources,
+        "deprioritized_sources": deprioritized_sources,
+    }
+
+
+# ── Weekly intelligence report ────────────────────────────────────────────────
+
+@router.get("/weekly-report")
+async def get_weekly_report(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Generate and return the weekly intelligence report data.
+    Called by the frontend to display the Sunday report (or on demand).
+    """
+    from briefly_api.services.weekly_report import generate_weekly_report
+
+    report = await generate_weekly_report(db, user.id)
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Not enough data yet to generate a weekly report.",
+        )
+    return report
+
+
 # ── Item feedback ─────────────────────────────────────────────────────────────
 
 _SIGNAL_MAP: dict[str, SignalType] = {
-    "liked":    SignalType.saved,
-    "disliked": SignalType.disliked,
-    "clicked":  SignalType.clicked,
-    "saved":    SignalType.saved,
+    "liked":        SignalType.saved,
+    "disliked":     SignalType.disliked,
+    "clicked":      SignalType.clicked,
+    "saved":        SignalType.saved,
+    "skipped":      SignalType.skipped,
+    "followed_up":  SignalType.followed_up,
+    "opened":       SignalType.opened,
 }
 
 
@@ -697,6 +806,17 @@ async def record_feedback(
             detail=f"Unknown signal_type '{body.signal_type}'. Use: liked, disliked, clicked, saved.",
         )
 
+    # opened signal uses digest_item_id to carry digest_id (special case from frontend)
+    if body.signal_type == "opened":
+        db.add(BehavioralSignal(
+            user_id=user.id,
+            signal_type=SignalType.opened,
+            digest_id=body.digest_id,
+            meta=body.meta or {},
+        ))
+        await db.commit()
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
     item_result = await db.execute(
         select(DigestItem).where(
             DigestItem.id == body.digest_item_id,
@@ -709,12 +829,15 @@ async def record_feedback(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Digest item not found.")
 
     # Update the item flags
-    if body.signal_type == "liked":
+    if body.signal_type in ("liked", "saved"):
         item.was_saved = True
     elif body.signal_type == "disliked":
         item.was_disliked = True
     elif body.signal_type == "clicked":
         item.was_clicked = True
+    elif body.signal_type == "followed_up":
+        item.had_follow_up = True
+        item.follow_up_depth = (item.follow_up_depth or 0) + 1
 
     # Store signal record
     db.add(BehavioralSignal(
@@ -805,10 +928,6 @@ async def _queue_click_discovery(user_id: str, source_url: str) -> None:
             from briefly_api.config import get_settings
             await run_source_discovery(db, user_id, settings=get_settings())
             log.info("click_discover: refreshed pending discoveries for user %s (domain %s)", user_id, domain)
-
-    except Exception:
-        log.exception("click_discover: unexpected error for user %s url %s", user_id, source_url)
-
 
     except Exception:
         log.exception("click_discover: unexpected error for user %s url %s", user_id, source_url)

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, type ProfileIntelligence } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { getToken } from "@/lib/auth";
 
@@ -76,6 +76,105 @@ function TagEditor({
   );
 }
 
+// ── Briefly Knows card ────────────────────────────────────────────────────────
+
+function BrieflyKnowsCard({ intel }: { intel: ProfileIntelligence }) {
+  const hasSomething = intel.digest_day > 0;
+
+  if (!hasSomething) {
+    return (
+      <div className="settings-section bk-card bk-card-empty">
+        <div className="settings-section-head">
+          <h2 className="settings-section-title">What Briefly knows about you</h2>
+          <p className="settings-section-desc">
+            Briefly learns more about your interests with every digest you read.
+            Keep reading to see your intelligence profile build.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="settings-section bk-card">
+      <div className="settings-section-head">
+        <h2 className="settings-section-title">What Briefly knows about you</h2>
+        <p className="settings-section-desc">
+          Briefly has been learning about you for{" "}
+          <strong>{intel.digest_day} day{intel.digest_day !== 1 ? "s" : ""}</strong>.
+          This is what it knows.
+        </p>
+      </div>
+      <div className="bk-body">
+
+        {intel.strongest_interests.length > 0 && (
+          <div className="bk-row">
+            <span className="bk-row-label">Strongest interests</span>
+            <div className="bk-chips">
+              {intel.strongest_interests.map((t) => (
+                <span key={t} className="bk-chip bk-chip-strong">{t}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {intel.active_threads.length > 0 && (
+          <div className="bk-row">
+            <span className="bk-row-label">Active story threads</span>
+            <div className="bk-threads">
+              {intel.active_threads.slice(0, 4).map((t) => (
+                <div key={t.topic} className="bk-thread">
+                  <span className="bk-thread-topic">{t.topic}</span>
+                  <span className="bk-thread-meta">
+                    {t.weeks} week{t.weeks !== 1 ? "s" : ""} · {t.appearances} appearances
+                  </span>
+                  {t.latest && (
+                    <span className="bk-thread-latest">&ldquo;{t.latest}&rdquo;</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {intel.top_sources.length > 0 && (
+          <div className="bk-row">
+            <span className="bk-row-label">Sources Briefly prioritises for you</span>
+            <div className="bk-chips">
+              {intel.top_sources.map((s) => (
+                <span key={s} className="bk-chip bk-chip-source">{s}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {intel.moved_away_from.length > 0 && (
+          <div className="bk-row">
+            <span className="bk-row-label">Topics you&apos;ve moved away from</span>
+            <div className="bk-chips">
+              {intel.moved_away_from.map((t) => (
+                <span key={t} className="bk-chip bk-chip-faded">{t}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {intel.deprioritized_sources.length > 0 && (
+          <div className="bk-row">
+            <span className="bk-row-label">Sources Briefly has deprioritised</span>
+            <div className="bk-chips">
+              {intel.deprioritized_sources.map((s) => (
+                <span key={s} className="bk-chip bk-chip-faded">{s}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
 // ── Section wrapper ───────────────────────────────────────────────────────────
 
 function Section({
@@ -144,6 +243,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
+  const [intel, setIntel] = useState<ProfileIntelligence | null>(null);
 
   // Local editable state
   const [role, setRole] = useState("");
@@ -173,8 +273,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!getToken()) { router.replace("/login"); return; }
-    Promise.all([api.getMe()])
-      .then(([meData]) => {
+    Promise.all([api.getMe(), api.getProfileIntelligence().catch(() => null)])
+      .then(([meData, intelData]) => {
         if (!meData.onboarding_completed) { router.replace("/onboarding"); return; }
         setMe({ name: meData.user.name, avatar_url: meData.user.avatar_url });
         const p = meData.profile;
@@ -186,6 +286,7 @@ export default function SettingsPage() {
           setNeverShow(p.never_show ?? []);
           setDeliveryTime(p.digest_time ?? "07:00");
         }
+        if (intelData) setIntel(intelData);
       })
       .catch(() => router.replace("/login"))
       .finally(() => setLoading(false));
@@ -246,6 +347,9 @@ export default function SettingsPage() {
           <SettingsSkeleton />
         ) : (
           <div className="settings-page">
+
+            {/* ── What Briefly knows ── */}
+            {intel && <BrieflyKnowsCard intel={intel} />}
 
             {/* ── Profile ── */}
             <Section

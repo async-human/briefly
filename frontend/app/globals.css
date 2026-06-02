@@ -6306,6 +6306,102 @@ footer {
   background: var(--accent-dim);
 }
 
+/* Meta actions group (save + dislike) */
+.read-meta-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Dislike button — one tap "less like this" */
+.read-dislike-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+.read-dislike-btn:hover {
+  color: #e05252;
+  border-color: rgba(224, 82, 82, 0.3);
+  background: rgba(224, 82, 82, 0.06);
+  opacity: 1;
+}
+.read-dislike-btn.disliked {
+  color: #e05252;
+  border-color: rgba(224, 82, 82, 0.3);
+  background: rgba(224, 82, 82, 0.08);
+  opacity: 1;
+}
+
+/* Memory callout — "Briefly remembers" box, shown once per digest */
+.read-memory-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(100, 100, 220, 0.06);
+  border: 1px solid rgba(100, 100, 220, 0.18);
+  border-radius: 8px;
+  flex-shrink: 0;
+  margin-bottom: 4px;
+}
+.read-memory-callout-icon {
+  font-size: 13px;
+  color: #8888cc;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.read-memory-callout-text {
+  font-size: 12px;
+  color: #aaaadd;
+  line-height: 1.5;
+}
+
+/* Confidence signal — subtle relevance note */
+.read-confidence-signal {
+  margin: 8px 0 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+/* Evolution note — surfaces behavior divergence */
+.read-evolution-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  border-left: 2px solid rgba(120, 120, 120, 0.3);
+  flex-shrink: 0;
+}
+.read-evolution-icon {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.read-evolution-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  font-style: italic;
+  margin: 0;
+}
+
 /* Headline */
 .read-headline {
   font-family: var(--serif);
@@ -11506,6 +11602,71 @@ footer {
   gap: 48px;
   padding: 36px 0;
   border-bottom: 1px solid var(--border);
+}
+
+/* ── Briefly Knows card ─────────────────────────────────────────────────── */
+.bk-card {
+  background: linear-gradient(135deg, rgba(100,100,220,0.04) 0%, rgba(201,184,150,0.03) 100%);
+  border: 1px solid rgba(100,100,220,0.12);
+  border-radius: 12px;
+  padding: 28px 32px;
+  display: block;
+}
+.bk-card-empty { opacity: 0.7; }
+.bk-body { display: flex; flex-direction: column; gap: 20px; padding-top: 4px; }
+.bk-row { display: flex; flex-direction: column; gap: 8px; }
+.bk-row-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.bk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bk-chip {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  border: 1px solid;
+}
+.bk-chip-strong {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-color: var(--accent-line);
+}
+.bk-chip-source {
+  color: #aaaadd;
+  background: rgba(100,100,220,0.07);
+  border-color: rgba(100,100,220,0.2);
+}
+.bk-chip-faded {
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.02);
+  border-color: var(--border);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+.bk-threads { display: flex; flex-direction: column; gap: 10px; }
+.bk-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 8px;
+  border-left: 2px solid rgba(100,100,220,0.25);
+}
+.bk-thread-topic { font-size: 13px; color: var(--text); font-weight: 500; }
+.bk-thread-meta { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+.bk-thread-latest {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .settings-section:last-child { border-bottom: none; }
 .settings-section-head { padding-top: 4px; }

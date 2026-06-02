@@ -118,6 +118,10 @@ class DigestItemOut(BaseModel):
     was_saved: bool = False
     was_clicked: bool = False
     duplicate_count: int = 1
+    # Compounding intelligence fields
+    memory_reference: str | None = None
+    confidence_signal: str | None = None
+    evolution_note: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -244,9 +248,10 @@ class BulkSourceOut(BaseModel):
 
 
 class FeedbackIn(BaseModel):
-    signal_type: str  # "liked" | "disliked" | "clicked" | "saved"
+    signal_type: str  # "liked" | "disliked" | "clicked" | "saved" | "skipped" | "followed_up" | "opened"
     digest_item_id: str
     digest_id: str | None = None
+    meta: dict = Field(default_factory=dict)  # extra context per signal (e.g. read_time_seconds)
 
 
 class SourceSuggestionOut(BaseModel):

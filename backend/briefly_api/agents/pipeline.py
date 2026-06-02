@@ -323,6 +323,9 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
             memory_connections=draft.memory_connections,
             relevance_score=draft.relevance_score,
             novelty_score=draft.novelty_score,
+            memory_reference=draft.memory_reference or None,
+            confidence_signal=draft.confidence_signal or None,
+            evolution_note=draft.evolution_note or None,
         )
         session.add(item)
 

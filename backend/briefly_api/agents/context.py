@@ -63,6 +63,10 @@ class DigestItemDraft:
     memory_connections: list[dict] = field(default_factory=list)
     relevance_score: float = 0.0
     novelty_score: float = 0.0
+    # Compounding intelligence fields — populated by BriefingWriterAgent
+    memory_reference: str = ""    # explicit past-reading connection ("You've been following this for 6 weeks...")
+    confidence_signal: str = ""   # how strongly Briefly knows this matches the user ("94% match to top cluster")
+    evolution_note: str = ""      # surfaces when behavior diverges from stated interests
 
 
 @dataclass

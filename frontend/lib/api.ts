@@ -189,6 +189,10 @@ export type DigestItem = {
   was_saved: boolean;
   was_clicked: boolean;
   duplicate_count: number;
+  // Compounding intelligence fields
+  memory_reference?: string | null;
+  confidence_signal?: string | null;
+  evolution_note?: string | null;
 };
 
 export type Digest = {
@@ -352,6 +356,40 @@ export type Source = {
   priority?: "high" | "normal" | "low";
 };
 
+export type StoryThread = {
+  topic: string;
+  weeks: number;
+  appearances: number;
+  latest: string;
+};
+
+export type ProfileIntelligence = {
+  digest_day: number;
+  strongest_interests: string[];
+  moved_away_from: string[];
+  active_threads: StoryThread[];
+  top_sources: string[];
+  deprioritized_sources: string[];
+};
+
+export type WeeklyReportTopic = {
+  topic: string;
+  observation: string;
+};
+
+export type WeeklyReport = {
+  week_number: number;
+  digest_day: number;
+  user_name: string | null;
+  digest_date: string;
+  stories_read: number;
+  top_source: string;
+  top_topics: WeeklyReportTopic[];
+  thinking_shift: string;
+  building_thread: string;
+  blind_spot: string;
+};
+
 export type BrainDump = {
   id: string;
   title: string;
@@ -479,7 +517,12 @@ export const api = {
     request<SourceSuggestion[]>("/api/v1/sources/suggestions"),
 
   // Item feedback
-  recordFeedback: (body: { signal_type: string; digest_item_id: string; digest_id?: string }) =>
+  recordFeedback: (body: {
+    signal_type: string;
+    digest_item_id: string;
+    digest_id?: string;
+    meta?: Record<string, unknown>;
+  }) =>
     request<void>("/api/v1/feedback", { method: "POST", body: JSON.stringify(body) }),
 
   // Reading session completion — records a "opened" signal with elapsed time
@@ -488,11 +531,19 @@ export const api = {
       method: "POST",
       body: JSON.stringify({
         signal_type: "opened",
-        digest_item_id: digestId,   // reuse field to carry digest id
+        digest_item_id: digestId,
         digest_id: digestId,
-        read_time_seconds: readTimeSec,
+        meta: { read_time_seconds: readTimeSec },
       }),
     }).catch(() => { /* non-critical */ }),
+
+  // Profile intelligence — accumulated learning data
+  getProfileIntelligence: () =>
+    request<ProfileIntelligence>("/api/v1/profile/intelligence"),
+
+  // Weekly intelligence report
+  getWeeklyReport: () =>
+    request<WeeklyReport>("/api/v1/weekly-report"),
 
   // Readwise
   connectReadwise: (api_key: string) =>

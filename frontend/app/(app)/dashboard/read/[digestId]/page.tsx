@@ -50,10 +50,35 @@ function SaveIcon({ filled }: { filled: boolean }) {
   );
 }
 
+function DislikeIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M17 2h2.67A2.31 2.31 0 0122 4v7a2.31 2.31 0 01-2.33 2H17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
 function ReadingCard({
-  item, mode, isSaved, onSave, index,
-}: { item: DigestItem; mode: Mode; isSaved: boolean; onSave: () => void; index: number }) {
+  item, mode, isSaved, isDisliked, onSave, onDislike, index, showMemoryCallout,
+}: {
+  item: DigestItem;
+  mode: Mode;
+  isSaved: boolean;
+  isDisliked: boolean;
+  onSave: () => void;
+  onDislike: () => void;
+  index: number;
+  showMemoryCallout: boolean;
+}) {
   const firstMemory = item.memory_connections?.[0];
+  const memoryText = item.memory_reference || firstMemory?.description || null;
   const coverageNote = item.duplicate_count > 1
     ? `Also covered by ${item.duplicate_count - 1} other source${item.duplicate_count > 2 ? "s" : ""}`
     : null;
@@ -89,14 +114,38 @@ function ReadingCard({
             <span className="read-meta-coverage">{coverageNote}</span>
           )}
         </div>
-        <button
-          className={`read-save-btn${isSaved ? " saved" : ""}`}
-          onClick={onSave}
-          aria-label={isSaved ? "Saved" : "Save for later"}
-        >
-          <SaveIcon filled={isSaved} />
-        </button>
+        <div className="read-meta-actions">
+          {/* Dislike — one tap, "less like this" */}
+          <button
+            className={`read-dislike-btn${isDisliked ? " disliked" : ""}`}
+            onClick={onDislike}
+            aria-label="Less like this"
+            title="Less like this"
+          >
+            <DislikeIcon />
+          </button>
+          <button
+            className={`read-save-btn${isSaved ? " saved" : ""}`}
+            onClick={onSave}
+            aria-label={isSaved ? "Saved" : "Save for later"}
+          >
+            <SaveIcon filled={isSaved} />
+          </button>
+        </div>
       </motion.div>
+
+      {/* ── Memory callout — shown on the item Briefly remembers (both modes) ── */}
+      {showMemoryCallout && memoryText && (
+        <motion.div
+          className="read-memory-callout"
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: EASE }}
+        >
+          <span className="read-memory-callout-icon" aria-hidden>⟳</span>
+          <span className="read-memory-callout-text">{memoryText}</span>
+        </motion.div>
+      )}
 
       {/* ── Headline zone — vertically centered ── */}
       <div className="read-headline-zone">
@@ -137,6 +186,12 @@ function ReadingCard({
           <span className="read-why-v2-label">Why this matters to you</span>
         </div>
         <p className="read-why-v2-text">{item.why_it_matters}</p>
+
+        {/* Confidence signal — how Briefly knows this is relevant */}
+        {item.confidence_signal && (
+          <p className="read-confidence-signal">◈ {item.confidence_signal}</p>
+        )}
+
         {articleUrl && mode === "deep" && (
           <motion.a
             href={articleUrl}
@@ -155,8 +210,21 @@ function ReadingCard({
         )}
       </motion.div>
 
-      {/* ── Memory connection (deep only) ── */}
-      {firstMemory && mode === "deep" && (
+      {/* ── Evolution note (deep mode) — surfaces when behavior diverges from stated interests ── */}
+      {item.evolution_note && mode === "deep" && (
+        <motion.div
+          className="read-evolution-note"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.3, ease: EASE }}
+        >
+          <span className="read-evolution-icon" aria-hidden>◐</span>
+          <p className="read-evolution-text">{item.evolution_note}</p>
+        </motion.div>
+      )}
+
+      {/* ── Memory connection detail (deep only, fallback if no callout) ── */}
+      {firstMemory && mode === "deep" && !showMemoryCallout && (
         <motion.div
           className="read-memory-v2"
           initial={{ opacity: 0 }}
@@ -348,8 +416,17 @@ export default function ReadingPage() {
   const [direction, setDirection] = useState(1);
   const [mode, setMode]           = useState<Mode>("quick");
   const [saved, setSaved]         = useState<Set<string>>(new Set());
+  const [disliked, setDisliked]   = useState<Set<string>>(new Set());
   const [isComplete, setIsComplete] = useState(false);
   const [elapsed, setElapsed]     = useState(0);
+  // Track which item index gets the memory callout (first item with memory_reference or memory_connections)
+  const memoryCalloutIndex = useMemo(() => {
+    const items = digest?.items ?? [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].memory_reference || items[i].memory_connections?.length) return i;
+    }
+    return -1;
+  }, [digest]);
 
   const startRef  = useRef(Date.now());
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -396,6 +473,10 @@ export default function ReadingPage() {
     if (withSave && item && !saved.has(item.id)) {
       addToSaved(item.id);
       api.recordFeedback({ signal_type: "saved", digest_item_id: item.id, digest_id: digest.id });
+    } else if (!withSave && item && !saved.has(item.id) && !disliked.has(item.id)) {
+      // User skipped without saving or disliking — record skip signal
+      api.recordFeedback({ signal_type: "skipped", digest_item_id: item.id, digest_id: digest.id })
+        .catch(() => {});
     }
     setDirection(1);
     if (currentIndex >= items.length - 1) {
@@ -403,7 +484,7 @@ export default function ReadingPage() {
     } else {
       setCurrentIndex((i) => i + 1);
     }
-  }, [currentIndex, items, digest, saved, complete, addToSaved]);
+  }, [currentIndex, items, digest, saved, disliked, complete, addToSaved]);
 
   const goBack = useCallback(() => {
     if (currentIndex > 0) {
@@ -420,6 +501,15 @@ export default function ReadingPage() {
     api.recordFeedback({ signal_type: "saved", digest_item_id: item.id, digest_id: digest.id });
   }, [currentIndex, items, digest, saved, addToSaved]);
 
+  const toggleDislike = useCallback(() => {
+    if (!digest) return;
+    const item = items[currentIndex];
+    if (!item || disliked.has(item.id)) return;
+    setDisliked((prev) => new Set(Array.from(prev).concat(item.id)));
+    api.recordFeedback({ signal_type: "disliked", digest_item_id: item.id, digest_id: digest.id })
+      .catch(() => {});
+  }, [currentIndex, items, digest, disliked]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handle = (e: KeyboardEvent) => {
@@ -430,12 +520,14 @@ export default function ReadingPage() {
         case "ArrowLeft": goBack(); break;
         case "s":
         case "S": toggleSave(); break;
+        case "d":
+        case "D": toggleDislike(); break;
         case "Escape": router.replace("/dashboard"); break;
       }
     };
     window.addEventListener("keydown", handle);
     return () => window.removeEventListener("keydown", handle);
-  }, [advance, goBack, toggleSave, isComplete, router]);
+  }, [advance, goBack, toggleSave, toggleDislike, isComplete, router]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (loading) return <ReadingSkeleton />;
@@ -551,8 +643,11 @@ export default function ReadingPage() {
               item={item}
               mode={mode}
               isSaved={saved.has(item.id)}
+              isDisliked={disliked.has(item.id)}
               onSave={toggleSave}
+              onDislike={toggleDislike}
               index={currentIndex}
+              showMemoryCallout={currentIndex === memoryCalloutIndex}
             />
           </motion.div>
         </AnimatePresence>

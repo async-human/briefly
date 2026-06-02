@@ -44,8 +44,11 @@ Rules:
 - Headlines are active and specific, not vague ("OpenAI's new reasoning model beats GPT-4o on coding benchmarks" not "AI news today")
 - Summaries are factual, 2 sentences maximum
 - The "why_it_matters_to_you" is 1-2 sentences and must feel personal — if it could apply to anyone, rewrite it
-- If a story is an update to something the user has been following, say so explicitly
+- If a story is an update to something the user has been following, say so explicitly in memory_reference
 - Citations are mandatory — every item must have a source URL
+- memory_reference: if this connects to the user's past reading or an active story thread, write 1 sentence naming the specific thread and how long they've been following it. If no connection, leave empty.
+- confidence_signal: 1 short phrase showing HOW Briefly knows this is relevant (e.g. "Matches your top interest cluster at 94%" or "3rd story on this thread this week"). If relevance is obvious, leave empty.
+- evolution_note: if the user's demonstrated behavior in the past 2 weeks diverges from their stated interests in a notable way, surface it as 1 observation (e.g. "You said you don't follow crypto — but you've clicked every Ethereum story this month. I've started prioritising this."). Only write if genuinely notable. Leave empty otherwise.
 
 Return ONLY valid JSON. No markdown, no preamble."""
 
@@ -54,6 +57,9 @@ _WRITER_PROMPT_TEMPLATE = """User profile:
 
 Recent digest history (what they've already seen):
 {recent_context}
+
+Active story threads (topics user has been following for 3+ days):
+{story_threads}
 
 Items to write briefing for (scored by relevance):
 {items_json}
@@ -89,7 +95,10 @@ Return JSON:
       "summary": "...",
       "why_it_matters_to_you": "...",
       "source_name": "...",
-      "source_url": "..."
+      "source_url": "...",
+      "memory_reference": "...",
+      "confidence_signal": "...",
+      "evolution_note": "..."
     }}
   ]
 }}"""
@@ -117,10 +126,12 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         recent_context = _build_recent_context(ctx.user.recent_digest_items)
         items_json = _build_items_json(items_to_write, ctx)
         memory_json = json.dumps(ctx.memory_connections, indent=2)
+        story_threads_json = _build_story_threads_summary(ctx.user.active_story_threads)
 
         prompt = _WRITER_PROMPT_TEMPLATE.format(
             profile_summary=profile_summary,
             recent_context=recent_context,
+            story_threads=story_threads_json,
             items_json=items_json,
             memory_connections=memory_json,
             section_whats_new=SECTION_WHATS_NEW,
@@ -201,6 +212,8 @@ def _fallback_drafts(items: list[RawItem], ctx: PipelineContext) -> list[DigestI
                 memory_connections=ctx.memory_connections.get(item.id, []),
                 relevance_score=item.relevance_score,
                 novelty_score=item.novelty_score,
+                memory_reference=_fallback_memory_reference(item, ctx.memory_connections),
+                confidence_signal=_fallback_confidence_signal(item, ctx.user.profile),
             )
         )
     return drafts
@@ -294,6 +307,30 @@ def _personalized_why_fallback(item: RawItem, profile: dict) -> str:
     )
 
 
+def _fallback_memory_reference(item: RawItem, memory_connections: dict) -> str:
+    """Build a plain-language memory reference when the LLM isn't available."""
+    connections = memory_connections.get(item.id, [])
+    if not connections:
+        return ""
+    c = connections[0]
+    thread_key = c.get("thread_key", "")
+    occ = c.get("occurrence_count", 1)
+    if thread_key:
+        weeks = max(1, round(occ / 3))
+        return f"You've been following this story for {weeks}+ week{'s' if weeks > 1 else ''}."
+    return ""
+
+
+def _fallback_confidence_signal(item: RawItem, profile: dict) -> str:
+    """Build a relevance confidence note when the LLM isn't available."""
+    score = item.relevance_score or 0.0
+    if score >= 0.85:
+        return "Very high relevance to your profile."
+    if score >= 0.70:
+        return "Strong match to your interests."
+    return ""
+
+
 def _ensure_personalized_why(
     drafts: list[DigestItemDraft],
     items: list[RawItem],
@@ -341,6 +378,9 @@ def _drafts_from_llm(
             memory_connections=ctx.memory_connections.get(item.id, []),
             relevance_score=source_item.relevance_score if source_item else 0.0,
             novelty_score=source_item.novelty_score if source_item else 0.5,
+            memory_reference=written.get("memory_reference", ""),
+            confidence_signal=written.get("confidence_signal", ""),
+            evolution_note=written.get("evolution_note", ""),
         )
         if draft.section not in (SECTION_WHATS_NEW, SECTION_HIGHLY_RELEVANT):
             draft.section = assigned
@@ -397,6 +437,21 @@ def _build_recent_context(recent_items: list[dict]) -> str:
         if headline:
             summaries.append(f"- [{date}] {headline}")
     return "\n".join(summaries) if summaries else "No recent items."
+
+
+def _build_story_threads_summary(threads: list[dict]) -> str:
+    """Summarise active story threads for the writer prompt."""
+    if not threads:
+        return "No active story threads yet."
+    parts = []
+    for t in threads[:10]:
+        key = t.get("key", "")
+        occ = t.get("occurrence_count", 1)
+        value = t.get("value") or {}
+        first_seen = value.get("first_seen", "")
+        latest = value.get("latest_headline", "")
+        parts.append(f"- '{key}' (appeared {occ}x since {first_seen}, latest: {latest[:80]})")
+    return "\n".join(parts)
 
 
 def _build_items_json(items: list[RawItem], ctx: PipelineContext) -> str:
