@@ -69,6 +69,9 @@ async def _refresh_priority_source_items(
         ctx.log_error("SourceCollectorAgent", w)
 
     kept = [item for item in existing if item.source_id not in priority_ids]
+    replaced = [item for item in existing if item.source_id in priority_ids]
+    replaced_by_hash = {item.content_hash: item for item in replaced if item.content_hash}
+
     source_rank: dict[str, int] = defaultdict(int)
     fresh: list[RawItem] = []
     existing_hashes = {item.content_hash for item in kept if item.content_hash}
@@ -77,6 +80,10 @@ async def _refresh_priority_source_items(
         text = article.clean_text or article.summary or article.title or ""
         content_hash = hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
         if content_hash in existing_hashes:
+            continue
+        if content_hash in replaced_by_hash:
+            fresh.append(replaced_by_hash[content_hash])
+            existing_hashes.add(content_hash)
             continue
         existing_hashes.add(content_hash)
         fresh.append(_article_to_raw_item(article, source_rank))
@@ -161,6 +168,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             await persist_live_raw_items(session, ctx.user.user_id, raw_items)
             await session.commit()
         except Exception as exc:
+            await session.rollback()
             log.warning("Could not persist live items to pool: %s", exc)
             ctx.log_error("SourceCollectorAgent", f"Live pool persist failed: {exc}")
 
