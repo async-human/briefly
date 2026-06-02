@@ -14,7 +14,7 @@ from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
-    BigInteger, Boolean, DateTime, Enum, Float, ForeignKey,
+    BigInteger, Boolean, DateTime, Enum, Float, ForeignKey, Index,
     Integer, String, Text, UniqueConstraint, func, text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -93,6 +93,8 @@ class User(Base):
     memory: Mapped[list["UserMemory"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     signals: Mapped[list["BehavioralSignal"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     follow_up_threads: Mapped[list["FollowUpThread"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    activity_events: Mapped[list["UserActivityEvent"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    digest_failures: Mapped[list["DigestFailure"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class UserProfile(Base):
@@ -165,6 +167,49 @@ class UserProfile(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user: Mapped["User"] = relationship(back_populates="profile")
+
+
+class UserActivityEvent(Base):
+    """Append-only activity log — replaces unbounded JSONB on UserProfile."""
+
+    __tablename__ = "user_activity_events"
+    __table_args__ = (
+        Index("ix_user_activity_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    meta: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship(back_populates="activity_events")
+
+
+class DigestFailure(Base):
+    """Failed scheduled digest — drives retry and user notification."""
+
+    __tablename__ = "digest_failures"
+    __table_args__ = (
+        Index("ix_digest_failures_pending", "resolved_at", "next_retry_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    digest_date: Mapped[str] = mapped_column(String(10), nullable=False)
+    error_message: Mapped[str] = mapped_column(Text, nullable=False)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    max_retries: Mapped[int] = mapped_column(Integer, default=1)
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped["User"] = relationship(back_populates="digest_failures")
 
 
 # ── Sources ───────────────────────────────────────────────────────────────────
@@ -387,6 +432,9 @@ class UserMemory(Base):
     This is what makes the digest feel like a second brain over time.
     """
     __tablename__ = "user_memory"
+    __table_args__ = (
+        Index("ix_user_memory_user_type", "user_id", "memory_type"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
@@ -415,6 +463,9 @@ class BehavioralSignal(Base):
     Feeds the LearningAgent to improve relevance over time.
     """
     __tablename__ = "behavioral_signals"
+    __table_args__ = (
+        Index("ix_behavioral_signals_user_created", "user_id", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)

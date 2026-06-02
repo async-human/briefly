@@ -19,6 +19,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from briefly_api.auth.google import generate_oauth_state
 from briefly_api.config import Settings
 from briefly_api.db.models import OAuthConnection, Source, User
+from briefly_api.security.oauth_tokens import (
+    oauth_access_token,
+    oauth_refresh_token,
+    set_oauth_tokens,
+)
 
 REDDIT_AUTH_URL = "https://www.reddit.com/api/v1/authorize"
 REDDIT_TOKEN_URL = "https://www.reddit.com/api/v1/access_token"
@@ -83,15 +88,16 @@ async def exchange_reddit_code(code: str, settings: Settings) -> dict:
 
 async def refresh_reddit_access_token(connection: OAuthConnection, settings: Settings) -> str:
     """Reddit tokens expire after 1 hour. Use refresh_token to renew."""
-    if not connection.refresh_token:
-        return connection.access_token
+    refresh = oauth_refresh_token(connection)
+    if not refresh:
+        return oauth_access_token(connection)
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             REDDIT_TOKEN_URL,
             data={
                 "grant_type": "refresh_token",
-                "refresh_token": connection.refresh_token,
+                "refresh_token": refresh,
             },
             headers={
                 "Authorization": _basic_auth_header(settings.reddit_client_id, settings.reddit_client_secret),
@@ -102,8 +108,8 @@ async def refresh_reddit_access_token(connection: OAuthConnection, settings: Set
         resp.raise_for_status()
         tokens = resp.json()
 
-    connection.access_token = tokens["access_token"]
-    return connection.access_token
+    set_oauth_tokens(connection, tokens["access_token"])
+    return oauth_access_token(connection)
 
 
 async def get_reddit_username(access_token: str, settings: Settings) -> str | None:
@@ -141,9 +147,11 @@ async def upsert_reddit_connection(
     connection = await get_reddit_connection(db, user.id)
 
     if connection:
-        connection.access_token = tokens["access_token"]
-        if tokens.get("refresh_token"):
-            connection.refresh_token = tokens["refresh_token"]
+        set_oauth_tokens(
+            connection,
+            tokens["access_token"],
+            tokens.get("refresh_token"),
+        )
         if username:
             connection.account_email = username
         connection.meta = {**(connection.meta or {}), "subreddit_count": subreddit_count}
@@ -152,10 +160,15 @@ async def upsert_reddit_connection(
             user_id=user.id,
             provider="reddit",
             account_email=username,
-            access_token=tokens["access_token"],
-            refresh_token=tokens.get("refresh_token"),
+            access_token="",
+            refresh_token=None,
             scopes=REDDIT_SCOPES,
             meta={"subreddit_count": subreddit_count},
+        )
+        set_oauth_tokens(
+            connection,
+            tokens["access_token"],
+            tokens.get("refresh_token"),
         )
         db.add(connection)
 

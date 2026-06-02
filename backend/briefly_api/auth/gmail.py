@@ -11,6 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from briefly_api.auth.google import GOOGLE_TOKEN_URL, generate_oauth_state
 from briefly_api.config import Settings
 from briefly_api.db.models import OAuthConnection, Source, User
+from briefly_api.security.oauth_tokens import (
+    oauth_access_token,
+    oauth_refresh_token,
+    set_oauth_tokens,
+)
 
 GMAIL_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GMAIL_SCOPES = "https://www.googleapis.com/auth/gmail.readonly openid email"
@@ -130,12 +135,13 @@ async def exchange_gmail_code(code: str, settings: Settings) -> dict:
 
 
 async def refresh_gmail_access_token(connection: OAuthConnection, settings: Settings) -> str:
-    if not connection.refresh_token:
-        return connection.access_token
+    refresh = oauth_refresh_token(connection)
+    if not refresh:
+        return oauth_access_token(connection)
 
     now = datetime.now(UTC)
     if connection.token_expires_at and connection.token_expires_at > now + timedelta(minutes=2):
-        return connection.access_token
+        return oauth_access_token(connection)
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -143,7 +149,7 @@ async def refresh_gmail_access_token(connection: OAuthConnection, settings: Sett
             data={
                 "client_id": settings.google_client_id,
                 "client_secret": settings.google_client_secret,
-                "refresh_token": connection.refresh_token,
+                "refresh_token": refresh,
                 "grant_type": "refresh_token",
             },
             headers={"Content-Type": "application/x-www-form-urlencoded"},
@@ -151,11 +157,11 @@ async def refresh_gmail_access_token(connection: OAuthConnection, settings: Sett
         resp.raise_for_status()
         tokens = resp.json()
 
-    connection.access_token = tokens["access_token"]
+    set_oauth_tokens(connection, tokens["access_token"])
     expires_in = tokens.get("expires_in")
     if expires_in:
         connection.token_expires_at = now + timedelta(seconds=int(expires_in))
-    return connection.access_token
+    return oauth_access_token(connection)
 
 
 async def get_gmail_connection(db: AsyncSession, user_id: str) -> OAuthConnection | None:
@@ -183,9 +189,11 @@ async def upsert_gmail_connection(
         expires_at = datetime.now(UTC) + timedelta(seconds=int(tokens["expires_in"]))
 
     if connection:
-        connection.access_token = tokens["access_token"]
-        if tokens.get("refresh_token"):
-            connection.refresh_token = tokens["refresh_token"]
+        set_oauth_tokens(
+            connection,
+            tokens["access_token"],
+            tokens.get("refresh_token"),
+        )
         connection.token_expires_at = expires_at
         if account_email:
             connection.account_email = account_email
@@ -200,10 +208,15 @@ async def upsert_gmail_connection(
             user_id=user.id,
             provider="gmail",
             account_email=account_email,
-            access_token=tokens["access_token"],
-            refresh_token=tokens.get("refresh_token"),
+            access_token="",
+            refresh_token=None,
             token_expires_at=expires_at,
             scopes=(tokens.get("scope") or "").strip() or s.gmail_scopes,
+        )
+        set_oauth_tokens(
+            connection,
+            tokens["access_token"],
+            tokens.get("refresh_token"),
         )
         db.add(connection)
 

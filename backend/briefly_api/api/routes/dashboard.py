@@ -528,11 +528,12 @@ async def get_ingestion_summary(
     from datetime import datetime, timedelta, timezone
 
     from briefly_api.db.models import ContentStatus, RawContent
+    from briefly_api.services.activity_feed import list_activity
 
     profile = user.profile
     meta = dict(profile.ingestion_meta or {}) if profile else {}
     last_summary = meta.get("last_summary") or {}
-    feed = list(profile.activity_feed or [])[:10] if profile else []
+    feed = await list_activity(db, user.id, limit=10) if profile else []
 
     pool_count = 0
     if profile:
@@ -561,6 +562,7 @@ async def run_ingestion_now(
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> IngestionSummaryOut:
+    from briefly_api.services.activity_feed import list_activity
     from briefly_api.services.content_ingestion import ingest_user_sources
 
     summary = await ingest_user_sources(db, user.id, settings=settings)
@@ -571,7 +573,7 @@ async def run_ingestion_now(
     return IngestionSummaryOut(
         last_ingestion_at=profile.last_ingestion_at if profile else None,
         last_summary=summary.to_dict(),
-        activity_feed=list(profile.activity_feed or [])[:10] if profile else [],
+        activity_feed=await list_activity(db, user.id, limit=10),
         pool_items_recent=summary.items_new + summary.items_updated,
     )
 

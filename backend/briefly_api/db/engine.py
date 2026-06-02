@@ -112,7 +112,7 @@ async def init_db() -> None:
             """))
         except Exception as exc:
             logger.warning("discovery backfill: %s", exc)
-    logger.info("Database initialized")
+    logger.info("Database initialized (run `alembic upgrade head` for versioned migrations)")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

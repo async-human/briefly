@@ -10,7 +10,6 @@ from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.connectors.base import BaseConnector, ConnectorValidation
 from briefly_api.services.connectors.types import GMAIL
 from briefly_api.services.gmail import fetch_newsletters
-from briefly_api.services.medium_ingestion import expand_medium_digest_items
 
 log = logging.getLogger(__name__)
 
@@ -45,14 +44,7 @@ class GmailConnector(BaseConnector):
 
         access_token = await refresh_gmail_access_token(connection, settings)
         await db.commit()
-        raw_items = await fetch_newsletters(access_token, limit=limit)
-
-        return await expand_medium_digest_items(
-            raw_items,
-            source_name=source_name,
-            per_digest_limit=limit,
-        )
+        return await fetch_newsletters(access_token, limit=limit)
 
     async def validate(self, identifier: str, settings: Settings) -> ConnectorValidation:
         return ConnectorValidation(valid=True)
-

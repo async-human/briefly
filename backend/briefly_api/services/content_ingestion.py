@@ -27,6 +27,7 @@ from briefly_api.db.models import (
     UserProfile,
 )
 from briefly_api.embeddings.adapter import get_embedding_adapter
+from briefly_api.services.activity_feed import append_activity
 from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.collector import collect_from_sources
 from briefly_api.services.connectors.types import FETCHABLE_SOURCE_TYPES
@@ -36,7 +37,6 @@ log = logging.getLogger(__name__)
 
 MIN_CLEAN_TEXT = 30
 QUALITY_TEXT_LEN = 200
-MAX_ACTIVITY_FEED = 25
 
 
 @dataclass
@@ -291,22 +291,21 @@ async def ingest_user_sources(
 
     # Persist ingestion summary on profile
     meta = dict(profile.ingestion_meta or {})
-    feed = list(profile.activity_feed or [])
-    feed.insert(0, {
-        "type": "ingestion",
-        "message": (
+    await append_activity(
+        session,
+        user_id,
+        "ingestion",
+        (
             f"Ingested {summary.items_new} new and {summary.items_updated} updated items "
             f"from {summary.sources_ok} sources"
         ),
-        "at": now.isoformat(),
-    })
+    )
     profile.ingestion_meta = {
         **meta,
         "last_run_at": now.isoformat(),
         "last_run_date": now.strftime("%Y-%m-%d"),
         "last_summary": summary.to_dict(),
     }
-    profile.activity_feed = feed[:MAX_ACTIVITY_FEED]
     profile.last_ingestion_at = now
 
     await session.commit()

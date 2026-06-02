@@ -17,6 +17,7 @@ from briefly_api.db.models import (
     Digest, DigestItem, Source, SourceStatus,
     User, UserMemory, UserProfile,
 )
+from briefly_api.services.activity_feed import list_activity
 
 
 async def get_user_with_profile(session: AsyncSession, user_id: str) -> dict | None:
@@ -61,7 +62,7 @@ async def get_user_with_profile(session: AsyncSession, user_id: str) -> dict | N
             "source_weights": dict(p.source_weights or {}),
             "ingestion_meta": dict(p.ingestion_meta or {}),
             "last_ingestion_at": p.last_ingestion_at.isoformat() if p.last_ingestion_at else None,
-            "activity_feed": list(p.activity_feed or []),
+            "activity_feed": await list_activity(session, user.id, limit=10),
             "auto_expand_sources": bool(p.auto_expand_sources),
             "ingest_time": p.ingest_time or "03:00",
         }

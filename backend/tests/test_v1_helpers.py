@@ -59,6 +59,25 @@ def test_build_fallback_drafts_from_selected_ids():
     assert drafts[0].section
 
 
+def test_build_fallback_drafts_when_writer_would_return_empty():
+    user = UserContext(
+        user_id="u1",
+        email="u@test.com",
+        name="Test",
+        profile={"role": "Founder", "interests": [{"topic": "AI"}]},
+        recent_digest_items=[],
+        seen_content_hashes=set(),
+        active_story_threads=[],
+        topic_clusters=[],
+    )
+    ctx = PipelineContext(user=user, run_date="2026-05-28")
+    ctx.enriched_items = []
+    ctx.selected_item_ids = []
+
+    drafts = build_fallback_drafts(ctx)
+    assert drafts == []
+
+
 def test_why_personalization_validator():
     profile = {"role": "Founder", "goal": "building AI products", "interests": [{"topic": "AI agents"}]}
     assert not _why_is_personalized("Worth a read based on what you follow.", profile)

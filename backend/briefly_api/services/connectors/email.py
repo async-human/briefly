@@ -14,8 +14,6 @@ from briefly_api.services.connectors.base import BaseConnector, ConnectorValidat
 from briefly_api.services.connectors.types import EMAIL
 from briefly_api.services.gmail import fetch_newsletters_from_sender
 from briefly_api.services.medium_extractor import detect_medium_digest
-from briefly_api.services.medium_ingestion import expand_medium_digest_items
-from briefly_api.services.profile_signals import load_profile_signals
 
 log = logging.getLogger(__name__)
 
@@ -117,16 +115,8 @@ class EmailConnector(BaseConnector):
                                 item.meta["is_medium_digest"] = True
                                 if raw_html:
                                     item.meta["raw_html"] = raw_html
-                        keywords, profile_embedding = await load_profile_signals(db, user_id)
-                        items = await expand_medium_digest_items(
-                            items,
-                            source_name=label,
-                            per_digest_limit=6,
-                            interest_keywords=keywords,
-                            profile_embedding=profile_embedding,
-                        )
                         log.info(
-                            "EmailConnector: fetched %d item(s) from %s after Medium expansion",
+                            "EmailConnector: fetched %d item(s) from %s",
                             len(items), normalized,
                         )
                         return items

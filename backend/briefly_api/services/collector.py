@@ -16,6 +16,7 @@ from briefly_api.services.connectors.types import (
     REDDIT_ACCOUNT,
     YOUTUBE_ACCOUNT,
 )
+from briefly_api.services.content_enrichment import enrich_medium_content
 
 log = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ async def collect_from_sources(
         )
         fetch_timeout = (
             _FETCH_TIMEOUT_EMAIL_SEC
-            if source.source_type == EMAIL
+            if source.source_type in (EMAIL, GMAIL)
             else _FETCH_TIMEOUT_SEC
         )
         async with sem:
@@ -117,6 +118,14 @@ async def collect_from_sources(
                         if display_name:
                             item.source_name = display_name
                         item.source_id = source.id
+                    if fetched and user_id and source.source_type in (EMAIL, GMAIL):
+                        fetched = await enrich_medium_content(
+                            fetched,
+                            fetch_session,
+                            user_id,
+                            source_name=display_name,
+                            per_digest_limit=min(6, source_limit),
+                        )
                     return source, fetched, None
                 except asyncio.TimeoutError:
                     label = display_name or source.identifier
