@@ -598,6 +598,8 @@ export function BriefingPanel({
   const remaining = restItems.length - restPreview.shown;
   let previewIndex = 0;
   const skipped = digest.meta?.skipped ?? [];
+  const blocked = digest.meta?.blocked;       // explicitly rejected items (new field)
+  const moreToday = digest.meta?.more_today;  // good-fit items cut for length (new field)
 
   return (
     <div className="briefing-panel briefing-panel-outcome">
@@ -688,6 +690,8 @@ export function BriefingPanel({
       <SafeToIgnorePanel
         skippedNote={outcome?.skipped_note}
         skippedItems={skipped}
+        blockedItems={blocked}
+        moreToday={moreToday}
         filteredCount={outcome?.filtered_count ?? 0}
       />
 

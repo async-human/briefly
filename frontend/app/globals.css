@@ -7551,22 +7551,129 @@ a.read-more-today-title:hover { color: var(--accent); }
 }
 .outcome-safe-ignore {
   margin: 0 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── More from today — good-fit articles cut by length cap ──────────────────── */
+.outcome-more-today {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  overflow: hidden;
+}
+.outcome-more-today-toggle {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+.outcome-more-today-toggle:hover {
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+.outcome-more-today-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.outcome-more-today-heading > span:first-child {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.outcome-more-today-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  font-family: var(--sans);
+}
+.outcome-more-today-chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  padding-top: 3px;
+}
+.outcome-more-today-list {
+  max-height: 340px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.outcome-more-today-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+}
+.outcome-more-today-item:last-child { border-bottom: none; }
+.outcome-more-today-item:hover { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.outcome-more-today-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.outcome-more-today-title {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+  text-decoration: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underline; }
+.outcome-more-today-title-plain { color: var(--text-secondary); }
+.outcome-more-today-source {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.outcome-more-today-link {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.outcome-more-today-link:hover {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* ── What Briefly filtered — truly rejected items ────────────────────────────── */
+.outcome-blocked {
   border: 1px dashed var(--border);
   border-radius: 12px;
   background: color-mix(in srgb, var(--surface) 60%, transparent);
 }
-.outcome-safe-ignore summary {
+.outcome-blocked-summary {
   cursor: pointer;
   padding: 12px 14px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
   color: var(--text-muted);
   list-style: none;
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.outcome-safe-ignore summary::-webkit-details-marker { display: none; }
+.outcome-blocked-summary::-webkit-details-marker { display: none; }
 .outcome-safe-ignore-count {
   margin-left: auto;
   font-size: 11px;
@@ -7588,6 +7695,13 @@ a.read-more-today-title:hover { color: var(--accent); }
   margin: 0;
   padding: 0;
   list-style: none;
+}
+/* Scrollable wrapper for long blocked lists */
+.outcome-safe-ignore-scroll {
+  max-height: 260px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
 .outcome-safe-ignore-list li {
   padding: 8px 0;
