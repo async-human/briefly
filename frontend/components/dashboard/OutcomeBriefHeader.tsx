@@ -68,7 +68,6 @@ export function SafeToIgnorePanel({
   filteredCount,
 }: SafeToIgnoreProps) {
   const [moreTodayOpen, setMoreTodayOpen] = useState(false);
-  const [blockedOpen, setBlockedOpen] = useState(false);
 
   // Prefer explicit blocked list; fall back to the old merged skipped list
   const blocked = blockedItems ?? skippedItems;
@@ -150,10 +149,7 @@ export function SafeToIgnorePanel({
 
       {/* ── What Briefly actually filtered — low relevance, blocked topics ── */}
       {hasBlocked && (
-        <details
-          className="outcome-blocked"
-          onToggle={(e) => setBlockedOpen((e.target as HTMLDetailsElement).open)}
-        >
+        <details className="outcome-blocked">
           <summary className="outcome-blocked-summary">
             What Briefly filtered
             {blocked.length > 0 && (
