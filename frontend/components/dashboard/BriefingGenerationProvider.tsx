@@ -22,6 +22,7 @@ type BriefingGenerationContextValue = {
   setDigest: (digest: Digest | null) => void;
   generating: boolean;
   generatingLabel: string;
+  generatingElapsedSec: number;   // seconds since generation started
   generateError: string;
   generateWarnings: string[];
   runGenerate: () => void;
@@ -40,6 +41,7 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
   const [digest, setDigest] = useState<Digest | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generatingLabel, setGeneratingLabel] = useState(DEFAULT_LABEL);
+  const [generatingElapsedSec, setGeneratingElapsedSec] = useState(0);
   const [generateError, setGenerateError] = useState("");
   const [generateWarnings, setGenerateWarnings] = useState<string[]>([]);
   const [readyNotice, setReadyNotice] = useState<ReadyNotice | null>(null);
@@ -47,6 +49,8 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
   const pollingRef = useRef(false);
   const pendingGenerateRef = useRef(false);
   const userTriggeredRef = useRef(false);
+  const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const generatingStartRef = useRef<number>(0);
 
   const pollBriefingUntilDone = useCallback(async (): Promise<{ digest: Digest; warnings: string[] }> => {
     const maxAttempts = 300;
@@ -92,6 +96,13 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
         userTriggeredRef.current = notifyOnComplete;
         setGenerateWarnings([]);
         setGeneratingLabel(DEFAULT_LABEL);
+        // Start elapsed-time counter
+        generatingStartRef.current = Date.now();
+        setGeneratingElapsedSec(0);
+        if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+        elapsedTimerRef.current = setInterval(() => {
+          setGeneratingElapsedSec(Math.floor((Date.now() - generatingStartRef.current) / 1000));
+        }, 1000);
       }
 
       try {
@@ -138,6 +149,11 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
       } finally {
         setGenerating(false);
         setGeneratingLabel(DEFAULT_LABEL);
+        setGeneratingElapsedSec(0);
+        if (elapsedTimerRef.current) {
+          clearInterval(elapsedTimerRef.current);
+          elapsedTimerRef.current = null;
+        }
         pollingRef.current = false;
         if (pendingGenerateRef.current) {
           pendingGenerateRef.current = false;
@@ -190,6 +206,7 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
     setDigest,
     generating,
     generatingLabel,
+    generatingElapsedSec,
     generateError,
     generateWarnings,
     runGenerate,

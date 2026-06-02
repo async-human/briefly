@@ -8377,6 +8377,51 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   font-size: 14px;
 }
 
+/* ── Updating banner — shown when a prior digest exists and today's is generating ── */
+.briefing-updating-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-elevated));
+  border-bottom: 1px solid rgba(201,184,150,0.15);
+}
+.briefing-updating-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.briefing-updating-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.briefing-updating-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.briefing-updating-label {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.briefing-updating-elapsed {
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* ── Live generating activity card — shown when no prior digest exists ─────── */
 .briefing-generating-live {
   padding: 28px 24px 32px;
@@ -8399,6 +8444,13 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   font-weight: 400;
   letter-spacing: -0.02em;
   color: var(--text);
+  margin: 0 0 2px;
+}
+.briefing-generating-live-elapsed {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
   margin: 0;
 }
 .briefing-generating-live-label {
@@ -8448,9 +8500,16 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   font-size: 11px;
   letter-spacing: 0.06em;
   color: var(--text-muted);
+  flex: 1;
 }
 .bgl-step-active .bgl-step-label {
   color: var(--text);
+}
+.bgl-step-check {
+  font-size: 10px;
+  color: var(--accent);
+  opacity: 0.6;
+  margin-left: 4px;
 }
 .briefing-generating-live-ghost {
   margin-top: 4px;

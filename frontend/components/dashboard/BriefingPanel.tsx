@@ -496,16 +496,25 @@ type BriefingPanelProps = {
   sourcesCount: number;
   generating: boolean;
   generatingLabel?: string;
+  generatingElapsedSec?: number;
   generateError: string;
   generateWarnings?: string[];
   onRegenerate?: () => void;
 };
+
+function fmtElapsed(sec: number): string {
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}m ${s.toString().padStart(2, "0")}s`;
+}
 
 export function BriefingPanel({
   digest,
   sourcesCount,
   generating,
   generatingLabel,
+  generatingElapsedSec = 0,
   generateError,
   generateWarnings = [],
   onRegenerate,
@@ -518,41 +527,34 @@ export function BriefingPanel({
           <div className="briefing-generating-live">
             <div className="briefing-generating-live-header">
               <span className="briefing-generating-dot briefing-generating-dot-lg" />
-              <h2 className="briefing-generating-live-title">Building your briefing</h2>
+              <div>
+                <h2 className="briefing-generating-live-title">Building your briefing</h2>
+                {generatingElapsedSec > 0 && (
+                  <p className="briefing-generating-live-elapsed">
+                    {fmtElapsed(generatingElapsedSec)}
+                    {generatingElapsedSec < 30 && " · usually under a minute"}
+                  </p>
+                )}
+              </div>
             </div>
             <p className="briefing-generating-live-label">{statusLabel}</p>
             <div className="briefing-generating-live-steps">
-              {[
-                "Reading sources",
-                "Scoring relevance",
-                "Removing duplicates",
-                "Writing briefing",
-              ].map((step, i) => {
-                // Infer which step is active from the label
+              {(["Collecting sources", "Scoring relevance", "Removing duplicates", "Writing briefing"] as const).map((step, i) => {
+                const lbl = statusLabel.toLowerCase();
                 const isActive =
-                  (i === 0 && statusLabel.toLowerCase().includes("fetch")) ||
-                  (i === 0 && statusLabel.toLowerCase().includes("collect")) ||
-                  (i === 0 && statusLabel.toLowerCase().includes("source")) ||
-                  (i === 1 && statusLabel.toLowerCase().includes("relev")) ||
-                  (i === 1 && statusLabel.toLowerCase().includes("scoring")) ||
-                  (i === 1 && statusLabel.toLowerCase().includes("clean")) ||
-                  (i === 2 && statusLabel.toLowerCase().includes("dedup")) ||
-                  (i === 2 && statusLabel.toLowerCase().includes("novel")) ||
-                  (i === 2 && statusLabel.toLowerCase().includes("memory")) ||
-                  (i === 2 && statusLabel.toLowerCase().includes("plann")) ||
-                  (i === 3 && statusLabel.toLowerCase().includes("writ")) ||
-                  (i === 3 && statusLabel.toLowerCase().includes("deliver"));
+                  (i === 0 && (lbl.includes("collect") || lbl.includes("source") || lbl.includes("fetch") || lbl.includes("clean") || lbl.includes("ingest"))) ||
+                  (i === 1 && (lbl.includes("relev") || lbl.includes("scor") || lbl.includes("novel"))) ||
+                  (i === 2 && (lbl.includes("dedup") || lbl.includes("memory") || lbl.includes("plann"))) ||
+                  (i === 3 && (lbl.includes("writ") || lbl.includes("deliver") || lbl.includes("verif") || lbl.includes("dump")));
                 const isDone =
-                  (i === 0 && !statusLabel.toLowerCase().includes("source") && !statusLabel.toLowerCase().includes("fetch") && !statusLabel.toLowerCase().includes("collect")) ||
-                  (i === 1 && (statusLabel.toLowerCase().includes("dedup") || statusLabel.toLowerCase().includes("novel") || statusLabel.toLowerCase().includes("plann") || statusLabel.toLowerCase().includes("writ") || statusLabel.toLowerCase().includes("deliver"))) ||
-                  (i === 2 && (statusLabel.toLowerCase().includes("writ") || statusLabel.toLowerCase().includes("deliver")));
+                  (i === 0 && !lbl.includes("collect") && !lbl.includes("source") && !lbl.includes("fetch") && !lbl.includes("clean") && !lbl.includes("ingest")) ||
+                  (i === 1 && (lbl.includes("dedup") || lbl.includes("memory") || lbl.includes("plann") || lbl.includes("writ") || lbl.includes("deliver"))) ||
+                  (i === 2 && (lbl.includes("writ") || lbl.includes("deliver") || lbl.includes("verif")));
                 return (
-                  <div
-                    key={step}
-                    className={`bgl-step${isActive ? " bgl-step-active" : isDone ? " bgl-step-done" : ""}`}
-                  >
+                  <div key={step} className={`bgl-step${isActive ? " bgl-step-active" : isDone ? " bgl-step-done" : ""}`}>
                     <span className="bgl-step-dot" />
                     <span className="bgl-step-label">{step}</span>
+                    {isDone && <span className="bgl-step-check" aria-hidden>✓</span>}
                   </div>
                 );
               })}
@@ -611,9 +613,17 @@ export function BriefingPanel({
       />
 
       {generating && (
-        <div className="briefing-generating-bar">
-          <span className="briefing-generating-dot" />
-          {generatingLabel || "Updating your brief…"}
+        <div className="briefing-updating-banner">
+          <div className="briefing-updating-left">
+            <span className="briefing-generating-dot" />
+            <div className="briefing-updating-text">
+              <span className="briefing-updating-title">Generating today&apos;s brief</span>
+              <span className="briefing-updating-label">{generatingLabel || "Working…"}</span>
+            </div>
+          </div>
+          {generatingElapsedSec > 0 && (
+            <span className="briefing-updating-elapsed">{fmtElapsed(generatingElapsedSec)}</span>
+          )}
         </div>
       )}
 

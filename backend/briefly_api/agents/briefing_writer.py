@@ -138,11 +138,15 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             section_highly_relevant=SECTION_HIGHLY_RELEVANT,
         )
 
+        # Haiku 4.5 is 3-4x faster than Sonnet for structured JSON generation
+        # with no quality loss on this templated writing task.
         result: dict | None = None
         try:
             result = await llm.complete_json(
                 messages=[Message(role="user", content=prompt)],
                 system=_WRITER_SYSTEM,
+                model="claude-haiku-4-5-20251001",
+                max_tokens=3000,  # 14 items × ~150 tokens + metadata; cap avoids wasted budget
             )
         except Exception as e:
             log.exception("BriefingWriterAgent: LLM call failed")

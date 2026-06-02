@@ -52,6 +52,7 @@ function DashboardContent() {
     setDigest,
     generating,
     generatingLabel,
+    generatingElapsedSec,
     generateError,
     generateWarnings,
     runGenerate,
@@ -263,6 +264,7 @@ function DashboardContent() {
             sourcesCount={fetchableSources.length}
             generating={generating}
             generatingLabel={generatingLabel}
+            generatingElapsedSec={generatingElapsedSec}
             generateError={generateError}
             generateWarnings={generateWarnings}
             onRegenerate={runGenerate}
