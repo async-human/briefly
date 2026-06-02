@@ -81,16 +81,18 @@ export function SourcesSidebar({
 
   return (
     <aside className="dash-sidebar dash-aside-col">
+      {/* ── Source list — primary focus ── */}
       <div className="dash-card dash-card-primary">
         <div className="dash-card-head">
           <div>
             <h2 className="dash-card-title">Briefly&apos;s sources</h2>
-            <p className="dash-card-desc dash-card-desc-tight">
-              Optional. Briefly discovers and reads sources automatically — adjust only if you want to.
-            </p>
+            {sources.length > 0 && (
+              <p className="dash-card-desc dash-card-desc-tight">
+                {sources.length} connected · star any to prioritise it
+              </p>
+            )}
           </div>
           <div className="dash-card-head-actions">
-            <span className="source-count">{sources.length}</span>
             {onClose && (
               <button type="button" className="outcome-sources-close" onClick={onClose} aria-label="Close sources">
                 ×
@@ -98,7 +100,7 @@ export function SourcesSidebar({
             )}
           </div>
         </div>
-        <AddSourceForm onAdded={onSourceAdded} />
+
         {sources.length > 0 && (
           <>
             <ul className="source-list source-list-connected source-list-compact">
@@ -154,8 +156,13 @@ export function SourcesSidebar({
                 Show all {sources.length} sources
               </button>
             )}
+            <div className="source-add-divider" />
           </>
         )}
+
+        {/* Add source form — below the list, not above it */}
+        <AddSourceForm onAdded={onSourceAdded} />
+
         <p className="dash-sidebar-footnote">
           Interests & delivery in{" "}
           <Link href="/settings" className="dash-inline-link">Preferences</Link>
@@ -170,14 +177,12 @@ export function SourcesSidebar({
         </p>
       </div>
 
-      <CollapsibleCard label="Suggestions" title="Recommended sources" defaultOpen={false}>
-        <SourceSuggestions
-          existingSources={sources}
-          onAdded={onSourceAdded}
-          autoSuggestions={autoSuggestions}
-          embedded
-        />
-      </CollapsibleCard>
+      {/* ── Inline source recommendations — 3 max, reason visible, no collapse ── */}
+      <InlineSourceRecommendations
+        existingSources={sources}
+        autoSuggestions={autoSuggestions}
+        onAdded={onSourceAdded}
+      />
 
       <CollapsibleCard label="Sync" title="Content pool" defaultOpen={false}>
         <IngestionPanel embedded />
@@ -231,6 +236,78 @@ export function SourcesSidebar({
         </CollapsibleCard>
       )}
     </aside>
+  );
+}
+
+// ── Inline recommendations — shown expanded, 3 max, reason visible ────────────
+
+function InlineSourceRecommendations({
+  existingSources,
+  autoSuggestions,
+  onAdded,
+}: {
+  existingSources: Source[];
+  autoSuggestions: AutoSuggestion[];
+  onAdded: (s: Source) => void;
+}) {
+  const [adding, setAdding] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  const existingUrls = new Set(existingSources.map((s) => s.identifier.toLowerCase()));
+
+  const visible = autoSuggestions
+    .filter((s) => !existingUrls.has(s.url.toLowerCase()) && !dismissed.has(s.url))
+    .slice(0, 3);
+
+  if (visible.length === 0) return null;
+
+  async function handleAdd(s: AutoSuggestion) {
+    setAdding(s.url);
+    try {
+      const src = await api.addSource({ identifier: s.url, name: s.name });
+      onAdded(src);
+      setDismissed((prev) => new Set(Array.from(prev).concat(s.url)));
+    } catch {
+      // show nothing on error — user can try again
+    } finally {
+      setAdding(null);
+    }
+  }
+
+  return (
+    <div className="dash-card inline-rec-card">
+      <p className="dash-card-label">Recommended</p>
+      <h2 className="dash-card-title" style={{ marginBottom: 12 }}>You might also follow</h2>
+      <ul className="inline-rec-list">
+        {visible.map((s) => (
+          <li key={s.url} className="inline-rec-item">
+            <div className="inline-rec-body">
+              <p className="inline-rec-name">{s.name}</p>
+              <p className="inline-rec-reason">
+                {s.reason || s.description || s.topic}
+              </p>
+            </div>
+            <div className="inline-rec-actions">
+              <button
+                type="button"
+                className="briefing-refresh inline-rec-add"
+                onClick={() => void handleAdd(s)}
+                disabled={adding === s.url}
+              >
+                {adding === s.url ? "…" : "+ Add"}
+              </button>
+              <button
+                type="button"
+                className="suggestion-dismiss-btn"
+                onClick={() => setDismissed((prev) => new Set(Array.from(prev).concat(s.url)))}
+              >
+                Skip
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -330,12 +407,27 @@ function BriefingPreviewItem({
   index: number;
   digestId?: string;
 }) {
+  // Truncate why_it_matters to a single compact line
+  const why = item.why_it_matters
+    ? item.why_it_matters.length > 100
+      ? item.why_it_matters.slice(0, 97).trimEnd() + "…"
+      : item.why_it_matters
+    : null;
+
+  const hasMemory = Boolean(item.memory_reference || item.memory_connections?.length);
+
   const content = (
     <>
       <span className="briefing-preview-index">{String(index + 1).padStart(2, "0")}</span>
       <div className="briefing-preview-body">
+        <div className="briefing-preview-meta-row">
+          <p className="briefing-preview-meta">{item.source_name}</p>
+          {hasMemory && (
+            <span className="briefing-preview-memory-dot" title="Briefly remembers this story" aria-label="You've been following this story" />
+          )}
+        </div>
         <h3 className="briefing-preview-headline">{item.headline}</h3>
-        <p className="briefing-preview-meta">{item.source_name}</p>
+        {why && <p className="briefing-preview-why">{why}</p>}
       </div>
       {digestId && <span className="briefing-preview-chevron" aria-hidden>→</span>}
     </>
@@ -353,9 +445,15 @@ function BriefingPreviewItem({
 }
 
 function sectionSubtitle(section: string): string {
-  if (section === SECTION_WHATS_NEW) return "Latest from each of your sources";
-  if (section === SECTION_HIGHLY_RELEVANT) return "Matched to your interests and profile";
+  if (section === SECTION_WHATS_NEW) return "Latest from your sources";
+  if (section === SECTION_HIGHLY_RELEVANT) return "Picked for your interests";
   return "";
+}
+
+function sectionBadgeLabel(section: string): string {
+  if (section === SECTION_WHATS_NEW) return "From your sources";
+  if (section === SECTION_HIGHLY_RELEVANT) return "Picked for you";
+  return section;
 }
 
 function buildGroupedPreview(items: DigestItem[], limit: number) {
@@ -387,9 +485,9 @@ function BriefingItemSkeleton() {
 }
 
 const GENERATING_PHASES = [
-  "Fetching from your sources…",
-  "Matching to your interests…",
-  "Building What's new & Highly relevant…",
+  "Reading your sources…",
+  "Scoring items for relevance…",
+  "Finding what&apos;s new for you…",
   "Writing your briefing…",
 ];
 
@@ -418,17 +516,53 @@ export function BriefingPanel({
     if (generating) {
       return (
         <div className="briefing-panel">
-          <div className="briefing-panel-header">
-            <h2 className="briefing-panel-title">Today&apos;s briefing</h2>
-          </div>
-          <div className="briefing-generating-bar">
-            <span className="briefing-generating-dot" />
-            {statusLabel}
-          </div>
-          <div className="briefing-preview-list">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <BriefingItemSkeleton key={i} />
-            ))}
+          <div className="briefing-generating-live">
+            <div className="briefing-generating-live-header">
+              <span className="briefing-generating-dot briefing-generating-dot-lg" />
+              <h2 className="briefing-generating-live-title">Building your briefing</h2>
+            </div>
+            <p className="briefing-generating-live-label">{statusLabel}</p>
+            <div className="briefing-generating-live-steps">
+              {[
+                "Reading sources",
+                "Scoring relevance",
+                "Removing duplicates",
+                "Writing briefing",
+              ].map((step, i) => {
+                // Infer which step is active from the label
+                const isActive =
+                  (i === 0 && statusLabel.toLowerCase().includes("fetch")) ||
+                  (i === 0 && statusLabel.toLowerCase().includes("collect")) ||
+                  (i === 0 && statusLabel.toLowerCase().includes("source")) ||
+                  (i === 1 && statusLabel.toLowerCase().includes("relev")) ||
+                  (i === 1 && statusLabel.toLowerCase().includes("scoring")) ||
+                  (i === 1 && statusLabel.toLowerCase().includes("clean")) ||
+                  (i === 2 && statusLabel.toLowerCase().includes("dedup")) ||
+                  (i === 2 && statusLabel.toLowerCase().includes("novel")) ||
+                  (i === 2 && statusLabel.toLowerCase().includes("memory")) ||
+                  (i === 2 && statusLabel.toLowerCase().includes("plann")) ||
+                  (i === 3 && statusLabel.toLowerCase().includes("writ")) ||
+                  (i === 3 && statusLabel.toLowerCase().includes("deliver"));
+                const isDone =
+                  (i === 0 && !statusLabel.toLowerCase().includes("source") && !statusLabel.toLowerCase().includes("fetch") && !statusLabel.toLowerCase().includes("collect")) ||
+                  (i === 1 && (statusLabel.toLowerCase().includes("dedup") || statusLabel.toLowerCase().includes("novel") || statusLabel.toLowerCase().includes("plann") || statusLabel.toLowerCase().includes("writ") || statusLabel.toLowerCase().includes("deliver"))) ||
+                  (i === 2 && (statusLabel.toLowerCase().includes("writ") || statusLabel.toLowerCase().includes("deliver")));
+                return (
+                  <div
+                    key={step}
+                    className={`bgl-step${isActive ? " bgl-step-active" : isDone ? " bgl-step-done" : ""}`}
+                  >
+                    <span className="bgl-step-dot" />
+                    <span className="bgl-step-label">{step}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="briefing-generating-live-ghost">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <BriefingItemSkeleton key={i} />
+              ))}
+            </div>
           </div>
         </div>
       );
@@ -515,7 +649,7 @@ export function BriefingPanel({
             restPreview.groups.map((group) => (
               <section key={group.section} className="briefing-section-group">
                 <header className="briefing-section-head">
-                  <span className={sectionBadgeClass(group.section)}>{group.section}</span>
+                  <span className={sectionBadgeClass(group.section)}>{sectionBadgeLabel(group.section)}</span>
                   {sectionSubtitle(group.section) && (
                     <p className="briefing-section-sub">{sectionSubtitle(group.section)}</p>
                   )}
@@ -562,11 +696,12 @@ export function BriefingPanel({
         <div className={`briefing-preview-footer${generating ? " briefing-preview-footer-dimmed" : ""}`}>
           {remaining > 0 && (
             <p className="briefing-preview-more">
-              +{remaining} more in reading mode
+              +{remaining} more {remaining === 1 ? "item" : "items"} below
             </p>
           )}
           <Link href={`/dashboard/read/${digest.id}`} className="briefing-preview-cta">
-            Read full brief ({digest.items.length} items)
+            Open briefing
+            <span className="briefing-preview-cta-count">{digest.items.length} items →</span>
           </Link>
         </div>
       )}

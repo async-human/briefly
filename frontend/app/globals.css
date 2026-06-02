@@ -7892,6 +7892,39 @@ footer {
 .briefing-preview-cta:hover {
   background: color-mix(in srgb, var(--accent) 14%, var(--accent-dim));
 }
+
+/* Why it matters preview line — the core differentiator */
+.briefing-preview-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.briefing-preview-why {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 6px 0 0;
+  font-style: italic;
+  opacity: 0.85;
+}
+.briefing-preview-memory-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #8888cc;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* CTA count chip */
+.briefing-preview-cta-count {
+  font-size: 11px;
+  font-family: var(--mono);
+  opacity: 0.65;
+  margin-left: 6px;
+}
+
 .source-list-compact .source-list-item {
   padding: 10px 0;
 }
@@ -8125,6 +8158,150 @@ footer {
 @keyframes dot-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50%       { opacity: 0.4; transform: scale(0.75); }
+}
+
+/* ── Streak — prominent, accent-colored ────────────────────────────────────── */
+.dash-toolbar-stat-streak .dash-toolbar-stat-value {
+  color: var(--accent);
+}
+.dash-toolbar-stat-streak-value {
+  color: var(--accent) !important;
+}
+.dash-streak-fire {
+  font-size: 14px;
+}
+
+/* ── Live generating activity card — shown when no prior digest exists ─────── */
+.briefing-generating-live {
+  padding: 28px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.briefing-generating-live-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.briefing-generating-dot-lg {
+  width: 8px !important;
+  height: 8px !important;
+}
+.briefing-generating-live-title {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin: 0;
+}
+.briefing-generating-live-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  margin: 0;
+  min-height: 16px;
+}
+.briefing-generating-live-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bgl-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0.35;
+  transition: opacity 0.3s;
+}
+.bgl-step-active {
+  opacity: 1;
+}
+.bgl-step-done {
+  opacity: 0.55;
+}
+.bgl-step-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.bgl-step-active .bgl-step-dot {
+  background: var(--accent);
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+.bgl-step-done .bgl-step-dot {
+  background: var(--accent);
+  opacity: 0.5;
+}
+.bgl-step-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.bgl-step-active .bgl-step-label {
+  color: var(--text);
+}
+.briefing-generating-live-ghost {
+  margin-top: 4px;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ── Source add divider ────────────────────────────────────────────────────── */
+.source-add-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0;
+}
+
+/* ── Inline source recommendations ────────────────────────────────────────── */
+.inline-rec-card { }
+.inline-rec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.inline-rec-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.inline-rec-item:first-child { border-top: none; }
+.inline-rec-body {
+  flex: 1;
+  min-width: 0;
+}
+.inline-rec-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0 0 3px;
+}
+.inline-rec-reason {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+.inline-rec-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.inline-rec-add {
+  font-size: 12px !important;
+  padding: 5px 10px !important;
 }
 
 .briefing-refresh {

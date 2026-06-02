@@ -60,23 +60,30 @@ export function DashboardToolbar({
             {itemCount != null && (
               <li>
                 <span className="dash-toolbar-stat-value">{itemCount}</span>
-                <span className="dash-toolbar-stat-label">curated</span>
+                <span className="dash-toolbar-stat-label">items selected</span>
               </li>
             )}
             {savedMinutes != null && savedMinutes > 0 && (
               <li>
                 <span className="dash-toolbar-stat-value">~{savedMinutes}m</span>
-                <span className="dash-toolbar-stat-label">saved</span>
+                <span className="dash-toolbar-stat-label">reading saved</span>
               </li>
             )}
             <li className="dash-toolbar-stat-hidden-mobile">
               <span className="dash-toolbar-stat-value">{sourceCount}</span>
-              <span className="dash-toolbar-stat-label">sources</span>
+              <span className="dash-toolbar-stat-label">
+                {sourceCount === 1 ? "source" : "sources"}
+              </span>
             </li>
             {streak > 0 && (
-              <li>
-                <span className="dash-toolbar-stat-value">{streak}</span>
-                <span className="dash-toolbar-stat-label">day streak</span>
+              <li className="dash-toolbar-stat-streak">
+                <span className="dash-toolbar-stat-value dash-toolbar-stat-streak-value">
+                  {streak}
+                  {streak >= 7 && <span className="dash-streak-fire" aria-hidden> 🔥</span>}
+                </span>
+                <span className="dash-toolbar-stat-label">
+                  {streak === 1 ? "day streak" : "day streak"}
+                </span>
               </li>
             )}
           </ul>
