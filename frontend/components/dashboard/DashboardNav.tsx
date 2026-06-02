@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { clearToken } from "@/lib/auth";
+import { useBriefingGeneration } from "./BriefingGenerationProvider";
 
 export function DashboardNav({
   userName,
@@ -13,6 +14,7 @@ export function DashboardNav({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { generating } = useBriefingGeneration();
   const initial = userName?.charAt(0).toUpperCase() ?? "?";
 
   function handleLogout() {
@@ -29,6 +31,9 @@ export function DashboardNav({
         <nav className="dash-nav-tabs" aria-label="Dashboard sections">
           <Link href="/dashboard" className={`dash-nav-link${pathname === "/dashboard" ? " active" : ""}`}>
             Today
+            {generating && pathname !== "/dashboard" && (
+              <span className="dash-nav-generating-pip" title="Briefing generating" aria-label="Generating briefing" />
+            )}
           </Link>
           <Link href="/history" className={`dash-nav-link${pathname === "/history" ? " active" : ""}`}>
             History

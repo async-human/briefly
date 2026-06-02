@@ -387,7 +387,7 @@ type BriefingPanelProps = {
   sources: Source[];
   sourcesCount: number;
   generating: boolean;
-  generatingPhase?: number;
+  generatingLabel?: string;
   generateError: string;
   generateWarnings?: string[];
   onRegenerate?: () => void;
@@ -397,11 +397,12 @@ export function BriefingPanel({
   digest,
   sourcesCount,
   generating,
-  generatingPhase = 0,
+  generatingLabel,
   generateError,
   generateWarnings = [],
   onRegenerate,
 }: BriefingPanelProps) {
+  const statusLabel = generatingLabel || GENERATING_PHASES[0];
   if (!digest) {
     if (generating) {
       return (
@@ -411,7 +412,7 @@ export function BriefingPanel({
           </div>
           <div className="briefing-generating-bar">
             <span className="briefing-generating-dot" />
-            {GENERATING_PHASES[generatingPhase] ?? GENERATING_PHASES[0]}
+            {statusLabel}
           </div>
           <div className="briefing-preview-list">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -465,7 +466,7 @@ export function BriefingPanel({
       {generating && (
         <div className="briefing-generating-bar">
           <span className="briefing-generating-dot" />
-          Updating your briefing…
+          {generatingLabel || "Updating your briefing…"}
         </div>
       )}
 
@@ -478,10 +479,11 @@ export function BriefingPanel({
       )}
 
       <div className="briefing-preview-list">
-        {generating ? (
+        {generating && !digest ? (
           Array.from({ length: 4 }).map((_, i) => <BriefingItemSkeleton key={i} />)
         ) : preview.shown > 0 ? (
-          preview.groups.map((group) => (
+          <div className={generating ? "briefing-preview-list-updating" : undefined}>
+          {preview.groups.map((group) => (
             <section key={group.section} className="briefing-section-group">
               <header className="briefing-section-head">
                 <span className={sectionBadgeClass(group.section)}>{group.section}</span>
@@ -503,7 +505,8 @@ export function BriefingPanel({
                 })}
               </div>
             </section>
-          ))
+          ))}
+          </div>
         ) : (
           <div className="briefing-tab-empty">
             <p>No items in today&apos;s briefing.</p>
@@ -520,8 +523,8 @@ export function BriefingPanel({
         )}
       </div>
 
-      {!generating && digest.items.length > 0 && (
-        <div className="briefing-preview-footer">
+      {digest.items.length > 0 && (
+        <div className={`briefing-preview-footer${generating ? " briefing-preview-footer-dimmed" : ""}`}>
           {remaining > 0 && (
             <p className="briefing-preview-more">
               +{remaining} more item{remaining === 1 ? "" : "s"} in reading mode

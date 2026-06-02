@@ -9217,6 +9217,111 @@ footer {
   from { transform: translateX(-50%) translateY(-12px); opacity: 0; }
   to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
 }
+
+.briefing-ready-toast {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  max-width: min(420px, calc(100vw - 32px));
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(28, 24, 18, 0.14);
+  backdrop-filter: blur(16px);
+  animation: briefing-toast-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes briefing-toast-in {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.briefing-ready-toast-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.briefing-ready-toast-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.briefing-ready-toast-body {
+  flex: 1;
+  min-width: 0;
+}
+.briefing-ready-toast-title {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.briefing-ready-toast-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.briefing-ready-toast-action {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--accent-text, #fff);
+  background: var(--accent);
+}
+.briefing-ready-toast-action:hover {
+  opacity: 0.92;
+}
+.briefing-ready-toast-close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.briefing-ready-toast-close:hover {
+  background: color-mix(in srgb, var(--border) 50%, transparent);
+  color: var(--text);
+}
+
+.dash-nav-generating-pip {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+  animation: briefing-pip-pulse 1.4s ease-in-out infinite;
+}
+@keyframes briefing-pip-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.briefing-preview-list-updating {
+  opacity: 0.72;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.briefing-preview-footer-dimmed {
+  opacity: 0.65;
+}
 .onboard-gmail-feature {
   border: 1px solid var(--border);
   border-radius: 16px;
