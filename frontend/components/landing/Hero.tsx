@@ -1,110 +1,79 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
-import { BrainCanvas } from "./BrainCanvas";
+import { motion } from "framer-motion";
+import { DigestPreview } from "./DigestPreview";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-function CountUp({ to, suffix = "" }: { to: number; suffix?: string }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true });
-  const [n, setN] = useState(0);
-
-  useEffect(() => {
-    if (!inView) return;
-    const dur = 1600;
-    const start = Date.now();
-    let raf: number;
-    const tick = () => {
-      const p = Math.min((Date.now() - start) / dur, 1);
-      setN(Math.round((1 - Math.pow(1 - p, 3)) * to));
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [inView, to]);
-
-  return <span ref={ref}>{n}{suffix}</span>;
-}
-
-const PROBLEM_STATS = [
-  { to: 12, line1: "newsletters", line2: "you'll never read" },
-  { to: 52, line1: "YouTube channels", line2: "unwatched" },
-  { to: 18, line1: "subreddits", line2: "you can't keep up with" },
+// A/Lumen DNA: hard metrics above the headline
+const METRICS = [
+  { value: "50+", label: "sources read", sub: "every night" },
+  { value: "10",  label: "items shown",  sub: "zero noise"  },
+  { value: "7am", label: "in your inbox", sub: "daily, cited" },
 ] as const;
 
 export function Hero() {
   return (
     <section className="hero-light">
-      {/* Subtle paper texture gradient */}
       <div className="hero-light-bg" aria-hidden>
         <div className="hero-light-glow" />
-        {/* Brain silhouette — ambient background, very low opacity */}
-        <BrainCanvas />
       </div>
 
-      <div className="hero-light-inner">
-        {/* Problem statement */}
+      {/* B/Cobalt DNA: asymmetric split — text left, live product right */}
+      <div className="hero-split-inner">
+
+        {/* ── Left column ─────────────────────────────────────────────── */}
         <motion.div
-          className="hero-problem"
-          initial={{ opacity: 0, y: 32 }}
+          className="hero-left"
+          initial={{ opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.1, ease: EASE }}
         >
-          <p className="hero-problem-eyebrow">The problem you know too well</p>
-          <div className="hero-problem-numbers">
-            {PROBLEM_STATS.map((stat, i) => (
+          {/* Metric row */}
+          <div className="hero-metrics">
+            {METRICS.map((m, i) => (
               <motion.div
-                key={stat.line1}
-                className="hero-problem-stat"
-                initial={{ opacity: 0, y: 16 }}
+                key={m.label}
+                className="hero-metric"
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.55, delay: 0.2 + i * 0.1, ease: EASE }}
+                transition={{ duration: 0.45, delay: 0.18 + i * 0.08, ease: EASE }}
               >
-                <span className="hero-problem-num">
-                  <CountUp to={stat.to} />
-                </span>
-                <span className="hero-problem-label">
-                  <span className="hero-problem-label-main">{stat.line1}</span>
-                  <span className="hero-problem-label-sub">{stat.line2}</span>
-                </span>
-                {i < PROBLEM_STATS.length - 1 && (
-                  <span className="hero-problem-sep" aria-hidden>
-                    +
-                  </span>
-                )}
+                <span className="hero-metric-value">{m.value}</span>
+                <span className="hero-metric-label">{m.label}</span>
+                <span className="hero-metric-sub">{m.sub}</span>
               </motion.div>
             ))}
           </div>
-        </motion.div>
 
-        {/* Divider */}
-        <motion.div
-          className="hero-divider-line"
-          initial={{ scaleX: 0 }}
-          animate={{ scaleX: 1 }}
-          transition={{ duration: 0.9, delay: 0.55, ease: EASE }}
-        />
-
-        {/* Solution */}
-        <motion.div
-          className="hero-solution"
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.7, ease: EASE }}
-        >
-          <h1 className="hero-light-headline">
+          <motion.h1
+            className="hero-light-headline"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.38, ease: EASE }}
+          >
             Briefly reads all of it.
             <br />
             <span className="hero-light-gradient">You just read the briefing.</span>
-          </h1>
-          <p className="hero-light-sub">
-            Connect your accounts once. Every night, Briefly reads everything — deduplicates across sources,
-            scores what matters to you, and writes a personalised morning briefing with every claim cited.
-            Zero maintenance. Forever.
-          </p>
-          <div className="hero-light-actions">
+          </motion.h1>
+
+          <motion.p
+            className="hero-light-sub"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.58, ease: EASE }}
+          >
+            Connect your sources once. Every night, Briefly reads everything —
+            deduplicates across sources, scores what matters to you, and writes
+            a personal morning briefing with every claim cited. Zero maintenance. Forever.
+          </motion.p>
+
+          <motion.div
+            className="hero-light-actions"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.72, ease: EASE }}
+          >
             <motion.a
               href="/login"
               className="btn-light-primary"
@@ -116,11 +85,20 @@ export function Hero() {
             <a href="#demo" className="btn-light-ghost">
               Watch it work ↓
             </a>
-          </div>
-          <p className="hero-light-fine">
+          </motion.div>
+
+          <motion.p
+            className="hero-light-fine"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.88, ease: EASE }}
+          >
             Free to start · No credit card · First briefing tomorrow at 7am
-          </p>
+          </motion.p>
         </motion.div>
+
+        {/* ── Right column: live animated digest ──────────────────────── */}
+        <DigestPreview />
       </div>
     </section>
   );
