@@ -24,7 +24,16 @@ def build_outcome_meta(ctx: PipelineContext) -> dict:
     saved_minutes = max(5, filtered_count * 4 + len(drafts) * 2)
 
     profile = ctx.user.profile or {}
-    interests = [str(i).strip() for i in (profile.get("interests") or []) if i][:3]
+    raw_interests = profile.get("interests") or []
+    interests: list[str] = []
+    for i in raw_interests:
+        if isinstance(i, dict):
+            topic = (i.get("topic") or "").strip()
+        else:
+            topic = str(i).strip()
+        if topic:
+            interests.append(topic)
+    interests = interests[:3]
     goal = str(profile.get("goal") or "").strip()
 
     skipped_note = str(ctx.__dict__.get("skipped_note") or "").strip()

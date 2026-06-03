@@ -676,10 +676,6 @@ export function BriefingPanel({
         digestDate={digest.digest_date}
       />
 
-      {generateError && (
-        <p className="form-error briefing-error">{generateError}</p>
-      )}
-
       {generateWarnings.length > 0 && (
         <ul className="briefing-warnings briefing-warnings-panel">
           {generateWarnings.map((warning) => (
@@ -772,7 +768,14 @@ export function BriefingPanel({
         </div>
       )}
 
-      {generateError && <p className="form-error briefing-error">{generateError}</p>}
+      {generateError && onRegenerate && (
+        <p className="briefing-refresh-hint">
+          Couldn&apos;t reach the server to check for updates.{" "}
+          <button type="button" className="briefing-refresh-hint-btn" onClick={onRegenerate}>
+            Refresh brief
+          </button>
+        </p>
+      )}
     </div>
   );
 }
