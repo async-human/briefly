@@ -506,6 +506,8 @@ function fmtElapsed(sec: number): string {
   if (sec < 60) return `${sec}s`;
   const m = Math.floor(sec / 60);
   const s = sec % 60;
+  // Cap display at 10 minutes — anything beyond that is a stale/stuck timer
+  if (m >= 10) return "taking longer than usual…";
   return `${m}m ${s.toString().padStart(2, "0")}s`;
 }
 
@@ -552,7 +554,7 @@ function GeneratingPanel({
           </h2>
           <p className="bgl-panel-subtitle">
             {elapsedSec > 0
-              ? `${fmtElapsed(elapsedSec)}${elapsedSec < 45 ? " · usually under a minute" : ""}`
+              ? fmtElapsed(elapsedSec)
               : "Starting up…"}
           </p>
         </div>

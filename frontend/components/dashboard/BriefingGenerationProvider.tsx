@@ -132,18 +132,26 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
           if (existing?.label) {
             setGeneratingLabel(existing.label);
           }
-          // Resume elapsed timer from the backend's started_at so it shows
-          // real elapsed time even when the user navigates back mid-generation.
+          // Resume elapsed timer from the backend's started_at, but only if
+          // it's recent. A stale "running" status (e.g. from a previous day's
+          // generation that never wrote "complete" due to the JSONB bug) would
+          // otherwise show absurd elapsed times like "2175m 20s".
           if (existing?.started_at) {
             const startedMs = new Date(existing.started_at).getTime();
-            if (!isNaN(startedMs)) {
+            const ageMs = Date.now() - startedMs;
+            const MAX_RESUME_AGE_MS = 20 * 60 * 1000; // 20 minutes
+            if (!isNaN(startedMs) && ageMs < MAX_RESUME_AGE_MS) {
               generatingStartRef.current = startedMs;
-              setGeneratingElapsedSec(Math.floor((Date.now() - startedMs) / 1000));
-              if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
-              elapsedTimerRef.current = setInterval(() => {
-                setGeneratingElapsedSec(Math.floor((Date.now() - generatingStartRef.current) / 1000));
-              }, 1000);
+              setGeneratingElapsedSec(Math.floor(ageMs / 1000));
+            } else {
+              // Stale started_at — reset clock to now so elapsed reads 0s
+              generatingStartRef.current = Date.now();
+              setGeneratingElapsedSec(0);
             }
+            if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+            elapsedTimerRef.current = setInterval(() => {
+              setGeneratingElapsedSec(Math.floor((Date.now() - generatingStartRef.current) / 1000));
+            }, 1000);
           }
         }
 
