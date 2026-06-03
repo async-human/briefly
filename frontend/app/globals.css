@@ -5121,7 +5121,8 @@ footer {
   --accent-dim:    rgba(158,123,63,0.10);
   --accent-line:   rgba(158,123,63,0.28);
   display: grid;
-  grid-template-columns: 1fr 460px;
+  /* Left gets 60% of the viewport, right is the fixed login card */
+  grid-template-columns: 1fr 420px;
   height: 100vh;
   overflow: hidden;
   background: var(--bg);
@@ -5134,14 +5135,15 @@ footer {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px 56px;
+  padding: 32px 48px;
   background: var(--bg);
   overflow: hidden;
 }
 .login-left-inner {
   position: relative;
   z-index: 1;
-  max-width: 500px;
+  /* Wider content area so the briefing preview card fills more of the panel */
+  max-width: 620px;
   width: 100%;
 }
 
