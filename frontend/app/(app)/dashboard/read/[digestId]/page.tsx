@@ -192,7 +192,7 @@ function ReadingCard({
           <p className="read-confidence-signal">◈ {item.confidence_signal}</p>
         )}
 
-        {articleUrl && mode === "deep" && (
+        {articleUrl && (
           <motion.a
             href={articleUrl}
             target="_blank"
@@ -409,6 +409,22 @@ function CompletionScreen({
           ← Back to dashboard
         </button>
       </motion.div>
+    </div>
+  );
+}
+
+// ── Progress dots ─────────────────────────────────────────────────────────────
+function ProgressDots({ current, total }: { current: number; total: number }) {
+  const MAX = 13;
+  const n = Math.min(total, MAX);
+  const active = total <= MAX
+    ? current
+    : Math.round((current / Math.max(total - 1, 1)) * (n - 1));
+  return (
+    <div className="read-dots" aria-hidden>
+      {Array.from({ length: n }, (_, i) => (
+        <span key={i} className={`read-dot${i === active ? " active" : i < active ? " done" : ""}`} />
+      ))}
     </div>
   );
 }
@@ -685,6 +701,12 @@ export default function ReadingPage() {
 
       {/* ── Card area ──────────────────────────────────────────────────── */}
       <main className="read-card-area">
+        {/* Desktop gutter arrows */}
+        {currentIndex > 0 && (
+          <button className="read-arrow read-arrow-left" onClick={goBack} aria-label="Previous article" tabIndex={-1}>←</button>
+        )}
+        <button className="read-arrow read-arrow-right" onClick={() => advance(false)} aria-label="Next article" tabIndex={-1}>→</button>
+
         {showSectionBanner && item.section && (
           <motion.div
             className="read-section-banner"
@@ -734,7 +756,7 @@ export default function ReadingPage() {
         </button>
 
         <div className="read-footer-center">
-          <span className="read-counter">{currentIndex + 1} of {items.length}</span>
+          <ProgressDots current={currentIndex} total={items.length} />
           <button
             className={`read-save-text-btn${saved.has(item.id) ? " saved" : ""}`}
             onClick={() => advance(true)}
