@@ -12499,6 +12499,15 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   font-size: 12px;
 }
 
+/* Hint shown when bars are seeded from declared interests, not yet learned */
+.bk-declared-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0 0 4px;
+  line-height: 1.5;
+}
+
 /* Empty-state hint when learned interests not yet available */
 .bk-empty-hint {
   font-size: 13px;

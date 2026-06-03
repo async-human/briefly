@@ -386,6 +386,7 @@ export type ProfileIntelligence = {
     avg_open_rate: number;
     avg_click_rate: number;
   };
+  interests_are_declared: boolean;
 };
 
 export type WeeklyReportTopic = {

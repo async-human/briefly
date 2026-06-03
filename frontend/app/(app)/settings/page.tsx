@@ -212,10 +212,19 @@ function BrieflyKnowsCard({
         </div>
       )}
 
-      {/* ── Inferred interests with strength bars ── */}
-      {hasLearnedInterests ? (
+      {/* ── Interest bars — learned or seeded from declared ── */}
+      {hasLearnedInterests && (
         <div className="bk-section">
-          <p className="bk-section-label">What Briefly has learned from your reading</p>
+          <p className="bk-section-label">
+            {intel.interests_are_declared
+              ? "Interest weights — based on what you told Briefly"
+              : "What Briefly has learned from your reading"}
+          </p>
+          {intel.interests_are_declared && (
+            <p className="bk-declared-hint">
+              These reflect your stated topics. Bars will shift as Briefly learns from what you actually open and save.
+            </p>
+          )}
           <div className="bk-interest-list">
             {topicEntries.map(([topic, strength]) => (
               <InterestBar key={topic} topic={topic} strength={strength} />
@@ -230,14 +239,7 @@ function BrieflyKnowsCard({
             </div>
           )}
         </div>
-      ) : intel.digest_day > 0 ? (
-        <div className="bk-section">
-          <p className="bk-section-label">What Briefly has learned from your reading</p>
-          <p className="bk-empty-hint">
-            Briefly is still building your interest profile. Open and click on stories that matter to you — signals accumulate after a few more digests.
-          </p>
-        </div>
-      ) : null}
+      )}
 
       {/* ── Active story threads ── */}
       {intel.active_threads.length > 0 && (

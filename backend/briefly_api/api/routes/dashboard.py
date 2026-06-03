@@ -714,6 +714,22 @@ async def get_profile_intelligence(
 
     # Strongest interests from topic_clusters (lowered threshold so early users see data)
     clusters = profile.topic_clusters or []
+
+    # If topic_clusters is empty (e.g. flag_modified bug existed before this fix),
+    # seed the display from declared interests so the user always sees something real.
+    # These entries are labelled "declared" so the UI can distinguish them.
+    if not clusters and profile.interests:
+        clusters = [
+            {
+                "cluster": i.get("topic", ""),
+                "strength": float(i.get("weight", 0.5)),
+                "source": "declared",
+                "item_count": 0,
+            }
+            for i in (profile.interests or [])
+            if i.get("topic")
+        ]
+
     strong = sorted(
         [c for c in clusters if cluster_label(c) and c.get("strength", 0) >= 0.25],
         key=lambda x: x.get("strength", 0),
@@ -805,6 +821,14 @@ async def get_profile_intelligence(
         "avg_click_rate": round((profile.avg_click_rate or 0) * 100),
     }
 
+    # True when topic_strengths was seeded from declared interests rather than
+    # learned clusters — lets the UI show "Based on what you told us" instead
+    # of "Learned from your reading".
+    interests_are_declared = bool(
+        topic_strengths
+        and all(c.get("source") == "declared" for c in clusters if cluster_label(c))
+    )
+
     return {
         "digest_day": digest_day,
         "strongest_interests": strongest_interests,
@@ -815,6 +839,7 @@ async def get_profile_intelligence(
         "deprioritized_sources": deprioritized_sources,
         "topic_strengths": topic_strengths,
         "reading_stats": reading_stats,
+        "interests_are_declared": interests_are_declared,
     }
 
 

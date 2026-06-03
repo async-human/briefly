@@ -28,6 +28,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
+from sqlalchemy.orm import flag_modified
 
 from briefly_api.agents.context import PipelineContext
 from briefly_api.db.models import (
@@ -226,6 +227,8 @@ async def _update_topic_clusters(ctx: PipelineContext, session) -> None:
     # Preserve meta rows (source_weight, meta type)
     meta_rows = [c for c in (profile.topic_clusters or []) if c.get("_type") in {"source_weight", "meta"}]
     profile.topic_clusters = meta_rows + sorted_clusters
+    # SQLAlchemy doesn't reliably detect mutations on JSONB columns without this.
+    flag_modified(profile, "topic_clusters")
     await session.flush()
 
 
@@ -297,6 +300,7 @@ async def _update_source_weights(ctx: PipelineContext, session) -> None:
         weights[key] = round(current + 0.05 * (target - current), 3)
 
     profile.source_weights = weights
+    flag_modified(profile, "source_weights")
     await session.flush()
 
 
