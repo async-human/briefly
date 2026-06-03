@@ -1,11 +1,13 @@
 "use client";
 
+import { flushSync } from "react-dom";
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -23,54 +25,93 @@ type LandingThemeContextValue = {
 
 const LandingThemeContext = createContext<LandingThemeContextValue | null>(null);
 
-// Temporarily add a class to <html> that enables cross-element transitions
-// during the ~350 ms of a theme switch. Removed immediately after so
-// hover / animation transitions elsewhere on the page are unaffected.
-let _transitionTimer: ReturnType<typeof setTimeout> | null = null;
-function _startTransition() {
-  if (typeof document === "undefined") return;
-  if (_transitionTimer) clearTimeout(_transitionTimer);
-  document.documentElement.classList.add("theme-switching");
-  _transitionTimer = setTimeout(() => {
-    document.documentElement.classList.remove("theme-switching");
-    _transitionTimer = null;
-  }, 400);
+// ── Smooth theme switching ────────────────────────────────────────────────────
+//
+// Primary path: View Transitions API (Chrome 111+, Safari 18+).
+//   Takes a full-page screenshot before the DOM update, applies the update,
+//   then cross-fades old ↔ new. Zero timing gymnastics required.
+//
+// Fallback: double-rAF + blanket CSS transitions.
+//   Frame 1: add .theme-switching so every element has transition: * set.
+//   Frame 2: browser records the computed "before" values.
+//   Then:    commit the DOM update — transitions fire from before → after.
+//   500 ms:  remove the class so hover/animation performance is restored.
+//
+let _fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+function smoothApply(commit: () => void): void {
+  if (typeof document === "undefined") {
+    commit();
+    return;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const d = document as any;
+
+  // ── View Transitions API (primary) ────────────────────────────────────────
+  // Takes a screenshot before the DOM update and cross-fades old ↔ new.
+  // Chrome 111+, Safari 18+. Zero timing gymnastics required.
+  if (typeof d.startViewTransition === "function") {
+    d.startViewTransition(commit);
+    return;
+  }
+
+  // ── CSS double-rAF fallback ───────────────────────────────────────────────
+  // Frame 1: add .theme-switching so every element has transition: * applied.
+  // Frame 2: browser records computed "before" values. Then commit fires.
+  if (_fallbackTimer) clearTimeout(_fallbackTimer);
+  d.documentElement.classList.add("theme-switching");
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      commit();
+      _fallbackTimer = setTimeout(() => {
+        d.documentElement.classList.remove("theme-switching");
+        _fallbackTimer = null;
+      }, 500);
+    });
+  });
 }
 
+// ── Provider ─────────────────────────────────────────────────────────────────
+
 export function LandingThemeProvider({ children }: { children: React.ReactNode }) {
-  // Always start with "light" on the server so SSR and the initial client
-  // render match — no hydration mismatch.  After mount we immediately read
-  // localStorage and apply the stored preference.
+  // Stable SSR default prevents hydration mismatch.
+  // Stored preference is applied in the mount effect below.
   const [theme, setThemeState] = useState<LandingTheme>("light");
 
-  // Read stored preference after hydration (one-time, no deps)
+  // Keep a ref so toggleTheme can read the latest value without a stale closure.
+  const themeRef = useRef<LandingTheme>("light");
+  useEffect(() => { themeRef.current = theme; }, [theme]);
+
+  // One-time: apply stored preference after hydration.
   useEffect(() => {
     const resolved = resolveLandingTheme(readStoredLandingTheme());
     setThemeState(resolved);
+    themeRef.current = resolved;
     document.body.dataset.landingTheme = resolved;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setTheme = useCallback((next: LandingTheme) => {
-    _startTransition();
-    setThemeState(next);
-    localStorage.setItem(LANDING_THEME_STORAGE_KEY, next);
-    document.body.dataset.landingTheme = next;
-  }, []);
-
-  const toggleTheme = useCallback(() => {
-    _startTransition();
-    setThemeState((prev) => {
-      const next = prev === "light" ? "dark" : "light";
+    smoothApply(() => {
+      // flushSync forces React to update the DOM synchronously inside the
+      // View Transition callback so the API captures the correct new frame.
+      flushSync(() => setThemeState(next));
+      themeRef.current = next;
       localStorage.setItem(LANDING_THEME_STORAGE_KEY, next);
       document.body.dataset.landingTheme = next;
-      return next;
     });
   }, []);
 
+  const toggleTheme = useCallback(() => {
+    const next = themeRef.current === "light" ? "dark" : "light";
+    setTheme(next);
+  }, [setTheme]);
+
   const value = useMemo(
     () => ({ theme, setTheme, toggleTheme }),
-    [theme, setTheme, toggleTheme]
+    [theme, setTheme, toggleTheme],
   );
 
   return (

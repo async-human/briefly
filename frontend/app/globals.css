@@ -36,15 +36,29 @@
     color 0.4s ease;
 }
 
-/* During a theme switch the JS adds .theme-switching to <html> for ~400 ms.
-   This enables smooth cross-element transitions only while switching,
-   so hover / animation performance is never affected outside of that window. */
+/* ── View Transitions API — cross-fade when theme switches (Chrome 111+) ── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 350ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Honour reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.01ms;
+  }
+}
+
+/* ── CSS fallback — .theme-switching on <html> for ~500 ms ── */
+/* Enables transitions on every element only while switching.   */
+/* Removed immediately after so page performance is unaffected. */
 .theme-switching *,
 .theme-switching *::before,
 .theme-switching *::after {
-  transition-property: background-color, color, border-color, fill, stroke, box-shadow, opacity !important;
-  transition-duration: 0.35s !important;
-  transition-timing-function: ease !important;
+  transition-property: background-color, color, border-color, fill, stroke, box-shadow !important;
+  transition-duration: 350ms !important;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 .landing-page[data-theme="light"] {
