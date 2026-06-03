@@ -164,22 +164,32 @@ function DashboardContent() {
         if (autoGenerateChecked.current) return;
         autoGenerateChecked.current = true;
 
-        // Rule 1 — valid digest already in context or just fetched from API
         const localToday = localDateString(digestTimezone);
-        const ctxDigestOk = digest && !needsBriefingForToday(digest, digestTimezone);
-        const apiDigestOk = digestData && !needsBriefingForToday(digestData, digestTimezone);
-        if (ctxDigestOk || apiDigestOk) return;
-
-        // Rule 2 — one attempt per day, stored in localStorage
         const lsKey = `briefly_gen_${meData.user.id}`;
+
+        // Rule 1 — one attempt per day recorded in localStorage.
+        // Check this FIRST so we never call generateDigest on the same calendar
+        // day, regardless of what API state says.
         const lastGenDate = typeof localStorage !== "undefined"
           ? localStorage.getItem(lsKey)
           : null;
         if (lastGenDate === localToday) return;
 
+        // Rule 2 — valid digest already exists in context or just fetched.
+        // Stamp localStorage so every subsequent navigation this day returns early
+        // from Rule 1 without any API calls.
+        const ctxDigestOk = digest && !needsBriefingForToday(digest, digestTimezone);
+        const apiDigestOk = digestData && !needsBriefingForToday(digestData, digestTimezone);
+        if (ctxDigestOk || apiDigestOk) {
+          if (typeof localStorage !== "undefined") {
+            localStorage.setItem(lsKey, localToday);
+          }
+          return;
+        }
+
         if (hasSources && !generating) {
-          // Record the attempt BEFORE triggering so tab-switches during generation
-          // don't fire a second attempt.
+          // Record the attempt BEFORE triggering so concurrent mounts or quick
+          // tab-switches can't fire a second generation.
           if (typeof localStorage !== "undefined") {
             localStorage.setItem(lsKey, localToday);
           }

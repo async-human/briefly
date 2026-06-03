@@ -54,6 +54,10 @@ async def report_briefing_progress(
 
         meta["briefing_generation"] = entry
         profile.ingestion_meta = meta
+        # JSONB columns require explicit dirty-marking; without this the
+        # ORM may not detect the mutation and the status never persists.
+        from sqlalchemy.orm import flag_modified
+        flag_modified(profile, "ingestion_meta")
         await session.commit()
 
 

@@ -518,6 +518,7 @@ async def generate_digest_now(
                 warnings=[],
             )
 
+    from sqlalchemy.orm import flag_modified as _flag_modified
     now = datetime.now(timezone.utc).isoformat()
     meta["briefing_generation"] = {
         "status": "running",
@@ -527,6 +528,7 @@ async def generate_digest_now(
         "updated_at": now,
     }
     profile.ingestion_meta = meta
+    _flag_modified(profile, "ingestion_meta")
     await db.commit()
 
     background_tasks.add_task(_briefing_worker, user.id)

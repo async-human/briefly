@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { api, type Digest } from "@/lib/api";
+import { needsBriefingForToday } from "@/lib/localDate";
 import { BriefingReadyToast } from "./BriefingReadyToast";
 
 type ReadyNotice = {
@@ -200,7 +201,13 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
         ]);
         if (cancelled) return;
         if (latest) setDigest(latest);
-        if (status?.status === "running") {
+
+        // Only resume polling when generation is genuinely in progress.
+        // If we already have today's valid digest, ignore a stale "running"
+        // status — the JSONB persistence bug previously left status stuck at
+        // "running" after completion, causing a spurious spinner on every visit.
+        const alreadyHaveToday = latest && !needsBriefingForToday(latest);
+        if (status?.status === "running" && !alreadyHaveToday) {
           resumePolling();
         }
       } catch {

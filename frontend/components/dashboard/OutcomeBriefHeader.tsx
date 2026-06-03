@@ -18,7 +18,17 @@ export function OutcomeBriefHeader({
 }: OutcomeBriefHeaderProps) {
   const saved = outcome?.saved_minutes;
   const filtered = outcome?.filtered_count ?? 0;
-  const topics = outcome?.catch_up_topics ?? [];
+
+  // Backend bug (now fixed) previously stored raw Python dict strings like
+  // "{'topic': 'startup funding', 'source': 'declared', 'weight': 0.8}".
+  // Clean those here so old stored digests still render correctly.
+  const rawTopics = outcome?.catch_up_topics ?? [];
+  const topics = rawTopics
+    .map((t) => {
+      const m = t.match(/'topic':\s*'([^']+)'/);
+      return m ? m[1] : t;
+    })
+    .filter((t) => t && !t.startsWith("{") && !t.startsWith("["));
 
   return (
     <div className="outcome-brief-header">

@@ -768,14 +768,8 @@ export function BriefingPanel({
         </div>
       )}
 
-      {generateError && onRegenerate && (
-        <p className="briefing-refresh-hint">
-          Couldn&apos;t reach the server to check for updates.{" "}
-          <button type="button" className="briefing-refresh-hint-btn" onClick={onRegenerate}>
-            Refresh brief
-          </button>
-        </p>
-      )}
+      {/* Server errors during background polling are suppressed when the digest
+          is already visible — the user has everything they need. */}
     </div>
   );
 }
