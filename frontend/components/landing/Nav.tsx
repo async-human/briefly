@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-
 import { ThemeToggle } from "./ThemeToggle";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -15,21 +14,11 @@ const NAV_LINKS = [
 ];
 
 export function Nav() {
-  const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
+    return () => { document.body.style.overflow = ""; };
   }, [menuOpen]);
 
   const open = () => setMenuOpen(true);
@@ -37,11 +26,12 @@ export function Nav() {
 
   return (
     <>
-      <nav className={`landing-nav${scrolled ? " scrolled" : ""}${menuOpen ? " menu-open" : ""}`}>
-        <div className="nav-inner">
-          <a href="#" className="nav-logo">Briefly</a>
+      {/* N5 — Floating pill */}
+      <nav className={`nav-fp${menuOpen ? " menu-open" : ""}`}>
+        <div className="nav-fp-inner">
+          <a href="#" className="nav-fp-logo">Briefly</a>
 
-          <ul className="nav-center">
+          <ul className="nav-fp-links">
             {NAV_LINKS.map((l) => (
               <li key={l.href}>
                 <a href={l.href}>{l.label}</a>
@@ -49,11 +39,9 @@ export function Nav() {
             ))}
           </ul>
 
-          <div className="nav-actions">
+          <div className="nav-fp-right">
             <ThemeToggle compact />
-            <span className="nav-actions-divider" aria-hidden />
-            <a href="/login" className="nav-signin">Sign in</a>
-            <a href="/login" className="nav-cta">Get started</a>
+            <a href="/login" className="nav-fp-cta">Start free →</a>
           </div>
 
           <button
@@ -83,7 +71,6 @@ export function Nav() {
               transition={{ duration: 0.2 }}
               onClick={close}
             />
-
             <motion.div
               className="nav-mobile-menu"
               role="dialog"
@@ -96,23 +83,12 @@ export function Nav() {
             >
               <div className="nav-mobile-topbar">
                 <span className="nav-mobile-brand">Briefly</span>
-                <button
-                  className="nav-mobile-close"
-                  onClick={close}
-                  aria-label="Close menu"
-                  type="button"
-                >
+                <button className="nav-mobile-close" onClick={close} aria-label="Close menu" type="button">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-                    <path
-                      d="M2 2l12 12M14 2L2 14"
-                      stroke="currentColor"
-                      strokeWidth="1.75"
-                      strokeLinecap="round"
-                    />
+                    <path d="M2 2l12 12M14 2L2 14" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
                   </svg>
                 </button>
               </div>
-
               <div className="nav-mobile-links" role="navigation" aria-label="Mobile navigation">
                 {NAV_LINKS.map((l, i) => (
                   <motion.a
@@ -129,22 +105,15 @@ export function Nav() {
                   </motion.a>
                 ))}
               </div>
-
               <motion.div
                 className="nav-mobile-actions"
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.28, duration: 0.25, ease: EASE }}
               >
-                <div className="nav-mobile-theme">
-                  <ThemeToggle />
-                </div>
-                <a href="/login" onClick={close} className="nav-mobile-signin">
-                  Sign in
-                </a>
-                <a href="/login" onClick={close} className="nav-mobile-cta">
-                  Get started free
-                </a>
+                <div className="nav-mobile-theme"><ThemeToggle /></div>
+                <a href="/login" onClick={close} className="nav-mobile-signin">Sign in</a>
+                <a href="/login" onClick={close} className="nav-mobile-cta">Get started free</a>
               </motion.div>
             </motion.div>
           </>

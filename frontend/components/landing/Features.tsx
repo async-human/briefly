@@ -326,7 +326,6 @@ function FeatureCard({ feature, accent = false }: { feature: Feature; accent?: b
       <SpotlightCard variant={feature.variant} accent={accent}>
         <div className="bento-top">
           <FeatureGlyph variant={feature.variant} />
-          <span className="bento-num">{feature.num}</span>
         </div>
         <h3 className={`bento-title${isLarge ? " bento-title-lg" : ""}`}>{feature.title}</h3>
         <p className="bento-desc">{feature.desc}</p>

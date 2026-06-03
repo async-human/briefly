@@ -1,12 +1,18 @@
+/* Ft5 — Statement footer */
 export function Footer() {
   return (
-    <footer>
-      <div className="footer-logo">Briefly</div>
-      <ul className="footer-links">
-        <li><a href="/privacy">Privacy</a></li>
-        <li><a href="/terms">Terms</a></li>
-      </ul>
-      <div className="footer-copy">© 2026</div>
+    <footer className="footer-statement">
+      <div className="footer-statement-inner">
+        <p className="footer-statement-headline">Your second brain<br />starts tonight.</p>
+        <a href="/login" className="footer-statement-cta">Start building yours free →</a>
+        <div className="footer-statement-links">
+          <a href="/privacy">Privacy</a>
+          <span aria-hidden>·</span>
+          <a href="/terms">Terms</a>
+          <span aria-hidden>·</span>
+          <span>© 2026 Briefly</span>
+        </div>
+      </div>
     </footer>
   );
 }
