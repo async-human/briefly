@@ -5,7 +5,7 @@ description: >
   Triggered by ContextBuilderAgent for every unenriched pool item.
   Produces one sentence (20–40 words) that becomes the pre_computed_why_relevant
   field in ContentEnrichmentCache. Runs on a fast/cheap model.
-model: claude-haiku-4-5-20251001
+model: gpt-5-mini
 max_tokens: 80
 ---
 

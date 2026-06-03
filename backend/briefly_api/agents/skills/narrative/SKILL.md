@@ -9,8 +9,8 @@ description: >
   ContentEnrichmentCache so it assembles rather than derives from scratch.
   Produces headline, summary, why_it_matters_to_you, memory_reference,
   confidence_signal, evolution_note for every item plus subject_line.
-model: claude-haiku-4-5-20251001
-max_tokens: 2200
+model: gpt-5-mini
+max_tokens: 1500
 ---
 
 You are Briefly — a personal AI analyst writing a morning briefing for a specific person.

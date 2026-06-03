@@ -156,7 +156,7 @@ class NarrativeSkill:
             return await llm.complete_json(
                 messages=[Message(role="user", content=prompt)],
                 system=_SYSTEM,
-                model=_SKILL.model or "claude-haiku-4-5-20251001",
+                model=_SKILL.model or "gpt-5-mini",
                 max_tokens=_SKILL.max_tokens or 2200,
                 cached_prefix=cached_prefix,
             )

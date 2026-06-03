@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "hallmark": {
+      "source": "nutlope/hallmark",
+      "sourceType": "github",
+      "skillPath": "skills/hallmark/SKILL.md",
+      "computedHash": "ea04b5806681ceaba893ea9883d92a8045cf7f0041b8b7c1c5e594f7e0eabb0f"
+    }
+  }
+}

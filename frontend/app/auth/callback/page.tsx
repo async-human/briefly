@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { setToken } from "@/lib/auth";
+import { api } from "@/lib/api";
 
 function CallbackHandler() {
   const router = useRouter();
@@ -10,16 +11,19 @@ function CallbackHandler() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    function finishLogin() {
+    async function finishLogin() {
       const token = searchParams.get("token");
       if (!token) {
         setError("No authentication token received.");
         return;
       }
       setToken(token);
-      // Always land on onboarding after login — returning users see step 2
-      // (connection management) and continue to dashboard from there.
-      router.replace("/onboarding");
+      try {
+        const status = await api.getOnboardingStatus();
+        router.replace(status.onboarding_completed ? "/dashboard" : "/onboarding");
+      } catch {
+        router.replace("/onboarding");
+      }
     }
     void finishLogin();
   }, [router, searchParams]);

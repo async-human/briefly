@@ -59,7 +59,7 @@ class RelevanceSkill:
             resp = await llm.complete(
                 messages=[Message(role="user", content=prompt)],
                 system=system,
-                model=_SKILL.model or "claude-haiku-4-5-20251001",
+                model=_SKILL.model or "gpt-5-mini",
                 max_tokens=_SKILL.max_tokens or 80,
                 temperature=0.2,
             )
