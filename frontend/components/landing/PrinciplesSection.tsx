@@ -59,7 +59,7 @@ function PrincipleRow({
         </div>
         <p className="principle-desc">{principle.body}</p>
       </div>
-    </motion.li>
+    </li>
   );
 }
 
