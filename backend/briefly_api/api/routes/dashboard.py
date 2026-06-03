@@ -746,10 +746,14 @@ async def get_profile_intelligence(
     # Strongest interests from topic_clusters (lowered threshold so early users see data)
     clusters = profile.topic_clusters or []
 
-    # If topic_clusters is empty (e.g. flag_modified bug existed before this fix),
-    # seed the display from declared interests so the user always sees something real.
-    # These entries are labelled "declared" so the UI can distinguish them.
-    if not clusters and profile.interests:
+    # Seed from declared interests when there are no VALID learned clusters.
+    # We must check cluster_label() rather than the raw list length because
+    # topic_clusters can contain stale section-label entries ("What's new",
+    # "Highly relevant to you") from a previous bug — those all return None
+    # from cluster_label() and produce empty topic_strengths even though the
+    # list itself is non-empty.
+    has_valid_clusters = any(cluster_label(c) for c in clusters)
+    if not has_valid_clusters and profile.interests:
         clusters = [
             {
                 "cluster": i.get("topic", ""),
