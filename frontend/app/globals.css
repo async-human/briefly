@@ -12476,6 +12476,13 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
 .bk-topic-tile--above::before {
   background: linear-gradient(180deg, transparent 0%, rgba(80,160,100,0.16) 100%);
 }
+.bk-topic-tile--discovered {
+  border-color: rgba(100, 130, 200, 0.22);
+  background: rgba(100, 130, 200, 0.04);
+}
+.bk-topic-tile--discovered::before {
+  background: linear-gradient(180deg, transparent 0%, rgba(100, 130, 200, 0.14) 100%);
+}
 .bk-topic-tile--declared {
   border-color: rgba(158,123,63,0.07);
   opacity: 0.85;

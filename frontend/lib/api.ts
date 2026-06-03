@@ -397,7 +397,13 @@ export type ProfileIntelligence = {
     total_signals?: number;
     overall_engagement?: number;
     save_rate?: number;
-    topic_actual?: Record<string, { rate: number; engaged: number; skipped: number; total: number }>;
+    topic_actual?: Record<string, {
+      rate: number;
+      engaged: number;
+      skipped: number;
+      total: number;
+      source?: "declared" | "discovered";
+    }>;
     source_engagement?: Record<string, number>;
     emerging_topics?: string[];
     insights?: BehavioralInsight[];

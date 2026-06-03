@@ -841,6 +841,45 @@ async def _compute_behavioral_intelligence(
                 "engaged": pos,
                 "skipped": neg,
                 "total":   tot,
+                "source":  "declared",
+            }
+
+    # Discovered topics: learned from reading behaviour, not explicitly declared
+    from briefly_api.services.profile_utils import cluster_label
+
+    declared_set = set(declared_topics)
+    discovered_candidates: list[str] = []
+    for entry in (profile.topic_clusters or []):
+        label = cluster_label(entry)
+        if not label:
+            continue
+        key = label.lower()
+        if key in declared_set:
+            continue
+        source = entry.get("source") or "inferred"
+        strength = float(entry.get("strength", 0))
+        item_count = int(entry.get("item_count", 0))
+        if source in {"inferred", "learned"} or (strength >= 0.2 and item_count >= 1):
+            discovered_candidates.append(key)
+
+    for topic in dict.fromkeys(discovered_candidates):
+        pos = neg = 0
+        for s in signals:
+            text = _item_text(s)
+            if not _topic_matches(topic, text):
+                continue
+            if s.signal_type in pos_types:
+                pos += 1
+            elif s.signal_type in neg_types:
+                neg += 1
+        tot = pos + neg
+        if tot >= 2:
+            topic_actual[topic] = {
+                "rate":    round(pos / tot, 3),
+                "engaged": pos,
+                "skipped": neg,
+                "total":   tot,
+                "source":  "discovered",
             }
 
     # Emerging topics: high-frequency words in saved/clicked headlines NOT
@@ -935,7 +974,7 @@ async def _compute_behavioral_intelligence(
         "total_signals":       total,
         "overall_engagement":  overall_engagement,
         "save_rate":           save_rate,
-        "topic_actual":        topic_actual,        # actual engagement per declared topic
+        "topic_actual":        topic_actual,        # engagement per topic (declared + discovered)
         "source_engagement":   source_engagement,   # engagement rate per source
         "emerging_topics":     emerging_topics,     # keywords from clicked items, not declared
         "insights":            insights,            # human-readable observation cards

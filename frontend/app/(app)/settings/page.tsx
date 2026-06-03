@@ -98,15 +98,17 @@ function lookupTopicStrength(strengths: Record<string, number>, topic: string): 
 }
 
 function TopicTile({
-  topic, pct, isActual, aboveExpectation, sampleTotal,
+  topic, pct, isActual, aboveExpectation, sampleTotal, isDiscovered,
 }: {
   topic: string;
   pct: number | null;
   isActual: boolean;
   aboveExpectation: boolean | null;
   sampleTotal?: number;
+  isDiscovered?: boolean;
 }) {
   const variant = !isActual ? "declared"
+    : isDiscovered ? "discovered"
     : aboveExpectation === true ? "above"
     : "engaged";
   const fill = pct !== null ? `${pct}%` : "0%";
@@ -129,6 +131,9 @@ function TopicTile({
       {!isActual && (
         <span className="bk-topic-sub">Need more signals</span>
       )}
+      {isActual && isDiscovered && (
+        <span className="bk-topic-sub">Discovered from your reads</span>
+      )}
     </div>
   );
 }
@@ -150,22 +155,34 @@ function BrieflyKnowsCard({
   const topicsWithEngagement = Object.values(topicActual).filter((t) => (t.total ?? 0) >= 2).length;
   const hasTopicEngagement = topicsWithEngagement > 0;
 
-  const comparisonRows = declared.interests
+  const declaredKeys = new Set(declared.interests.map((t) => t.toLowerCase()));
+
+  const engagedRows = Object.entries(topicActual)
+    .filter(([, data]) => (data.total ?? 0) >= 2)
+    .map(([key, data]) => ({
+      topic: key,
+      declared: lookupTopicStrength(intel.topic_strengths ?? {}, key),
+      actual: data.rate,
+      sampleTotal: data.total,
+      isDiscovered: data.source === "discovered" || !declaredKeys.has(key),
+    }))
+    .sort((a, b) => b.actual - a.actual);
+
+  const declaredPendingRows = declared.interests
     .filter(isCleanLabel)
-    .map((t) => {
-      const key = t.toLowerCase();
-      const actualData = topicActual[key];
-      const hasActual = Boolean(actualData && (actualData.total ?? 0) >= 2);
-      return {
-        topic: t,
-        declared: lookupTopicStrength(intel.topic_strengths ?? {}, t),
-        actual: hasActual ? actualData!.rate : null,
-        sampleTotal: hasActual ? actualData!.total : 0,
-      };
+    .filter((t) => {
+      const data = topicActual[t.toLowerCase()];
+      return !data || (data.total ?? 0) < 2;
     })
-    .filter((r) => r.declared > 0)
-    .sort((a, b) => (b.actual ?? -1) - (a.actual ?? -1) || b.declared - a.declared)
-    .slice(0, 12);
+    .map((t) => ({
+      topic: t,
+      declared: lookupTopicStrength(intel.topic_strengths ?? {}, t),
+      actual: null as number | null,
+      sampleTotal: 0,
+      isDiscovered: false,
+    }));
+
+  const comparisonRows = [...engagedRows, ...declaredPendingRows].slice(0, 12);
 
   const cleanSources       = (intel.top_sources           ?? []).filter(isCleanLabel);
   const cleanDeprioritized = (intel.deprioritized_sources ?? []).filter(isCleanLabel);
@@ -253,7 +270,7 @@ function BrieflyKnowsCard({
             </p>
           )}
           <div className="bk-topics-grid">
-            {comparisonRows.map(({ topic, declared: d, actual: a, sampleTotal }) => {
+            {comparisonRows.map(({ topic, declared: d, actual: a, sampleTotal, isDiscovered }) => {
               const hasActual = a !== null;
               const pct = hasActual ? Math.round(a * 100) : null;
               const diff = hasActual ? Math.round(a * 100) - Math.round(d * 100) : null;
@@ -263,8 +280,9 @@ function BrieflyKnowsCard({
                   topic={topic}
                   pct={pct}
                   isActual={hasActual}
-                  aboveExpectation={diff !== null ? diff > 10 : null}
+                  aboveExpectation={diff !== null && !isDiscovered ? diff > 10 : null}
                   sampleTotal={sampleTotal}
+                  isDiscovered={isDiscovered}
                 />
               );
             })}
