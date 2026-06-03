@@ -99,7 +99,7 @@ class LLMAdapter:
                 max_tokens=_max, cached_prefix=cached_prefix,
             )
         elif provider == "openai":
-            return await self._openai(messages, system=system, model=_model, temperature=_temp, max_tokens=_max)
+            return await self._openai(messages, system=system, model=_model, temperature=_temp, max_tokens=_max, json_mode=json_mode)
         elif provider == "groq":
             return await self._groq(messages, system=system, model=_model, temperature=_temp, max_tokens=_max)
         else:
@@ -134,9 +134,9 @@ class LLMAdapter:
     # ── Anthropic ─────────────────────────────────────────────────────────────
 
     @retry(
-        retry=retry_if_exception_type((httpx.HTTPStatusError, httpx.TimeoutException)),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type(httpx.TimeoutException),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(2),
         reraise=True,
     )
     async def _anthropic(
@@ -188,7 +188,7 @@ class LLMAdapter:
                 {"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}
             ]
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
@@ -222,9 +222,9 @@ class LLMAdapter:
     # ── OpenAI ────────────────────────────────────────────────────────────────
 
     @retry(
-        retry=retry_if_exception_type((httpx.HTTPStatusError, httpx.TimeoutException)),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type(httpx.TimeoutException),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(2),
         reraise=True,
     )
     async def _openai(
@@ -235,6 +235,7 @@ class LLMAdapter:
         model: str,
         temperature: float,
         max_tokens: int,
+        json_mode: bool = False,
     ) -> LLMResponse:
         if not self._s.openai_api_key:
             raise RuntimeError("OPENAI_API_KEY not set")
@@ -244,19 +245,23 @@ class LLMAdapter:
             all_messages.append({"role": "system", "content": system})
         all_messages.extend({"role": m.role, "content": m.content} for m in messages)
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": all_messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {self._s.openai_api_key}",
                     "Content-Type": "application/json",
                 },
-                json={
-                    "model": model,
-                    "messages": all_messages,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                },
+                json=payload,
             )
             resp.raise_for_status()
             data = resp.json()

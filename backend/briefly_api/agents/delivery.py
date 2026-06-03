@@ -61,7 +61,10 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             # Embed preview text as hidden preheader in HTML (already in template)
             pass
 
-        response = await asyncio.to_thread(resend.Emails.send, params)
+        response = await asyncio.wait_for(
+            asyncio.to_thread(resend.Emails.send, params),
+            timeout=20.0,
+        )
         message_id = response.get("id") if isinstance(response, dict) else getattr(response, "id", None)
 
         log.info(
@@ -72,6 +75,9 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         # Store message_id for tracking — pipeline will persist it via _persist_digest
         ctx.__dict__["resend_message_id"] = message_id
 
+    except asyncio.TimeoutError:
+        log.error("DeliveryAgent: Resend API call timed out (>20s)")
+        ctx.log_error("DeliveryAgent", "Resend API timed out")
     except Exception as e:
         log.exception("DeliveryAgent: Resend API call failed: %s", e)
         ctx.log_error("DeliveryAgent", str(e))

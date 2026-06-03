@@ -64,7 +64,9 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         behavioral_fp_text   = ctx.behavioral_fingerprint_text or "No behavioral data yet."
         recent_context       = _build_recent_context(ctx.user.recent_digest_items)
         story_threads_text   = _build_story_threads_summary(ctx.user.active_story_threads)
-        memory_json          = json.dumps(ctx.memory_connections, indent=2)
+        # Cap memory_connections to prevent huge prompts (keep top 10 items max)
+        memory_connections_capped = dict(list(ctx.memory_connections.items())[:10])
+        memory_json = json.dumps(memory_connections_capped, indent=2)
 
         # Stable prefix — changes only when profile/fingerprint changes.
         # Anthropic caches this across retries and same-day re-runs.

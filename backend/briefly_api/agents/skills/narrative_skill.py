@@ -149,17 +149,26 @@ class NarrativeSkill:
     ) -> dict | None:
         """
         Run the full narrative LLM call.  Returns parsed JSON dict or None.
+        Hard timeout: 45 seconds — if the LLM doesn't respond, fall back to
+        plain drafts rather than blocking the whole pipeline.
         """
+        import asyncio
         llm    = get_llm_adapter()
         prompt = cached_prefix + items_section
         try:
-            return await llm.complete_json(
-                messages=[Message(role="user", content=prompt)],
-                system=_SYSTEM,
-                model=_SKILL.model or "gpt-5-mini",
-                max_tokens=_SKILL.max_tokens or 2200,
-                cached_prefix=cached_prefix,
+            return await asyncio.wait_for(
+                llm.complete_json(
+                    messages=[Message(role="user", content=prompt)],
+                    system=_SYSTEM,
+                    model=_SKILL.model or None,
+                    max_tokens=_SKILL.max_tokens or 2200,
+                    cached_prefix=cached_prefix,
+                ),
+                timeout=45.0,
             )
+        except asyncio.TimeoutError:
+            log.warning("NarrativeSkill: LLM call timed out (>45s) — using fallback drafts")
+            return None
         except Exception:
             log.exception("NarrativeSkill: LLM call failed")
             return None

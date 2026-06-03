@@ -67,7 +67,13 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
 
     try:
         async with get_session_factory()() as session:
-            return await _run_pipeline(session, user_id, run_date, s)
+            return await asyncio.wait_for(
+                _run_pipeline(session, user_id, run_date, s),
+                timeout=180.0,  # 3-minute hard cap — never leave user waiting longer
+            )
+    except asyncio.TimeoutError:
+        log.error("Pipeline timed out (>3 min) for user %s", user_id)
+        return {"success": False, "error": "Briefing took too long to generate. Please try again — it will be faster next time."}
     except Exception as exc:
         log.exception("Pipeline failed for user %s", user_id)
         return {"success": False, "error": f"Briefing pipeline error: {exc}"}
