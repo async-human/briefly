@@ -404,10 +404,12 @@ def _build_profile_summary(profile: dict, topic_clusters: list[dict]) -> str:
         parts.append(f"Role: {profile['role']}")
     if profile.get("goal"):
         parts.append(f"Goal: {profile['goal']}")
+    if profile.get("recent_insight"):
+        parts.append(f"Depth of thinking they value (a recent insight that shaped them): {profile['recent_insight'][:250]}")
     interests = profile.get("interests", [])
     if interests:
         topics = ", ".join(i.get("topic", "") for i in interests[:8] if i.get("topic"))
-        parts.append(f"Interests: {topics}")
+        parts.append(f"Declared interests: {topics}")
     if topic_clusters:
         cluster_parts: list[str] = []
         for c in sorted(topic_clusters, key=lambda x: x.get("strength", 0), reverse=True):
@@ -422,7 +424,7 @@ def _build_profile_summary(profile: dict, topic_clusters: list[dict]) -> str:
             if len(cluster_parts) >= 5:
                 break
         if cluster_parts:
-            parts.append(f"Inferred topics: {', '.join(cluster_parts)}")
+            parts.append(f"Inferred topics (from reading behaviour): {', '.join(cluster_parts)}")
     if profile.get("never_show"):
         never = ", ".join(profile["never_show"][:5])
         parts.append(f"Never show: {never}")

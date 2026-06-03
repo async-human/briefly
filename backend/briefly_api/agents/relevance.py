@@ -56,7 +56,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     topic_clusters: list[dict] = ctx.user.topic_clusters
 
     # Build interest keyword set for fast matching
-    interest_keywords = _build_keyword_set(interests, topic_clusters)
+    interest_keywords = _build_keyword_set(interests, topic_clusters, profile)
 
     # Get profile embedding for semantic matching
     profile_embedding = profile.get("profile_embedding")
@@ -247,6 +247,7 @@ def _source_score(item: RawItem, ctx: PipelineContext) -> float:
 def _build_keyword_set(
     interests: list[dict],
     topic_clusters: list[dict],
+    profile: dict | None = None,
 ) -> set[str]:
     """Extract all interest keywords for fast text matching."""
     keywords: set[str] = set()
@@ -254,7 +255,6 @@ def _build_keyword_set(
     for interest in interests:
         topic = interest.get("topic", "").lower()
         if topic:
-            # Add the full topic and individual words
             keywords.add(topic)
             for word in topic.split():
                 if len(word) > 3:
@@ -268,6 +268,17 @@ def _build_keyword_set(
             keywords.add(cluster_name)
             for word in cluster_name.split():
                 if len(word) > 3:
+                    keywords.add(word)
+
+    # Extract meaningful terms from the user's stated goal so that articles
+    # aligned with their current focus get a keyword-match boost even when
+    # those terms don't appear as explicit interest tags yet.
+    if profile:
+        goal = profile.get("goal", "")
+        if goal:
+            for word in goal.lower().split():
+                word = word.strip(".,;:!?\"'()")
+                if len(word) > 4:  # skip short stop-words
                     keywords.add(word)
 
     return keywords
@@ -296,8 +307,12 @@ def _profile_to_text(
 
 
 def _matches_never_show(item: RawItem, never_show: list[str]) -> bool:
-    """Hard block: return True if item matches any never-show filter."""
+    """Hard block: return True if item matches any never-show filter.
+
+    Checks title, source name, and summary so topics that only appear
+    in the body are still caught, while avoiding expensive full-text scans.
+    """
     if not never_show:
         return False
-    text = f"{item.title} {item.source_name}".lower()
+    text = f"{item.title} {item.source_name} {item.summary or ''}".lower()
     return any(ns.lower() in text for ns in never_show)
