@@ -114,13 +114,7 @@ function SleepViz({ sources }: { sources: string[] }) {
         animate={inView ? { scale: 1, opacity: 1 } : {}}
         transition={{ duration: 0.5, delay: 0.35, ease: EASE }}
       >
-        <span className="bento-viz-hub-ring" />
         <span className="bento-viz-hub-core">Briefly</span>
-        <motion.span
-          className="bento-viz-hub-pulse"
-          animate={{ scale: [1, 1.35, 1], opacity: [0.5, 0, 0.5] }}
-          transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-        />
       </motion.div>
     </div>
   );
