@@ -121,9 +121,8 @@ export function Pricing() {
                 ))}
               </ul>
               <a href="/login" className="pricing-v2-btn pricing-v2-btn-pro">
-                Start free trial
+                Get Pro — $9/month
               </a>
-              <p className="pricing-no-card">No credit card required</p>
             </motion.div>
           </div>
         </Reveal>
