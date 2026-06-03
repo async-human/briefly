@@ -36,6 +36,17 @@
     color 0.4s ease;
 }
 
+/* During a theme switch the JS adds .theme-switching to <html> for ~400 ms.
+   This enables smooth cross-element transitions only while switching,
+   so hover / animation performance is never affected outside of that window. */
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition-property: background-color, color, border-color, fill, stroke, box-shadow, opacity !important;
+  transition-duration: 0.35s !important;
+  transition-timing-function: ease !important;
+}
+
 .landing-page[data-theme="light"] {
   --bg: #FAF9F6;
   --bg-elevated: #F4F2ED;
