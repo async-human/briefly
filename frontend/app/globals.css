@@ -5957,6 +5957,34 @@ footer {
   background: var(--accent);
   box-shadow: 0 0 8px rgba(212, 170, 106, 0.6);
 }
+.read-speak-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+.read-speak-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+.read-speak-btn.speaking {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(201, 184, 150, 0.08);
+  animation: speak-pulse 1.5s ease-in-out infinite;
+}
+@keyframes speak-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
 .read-mode-toggle {
   display: inline-flex;
   padding: 3px;

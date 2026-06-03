@@ -128,6 +128,9 @@ class PipelineContext:
     web_body: str = ""
     verification_warnings: list[str] = field(default_factory=list)
 
+    # Stage 8b: Audio (populated by AudioAgent — optional)
+    audio_url: str | None = None
+
     # Pipeline metadata
     total_ingested: int = 0
     total_after_dedup: int = 0

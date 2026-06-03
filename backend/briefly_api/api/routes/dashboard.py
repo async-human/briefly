@@ -43,6 +43,7 @@ from briefly_api.auth.gmail import (
 )
 from briefly_api.auth.youtube import get_youtube_connection
 from briefly_api.auth.reddit import get_reddit_connection
+from briefly_api.api.plan_limits import FREE_HISTORY_DAYS, check_source_limit
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
@@ -184,12 +185,11 @@ async def list_digests(
     db: AsyncSession = Depends(get_db),
     limit: int = 20,
 ) -> list[DigestSummaryOut]:
-    result = await db.execute(
-        select(Digest)
-        .where(Digest.user_id == user.id)
-        .order_by(Digest.digest_date.desc())
-        .limit(limit)
-    )
+    query = select(Digest).where(Digest.user_id == user.id)
+    if user.plan != "pro":
+        cutoff = (date.today() - timedelta(days=FREE_HISTORY_DAYS)).isoformat()
+        query = query.where(Digest.digest_date >= cutoff)
+    result = await db.execute(query.order_by(Digest.digest_date.desc()).limit(limit))
     digests = result.scalars().all()
     return [DigestSummaryOut.model_validate(d) for d in digests]
 
@@ -306,7 +306,7 @@ async def detect_source_type(
 @router.post("/sources", response_model=SourceOut, status_code=status.HTTP_201_CREATED)
 async def create_source(
     body: SourceCreate,
-    user: User = Depends(get_current_user),
+    user: User = Depends(check_source_limit),
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> SourceOut:
@@ -673,10 +673,24 @@ async def bulk_create_sources(
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> BulkSourceOut:
+    from briefly_api.api.plan_limits import FREE_SOURCE_LIMIT
+
     added: list[Source] = []
     skipped = 0
 
+    # For free users, cap how many more sources they can add
+    remaining_slots: int | None = None
+    if user.plan != "pro":
+        count_result = await db.execute(
+            select(func.count()).select_from(Source).where(Source.user_id == user.id)
+        )
+        current_count = count_result.scalar() or 0
+        remaining_slots = max(0, FREE_SOURCE_LIMIT - current_count)
+
     for item in body.sources:
+        if remaining_slots is not None and remaining_slots <= 0:
+            skipped += 1
+            continue
         try:
             source_type, identifier = await _resolve_source(item, settings)
         except HTTPException:
@@ -702,6 +716,8 @@ async def bulk_create_sources(
         )
         db.add(source)
         added.append(source)
+        if remaining_slots is not None:
+            remaining_slots -= 1
 
     try:
         await db.commit()

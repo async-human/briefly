@@ -193,6 +193,15 @@ class Settings(BaseSettings):
     ls_pro_variant_id: str = ""        # "Pro" variant (future price)
     founding_member_cap: int = 200
 
+    # ── Audio (TTS) ───────────────────────────────────────────────────────────
+    audio_enabled: bool = False
+    audio_storage_path: str = "/tmp/briefly_audio"
+    audio_voice_name: str = "M1"
+
+    # ── Sentry ────────────────────────────────────────────────────────────────
+    sentry_dsn: str = ""
+    sentry_traces_sample_rate: float = 0.1  # 10% of requests traced
+
     # ── Admin ────────────────────────────────────────────────────────────────
     admin_key: str = "change-me-admin-key"
 

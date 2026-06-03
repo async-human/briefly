@@ -39,12 +39,23 @@ async def run(ctx: PipelineContext) -> PipelineContext:
 
     resend.api_key = s.resend_api_key
 
+    html_body = ctx.html_body
+    if ctx.audio_url:
+        listen_button = (
+            f'<div style="text-align:center;margin:24px 0">'
+            f'<a href="{ctx.audio_url}" style="background:#1a1a1a;color:#fff;'
+            f'padding:12px 28px;border-radius:6px;text-decoration:none;'
+            f'font-family:sans-serif;font-size:14px;">▶ Listen to your briefing</a>'
+            f'</div>'
+        )
+        html_body = html_body.replace("</body>", f"{listen_button}</body>", 1)
+
     try:
         params: resend.Emails.SendParams = {
             "from": f"{s.digest_from_name} <{s.digest_from_email}>",
             "to": [ctx.user.email],
             "subject": ctx.subject_line or f"Your Briefly — {ctx.run_date}",
-            "html": ctx.html_body,
+            "html": html_body,
         }
         if ctx.preview_text:
             # Embed preview text as hidden preheader in HTML (already in template)

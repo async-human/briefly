@@ -15,6 +15,40 @@ import {
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Mode = "quick" | "deep";
 
+// ── Web Speech API hook ───────────────────────────────────────────────────────
+function useSpeech() {
+  const [speaking, setSpeaking] = useState(false);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  const stop = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.speechSynthesis?.cancel();
+    setSpeaking(false);
+  }, []);
+
+  const speak = useCallback((text: string) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.onstart  = () => setSpeaking(true);
+    utterance.onend    = () => setSpeaking(false);
+    utterance.onerror  = () => setSpeaking(false);
+    utteranceRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  }, []);
+
+  const toggle = useCallback((text: string) => {
+    if (speaking) { stop(); } else { speak(text); }
+  }, [speaking, speak, stop]);
+
+  // Cleanup on unmount
+  useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
+
+  return { speaking, speak, stop, toggle };
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -37,6 +71,22 @@ function fmtTime(s: number) {
 }
 
 // ── Card component ─────────────────────────────────────────────────────────────
+function SpeakerIcon({ speaking }: { speaking: boolean }) {
+  return speaking ? (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M15.54 8.46a5 5 0 010 7.07" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+      <path d="M19.07 4.93a10 10 0 010 14.14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+    </svg>
+  ) : (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+      <line x1="23" y1="9" x2="17" y2="15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+      <line x1="17" y1="9" x2="23" y2="15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
 function SaveIcon({ filled }: { filled: boolean }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} aria-hidden>
@@ -516,6 +566,7 @@ export default function ReadingPage() {
 
   const startRef  = useRef(Date.now());
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { speaking, stop, toggle: toggleSpeech } = useSpeech();
 
   // Load digest, streak, and persisted save/dislike signals in one shot
   useEffect(() => {
@@ -536,6 +587,9 @@ export default function ReadingPage() {
       })
       .catch(() => router.replace("/dashboard"));
   }, [digestId, router]);
+
+  // Stop speech when navigating to a different card
+  useEffect(() => { stop(); }, [currentIndex, stop]);
 
   // Reading clock
   useEffect(() => {
@@ -689,6 +743,15 @@ export default function ReadingPage() {
               Day {streak}
             </span>
           )}
+          <button
+            type="button"
+            className={`read-speak-btn${speaking ? " speaking" : ""}`}
+            onClick={() => toggleSpeech(`${item.headline}. ${item.why_it_matters}`)}
+            aria-label={speaking ? "Stop reading" : "Read this item aloud"}
+            title={speaking ? "Stop" : "Listen"}
+          >
+            <SpeakerIcon speaking={speaking} />
+          </button>
           <div className="read-mode-toggle" role="group" aria-label="Reading mode">
             <button
               type="button"

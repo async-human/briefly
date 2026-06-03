@@ -4,8 +4,12 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from briefly_api.api.router import api_router
 from briefly_api.config import get_settings
@@ -16,6 +20,17 @@ from briefly_api.workers.scheduler import digest_scheduler_loop
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+_settings = get_settings()
+if _settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=_settings.sentry_dsn,
+        integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+        traces_sample_rate=_settings.sentry_traces_sample_rate,
+        environment=_settings.app_env,
+        send_default_pii=False,
+    )
+    logger.info("Sentry initialised (env=%s)", _settings.app_env)
 
 
 @asynccontextmanager
@@ -66,6 +81,12 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(api_router)
+
+    if settings.audio_enabled:
+        from pathlib import Path
+        Path(settings.audio_storage_path).mkdir(parents=True, exist_ok=True)
+        app.mount("/audio", StaticFiles(directory=settings.audio_storage_path), name="audio")
+
     return app
 
 

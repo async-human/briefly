@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from briefly_api.api.plan_limits import require_pro
 from briefly_api.api.schemas import BrainDumpOut, BrainDumpTextIn, BrainDumpTranscribeOut
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
@@ -59,7 +60,7 @@ async def list_brain_dumps(
 @router.post("/brain-dumps", response_model=BrainDumpOut, status_code=status.HTTP_201_CREATED)
 async def create_text_brain_dump(
     body: BrainDumpTextIn,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_pro),
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> BrainDumpOut:
@@ -77,7 +78,7 @@ async def create_text_brain_dump(
 @router.post("/brain-dumps/transcribe-preview", response_model=BrainDumpTranscribeOut)
 async def transcribe_brain_dump_preview(
     file: UploadFile = File(...),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_pro),
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> BrainDumpTranscribeOut:
@@ -125,7 +126,7 @@ async def transcribe_brain_dump_preview(
 @router.post("/brain-dumps/audio", response_model=BrainDumpOut, status_code=status.HTTP_201_CREATED)
 async def create_audio_brain_dump(
     file: UploadFile = File(...),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_pro),
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> BrainDumpOut:

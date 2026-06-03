@@ -15,6 +15,7 @@ import time
 from datetime import datetime, timezone
 
 from briefly_api.agents import (
+    audio,
     cleaner,
     collector,
     deduplication,
@@ -148,6 +149,7 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
 
         ctx = await _run_agent("BrainDumpInjectorAgent", brain_dump_injector.run, ctx)
         ctx = await _run_agent("CitationVerifierAgent",  citation_verifier.run, ctx)
+        ctx = await _run_agent("AudioAgent",             audio.run,            ctx)
         ctx = await _run_agent("DeliveryAgent",          delivery.run,         ctx)
 
         # ── Persist digest to DB ──────────────────────────────────────────────
