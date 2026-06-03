@@ -5,8 +5,9 @@ Provider-agnostic speech-to-text adapter.
 Switch provider + model entirely from .env — zero code changes.
 
 Supported providers:
-  groq   → whisper-large-v3 (fast, cheap — recommended default)
-  openai → whisper-1
+  openai → gpt-4o-transcribe (best accuracy — recommended)
+  openai → gpt-4o-mini-transcribe, whisper-1
+  groq   → whisper-large-v3 (fast, budget option)
 """
 from __future__ import annotations
 
@@ -18,15 +19,13 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from briefly_api.config import Settings, get_settings
 from briefly_api.stt.audio_utils import convert_to_wav, normalize_upload
+from briefly_api.stt.prompts import build_transcription_prompt
 
 log = logging.getLogger(__name__)
 
-_STT_PROMPT = (
-    "Transcribe spoken English accurately with proper punctuation, capitalization, "
-    "paragraph breaks, and bullet points when the speaker lists multiple items. "
-    "Ignore background noise, hum, keyboard clicks, and room echo — transcribe only "
-    "the primary speaker's words."
-)
+
+def _is_gpt4o_transcribe(model: str) -> bool:
+    return model.startswith("gpt-4o")
 
 
 class STTAdapter:
@@ -42,19 +41,18 @@ class STTAdapter:
         filename: str = "recording.webm",
         content_type: str = "audio/webm",
         language: str | None = None,
+        context_prompt: str | None = None,
     ) -> str:
         """
         Transcribe audio bytes to plain text.
 
         Args:
-            audio_bytes: Raw audio file bytes (webm, wav, mp3, m4a, etc.)
-            filename:    Filename hint for the provider
-            content_type: MIME type of the audio
-            language:    Optional ISO-639-1 language code (e.g. "en")
+            context_prompt: Optional vocabulary/style hint (user interests, tech terms).
         """
         provider = self._s.stt_provider
         model = self._s.stt_model
         content_type, filename = normalize_upload(content_type, filename)
+        prompt = (context_prompt or build_transcription_prompt()).strip()
 
         log.debug(
             "STT call: provider=%s model=%s bytes=%d type=%s file=%s",
@@ -62,9 +60,9 @@ class STTAdapter:
         )
 
         if provider == "groq":
-            return await self._groq(audio_bytes, filename, content_type, model, language)
+            return await self._groq(audio_bytes, filename, content_type, model, language, prompt)
         if provider == "openai":
-            return await self._openai(audio_bytes, filename, content_type, model, language)
+            return await self._openai(audio_bytes, filename, content_type, model, language, prompt)
         raise ValueError(f"Unknown STT provider: {provider}")
 
     async def _groq(
@@ -74,17 +72,17 @@ class STTAdapter:
         content_type: str,
         model: str,
         language: str | None,
+        prompt: str,
     ) -> str:
         suffix = "." + filename.rsplit(".", 1)[-1] if "." in filename else ".webm"
         ct = (content_type or "").split(";")[0].strip().lower()
 
-        # Browser WebM (especially in-progress recordings) is more reliable via ffmpeg WAV.
         if ct in {"audio/webm", "video/webm"} or suffix == ".webm":
             wav_bytes = convert_to_wav(audio_bytes, input_suffix=suffix)
             if wav_bytes:
                 try:
                     return await self._groq_request(
-                        wav_bytes, "recording.wav", "audio/wav", model, language,
+                        wav_bytes, "recording.wav", "audio/wav", model, language, prompt,
                     )
                 except httpx.HTTPStatusError as exc:
                     if exc.response.status_code != 400:
@@ -93,7 +91,7 @@ class STTAdapter:
 
         try:
             return await self._groq_request(
-                audio_bytes, filename, content_type, model, language,
+                audio_bytes, filename, content_type, model, language, prompt,
             )
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code != 400:
@@ -102,7 +100,7 @@ class STTAdapter:
             if wav_bytes:
                 log.info("STT: retrying Groq transcription with ffmpeg WAV conversion")
                 return await self._groq_request(
-                    wav_bytes, "recording.wav", "audio/wav", model, language,
+                    wav_bytes, "recording.wav", "audio/wav", model, language, prompt,
                 )
             raise
 
@@ -119,6 +117,7 @@ class STTAdapter:
         content_type: str,
         model: str,
         language: str | None,
+        prompt: str,
     ) -> str:
         if not self._s.groq_api_key:
             raise RuntimeError("GROQ_API_KEY not set (required for STT provider=groq)")
@@ -127,29 +126,18 @@ class STTAdapter:
             "model": model,
             "response_format": "json",
             "language": language or "en",
-            "prompt": _STT_PROMPT,
+            "prompt": prompt,
             "temperature": "0",
         }
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            resp = await client.post(
-                "https://api.groq.com/openai/v1/audio/transcriptions",
-                headers={"Authorization": f"Bearer {self._s.groq_api_key}"},
-                data=data,
-                files={"file": (filename, audio_bytes, content_type)},
-            )
-            if resp.status_code >= 400:
-                log.error(
-                    "Groq STT error %s: %s",
-                    resp.status_code,
-                    resp.text[:800],
-                )
-            resp.raise_for_status()
-            body = resp.text.strip()
-            if body.startswith("{"):
-                parsed = json.loads(body)
-                return str(parsed.get("text") or "").strip()
-            return body
+        return await self._post_transcription(
+            "https://api.groq.com/openai/v1/audio/transcriptions",
+            self._s.groq_api_key,
+            data,
+            audio_bytes,
+            filename,
+            content_type,
+        )
 
     @retry(
         retry=retry_if_exception_type((httpx.TimeoutException,)),
@@ -164,6 +152,7 @@ class STTAdapter:
         content_type: str,
         model: str,
         language: str | None,
+        prompt: str,
     ) -> str:
         if not self._s.openai_api_key:
             raise RuntimeError("OPENAI_API_KEY not set (required for STT provider=openai)")
@@ -171,25 +160,54 @@ class STTAdapter:
         data: dict[str, str] = {
             "model": model,
             "response_format": "json",
-            "prompt": _STT_PROMPT,
-            "temperature": "0",
+            "prompt": prompt,
         }
         if language:
             data["language"] = language
+        # gpt-4o-transcribe models reject temperature; Whisper accepts it.
+        if not _is_gpt4o_transcribe(model):
+            data["temperature"] = "0"
 
+        suffix = "." + filename.rsplit(".", 1)[-1] if "." in filename else ".webm"
+        ct = (content_type or "").split(";")[0].strip().lower()
+        upload_bytes = audio_bytes
+        upload_name = filename
+        upload_type = content_type
+
+        if ct in {"audio/webm", "video/webm"} or suffix == ".webm":
+            wav_bytes = convert_to_wav(audio_bytes, input_suffix=suffix)
+            if wav_bytes:
+                upload_bytes = wav_bytes
+                upload_name = "recording.wav"
+                upload_type = "audio/wav"
+
+        return await self._post_transcription(
+            "https://api.openai.com/v1/audio/transcriptions",
+            self._s.openai_api_key,
+            data,
+            upload_bytes,
+            upload_name,
+            upload_type,
+        )
+
+    async def _post_transcription(
+        self,
+        url: str,
+        api_key: str,
+        data: dict[str, str],
+        audio_bytes: bytes,
+        filename: str,
+        content_type: str,
+    ) -> str:
         async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(
-                "https://api.openai.com/v1/audio/transcriptions",
-                headers={"Authorization": f"Bearer {self._s.openai_api_key}"},
+                url,
+                headers={"Authorization": f"Bearer {api_key}"},
                 data=data,
                 files={"file": (filename, audio_bytes, content_type)},
             )
             if resp.status_code >= 400:
-                log.error(
-                    "OpenAI STT error %s: %s",
-                    resp.status_code,
-                    resp.text[:800],
-                )
+                log.error("STT error %s: %s", resp.status_code, resp.text[:800])
             resp.raise_for_status()
             body = resp.text.strip()
             if body.startswith("{"):

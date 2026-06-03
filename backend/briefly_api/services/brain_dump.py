@@ -110,6 +110,8 @@ async def transcribe_audio_preview(
     filename: str = "recording.webm",
     content_type: str = "audio/webm",
     settings: Settings | None = None,
+    db: AsyncSession | None = None,
+    user_id: str | None = None,
 ) -> str:
     """Transcribe audio without persisting — used for live preview while recording."""
     if not audio_bytes or len(audio_bytes) < 800:
@@ -118,10 +120,15 @@ async def transcribe_audio_preview(
         raise ValueError("Audio file exceeds 25 MB limit.")
 
     stt = get_stt_adapter(settings)
+    context_prompt = None
+    if db is not None and user_id:
+        from briefly_api.stt.profile_context import transcription_prompt_for_user
+        context_prompt = await transcription_prompt_for_user(db, user_id)
     return await stt.transcribe(
         audio_bytes,
         filename=filename,
         content_type=content_type,
+        context_prompt=context_prompt,
     )
 
 
@@ -141,10 +148,15 @@ async def process_audio_dump(
         raise ValueError("Audio file exceeds 25 MB limit.")
 
     stt = get_stt_adapter(settings)
+    context_prompt = None
+    if db is not None and user_id:
+        from briefly_api.stt.profile_context import transcription_prompt_for_user
+        context_prompt = await transcription_prompt_for_user(db, user_id)
     transcript = await stt.transcribe(
         audio_bytes,
         filename=filename,
         content_type=content_type,
+        context_prompt=context_prompt,
     )
     if not transcript.strip():
         raise ValueError("Could not transcribe any speech from the audio.")

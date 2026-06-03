@@ -78,10 +78,10 @@ async def create_text_brain_dump(
 async def transcribe_brain_dump_preview(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> BrainDumpTranscribeOut:
     """Live transcription of in-progress recording (audio is source of truth)."""
-    _ = user  # auth gate only
     content_type = (file.content_type or "audio/webm").split(";")[0].strip().lower()
     if content_type not in ALLOWED_AUDIO_TYPES:
         raise HTTPException(
@@ -105,6 +105,8 @@ async def transcribe_brain_dump_preview(
             filename=filename,
             content_type=content_type,
             settings=settings,
+            db=db,
+            user_id=user.id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

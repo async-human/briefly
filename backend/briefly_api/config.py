@@ -48,10 +48,12 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
 
     # ── Speech-to-text — fully agnostic ───────────────────────────────────────
-    # groq → whisper-large-v3 (fast + cheap, recommended)
-    # openai → whisper-1
-    stt_provider: Literal["groq", "openai"] = "groq"
-    stt_model: str = "whisper-large-v3"
+    # openai → gpt-4o-transcribe (best accuracy, technical terms — recommended)
+    # openai → gpt-4o-mini-transcribe (cheaper, still better than Whisper)
+    # openai → whisper-1 (legacy)
+    # groq   → whisper-large-v3 (fast + cheap)
+    stt_provider: Literal["groq", "openai"] = "openai"
+    stt_model: str = "gpt-4o-transcribe"
 
     # ── Embeddings — fully agnostic ───────────────────────────────────────────
     embedding_provider: Literal["voyage", "openai"] = "voyage"
