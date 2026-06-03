@@ -91,7 +91,7 @@ export function Pricing() {
               <div className="pricing-card-header">
                 <div className="pricing-pro-top">
                   <p className="pricing-v2-name">Pro</p>
-                  <span className="pricing-pro-badge">Most popular</span>
+                  <span className="pricing-pro-badge">Founding Price</span>
                 </div>
                 <div className="pricing-v2-price-row">
                   <span className="pricing-v2-amount">$9</span>
@@ -100,8 +100,11 @@ export function Pricing() {
                     <span className="pricing-v2-annual">or $90/year · save 17%</span>
                   </div>
                 </div>
+                <p className="pricing-founding-cap">
+                  First 200 founding members · price locked forever
+                </p>
                 <p className="pricing-v2-tagline">
-                  The full second brain experience
+                  V2, V3 &amp; V4 included as they ship
                 </p>
               </div>
               <ul className="pricing-v2-features">

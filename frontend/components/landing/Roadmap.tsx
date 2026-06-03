@@ -574,7 +574,7 @@ export function Roadmap() {
             viewport={{ once: true }}
             transition={{ duration: 0.5, ease: EASE }}
           >
-            Pro members get V2, V3, and V4 as they ship — $9/month, no price increases.
+            The first 200 founding members get V2, V3, and V4 as they ship — $9/month, price locked forever.
           </motion.p>
         </Reveal>
       </div>

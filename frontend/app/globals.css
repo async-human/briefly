@@ -2813,6 +2813,13 @@ nav.landing-nav.menu-open .nav-hamburger span:nth-child(3) {
   color: var(--accent);
   font-family: var(--mono);
 }
+.pricing-founding-cap {
+  font-size: 11px;
+  color: var(--accent);
+  font-family: var(--mono);
+  margin: 6px 0 0;
+  opacity: 0.85;
+}
 .pricing-v2-tagline {
   font-size: 13px;
   color: var(--text-secondary);
