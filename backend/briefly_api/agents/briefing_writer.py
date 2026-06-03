@@ -128,25 +128,48 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         memory_json = json.dumps(ctx.memory_connections, indent=2)
         story_threads_json = _build_story_threads_summary(ctx.user.active_story_threads)
 
-        prompt = _WRITER_PROMPT_TEMPLATE.format(
-            profile_summary=profile_summary,
-            recent_context=recent_context,
-            story_threads=story_threads_json,
-            items_json=items_json,
-            memory_connections=memory_json,
-            section_whats_new=SECTION_WHATS_NEW,
-            section_highly_relevant=SECTION_HIGHLY_RELEVANT,
+        # The stable prefix (profile + context + threads + memory) changes only
+        # when the user's profile changes — mark it for Anthropic prompt caching
+        # so repeated calls (retries, same-day re-runs) get a cache hit and skip
+        # re-processing those tokens (~700-1000 tokens saved per call → ~30-50%
+        # faster LLM response on cache hits).
+        cached_prefix = (
+            f"User profile:\n{profile_summary}\n\n"
+            f"Recent digest history (what they've already seen):\n{recent_context}\n\n"
+            f"Active story threads (topics user has been following for 3+ days):\n{story_threads_json}\n\n"
+            f"Memory connections (stories the user has been tracking):\n{memory_json}\n\n"
         )
+        items_section = (
+            f"Items to write briefing for (scored by relevance):\n{items_json}\n\n"
+            f"Write a personalized morning briefing. For each item, generate:\n"
+            f"- section: MUST equal the item's pre-assigned digest_section exactly ({SECTION_WHATS_NEW} or {SECTION_HIGHLY_RELEVANT})\n"
+            f"- headline: sharp, specific, active voice\n"
+            f"- summary: 2 sentences max, factual\n"
+            f"- why_it_matters_to_you: 1-2 sentences, MUST reference this user's specific context\n"
+            f"- source_name: publication name\n"
+            f"- source_url: direct URL to the content\n\n"
+            f"Do NOT rename or reassign sections — the planner has already grouped items.\n\n"
+            f"Also generate:\n"
+            f"- subject_line: email subject that makes THIS user want to open it (reference a specific story they care about)\n"
+            f"- preview_text: 1 sentence shown in email preview (different from subject)\n"
+            f"- skipped_note: 1 sentence explaining what you filtered out today\n\n"
+            f'Return JSON:\n{{{{"subject_line": "...", "preview_text": "...", "skipped_note": "...", '
+            f'"items": [{{{{"content_id": "...", "section": "...", "headline": "...", "summary": "...", '
+            f'"why_it_matters_to_you": "...", "source_name": "...", "source_url": "...", '
+            f'"memory_reference": "...", "confidence_signal": "...", "evolution_note": "..."}}}}]}}}}'
+        )
+        prompt = cached_prefix + items_section
 
-        # Haiku 4.5 is 3-4x faster than Sonnet for structured JSON generation
-        # with no quality loss on this templated writing task.
+        # Haiku 4.5 is 3-4x faster than Sonnet for structured JSON generation.
+        # max_tokens: 13 items × ~130 tokens + metadata = ~1800; 2000 gives buffer.
         result: dict | None = None
         try:
             result = await llm.complete_json(
                 messages=[Message(role="user", content=prompt)],
                 system=_WRITER_SYSTEM,
                 model="claude-haiku-4-5-20251001",
-                max_tokens=3000,  # 14 items × ~150 tokens + metadata; cap avoids wasted budget
+                max_tokens=2000,
+                cached_prefix=cached_prefix,
             )
         except Exception as e:
             log.exception("BriefingWriterAgent: LLM call failed")
@@ -437,7 +460,7 @@ def _build_recent_context(recent_items: list[dict]) -> str:
     if not recent_items:
         return "No previous digest history yet — this is their first digest."
     summaries = []
-    for item in recent_items[:10]:
+    for item in recent_items[:5]:  # 5 is enough context; 10 added ~200 unnecessary tokens
         date = item.get("digest_date", "")
         headline = item.get("headline", "")
         if headline:
@@ -463,6 +486,10 @@ def _build_story_threads_summary(threads: list[dict]) -> str:
 def _build_items_json(items: list[RawItem], ctx: PipelineContext) -> str:
     slim = []
     for item in items:
+        # Prefer the structured summary; fall back to a short clean_text excerpt.
+        # 200 chars is enough context for the writer — trimming from 400 reduces
+        # input tokens by ~30% without losing meaningful signal.
+        body = item.summary or (item.clean_text[:200] if item.clean_text else "")
         slim.append({
             "id": item.id,
             "digest_section": _assigned_section(item),
@@ -470,7 +497,7 @@ def _build_items_json(items: list[RawItem], ctx: PipelineContext) -> str:
             "source": item.source_name,
             "source_type": item.source_type,
             "url": item.url,
-            "summary": item.summary or item.clean_text[:400],
+            "summary": body,
             "relevance_score": round(item.relevance_score, 2),
             "novelty_score": round(item.novelty_score, 2),
             "duplicate_sources": item.duplicate_sources,

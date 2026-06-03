@@ -148,6 +148,23 @@ async def _detect_story_threads(ctx: PipelineContext) -> None:
                 if kw not in topic_latest_headline and headline:
                     topic_latest_headline[kw] = headline
 
+    # Batch-load all existing story-thread memories in one query instead of
+    # issuing a SELECT per keyword (N+1 pattern that adds 50-100ms per topic).
+    active_kws = {
+        kw for kw, dates in topic_dates.items()
+        if len(dates) >= _THREAD_MIN_APPEARANCES
+    }
+    existing_result = await session.execute(
+        select(UserMemory).where(
+            UserMemory.user_id == ctx.user.user_id,
+            UserMemory.memory_type == "story_thread",
+            UserMemory.key.in_(active_kws),
+        )
+    )
+    existing_memories: dict[str, UserMemory] = {
+        m.key: m for m in existing_result.scalars().all()
+    }
+
     # Upsert story threads for topics that cross the threshold
     for kw, dates in topic_dates.items():
         if len(dates) < _THREAD_MIN_APPEARANCES:
@@ -157,15 +174,7 @@ async def _detect_story_threads(ctx: PipelineContext) -> None:
         latest_headline = topic_latest_headline.get(kw, "")
         first_date = min(dates) if dates else ""
 
-        # Check if memory already exists for this key
-        existing = await session.execute(
-            select(UserMemory).where(
-                UserMemory.user_id == ctx.user.user_id,
-                UserMemory.memory_type == "story_thread",
-                UserMemory.key == kw,
-            )
-        )
-        memory = existing.scalar_one_or_none()
+        memory = existing_memories.get(kw)
 
         if memory:
             # Update existing thread

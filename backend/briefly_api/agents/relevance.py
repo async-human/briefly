@@ -68,6 +68,24 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         if profile_text:
             profile_embedding = await embedder.embed(profile_text)
 
+    # Pre-batch-embed any items whose embedding was not set by ContentCleanerAgent.
+    # Without this, _semantic_score would make N sequential embed API calls (each
+    # 300-800ms), turning a 1-call operation into minutes for large item sets.
+    items_needing_embed = [i for i in items if not i.embedding]
+    if items_needing_embed:
+        try:
+            texts = [
+                f"{i.title} | {i.summary or i.clean_text[:400]}"
+                for i in items_needing_embed
+            ]
+            batch_embeddings = await embedder.embed_batch(texts)
+            for item, emb in zip(items_needing_embed, batch_embeddings):
+                if emb:
+                    item.embedding = emb
+            log.info("RelevanceAgent: pre-embedded %d items missing embeddings", len(items_needing_embed))
+        except Exception as exc:
+            log.warning("RelevanceAgent: batch pre-embed failed, will embed per-item: %s", exc)
+
     scored: list[RawItem] = []
     dropped: list[RawItem] = []
 
