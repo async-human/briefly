@@ -144,55 +144,44 @@ function DashboardContent() {
           }
         }
 
+        const digestTimezone = meData.profile?.digest_timezone;
+        const localToday    = localDateString(digestTimezone);
+        const lsKey         = `briefly_gen_${meData.user.id}`;
+        const hasSources    = sourcesData.some((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
+
+        // ── GUARD 1: today's digest already exists ───────────────────────────
+        // This MUST be the first check — before the generation-status branch.
+        // A stale "running" status in the DB (from a prior generation that
+        // never wrote "complete") would otherwise short-circuit here and call
+        // resumePolling(), showing the spinner even though the brief is ready.
+        const apiDigestOk = digestData && !needsBriefingForToday(digestData, digestTimezone);
+        const ctxDigestOk = digest     && !needsBriefingForToday(digest,     digestTimezone);
+        if (apiDigestOk || ctxDigestOk) {
+          // Stamp localStorage so every subsequent navigation returns from
+          // Guard 2 without any further API calls or logic.
+          if (typeof localStorage !== "undefined") localStorage.setItem(lsKey, localToday);
+          return;
+        }
+
+        // ── GUARD 2: localStorage says we already generated today ────────────
+        const lastGenDate = typeof localStorage !== "undefined"
+          ? localStorage.getItem(lsKey) : null;
+        if (lastGenDate === localToday) return;
+
+        // ── GUARD 3: generation is already running on the backend ────────────
+        // Only reached when we genuinely don't have today's digest yet.
         if (genStatus?.status === "running") {
           resumePolling();
           return;
         }
 
-        const digestTimezone = meData.profile?.digest_timezone;
-        const hasSources = sourcesData.some((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
-
-        // ── Auto-generation guard ────────────────────────────────────────────
-        // Rules:
-        //  1. Never generate if today's digest already exists and has items.
-        //  2. Generate at most once per local calendar day per user, regardless
-        //     of login/logout cycles, browser restarts, or tab switches.
-        //     Uses localStorage (not sessionStorage) so the flag persists
-        //     across page reloads and new browser sessions.
-        //  3. Manual "Refresh brief" always works — it bypasses this guard by
-        //     calling runGenerate() directly.
+        // ── GUARD 4: only trigger once per component mount ───────────────────
         if (autoGenerateChecked.current) return;
         autoGenerateChecked.current = true;
 
-        const localToday = localDateString(digestTimezone);
-        const lsKey = `briefly_gen_${meData.user.id}`;
-
-        // Rule 1 — one attempt per day recorded in localStorage.
-        // Check this FIRST so we never call generateDigest on the same calendar
-        // day, regardless of what API state says.
-        const lastGenDate = typeof localStorage !== "undefined"
-          ? localStorage.getItem(lsKey)
-          : null;
-        if (lastGenDate === localToday) return;
-
-        // Rule 2 — valid digest already exists in context or just fetched.
-        // Stamp localStorage so every subsequent navigation this day returns early
-        // from Rule 1 without any API calls.
-        const ctxDigestOk = digest && !needsBriefingForToday(digest, digestTimezone);
-        const apiDigestOk = digestData && !needsBriefingForToday(digestData, digestTimezone);
-        if (ctxDigestOk || apiDigestOk) {
-          if (typeof localStorage !== "undefined") {
-            localStorage.setItem(lsKey, localToday);
-          }
-          return;
-        }
-
+        // ── Generate ─────────────────────────────────────────────────────────
         if (hasSources && !generating) {
-          // Record the attempt BEFORE triggering so concurrent mounts or quick
-          // tab-switches can't fire a second generation.
-          if (typeof localStorage !== "undefined") {
-            localStorage.setItem(lsKey, localToday);
-          }
+          if (typeof localStorage !== "undefined") localStorage.setItem(lsKey, localToday);
           ensureBriefing();
         }
       } catch (err) {
