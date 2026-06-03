@@ -88,17 +88,35 @@ function isCleanLabel(s: string) {
   return s.length > 1 && !INTERNAL_LABELS.has(s.toLowerCase()) && !UUID_RE.test(s);
 }
 
-function InterestBar({ topic, strength }: { topic: string; strength: number }) {
-  const pct = Math.round(strength * 100);
-  const label = strength >= 0.6 ? "strong" : strength >= 0.35 ? "building" : "early signal";
-  const cls = strength >= 0.6 ? "bk-signal-strong" : strength >= 0.35 ? "bk-signal-mid" : "bk-signal-low";
+// Dual bar: declared weight (light) vs actual engagement (dark overlay)
+function TopicComparisonBar({
+  topic, declared, actual,
+}: { topic: string; declared: number; actual: number | null }) {
+  const declPct   = Math.round(declared * 100);
+  const actPct    = actual !== null ? Math.round(actual * 100) : null;
+  const diff      = actPct !== null ? actPct - declPct : null;
+  const diffLabel = diff === null ? null
+    : diff > 10  ? `+${diff}pp above expectation`
+    : diff < -10 ? `${diff}pp below expectation`
+    : null;
   return (
-    <div className="bk-interest-row">
+    <div className="bk-interest-row bk-interest-row--compare">
       <span className="bk-interest-name">{topic}</span>
       <div className="bk-interest-track">
-        <div className="bk-interest-fill" style={{ width: `${pct}%` }} />
+        {/* declared baseline */}
+        <div className="bk-interest-fill bk-interest-fill--declared" style={{ width: `${declPct}%` }} />
+        {/* actual engagement overlay */}
+        {actPct !== null && (
+          <div
+            className={`bk-interest-fill bk-interest-fill--actual ${actPct > declPct ? "bk-interest-fill--above" : "bk-interest-fill--below"}`}
+            style={{ width: `${actPct}%` }}
+          />
+        )}
       </div>
-      <span className={`bk-signal ${cls}`}>{label}</span>
+      <span className="bk-signal bk-signal-strong">
+        {actPct !== null ? `${actPct}%` : `${declPct}%`}
+        {diffLabel && <span className="bk-signal-diff">{diffLabel}</span>}
+      </span>
     </div>
   );
 }
@@ -110,30 +128,43 @@ function BrieflyKnowsCard({
   streak: number;
   declared: { role: string; goal: string; interests: string[] };
 }) {
-  const stats = intel.reading_stats ?? { total_digests: 0, avg_open_rate: 0, avg_click_rate: 0 };
+  const stats    = intel.reading_stats ?? { total_digests: 0, avg_open_rate: 0, avg_click_rate: 0 };
+  const beh      = intel.behavioral    ?? {};
+  const insights = beh.insights        ?? [];
+  const topicActual = beh.topic_actual ?? {};
+  const srcEngage   = beh.source_engagement ?? {};
+  const emerging    = (beh.emerging_topics ?? []).filter(isCleanLabel).slice(0, 6);
 
-  // Clean inferred topic entries — strip internal labels and UUIDs
-  const topicEntries = Object.entries(intel.topic_strengths ?? {})
-    .filter(([t]) => isCleanLabel(t))
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 8);
+  const hasBehavioral = insights.length > 0 || Object.keys(topicActual).length > 0;
 
-  const cleanSources = (intel.top_sources ?? []).filter(isCleanLabel);
+  // Declared topics with actual engagement overlaid
+  const comparisonRows = declared.interests
+    .filter(isCleanLabel)
+    .map((t) => ({
+      topic:    t,
+      declared: (intel.topic_strengths ?? {})[t] ?? 0.5,
+      actual:   topicActual[t.toLowerCase()]?.rate ?? null,
+    }))
+    .filter((r) => r.declared > 0)
+    .sort((a, b) => (b.actual ?? b.declared) - (a.actual ?? a.declared))
+    .slice(0, 10);
+
+  const cleanSources      = (intel.top_sources      ?? []).filter(isCleanLabel);
   const cleanDeprioritized = (intel.deprioritized_sources ?? []).filter(isCleanLabel);
-  const cleanMovedAway = (intel.moved_away_from ?? []).filter(isCleanLabel);
-  const cleanEmerging = (intel.emerging_interests ?? []).filter(isCleanLabel);
+  const cleanThreads       = intel.active_threads.slice(0, 4);
 
-  const hasLearnedInterests = topicEntries.length > 0;
-  const hasDeclared = declared.role || declared.goal || declared.interests.length > 0;
+  // High-signal sources from behavioral engine (engagement rate ≥ 55%)
+  const topSrcRows = Object.entries(srcEngage)
+    .filter(([s, r]) => isCleanLabel(s) && r >= 0.55)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 4);
 
-  if (intel.digest_day === 0 && !hasDeclared) {
+  if (intel.digest_day === 0 && !declared.role && declared.interests.length === 0) {
     return (
       <div className="settings-section bk-card bk-card-empty">
         <div className="bk-header">
           <h2 className="bk-title">What Briefly knows about you</h2>
-          <p className="bk-subtitle">
-            Briefly learns from every digest you read. Your intelligence profile will appear here after your first briefing.
-          </p>
+          <p className="bk-subtitle">Your profile builds with every digest you read.</p>
         </div>
       </div>
     );
@@ -141,99 +172,61 @@ function BrieflyKnowsCard({
 
   return (
     <div className="settings-section bk-card">
-      {/* ── Header ── */}
+      {/* ── Header + quick stats ── */}
       <div className="bk-header">
-        <h2 className="bk-title">What Briefly knows about you</h2>
-        <p className="bk-subtitle">
-          {intel.digest_day > 0
-            ? `${intel.digest_day} day${intel.digest_day !== 1 ? "s" : ""} of learning — profile updates with every digest`
-            : "Profile built from your preferences — learning begins with your first digest"}
-        </p>
+        <div>
+          <h2 className="bk-title">What Briefly knows about you</h2>
+          <p className="bk-subtitle">
+            {stats.total_digests} digest{stats.total_digests !== 1 ? "s" : ""} read
+            {beh.total_signals ? ` · ${beh.total_signals} behavioural signals collected` : ""}
+            {streak > 0 ? ` · ${streak}-day streak 🔥` : ""}
+          </p>
+        </div>
       </div>
 
-      {/* ── Stats row ── */}
-      {(stats.total_digests > 0 || streak > 0) && (
-        <div className="bk-stats-row">
-          {stats.total_digests > 0 && (
-            <div className="bk-stat-box">
-              <span className="bk-stat-num">{stats.total_digests}</span>
-              <span className="bk-stat-label">digests read</span>
-            </div>
-          )}
-          {stats.avg_open_rate > 0 && (
-            <div className="bk-stat-box">
-              <span className="bk-stat-num">{stats.avg_open_rate}%</span>
-              <span className="bk-stat-label">avg open rate</span>
-            </div>
-          )}
-          {stats.avg_click_rate > 0 && (
-            <div className="bk-stat-box">
-              <span className="bk-stat-num">{stats.avg_click_rate}%</span>
-              <span className="bk-stat-label">avg click rate</span>
-            </div>
-          )}
-          {streak > 0 && (
-            <div className="bk-stat-box">
-              <span className="bk-stat-num">{streak}</span>
-              <span className="bk-stat-label">day streak 🔥</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── What you've told Briefly (always visible) ── */}
-      {hasDeclared && (
+      {/* ── Behavioural insight cards ── */}
+      {insights.length > 0 && (
         <div className="bk-section">
-          <p className="bk-section-label">What you&apos;ve told Briefly</p>
-          <div className="bk-declared-grid">
-            {declared.role && (
-              <div className="bk-declared-item">
-                <span className="bk-declared-key">Role</span>
-                <span className="bk-declared-val">{declared.role}</span>
+          <p className="bk-section-label">Insights from your reading behaviour</p>
+          <div className="bk-insight-cards">
+            {insights.map((ins, i) => (
+              <div key={i} className={`bk-insight-card bk-insight-card--${ins.type}`}>
+                <span className="bk-insight-label">{ins.label}</span>
+                <p className="bk-insight-text">{ins.text}</p>
               </div>
-            )}
-            {declared.goal && (
-              <div className="bk-declared-item">
-                <span className="bk-declared-key">Current focus</span>
-                <span className="bk-declared-val">{declared.goal}</span>
-              </div>
-            )}
-            {declared.interests.length > 0 && (
-              <div className="bk-declared-item bk-declared-item--full">
-                <span className="bk-declared-key">Topics to track</span>
-                <div className="bk-chips" style={{ marginTop: 6 }}>
-                  {declared.interests.map((t) => (
-                    <span key={t} className="bk-chip bk-chip-declared">{t}</span>
-                  ))}
-                </div>
-              </div>
-            )}
+            ))}
           </div>
         </div>
       )}
 
-      {/* ── Interest bars — learned or seeded from declared ── */}
-      {hasLearnedInterests && (
+      {/* ── Topic engagement comparison ── */}
+      {comparisonRows.length > 0 && (
         <div className="bk-section">
           <p className="bk-section-label">
-            {intel.interests_are_declared
-              ? "Interest weights — based on what you told Briefly"
-              : "What Briefly has learned from your reading"}
+            {hasBehavioral
+              ? "Topic engagement — declared vs actual"
+              : "Interest weights — based on what you told Briefly"}
           </p>
-          {intel.interests_are_declared && (
+          {hasBehavioral && (
+            <div className="bk-bar-legend">
+              <span className="bk-bar-legend-declared">declared baseline</span>
+              <span className="bk-bar-legend-actual">actual engagement</span>
+            </div>
+          )}
+          {!hasBehavioral && (
             <p className="bk-declared-hint">
-              These reflect your stated topics. Bars will shift as Briefly learns from what you actually open and save.
+              Open and save stories to see your actual engagement vs what you declared.
             </p>
           )}
           <div className="bk-interest-list">
-            {topicEntries.map(([topic, strength]) => (
-              <InterestBar key={topic} topic={topic} strength={strength} />
+            {comparisonRows.map(({ topic, declared: d, actual: a }) => (
+              <TopicComparisonBar key={topic} topic={topic} declared={d} actual={a} />
             ))}
           </div>
-          {cleanEmerging.length > 0 && (
-            <div className="bk-emerging">
-              <span className="bk-emerging-label">Also noticing:</span>
-              {cleanEmerging.map((t) => (
+          {emerging.length > 0 && (
+            <div className="bk-emerging" style={{ marginTop: 12 }}>
+              <span className="bk-emerging-label">Emerging in your reads (not declared):</span>
+              {emerging.map((t) => (
                 <span key={t} className="bk-chip bk-chip-emerging">{t}</span>
               ))}
             </div>
@@ -241,58 +234,60 @@ function BrieflyKnowsCard({
         </div>
       )}
 
-      {/* ── Active story threads ── */}
-      {intel.active_threads.length > 0 && (
+      {/* ── Source engagement from behaviour ── */}
+      {topSrcRows.length > 0 && (
         <div className="bk-section">
-          <p className="bk-section-label">Stories Briefly is tracking for you</p>
-          <div className="bk-threads-list">
-            {intel.active_threads.slice(0, 4).map((t) => (
-              <div key={t.topic} className="bk-thread-card">
-                <div className="bk-thread-card-header">
-                  <span className="bk-thread-card-topic">{t.topic}</span>
-                  <span className="bk-thread-card-meta">{t.weeks}w · {t.appearances} items</span>
+          <p className="bk-section-label">Sources you consistently engage with</p>
+          <div className="bk-source-rates">
+            {topSrcRows.map(([src, rate]) => (
+              <div key={src} className="bk-source-rate-row">
+                <span className="bk-source-rate-name">{src}</span>
+                <div className="bk-interest-track" style={{ flex: 1 }}>
+                  <div className="bk-interest-fill bk-interest-fill--actual" style={{ width: `${Math.round(rate * 100)}%` }} />
                 </div>
-                {t.latest && (
-                  <p className="bk-thread-card-latest">&ldquo;{t.latest}&rdquo;</p>
-                )}
+                <span className="bk-source-rate-pct">{Math.round(rate * 100)}% engaged</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* ── Source preferences ── */}
-      {cleanSources.length > 0 && (
+      {/* ── Active story threads ── */}
+      {cleanThreads.length > 0 && (
         <div className="bk-section">
-          <p className="bk-section-label">Sources Briefly has learned you prefer</p>
-          <div className="bk-chips">
-            {cleanSources.map((s) => (
-              <span key={s} className="bk-chip bk-chip-source">{s}</span>
+          <p className="bk-section-label">Stories Briefly is tracking for you</p>
+          <div className="bk-threads-list">
+            {cleanThreads.map((t) => (
+              <div key={t.topic} className="bk-thread-card">
+                <div className="bk-thread-card-header">
+                  <span className="bk-thread-card-topic">{t.topic}</span>
+                  <span className="bk-thread-card-meta">{t.weeks}w · {t.appearances} items</span>
+                </div>
+                {t.latest && <p className="bk-thread-card-latest">&ldquo;{t.latest}&rdquo;</p>}
+              </div>
             ))}
           </div>
         </div>
       )}
 
       {/* ── Fading signals ── */}
-      {(cleanMovedAway.length > 0 || cleanDeprioritized.length > 0) && (
+      {(cleanDeprioritized.length > 0 || cleanSources.length > 0 && topSrcRows.length === 0) && (
         <div className="bk-section bk-section-dim">
-          {cleanMovedAway.length > 0 && (
+          {cleanSources.length > 0 && topSrcRows.length === 0 && (
             <>
-              <p className="bk-section-label">Topics you&apos;ve moved away from</p>
-              <div className="bk-chips" style={{ marginBottom: cleanDeprioritized.length > 0 ? 12 : 0 }}>
-                {cleanMovedAway.map((t) => (
-                  <span key={t} className="bk-chip bk-chip-faded">{t}</span>
-                ))}
+              <p className="bk-section-label">Sources Briefly watches for you</p>
+              <div className="bk-chips">
+                {cleanSources.map((s) => <span key={s} className="bk-chip bk-chip-source">{s}</span>)}
               </div>
             </>
           )}
           {cleanDeprioritized.length > 0 && (
             <>
-              <p className="bk-section-label">Sources with low engagement</p>
+              <p className="bk-section-label" style={{ marginTop: cleanSources.length > 0 ? 12 : 0 }}>
+                Sources with low engagement — being deprioritised
+              </p>
               <div className="bk-chips">
-                {cleanDeprioritized.map((s) => (
-                  <span key={s} className="bk-chip bk-chip-faded">{s}</span>
-                ))}
+                {cleanDeprioritized.map((s) => <span key={s} className="bk-chip bk-chip-faded">{s}</span>)}
               </div>
             </>
           )}

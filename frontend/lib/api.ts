@@ -372,6 +372,12 @@ export type StoryThread = {
   latest: string;
 };
 
+export type BehavioralInsight = {
+  type: string;
+  label: string;
+  text: string;
+};
+
 export type ProfileIntelligence = {
   digest_day: number;
   strongest_interests: string[];
@@ -387,6 +393,15 @@ export type ProfileIntelligence = {
     avg_click_rate: number;
   };
   interests_are_declared: boolean;
+  behavioral: {
+    total_signals?: number;
+    overall_engagement?: number;
+    save_rate?: number;
+    topic_actual?: Record<string, { rate: number; engaged: number; skipped: number; total: number }>;
+    source_engagement?: Record<string, number>;
+    emerging_topics?: string[];
+    insights?: BehavioralInsight[];
+  };
 };
 
 export type WeeklyReportTopic = {

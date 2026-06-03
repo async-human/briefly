@@ -719,6 +719,203 @@ async def bulk_create_sources(
     )
 
 
+# ── Behavioral intelligence helper ───────────────────────────────────────────
+
+async def _compute_behavioral_intelligence(
+    user_id: str,
+    profile,
+    db: AsyncSession,
+) -> dict:
+    """
+    Mine BehavioralSignal + DigestItem for real behavioral patterns.
+    Returns per-topic actual engagement, emerging topics, source patterns,
+    and human-readable insight sentences — all derived from what the user
+    actually clicked/saved/skipped, not what they declared.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=45)
+
+    result = await db.execute(
+        select(
+            BehavioralSignal.signal_type,
+            DigestItem.headline,
+            DigestItem.source_name,
+            DigestItem.why_it_matters,
+        )
+        .join(DigestItem, BehavioralSignal.digest_item_id == DigestItem.id)
+        .where(
+            BehavioralSignal.user_id == user_id,
+            BehavioralSignal.created_at >= cutoff,
+            BehavioralSignal.signal_type.in_([
+                SignalType.saved, SignalType.clicked, SignalType.followed_up,
+                SignalType.skipped, SignalType.disliked,
+            ]),
+            BehavioralSignal.digest_item_id.isnot(None),
+        )
+        .limit(600)
+    )
+    signals = result.all()
+
+    if not signals:
+        return {}
+
+    pos_types  = {SignalType.saved, SignalType.clicked, SignalType.followed_up}
+    neg_types  = {SignalType.skipped, SignalType.disliked}
+
+    total      = len(signals)
+    save_count = sum(1 for s in signals if s.signal_type == SignalType.saved)
+    pos_count  = sum(1 for s in signals if s.signal_type in pos_types)
+
+    overall_engagement = round(pos_count / max(total, 1), 3)
+    save_rate          = round(save_count / max(total, 1), 3)
+
+    # Per-source engagement (min 3 signals to count)
+    src_pos: dict[str, int] = {}
+    src_tot: dict[str, int] = {}
+    for s in signals:
+        if not s.source_name:
+            continue
+        k = s.source_name.lower().strip()
+        src_tot[k] = src_tot.get(k, 0) + 1
+        if s.signal_type in pos_types:
+            src_pos[k] = src_pos.get(k, 0) + 1
+
+    source_engagement = {
+        k: round(src_pos.get(k, 0) / v, 3)
+        for k, v in src_tot.items()
+        if v >= 3
+    }
+
+    # Per-declared-topic actual engagement via keyword matching on headlines
+    declared_topics = [
+        (i.get("topic") or "").lower()
+        for i in (profile.interests or [])
+        if i.get("topic")
+    ]
+    declared_word_set: set[str] = set()
+    for t in declared_topics:
+        declared_word_set.update(w for w in t.split() if len(w) > 3)
+
+    topic_actual: dict[str, dict] = {}
+    for topic in declared_topics:
+        words = {w for w in topic.split() if len(w) > 3}
+        if not words:
+            continue
+        pos = neg = 0
+        for s in signals:
+            text = (s.headline or "").lower()
+            if any(w in text for w in words):
+                if s.signal_type in pos_types:
+                    pos += 1
+                else:
+                    neg += 1
+        tot = pos + neg
+        if tot >= 2:
+            topic_actual[topic] = {
+                "rate":    round(pos / tot, 3),
+                "engaged": pos,
+                "skipped": neg,
+                "total":   tot,
+            }
+
+    # Emerging topics: high-frequency words in saved/clicked headlines NOT
+    # already covered by a declared interest
+    emerging_counts: dict[str, int] = {}
+    stop = {"that", "with", "this", "from", "have", "will", "been", "into",
+            "they", "their", "about", "more", "after", "what", "when",
+            "could", "would", "says", "your", "over", "here", "than"}
+    for s in signals:
+        if s.signal_type not in pos_types or not s.headline:
+            continue
+        for word in s.headline.lower().split():
+            word = word.strip(".,;:!?\"'()[]")
+            if len(word) > 5 and word.isalpha() and word not in declared_word_set and word not in stop:
+                emerging_counts[word] = emerging_counts.get(word, 0) + 1
+
+    emerging_topics = [
+        w for w, c in sorted(emerging_counts.items(), key=lambda x: x[1], reverse=True)
+        if c >= 2
+    ][:6]
+
+    # Generate insight sentences
+    insights: list[dict] = []
+
+    # Engagement level insight
+    if total >= 5:
+        pct = round(overall_engagement * 100)
+        if pct >= 60:
+            insights.append({
+                "type": "engagement",
+                "label": "High signal reader",
+                "text": f"You engage with {pct}% of what Briefly shows you — well above average. Your profile trains fast.",
+            })
+        elif pct >= 35:
+            insights.append({
+                "type": "engagement",
+                "label": "Active reader",
+                "text": f"You engage with {pct}% of your digest items. The {100 - pct}% you skip is just as valuable a signal.",
+            })
+
+    # Save habit
+    if save_count >= 3:
+        insights.append({
+            "type": "saves",
+            "label": f"{save_count} saves so far",
+            "text": f"You've saved {save_count} articles. Briefly treats each save as a strong interest signal — it raises the weight of similar future stories.",
+        })
+
+    # Top source loyalty
+    if source_engagement:
+        top_src, top_rate = max(source_engagement.items(), key=lambda x: x[1])
+        if top_rate >= 0.55:
+            insights.append({
+                "type": "source_loyalty",
+                "label": f"{top_src.title()} — {round(top_rate * 100)}% engaged",
+                "text": f"You open or save {round(top_rate * 100)}% of content from {top_src.title()}. Briefly now prioritises it above your other sources.",
+            })
+
+    # Divergence: topic you engage with more than you declared
+    if topic_actual:
+        top_topic = max(topic_actual.items(), key=lambda x: x[1]["rate"])
+        top_name, top_data = top_topic
+        # Only surface if it's notably above 50% and not the #1 declared topic
+        if top_data["rate"] >= 0.6 and top_name != declared_topics[0]:
+            insights.append({
+                "type": "divergence",
+                "label": "Behaviour ≠ declaration",
+                "text": (
+                    f"You engage with '{top_name}' content {round(top_data['rate']*100)}% of the time — "
+                    f"higher than your top declared interest. Briefly has already shifted its weighting."
+                ),
+            })
+
+    # Low-signal topic the user declared but rarely engages with
+    if topic_actual:
+        neglected = [
+            (t, d) for t, d in topic_actual.items()
+            if d["rate"] < 0.25 and d["total"] >= 3
+        ]
+        if neglected:
+            t_name, t_data = neglected[0]
+            insights.append({
+                "type": "drift",
+                "label": "Drifting topic detected",
+                "text": (
+                    f"You declared '{t_name}' as an interest but engage with it only {round(t_data['rate']*100)}% of the time. "
+                    f"Briefly will gradually deprioritise it unless you re-engage."
+                ),
+            })
+
+    return {
+        "total_signals":       total,
+        "overall_engagement":  overall_engagement,
+        "save_rate":           save_rate,
+        "topic_actual":        topic_actual,        # actual engagement per declared topic
+        "source_engagement":   source_engagement,   # engagement rate per source
+        "emerging_topics":     emerging_topics,     # keywords from clicked items, not declared
+        "insights":            insights,            # human-readable observation cards
+    }
+
+
 # ── Profile intelligence ──────────────────────────────────────────────────────
 
 @router.get("/profile/intelligence")
@@ -864,6 +1061,13 @@ async def get_profile_intelligence(
         and all(c.get("source") == "declared" for c in clusters if cluster_label(c))
     )
 
+    # Compute real behavioral intelligence from signal history
+    behavioral = {}
+    try:
+        behavioral = await _compute_behavioral_intelligence(user.id, profile, db)
+    except Exception as exc:
+        log.warning("Behavioral intelligence computation failed: %s", exc)
+
     return {
         "digest_day": digest_day,
         "strongest_interests": strongest_interests,
@@ -875,6 +1079,7 @@ async def get_profile_intelligence(
         "topic_strengths": topic_strengths,
         "reading_stats": reading_stats,
         "interests_are_declared": interests_are_declared,
+        "behavioral": behavioral,
     }
 
 

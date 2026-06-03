@@ -12464,6 +12464,127 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   white-space: nowrap;
 }
 
+/* ── Behavioral insight cards ── */
+.bk-insight-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bk-insight-card {
+  padding: 14px 18px;
+  border-radius: 12px;
+  border-left: 3px solid;
+  background: rgba(0,0,0,0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.bk-insight-card--engagement  { border-color: rgba(158,123,63,0.6); }
+.bk-insight-card--saves        { border-color: rgba(80,160,100,0.6); }
+.bk-insight-card--source_loyalty { border-color: rgba(80,120,220,0.5); }
+.bk-insight-card--divergence   { border-color: rgba(220,100,80,0.5); }
+.bk-insight-card--drift        { border-color: rgba(160,130,80,0.5); }
+.bk-insight-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.bk-insight-text {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Comparison bar legend */
+.bk-bar-legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.bk-bar-legend-declared,
+.bk-bar-legend-actual {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.bk-bar-legend-declared::before {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(158,123,63,0.25);
+}
+.bk-bar-legend-actual::before {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(158,123,63,0.8);
+}
+
+/* Dual-bar fill variants */
+.bk-interest-fill--declared {
+  background: rgba(158,123,63,0.2);
+}
+.bk-interest-fill--actual {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 100px;
+  background: linear-gradient(90deg, rgba(158,123,63,0.8), rgba(201,184,150,0.95));
+}
+.bk-interest-fill--above {
+  background: linear-gradient(90deg, rgba(80,160,100,0.7), rgba(120,200,130,0.9));
+}
+.bk-interest-fill--below {
+  background: linear-gradient(90deg, rgba(220,160,60,0.6), rgba(201,184,150,0.8));
+}
+/* Make the track position:relative so the absolute overlay works */
+.bk-interest-row--compare .bk-interest-track {
+  position: relative;
+}
+.bk-signal-diff {
+  display: block;
+  font-size: 9px;
+  opacity: 0.7;
+  margin-top: 1px;
+}
+
+/* Source engagement rate rows */
+.bk-source-rates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bk-source-rate-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 100px;
+  align-items: center;
+  gap: 12px;
+}
+.bk-source-rate-name {
+  font-size: 13px;
+  color: var(--text);
+}
+.bk-source-rate-pct {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
 /* Declared preferences grid */
 .bk-declared-grid {
   display: flex;
