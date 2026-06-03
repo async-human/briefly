@@ -1,6 +1,10 @@
 "use client";
 
+import { motion, useInView } from "framer-motion";
+import { useRef } from "react";
 import { Reveal } from "./Reveal";
+
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 const principles = [
   {
@@ -43,12 +47,22 @@ const principles = [
 
 function PrincipleRow({
   principle,
+  index,
 }: {
   principle: (typeof principles)[number];
-  index?: number;
+  index: number;
 }) {
+  const ref = useRef<HTMLLIElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-60px" });
+
   return (
-    <li className="principle-row">
+    <motion.li
+      ref={ref}
+      className="principle-row"
+      initial={{ opacity: 0, y: 20 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.5, delay: index * 0.05, ease: EASE }}
+    >
       <span className="principle-num" aria-hidden>
         {principle.num}
       </span>
@@ -59,7 +73,7 @@ function PrincipleRow({
         </div>
         <p className="principle-desc">{principle.body}</p>
       </div>
-    </li>
+    </motion.li>
   );
 }
 
@@ -87,8 +101,8 @@ export function PrinciplesSection() {
 
           <Reveal delay={0.12}>
             <ol className="principles-list">
-              {principles.map((p) => (
-                <PrincipleRow key={p.num} principle={p} />
+              {principles.map((p, i) => (
+                <PrincipleRow key={p.num} principle={p} index={i} />
               ))}
             </ol>
             <p className="principles-footnote">
