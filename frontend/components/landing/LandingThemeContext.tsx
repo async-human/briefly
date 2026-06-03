@@ -24,30 +24,33 @@ type LandingThemeContextValue = {
 const LandingThemeContext = createContext<LandingThemeContextValue | null>(null);
 
 export function LandingThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<LandingTheme>(() => {
-    if (typeof window === "undefined") return "light";
-    return resolveLandingTheme(readStoredLandingTheme());
-  });
+  // Always start with "light" on the server so SSR and the initial client
+  // render match — no hydration mismatch.  After mount we immediately read
+  // localStorage and apply the stored preference.
+  const [theme, setThemeState] = useState<LandingTheme>("light");
+
+  // Read stored preference after hydration (one-time, no deps)
+  useEffect(() => {
+    const resolved = resolveLandingTheme(readStoredLandingTheme());
+    setThemeState(resolved);
+    document.body.dataset.landingTheme = resolved;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setTheme = useCallback((next: LandingTheme) => {
     setThemeState(next);
     localStorage.setItem(LANDING_THEME_STORAGE_KEY, next);
+    document.body.dataset.landingTheme = next;
   }, []);
 
   const toggleTheme = useCallback(() => {
     setThemeState((prev) => {
       const next = prev === "light" ? "dark" : "light";
       localStorage.setItem(LANDING_THEME_STORAGE_KEY, next);
+      document.body.dataset.landingTheme = next;
       return next;
     });
   }, []);
-
-  useEffect(() => {
-    document.body.dataset.landingTheme = theme;
-    return () => {
-      delete document.body.dataset.landingTheme;
-    };
-  }, [theme]);
 
   const value = useMemo(
     () => ({ theme, setTheme, toggleTheme }),
@@ -56,7 +59,8 @@ export function LandingThemeProvider({ children }: { children: React.ReactNode }
 
   return (
     <LandingThemeContext.Provider value={value}>
-      <div className="landing-page" data-theme={theme}>
+      {/* suppressHydrationWarning: data-theme is intentionally set after mount */}
+      <div className="landing-page" data-theme={theme} suppressHydrationWarning>
         {children}
       </div>
     </LandingThemeContext.Provider>
