@@ -21,8 +21,6 @@ import logging
 from datetime import datetime
 
 from briefly_api.agents.context import DigestItemDraft, PipelineContext, RawItem
-from briefly_api.config import get_settings
-from briefly_api.llm.adapter import Message, get_llm_adapter
 from briefly_api.services.digest_sections import (
     SECTION_HIGHLY_RELEVANT,
     SECTION_WHATS_NEW,
@@ -32,85 +30,23 @@ from briefly_api.services.article_urls import resolve_article_url
 
 log = logging.getLogger(__name__)
 
-# System prompt for the briefing writer
-# This is the voice of Briefly — must feel like a sharp personal analyst
-_WRITER_SYSTEM = """You are Briefly, a personal AI analyst writing a morning briefing for a specific person.
-
-Your voice: sharp, direct, intelligent. Not a newsletter, not a chatbot. A trusted colleague who read everything you follow and is telling you what matters.
-
-Rules:
-- Never use phrases like "In this article...", "According to...", "This piece discusses..."
-- Every "why_it_matters_to_you" must reference something specific about THIS user — their role, goals, interests, or past reading
-- Headlines are active and specific, not vague ("OpenAI's new reasoning model beats GPT-4o on coding benchmarks" not "AI news today")
-- Summaries are factual, 2 sentences maximum
-- The "why_it_matters_to_you" is 1-2 sentences and must feel personal — if it could apply to anyone, rewrite it
-- If a story is an update to something the user has been following, say so explicitly in memory_reference
-- Citations are mandatory — every item must have a source URL
-- memory_reference: if this connects to the user's past reading or an active story thread, write 1 sentence naming the specific thread and how long they've been following it. If no connection, leave empty.
-- confidence_signal: 1 short phrase showing HOW Briefly knows this is relevant (e.g. "Matches your top interest cluster at 94%" or "3rd story on this thread this week"). If relevance is obvious, leave empty.
-- evolution_note: if the user's demonstrated behavior in the past 2 weeks diverges from their stated interests in a notable way, surface it as 1 observation (e.g. "You said you don't follow crypto — but you've clicked every Ethereum story this month. I've started prioritising this."). Only write if genuinely notable. Leave empty otherwise.
-
-Return ONLY valid JSON. No markdown, no preamble."""
-
-_WRITER_PROMPT_TEMPLATE = """User profile:
-{profile_summary}
-
-Recent digest history (what they've already seen):
-{recent_context}
-
-Active story threads (topics user has been following for 3+ days):
-{story_threads}
-
-Items to write briefing for (scored by relevance):
-{items_json}
-
-Memory connections (stories the user has been tracking):
-{memory_connections}
-
-Write a personalized morning briefing. For each item, generate:
-- section: MUST equal the item's pre-assigned digest_section exactly ({section_whats_new} or {section_highly_relevant})
-- headline: sharp, specific, active voice
-- summary: 2 sentences max, factual
-- why_it_matters_to_you: 1-2 sentences, MUST reference this user's specific context
-- source_name: publication name
-- source_url: direct URL to the content
-
-Do NOT rename or reassign sections — the planner has already grouped items.
-
-Also generate:
-- subject_line: email subject that makes THIS user want to open it (reference a specific story they care about)
-- preview_text: 1 sentence shown in email preview (different from subject)
-- skipped_note: 1 sentence explaining what you filtered out today (e.g. "Skipped 12 stories — mostly crypto price updates and general market news you've told me to deprioritize")
-
-Return JSON:
-{{
-  "subject_line": "...",
-  "preview_text": "...",
-  "skipped_note": "...",
-  "items": [
-    {{
-      "content_id": "...",
-      "section": "...",
-      "headline": "...",
-      "summary": "...",
-      "why_it_matters_to_you": "...",
-      "source_name": "...",
-      "source_url": "...",
-      "memory_reference": "...",
-      "confidence_signal": "...",
-      "evolution_note": "..."
-    }}
-  ]
-}}"""
+# NarrativeSkill owns the system prompt and prompt building.
+# The constants and templates that were here have moved to
+# agents/skills/narrative_skill.py.
 
 
 async def run(ctx: PipelineContext) -> PipelineContext:
     """
     Write the personalized briefing for all planned items.
     Populates ctx.digest_items, ctx.subject_line, ctx.preview_text.
+
+    Now uses NarrativeSkill which:
+      - Injects behavioral_fingerprint_text into the stable cached prefix
+        (so Anthropic caches the fingerprint alongside the static profile)
+      - Passes pre-computed enrichment (connection_sentence, why_relevant, etc.)
+        per item so the model assembles rather than derives
     """
-    _ = get_settings()
-    llm = get_llm_adapter()
+    from briefly_api.agents.skills.narrative_skill import NarrativeSkill
 
     selected_ids = set(ctx.selected_item_ids)
     item_map = {i.id: i for i in ctx.enriched_items if i.id in selected_ids}
@@ -121,59 +57,33 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         ctx.log_error("BriefingWriterAgent", "No items to write")
         return ctx
 
+    skill = NarrativeSkill()
+
     try:
-        profile_summary = _build_profile_summary(ctx.user.profile, ctx.user.topic_clusters)
-        recent_context = _build_recent_context(ctx.user.recent_digest_items)
-        items_json = _build_items_json(items_to_write, ctx)
-        memory_json = json.dumps(ctx.memory_connections, indent=2)
-        story_threads_json = _build_story_threads_summary(ctx.user.active_story_threads)
+        profile_summary      = _build_profile_summary(ctx.user.profile, ctx.user.topic_clusters)
+        behavioral_fp_text   = ctx.behavioral_fingerprint_text or "No behavioral data yet."
+        recent_context       = _build_recent_context(ctx.user.recent_digest_items)
+        story_threads_text   = _build_story_threads_summary(ctx.user.active_story_threads)
+        memory_json          = json.dumps(ctx.memory_connections, indent=2)
 
-        # The stable prefix (profile + context + threads + memory) changes only
-        # when the user's profile changes — mark it for Anthropic prompt caching
-        # so repeated calls (retries, same-day re-runs) get a cache hit and skip
-        # re-processing those tokens (~700-1000 tokens saved per call → ~30-50%
-        # faster LLM response on cache hits).
-        cached_prefix = (
-            f"User profile:\n{profile_summary}\n\n"
-            f"Recent digest history (what they've already seen):\n{recent_context}\n\n"
-            f"Active story threads (topics user has been following for 3+ days):\n{story_threads_json}\n\n"
-            f"Memory connections (stories the user has been tracking):\n{memory_json}\n\n"
+        # Stable prefix — changes only when profile/fingerprint changes.
+        # Anthropic caches this across retries and same-day re-runs.
+        cached_prefix = skill.build_cached_prefix(
+            profile_summary=profile_summary,
+            behavioral_fingerprint_text=behavioral_fp_text,
+            recent_context=recent_context,
+            story_threads_text=story_threads_text,
+            memory_json=memory_json,
         )
-        items_section = (
-            f"Items to write briefing for (scored by relevance):\n{items_json}\n\n"
-            f"Write a personalized morning briefing. For each item, generate:\n"
-            f"- section: MUST equal the item's pre-assigned digest_section exactly ({SECTION_WHATS_NEW} or {SECTION_HIGHLY_RELEVANT})\n"
-            f"- headline: sharp, specific, active voice\n"
-            f"- summary: 2 sentences max, factual\n"
-            f"- why_it_matters_to_you: 1-2 sentences, MUST reference this user's specific context\n"
-            f"- source_name: publication name\n"
-            f"- source_url: direct URL to the content\n\n"
-            f"Do NOT rename or reassign sections — the planner has already grouped items.\n\n"
-            f"Also generate:\n"
-            f"- subject_line: email subject that makes THIS user want to open it (reference a specific story they care about)\n"
-            f"- preview_text: 1 sentence shown in email preview (different from subject)\n"
-            f"- skipped_note: 1 sentence explaining what you filtered out today\n\n"
-            f'Return JSON:\n{{{{"subject_line": "...", "preview_text": "...", "skipped_note": "...", '
-            f'"items": [{{{{"content_id": "...", "section": "...", "headline": "...", "summary": "...", '
-            f'"why_it_matters_to_you": "...", "source_name": "...", "source_url": "...", '
-            f'"memory_reference": "...", "confidence_signal": "...", "evolution_note": "..."}}}}]}}}}'
-        )
-        prompt = cached_prefix + items_section
 
-        # Haiku 4.5 is 3-4x faster than Sonnet for structured JSON generation.
-        # max_tokens: 13 items × ~130 tokens + metadata = ~1800; 2000 gives buffer.
-        result: dict | None = None
-        try:
-            result = await llm.complete_json(
-                messages=[Message(role="user", content=prompt)],
-                system=_WRITER_SYSTEM,
-                model="claude-haiku-4-5-20251001",
-                max_tokens=2000,
-                cached_prefix=cached_prefix,
-            )
-        except Exception as e:
-            log.exception("BriefingWriterAgent: LLM call failed")
-            ctx.log_error("BriefingWriterAgent", str(e))
+        # Variable section — items + pre-computed enrichment
+        items_section = skill.build_items_section(
+            items=items_to_write,
+            enrichment_cache=ctx.enrichment_cache,
+            ctx=ctx,
+        )
+
+        result = await skill.run(cached_prefix=cached_prefix, items_section=items_section)
 
         if result and result.get("items"):
             ctx.subject_line = result.get("subject_line", f"Your Briefly for {ctx.run_date}")
@@ -190,6 +100,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             ctx.preview_text = items_to_write[0].title[:120] if items_to_write else ""
             drafts = _fallback_drafts(items_to_write, ctx)
             drafts = _ensure_personalized_why(drafts, items_to_write, ctx.user.profile)
+
     except Exception as e:
         log.exception("BriefingWriterAgent: failed — using fallback drafts")
         ctx.log_error("BriefingWriterAgent", str(e))
@@ -201,9 +112,12 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     ctx.digest_items = drafts
     ctx.total_shown = len(drafts)
 
+    enrichment_hit_count = sum(
+        1 for i in items_to_write if ctx.enrichment_cache.get(i.id)
+    )
     log.info(
-        "BriefingWriterAgent: wrote %d items, subject='%s'",
-        len(drafts), ctx.subject_line[:60],
+        "BriefingWriterAgent: wrote %d items (enrichment_cache_hits=%d/%d) subject='%s'",
+        len(drafts), enrichment_hit_count, len(items_to_write), ctx.subject_line[:60],
     )
     return ctx
 

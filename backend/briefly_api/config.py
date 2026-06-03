@@ -139,6 +139,53 @@ class Settings(BaseSettings):
 
     gmail_scopes: str = "https://www.googleapis.com/auth/gmail.readonly openid email"
 
+    # ── Continuous enrichment worker ──────────────────────────────────────────
+    # Runs every N hours; pre-computes memory connections + contradiction flags
+    # for all new pool items so the morning pipeline is just assembly.
+    enrichment_worker_enabled: bool = True
+    enrichment_worker_interval_hours: int = 2
+    # Max items to enrich per user per run (guards against runaway LLM costs)
+    enrichment_max_items_per_run: int = 50
+    # Min cosine similarity to the user's active threads to declare a connection
+    enrichment_connection_min_similarity: float = 0.65
+    # Min cosine similarity between new item and recent items to check for contradiction
+    enrichment_contradiction_min_similarity: float = 0.70
+
+    # ── Content watcher ───────────────────────────────────────────────────────
+    # Runs every N hours; detects new pool items and breaking developments
+    content_watcher_enabled: bool = True
+    content_watcher_interval_hours: int = 4
+    # How many distinct sources covering the same topic within the window
+    # constitutes a "breaking development"
+    breaking_development_min_sources: int = 3
+    breaking_development_window_hours: int = 6
+
+    # ── Signal monitor ────────────────────────────────────────────────────────
+    # Rebuild the behavioral fingerprint every N hours (or after high-intent signal)
+    signal_monitor_enabled: bool = True
+    behavioral_fingerprint_refresh_hours: int = 6
+
+    # ── Story thread agent ────────────────────────────────────────────────────
+    # Runs nightly; uses longer lookback than the in-pipeline MemoryAgent
+    story_thread_agent_enabled: bool = True
+    story_thread_agent_lookback_days: int = 30
+    # Topics that appear in N+ distinct digest-dates become story threads
+    story_thread_min_appearances: int = 3
+    # A topic with zero content for this many days triggers a coverage_gap_alert
+    coverage_gap_alert_days: int = 5
+
+    # ── Proactive surfacing ───────────────────────────────────────────────────
+    proactive_surfacing_enabled: bool = True
+    # Cap proactive events per user per day to avoid notification fatigue
+    proactive_max_per_user_per_day: int = 2
+
+    # ── Weekly intelligence skill ─────────────────────────────────────────────
+    weekly_intelligence_enabled: bool = True
+    # ISO weekday: 0=Monday … 6=Sunday (run on this day)
+    weekly_intelligence_weekday: int = 0
+    # UTC hour to run the weekly analysis
+    weekly_intelligence_hour: int = 2
+
     # ── Admin ────────────────────────────────────────────────────────────────
     admin_key: str = "change-me-admin-key"
 

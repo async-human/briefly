@@ -11,6 +11,7 @@ from briefly_api.api.router import api_router
 from briefly_api.config import get_settings
 from briefly_api.db.engine import init_db
 from briefly_api.ingestion.smtp_server import start_smtp_server
+from briefly_api.workers.enrichment_worker import continuous_enrichment_loop
 from briefly_api.workers.scheduler import digest_scheduler_loop
 
 logging.basicConfig(level=logging.INFO)
@@ -25,8 +26,9 @@ async def lifespan(_app: FastAPI):
         logger.exception("Database startup failed — check DATABASE_URL and Supabase SSL/password")
         raise
 
-    scheduler_task = asyncio.create_task(digest_scheduler_loop())
-    logger.info("Digest scheduler started")
+    scheduler_task   = asyncio.create_task(digest_scheduler_loop())
+    enrichment_task  = asyncio.create_task(continuous_enrichment_loop())
+    logger.info("Digest scheduler + enrichment worker started")
 
     settings = get_settings()
     smtp_controller = start_smtp_server(settings)
@@ -34,11 +36,13 @@ async def lifespan(_app: FastAPI):
     yield
 
     scheduler_task.cancel()
-    try:
-        await scheduler_task
-    except asyncio.CancelledError:
-        pass
-    logger.info("Digest scheduler stopped")
+    enrichment_task.cancel()
+    for task in (scheduler_task, enrichment_task):
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    logger.info("Digest scheduler + enrichment worker stopped")
 
     if smtp_controller:
         smtp_controller.stop()

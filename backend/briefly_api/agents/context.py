@@ -135,6 +135,22 @@ class PipelineContext:
     total_shown: int = 0
     pipeline_errors: list[dict] = field(default_factory=list)
 
+    # ── Proactive intelligence layer (populated by pipeline before writer) ────
+    # Pre-computed enrichment from ContentEnrichmentCache, keyed by content_id.
+    # Each dict mirrors the ContentEnrichmentCache row fields:
+    #   why_relevant, connection_sentence, thread_update, thread_key,
+    #   contradiction_flag, contradiction_explanation, user_angle
+    enrichment_cache: dict[str, dict] = field(default_factory=dict)
+
+    # Behavioral fingerprint text block (from BehavioralFingerprint table).
+    # Injected into the writer prompt's cached prefix so the LLM knows the
+    # user's demonstrated behavior, not just their onboarding answers.
+    behavioral_fingerprint_text: str = ""
+
+    # Pending proactive surfacing events (from ProactiveSurfacingEvent table).
+    # The writer uses these to know which threads/topics to elevate.
+    proactive_events: list[dict] = field(default_factory=list)
+
     # Shared DB session — set by pipeline orchestrator, used by agents that need DB
     db_session: Any | None = field(default=None, repr=False)
 

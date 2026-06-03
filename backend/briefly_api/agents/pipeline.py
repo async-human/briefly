@@ -32,7 +32,12 @@ from briefly_api.agents import (
 from briefly_api.agents.context import PipelineContext, UserContext
 from briefly_api.config import get_settings
 from briefly_api.db.engine import get_session_factory
-from briefly_api.db.models import Digest, DigestItem, DigestStatus
+from briefly_api.db.models import (
+    ContentEnrichmentCache,
+    Digest,
+    DigestItem,
+    DigestStatus,
+)
 from briefly_api.db.queries import (
     get_user_with_profile,
     get_active_sources,
@@ -120,6 +125,12 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
         ctx = await _run_agent("NoveltyAgent",           novelty.run,          ctx)
         ctx = await _run_agent("MemoryAgent",            memory.run,           ctx)
         ctx = await _run_agent("BriefingPlannerAgent",   planner.run,          ctx)
+
+        # ── Load proactive intelligence layer before writer ───────────────────
+        # Populates ctx.enrichment_cache, ctx.behavioral_fingerprint_text, and
+        # ctx.proactive_events so BriefingWriterAgent can use pre-computed context.
+        ctx = await _load_proactive_context(session, ctx)
+
         ctx = await _run_agent("BriefingWriterAgent",    briefing_writer.run,  ctx)
 
         # Persist guard: planner selected items but writer produced none → fallback drafts
@@ -200,6 +211,78 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+async def _load_proactive_context(session, ctx: PipelineContext) -> PipelineContext:
+    """
+    Load pre-computed intelligence into PipelineContext before the writer runs.
+
+    Specifically:
+      1. ContentEnrichmentCache rows for all selected items
+         → ctx.enrichment_cache (keyed by content_id)
+      2. BehavioralFingerprint text for the user
+         → ctx.behavioral_fingerprint_text
+      3. Pending ProactiveSurfacingEvents (highest priority, not yet surfaced)
+         → ctx.proactive_events
+    """
+    user_id = ctx.user.user_id
+    selected_ids = set(ctx.selected_item_ids)
+
+    # ── 1. Enrichment cache ───────────────────────────────────────────────────
+    try:
+        from sqlalchemy import select as sa_select
+        cache_result = await session.execute(
+            sa_select(ContentEnrichmentCache).where(
+                ContentEnrichmentCache.user_id == user_id,
+                ContentEnrichmentCache.content_id.in_(selected_ids),
+            )
+        )
+        rows = cache_result.scalars().all()
+        ctx.enrichment_cache = {
+            row.content_id: {
+                "why_relevant":               row.why_relevant,
+                "connection_sentence":         row.connection_sentence,
+                "thread_update":               row.thread_update,
+                "thread_key":                  row.thread_key,
+                "contradiction_flag":          row.contradiction_flag,
+                "contradiction_explanation":   row.contradiction_explanation,
+                "user_angle":                  row.user_angle,
+                "connection_strength":         row.connection_strength,
+            }
+            for row in rows
+        }
+        log.debug(
+            "Pipeline: enrichment cache loaded %d/%d items for user %s",
+            len(ctx.enrichment_cache), len(selected_ids), user_id,
+        )
+    except Exception:
+        log.debug("Pipeline: enrichment cache load failed — continuing without", exc_info=True)
+
+    # ── 2. Behavioral fingerprint text ────────────────────────────────────────
+    try:
+        from briefly_api.services.behavioral_fingerprint import load_as_text
+        ctx.behavioral_fingerprint_text = await load_as_text(session, user_id)
+    except Exception:
+        log.debug("Pipeline: behavioral fingerprint load failed — continuing without", exc_info=True)
+
+    # ── 3. Proactive events ───────────────────────────────────────────────────
+    try:
+        from briefly_api.agents.proactive.proactive_surfacing import (
+            get_pending_events,
+            mark_surfaced,
+        )
+        events = await get_pending_events(session, user_id)
+        ctx.proactive_events = events
+        if events:
+            await mark_surfaced(session, [e["id"] for e in events])
+            log.info(
+                "Pipeline: loaded %d proactive event(s) for user %s",
+                len(events), user_id,
+            )
+    except Exception:
+        log.debug("Pipeline: proactive events load failed — continuing without", exc_info=True)
+
+    return ctx
+
 
 _AGENT_PROGRESS_LABELS: dict[str, str] = {
     "SourceCollectorAgent": "Collecting content from your sources…",

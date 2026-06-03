@@ -1254,6 +1254,23 @@ async def record_feedback(
 
     await db.commit()
 
+    # ── Real-time signal processing (SignalMonitorAgent) ──────────────────────
+    # Runs immediately after commit to update topic clusters + fingerprint.
+    # Errors are swallowed — this must never break the feedback route.
+    try:
+        from briefly_api.workers.signal_processor import handle_signal
+        asyncio.create_task(
+            handle_signal(
+                session=db,
+                user_id=user.id,
+                signal_type=signal_type,
+                digest_item_id=body.digest_item_id,
+                meta={"source_name": item.source_name},
+            )
+        )
+    except Exception:
+        pass
+
     # Click-to-discover: suggest RSS feeds via pending discovery on next scan —
     # no silent auto-add (user confirms sources before briefing).
     if body.signal_type == "clicked" and item.source_url:

@@ -512,6 +512,221 @@ class FollowUpThread(Base):
     user: Mapped["User"] = relationship(back_populates="follow_up_threads")
 
 
+# ── Content Enrichment Cache ──────────────────────────────────────────────────
+
+class ContentEnrichmentCache(Base):
+    """
+    Pre-computed enrichment for each RawContent item per user.
+
+    Built continuously by ContextBuilderAgent (runs every 2 hours) so that by
+    7 am, every item in the digest pool already has memory connections,
+    contradiction flags, and narrative hooks computed.  The BriefingWriterAgent
+    reads from here instead of computing from scratch under time pressure.
+    """
+    __tablename__ = "content_enrichment_cache"
+    __table_args__ = (
+        UniqueConstraint("content_id", "user_id", name="uq_enrichment_cache"),
+        Index("ix_enrichment_cache_user_staleness", "user_id", "enriched_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    content_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("raw_contents.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+
+    # Connection analysis (ConnectionSkill)
+    why_relevant: Mapped[str | None] = mapped_column(Text)
+    # e.g. "matches your 6-week AI-reliability thread"
+    memory_connections: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+    thread_update: Mapped[str | None] = mapped_column(Text)
+    # e.g. "3rd update to the GPT-5 story"
+    thread_key: Mapped[str | None] = mapped_column(String(255))
+    connection_strength: Mapped[float] = mapped_column(Float, default=0.0)  # 0-1
+
+    # Contradiction detection (ContradictionSkill)
+    contradiction_flag: Mapped[bool] = mapped_column(Boolean, default=False)
+    contradiction_explanation: Mapped[str | None] = mapped_column(Text)
+    contradicts_item_id: Mapped[str | None] = mapped_column(String(36))
+
+    # Breaking development flag (set by ContentWatcherAgent)
+    is_breaking_development: Mapped[bool] = mapped_column(Boolean, default=False)
+    breaking_topic: Mapped[str | None] = mapped_column(String(255))
+
+    # Narrative pre-computation (NarrativeSkill — fast path for writer)
+    user_angle: Mapped[str | None] = mapped_column(Text)
+    # the specific angle that matters for this user's role/goal
+    opening_hook: Mapped[str | None] = mapped_column(Text)
+    # best opening sentence for this user
+    connection_sentence: Mapped[str | None] = mapped_column(Text)
+    # how to link this item to the user's past reading
+
+    # Housekeeping
+    enriched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    enrichment_version: Mapped[int] = mapped_column(Integer, default=1)
+
+
+# ── Behavioral Fingerprint ────────────────────────────────────────────────────
+
+class BehavioralFingerprint(Base):
+    """
+    A computed behavioral fingerprint per user rebuilt every 6 hours by
+    SignalMonitorAgent.  Contains derived engagement patterns that go beyond
+    raw signals — topics the user actually reads deeply vs. topics they declared
+    but ignore, reading-time patterns, coverage gaps, and mind shifts.
+
+    BriefingWriterAgent injects this as a second context layer alongside the
+    static onboarding profile so the writer prompt reflects who the user IS
+    (demonstrated behaviour) rather than who they said they were (onboarding).
+    """
+    __tablename__ = "behavioral_fingerprints"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), unique=True
+    )
+
+    # Topics the user engages deeply with (follow-up depth ≥ 2, or saved)
+    # [{"topic": "LLM infrastructure", "follow_up_count": 12, "avg_depth": 3.2}]
+    high_engagement_topics: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+
+    # Declared topics the user consistently ignores (skip rate > 70 %)
+    # [{"topic": "crypto", "declared": True, "actual_clicks": 0, "skip_count": 8}]
+    low_engagement_topics: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+
+    # 0 = quick scanner, 1 = deep reader (derived from avg follow_up_depth)
+    depth_preference_score: Mapped[float] = mapped_column(Float, default=0.5)
+
+    # {"peak_hour_utc": 8, "avg_items_read": 6.2, "preferred_length": "standard"}
+    reading_time_pattern: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+    # Tracked interests that had < 2 items in last 5 days
+    # ["Indian startup exits", "AI agent reliability"]
+    coverage_gaps: Mapped[list[str]] = mapped_column(JSONB, default=list)
+
+    # Topics where engagement direction changed in last 2 weeks vs prior 2 weeks
+    # [{"topic": "crypto", "direction": "declining", "evidence": "was clicking 2mo ago, now ignoring"}]
+    mind_shifts: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+
+    # Inferred current focus derived from last 7 days of deep engagements
+    current_focus: Mapped[str | None] = mapped_column(Text)
+    # e.g. "LLM infrastructure and AI reliability"
+
+    total_signals_analyzed: Mapped[int] = mapped_column(Integer, default=0)
+
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+# ── Breaking Development Events ───────────────────────────────────────────────
+
+class BreakingDevelopmentEvent(Base):
+    """
+    Detected when 3+ content items on the same topic arrive from distinct
+    sources within a 6-hour window.  ContentWatcherAgent writes these rows;
+    ProactiveSurfacingAgent reads them and queues notifications.
+    """
+    __tablename__ = "breaking_development_events"
+    __table_args__ = (
+        Index("ix_breaking_dev_user_topic", "user_id", "topic"),
+        Index("ix_breaking_dev_unnotified", "user_id", "notified_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    topic: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_ids: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    source_count: Mapped[int] = mapped_column(Integer, default=3)
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# ── Source Fetch Patterns ─────────────────────────────────────────────────────
+
+class SourceFetchPattern(Base):
+    """
+    Learned optimal fetch timing per source.  ContentWatcherAgent updates
+    `content_arrival_pattern` every cycle; the scheduler uses `best_fetch_hour`
+    to fetch each source right after its content typically publishes rather than
+    at a fixed 03:00.
+    """
+    __tablename__ = "source_fetch_patterns"
+    __table_args__ = (
+        UniqueConstraint("source_id", name="uq_source_fetch_pattern"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    source_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("sources.id", ondelete="CASCADE"), unique=True
+    )
+
+    # UTC hour (0-23) when this source most reliably has new content
+    best_fetch_hour: Mapped[int | None] = mapped_column(Integer)
+
+    # {"hourly_distribution": [0,0,5,12,...], "peak_hours": [8,9,17], "samples": 30}
+    content_arrival_pattern: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+    last_content_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    pattern_confidence: Mapped[float] = mapped_column(Float, default=0.0)  # 0–1
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+# ── Proactive Surfacing Events ─────────────────────────────────────────────────
+
+class ProactiveSurfacingEvent(Base):
+    """
+    Queue of proactive notifications assembled by ProactiveSurfacingAgent.
+    Events are created on triggers (thread update, breaking development, voice-
+    note connection, contradiction) and consumed at digest-compose time or via
+    a push-notification pathway.
+
+    event_type values:
+      "thread_update"       — a tracked story thread has a significant update
+      "breaking_development"— 3+ sources covered the same topic in 6 h
+      "voice_note_connection"— a brain-dump connects to external content found
+      "contradiction"       — new item contradicts something shown last 30 days
+      "coverage_gap_alert"  — tracked topic has had no content for 5 days
+    """
+    __tablename__ = "proactive_surfacing_events"
+    __table_args__ = (
+        Index("ix_proactive_user_unsurfaced", "user_id", "surfaced_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+
+    content_ids: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    thread_key: Mapped[str | None] = mapped_column(String(255))
+    priority: Mapped[int] = mapped_column(Integer, default=5)  # 1=low … 10=urgent
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    surfaced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 # ── Magic Links ───────────────────────────────────────────────────────────────
 
 class MagicLink(Base):
