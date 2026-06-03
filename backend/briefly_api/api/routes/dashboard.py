@@ -712,14 +712,29 @@ async def get_profile_intelligence(
     # Digest day count
     digest_day = profile.total_digests_received or 0
 
-    # Strongest interests from topic_clusters
+    # Strongest interests from topic_clusters (lowered threshold so early users see data)
     clusters = profile.topic_clusters or []
     strong = sorted(
-        [c for c in clusters if cluster_label(c) and c.get("strength", 0) >= 0.5],
+        [c for c in clusters if cluster_label(c) and c.get("strength", 0) >= 0.25],
         key=lambda x: x.get("strength", 0),
         reverse=True,
     )
-    strongest_interests = [cluster_label(c) for c in strong[:6] if cluster_label(c)]
+    strongest_interests = [cluster_label(c) for c in strong[:8] if cluster_label(c)]
+
+    # Emerging interests (building up, not yet strong)
+    emerging = sorted(
+        [c for c in clusters if cluster_label(c) and 0.08 <= c.get("strength", 0) < 0.25],
+        key=lambda x: x.get("strength", 0),
+        reverse=True,
+    )
+    emerging_interests = [cluster_label(c) for c in emerging[:4] if cluster_label(c)]
+
+    # All topic strengths for visual bar rendering in UI
+    topic_strengths = {
+        cluster_label(c): round(c.get("strength", 0), 3)
+        for c in sorted(clusters, key=lambda x: x.get("strength", 0), reverse=True)
+        if cluster_label(c) and c.get("strength", 0) > 0.05
+    }
 
     # Topics the user has moved away from (low strength, was once higher)
     faded = sorted(
@@ -756,19 +771,29 @@ async def get_profile_intelligence(
             "latest": val.get("latest_headline", "")[:100],
         })
 
-    # Source weights — top and bottom
+    # Source weights — top and bottom (lowered threshold so early users see their sources)
     source_weights = dict(profile.source_weights or {})
     sorted_sources = sorted(source_weights.items(), key=lambda x: x[1], reverse=True)
-    top_sources = [k for k, v in sorted_sources[:4] if v >= 0.6]
-    deprioritized_sources = [k for k, v in sorted_sources if v < 0.35][:3]
+    top_sources = [k for k, v in sorted_sources[:6] if v >= 0.35]
+    deprioritized_sources = [k for k, v in sorted_sources if v < 0.25][:3]
+
+    # Reading behaviour stats
+    reading_stats = {
+        "total_digests": profile.total_digests_received or 0,
+        "avg_open_rate": round((profile.avg_open_rate or 0) * 100),
+        "avg_click_rate": round((profile.avg_click_rate or 0) * 100),
+    }
 
     return {
         "digest_day": digest_day,
         "strongest_interests": strongest_interests,
+        "emerging_interests": emerging_interests,
         "moved_away_from": moved_away_from,
         "active_threads": active_threads,
         "top_sources": top_sources,
         "deprioritized_sources": deprioritized_sources,
+        "topic_strengths": topic_strengths,
+        "reading_stats": reading_stats,
     }
 
 

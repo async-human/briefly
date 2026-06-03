@@ -78,7 +78,22 @@ function TagEditor({
 
 // ── Briefly Knows card ────────────────────────────────────────────────────────
 
-function BrieflyKnowsCard({ intel }: { intel: ProfileIntelligence }) {
+function InterestBar({ topic, strength }: { topic: string; strength: number }) {
+  const pct = Math.round(strength * 100);
+  const label = strength >= 0.6 ? "strong" : strength >= 0.35 ? "building" : "early signal";
+  const cls = strength >= 0.6 ? "bk-signal-strong" : strength >= 0.35 ? "bk-signal-mid" : "bk-signal-low";
+  return (
+    <div className="bk-interest-row">
+      <span className="bk-interest-name">{topic}</span>
+      <div className="bk-interest-track">
+        <div className="bk-interest-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <span className={`bk-signal ${cls}`}>{label}</span>
+    </div>
+  );
+}
+
+function BrieflyKnowsCard({ intel, streak }: { intel: ProfileIntelligence; streak: number }) {
   const hasSomething = intel.digest_day > 0;
 
   if (!hasSomething) {
@@ -87,90 +102,139 @@ function BrieflyKnowsCard({ intel }: { intel: ProfileIntelligence }) {
         <div className="settings-section-head">
           <h2 className="settings-section-title">What Briefly knows about you</h2>
           <p className="settings-section-desc">
-            Briefly learns more about your interests with every digest you read.
-            Keep reading to see your intelligence profile build.
+            Briefly learns from every digest you read. Your intelligence profile will appear here after your first briefing.
           </p>
         </div>
       </div>
     );
   }
 
+  const topicEntries = Object.entries(intel.topic_strengths ?? {})
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 8);
+
+  const hasInterests = topicEntries.length > 0 || intel.strongest_interests.length > 0;
+  const stats = intel.reading_stats ?? { total_digests: 0, avg_open_rate: 0, avg_click_rate: 0 };
+
   return (
     <div className="settings-section bk-card">
-      <div className="settings-section-head">
-        <h2 className="settings-section-title">What Briefly knows about you</h2>
-        <p className="settings-section-desc">
-          Briefly has been learning about you for{" "}
-          <strong>{intel.digest_day} day{intel.digest_day !== 1 ? "s" : ""}</strong>.
-          This is what it knows.
+      {/* ── Header ── */}
+      <div className="bk-header">
+        <h2 className="bk-title">What Briefly knows about you</h2>
+        <p className="bk-subtitle">
+          {intel.digest_day} day{intel.digest_day !== 1 ? "s" : ""} of learning — updates with every digest
         </p>
       </div>
-      <div className="bk-body">
 
-        {intel.strongest_interests.length > 0 && (
-          <div className="bk-row">
-            <span className="bk-row-label">Strongest interests</span>
-            <div className="bk-chips">
-              {intel.strongest_interests.map((t) => (
-                <span key={t} className="bk-chip bk-chip-strong">{t}</span>
-              ))}
-            </div>
+      {/* ── Stats row ── */}
+      <div className="bk-stats-row">
+        <div className="bk-stat-box">
+          <span className="bk-stat-num">{stats.total_digests}</span>
+          <span className="bk-stat-label">digests read</span>
+        </div>
+        {stats.avg_open_rate > 0 && (
+          <div className="bk-stat-box">
+            <span className="bk-stat-num">{stats.avg_open_rate}%</span>
+            <span className="bk-stat-label">avg open rate</span>
           </div>
         )}
-
-        {intel.active_threads.length > 0 && (
-          <div className="bk-row">
-            <span className="bk-row-label">Active story threads</span>
-            <div className="bk-threads">
-              {intel.active_threads.slice(0, 4).map((t) => (
-                <div key={t.topic} className="bk-thread">
-                  <span className="bk-thread-topic">{t.topic}</span>
-                  <span className="bk-thread-meta">
-                    {t.weeks} week{t.weeks !== 1 ? "s" : ""} · {t.appearances} appearances
-                  </span>
-                  {t.latest && (
-                    <span className="bk-thread-latest">&ldquo;{t.latest}&rdquo;</span>
-                  )}
-                </div>
-              ))}
-            </div>
+        {stats.avg_click_rate > 0 && (
+          <div className="bk-stat-box">
+            <span className="bk-stat-num">{stats.avg_click_rate}%</span>
+            <span className="bk-stat-label">avg click rate</span>
           </div>
         )}
-
-        {intel.top_sources.length > 0 && (
-          <div className="bk-row">
-            <span className="bk-row-label">Sources Briefly prioritises for you</span>
-            <div className="bk-chips">
-              {intel.top_sources.map((s) => (
-                <span key={s} className="bk-chip bk-chip-source">{s}</span>
-              ))}
-            </div>
+        {streak > 0 && (
+          <div className="bk-stat-box">
+            <span className="bk-stat-num">{streak}</span>
+            <span className="bk-stat-label">day streak 🔥</span>
           </div>
         )}
-
-        {intel.moved_away_from.length > 0 && (
-          <div className="bk-row">
-            <span className="bk-row-label">Topics you&apos;ve moved away from</span>
-            <div className="bk-chips">
-              {intel.moved_away_from.map((t) => (
-                <span key={t} className="bk-chip bk-chip-faded">{t}</span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {intel.deprioritized_sources.length > 0 && (
-          <div className="bk-row">
-            <span className="bk-row-label">Sources Briefly has deprioritised</span>
-            <div className="bk-chips">
-              {intel.deprioritized_sources.map((s) => (
-                <span key={s} className="bk-chip bk-chip-faded">{s}</span>
-              ))}
-            </div>
-          </div>
-        )}
-
       </div>
+
+      {/* ── Inferred interests with strength bars ── */}
+      {hasInterests && (
+        <div className="bk-section">
+          <p className="bk-section-label">Interests Briefly has inferred</p>
+          <div className="bk-interest-list">
+            {topicEntries.length > 0
+              ? topicEntries.map(([topic, strength]) => (
+                  <InterestBar key={topic} topic={topic} strength={strength} />
+                ))
+              : intel.strongest_interests.map((t) => (
+                  <InterestBar key={t} topic={t} strength={0.65} />
+                ))}
+          </div>
+          {intel.emerging_interests?.length > 0 && (
+            <div className="bk-emerging">
+              <span className="bk-emerging-label">Also noticing:</span>
+              {intel.emerging_interests.map((t) => (
+                <span key={t} className="bk-chip bk-chip-emerging">{t}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Active story threads ── */}
+      {intel.active_threads.length > 0 && (
+        <div className="bk-section">
+          <p className="bk-section-label">Stories Briefly is tracking for you</p>
+          <div className="bk-threads-list">
+            {intel.active_threads.slice(0, 4).map((t) => (
+              <div key={t.topic} className="bk-thread-card">
+                <div className="bk-thread-card-header">
+                  <span className="bk-thread-card-topic">{t.topic}</span>
+                  <span className="bk-thread-card-meta">
+                    {t.weeks}w · {t.appearances} items
+                  </span>
+                </div>
+                {t.latest && (
+                  <p className="bk-thread-card-latest">&ldquo;{t.latest}&rdquo;</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Source preferences ── */}
+      {intel.top_sources.length > 0 && (
+        <div className="bk-section">
+          <p className="bk-section-label">Sources Briefly prioritises for you</p>
+          <div className="bk-chips">
+            {intel.top_sources.map((s) => (
+              <span key={s} className="bk-chip bk-chip-source">{s}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Fading signals ── */}
+      {(intel.moved_away_from.length > 0 || intel.deprioritized_sources.length > 0) && (
+        <div className="bk-section bk-section-dim">
+          {intel.moved_away_from.length > 0 && (
+            <>
+              <p className="bk-section-label">Topics you&apos;ve moved away from</p>
+              <div className="bk-chips" style={{ marginBottom: intel.deprioritized_sources.length > 0 ? 12 : 0 }}>
+                {intel.moved_away_from.map((t) => (
+                  <span key={t} className="bk-chip bk-chip-faded">{t}</span>
+                ))}
+              </div>
+            </>
+          )}
+          {intel.deprioritized_sources.length > 0 && (
+            <>
+              <p className="bk-section-label">Sources with low engagement</p>
+              <div className="bk-chips">
+                {intel.deprioritized_sources.map((s) => (
+                  <span key={s} className="bk-chip bk-chip-faded">{s}</span>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -244,6 +308,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
   const [intel, setIntel] = useState<ProfileIntelligence | null>(null);
+  const [streak, setStreak] = useState(0);
 
   // Local editable state
   const [role, setRole] = useState("");
@@ -277,6 +342,7 @@ export default function SettingsPage() {
       .then(([meData, intelData]) => {
         if (!meData.onboarding_completed) { router.replace("/onboarding"); return; }
         setMe({ name: meData.user.name, avatar_url: meData.user.avatar_url });
+        setStreak(meData.reading_streak ?? 0);
         const p = meData.profile;
         if (p) {
           setRole(p.role ?? "");
@@ -349,7 +415,7 @@ export default function SettingsPage() {
           <div className="settings-page">
 
             {/* ── What Briefly knows ── */}
-            {intel && <BrieflyKnowsCard intel={intel} />}
+            {intel && <BrieflyKnowsCard intel={intel} streak={streak} />}
 
             {/* ── Profile ── */}
             <Section

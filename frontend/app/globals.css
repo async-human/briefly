@@ -12313,67 +12313,216 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
 
 /* ── Briefly Knows card ─────────────────────────────────────────────────── */
 .bk-card {
-  background: linear-gradient(135deg, rgba(100,100,220,0.04) 0%, rgba(201,184,150,0.03) 100%);
-  border: 1px solid rgba(100,100,220,0.12);
-  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(158,123,63,0.05) 0%, rgba(100,100,220,0.03) 100%);
+  border: 1px solid rgba(158,123,63,0.18);
+  border-radius: 16px;
   padding: 28px 32px;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
 }
 .bk-card-empty { opacity: 0.7; }
-.bk-body { display: flex; flex-direction: column; gap: 20px; padding-top: 4px; }
-.bk-row { display: flex; flex-direction: column; gap: 8px; }
-.bk-row-label {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+
+/* Header */
+.bk-header { display: flex; flex-direction: column; gap: 4px; }
+.bk-title {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin: 0;
+}
+.bk-subtitle {
+  font-size: 13px;
   color: var(--text-muted);
+  margin: 0;
 }
-.bk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.bk-chip {
-  font-size: 12px;
-  padding: 3px 10px;
-  border-radius: 100px;
-  border: 1px solid;
+
+/* Stats row */
+.bk-stats-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
-.bk-chip-strong {
-  color: var(--accent);
-  background: var(--accent-dim);
-  border-color: var(--accent-line);
-}
-.bk-chip-source {
-  color: #aaaadd;
-  background: rgba(100,100,220,0.07);
-  border-color: rgba(100,100,220,0.2);
-}
-.bk-chip-faded {
-  color: var(--text-muted);
-  background: rgba(255,255,255,0.02);
-  border-color: var(--border);
-  text-decoration: line-through;
-  opacity: 0.6;
-}
-.bk-threads { display: flex; flex-direction: column; gap: 10px; }
-.bk-thread {
+.bk-stat-box {
+  flex: 1;
+  min-width: 80px;
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding: 10px 14px;
-  background: rgba(255,255,255,0.02);
-  border-radius: 8px;
-  border-left: 2px solid rgba(100,100,220,0.25);
+  padding: 14px 18px;
+  background: rgba(255,255,255,0.5);
+  border: 1px solid rgba(0,0,0,0.07);
+  border-radius: 12px;
 }
-.bk-thread-topic { font-size: 13px; color: var(--text); font-weight: 500; }
-.bk-thread-meta { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
-.bk-thread-latest {
+.bk-stat-num {
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  line-height: 1;
+}
+.bk-stat-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Sections */
+.bk-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bk-section-dim { opacity: 0.65; }
+.bk-section-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* Interest bars */
+.bk-interest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bk-interest-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 80px;
+  align-items: center;
+  gap: 12px;
+}
+.bk-interest-name {
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bk-interest-track {
+  height: 6px;
+  background: rgba(0,0,0,0.07);
+  border-radius: 100px;
+  overflow: hidden;
+}
+.bk-interest-fill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(158,123,63,0.7), rgba(201,184,150,0.95));
+  border-radius: 100px;
+  transition: width 0.6s cubic-bezier(0.22,1,0.36,1);
+}
+.bk-signal {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-align: right;
+}
+.bk-signal-strong { color: rgba(158,123,63,0.9); }
+.bk-signal-mid    { color: var(--text-muted); }
+.bk-signal-low    { color: rgba(0,0,0,0.3); }
+
+/* Emerging interests chips */
+.bk-emerging {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.bk-emerging-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Thread cards */
+.bk-threads-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bk-thread-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.5);
+  border: 1px solid rgba(0,0,0,0.07);
+  border-radius: 10px;
+  border-left: 3px solid rgba(158,123,63,0.4);
+}
+.bk-thread-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.bk-thread-card-topic {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.bk-thread-card-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.bk-thread-card-latest {
   font-size: 12px;
   color: var(--text-secondary);
   font-style: italic;
-  margin-top: 2px;
+  margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Chips */
+.bk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.bk-chip {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  border: 1px solid;
+}
+.bk-chip-source {
+  color: #5a5aaa;
+  background: rgba(100,100,220,0.06);
+  border-color: rgba(100,100,220,0.18);
+}
+.bk-chip-emerging {
+  color: rgba(158,123,63,0.8);
+  background: rgba(158,123,63,0.07);
+  border-color: rgba(158,123,63,0.2);
+  font-size: 11px;
+}
+.bk-chip-faded {
+  color: var(--text-muted);
+  background: rgba(0,0,0,0.02);
+  border-color: rgba(0,0,0,0.08);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+@media (max-width: 600px) {
+  .bk-card { padding: 20px; }
+  .bk-interest-row { grid-template-columns: 120px 1fr 70px; gap: 8px; }
+  .bk-stat-num { font-size: 22px; }
 }
 .settings-section:last-child { border-bottom: none; }
 .settings-section-head { padding-top: 4px; }

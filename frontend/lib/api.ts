@@ -375,10 +375,17 @@ export type StoryThread = {
 export type ProfileIntelligence = {
   digest_day: number;
   strongest_interests: string[];
+  emerging_interests: string[];
   moved_away_from: string[];
   active_threads: StoryThread[];
   top_sources: string[];
   deprioritized_sources: string[];
+  topic_strengths: Record<string, number>;
+  reading_stats: {
+    total_digests: number;
+    avg_open_rate: number;
+    avg_click_rate: number;
+  };
 };
 
 export type WeeklyReportTopic = {
