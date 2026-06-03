@@ -701,8 +701,8 @@ async def get_profile_intelligence(
     prioritised and deprioritised sources.
     This is the data behind the 'Your Briefly Knows' card in settings.
     """
-    from briefly_api.db.models import UserMemory
-    from briefly_api.services.profile_utils import cluster_label
+    from briefly_api.db.models import UserMemory, Source
+    from briefly_api.services.profile_utils import cluster_label, _UUID_RE
 
     profile = user.profile
     if not profile:
@@ -771,9 +771,30 @@ async def get_profile_intelligence(
             "latest": val.get("latest_headline", "")[:100],
         })
 
-    # Source weights — top and bottom (lowered threshold so early users see their sources)
+    # Source weights — resolve UUID keys to human-readable names, then rank
     source_weights = dict(profile.source_weights or {})
-    sorted_sources = sorted(source_weights.items(), key=lambda x: x[1], reverse=True)
+
+    # Build UUID → name map for any keys that look like source IDs
+    uuid_keys = [k for k in source_weights if _UUID_RE.match(k)]
+    source_id_to_name: dict[str, str] = {}
+    if uuid_keys:
+        src_result = await db.execute(
+            select(Source.id, Source.name)
+            .where(Source.user_id == user.id, Source.id.in_(uuid_keys))
+        )
+        source_id_to_name = {str(r.id): r.name for r in src_result.all() if r.name}
+
+    # Normalise: replace UUID keys with resolved names; skip unresolvable UUIDs
+    resolved_weights: dict[str, float] = {}
+    for k, v in source_weights.items():
+        if _UUID_RE.match(k):
+            name = source_id_to_name.get(k)
+            if name:
+                resolved_weights[name.lower()] = max(resolved_weights.get(name.lower(), 0.0), v)
+        else:
+            resolved_weights[k] = max(resolved_weights.get(k, 0.0), v)
+
+    sorted_sources = sorted(resolved_weights.items(), key=lambda x: x[1], reverse=True)
     top_sources = [k for k, v in sorted_sources[:6] if v >= 0.35]
     deprioritized_sources = [k for k, v in sorted_sources if v < 0.25][:3]
 

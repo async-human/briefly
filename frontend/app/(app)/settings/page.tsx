@@ -78,6 +78,16 @@ function TagEditor({
 
 // ── Briefly Knows card ────────────────────────────────────────────────────────
 
+// Known internal routing labels that should never surface as user interests
+const INTERNAL_LABELS = new Set([
+  "what's new", "whats new", "highly relevant to you", "highly relevant",
+]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isCleanLabel(s: string) {
+  return s.length > 1 && !INTERNAL_LABELS.has(s.toLowerCase()) && !UUID_RE.test(s);
+}
+
 function InterestBar({ topic, strength }: { topic: string; strength: number }) {
   const pct = Math.round(strength * 100);
   const label = strength >= 0.6 ? "strong" : strength >= 0.35 ? "building" : "early signal";
@@ -93,15 +103,35 @@ function InterestBar({ topic, strength }: { topic: string; strength: number }) {
   );
 }
 
-function BrieflyKnowsCard({ intel, streak }: { intel: ProfileIntelligence; streak: number }) {
-  const hasSomething = intel.digest_day > 0;
+function BrieflyKnowsCard({
+  intel, streak, declared,
+}: {
+  intel: ProfileIntelligence;
+  streak: number;
+  declared: { role: string; goal: string; interests: string[] };
+}) {
+  const stats = intel.reading_stats ?? { total_digests: 0, avg_open_rate: 0, avg_click_rate: 0 };
 
-  if (!hasSomething) {
+  // Clean inferred topic entries — strip internal labels and UUIDs
+  const topicEntries = Object.entries(intel.topic_strengths ?? {})
+    .filter(([t]) => isCleanLabel(t))
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 8);
+
+  const cleanSources = (intel.top_sources ?? []).filter(isCleanLabel);
+  const cleanDeprioritized = (intel.deprioritized_sources ?? []).filter(isCleanLabel);
+  const cleanMovedAway = (intel.moved_away_from ?? []).filter(isCleanLabel);
+  const cleanEmerging = (intel.emerging_interests ?? []).filter(isCleanLabel);
+
+  const hasLearnedInterests = topicEntries.length > 0;
+  const hasDeclared = declared.role || declared.goal || declared.interests.length > 0;
+
+  if (intel.digest_day === 0 && !hasDeclared) {
     return (
       <div className="settings-section bk-card bk-card-empty">
-        <div className="settings-section-head">
-          <h2 className="settings-section-title">What Briefly knows about you</h2>
-          <p className="settings-section-desc">
+        <div className="bk-header">
+          <h2 className="bk-title">What Briefly knows about you</h2>
+          <p className="bk-subtitle">
             Briefly learns from every digest you read. Your intelligence profile will appear here after your first briefing.
           </p>
         </div>
@@ -109,72 +139,105 @@ function BrieflyKnowsCard({ intel, streak }: { intel: ProfileIntelligence; strea
     );
   }
 
-  const topicEntries = Object.entries(intel.topic_strengths ?? {})
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 8);
-
-  const hasInterests = topicEntries.length > 0 || intel.strongest_interests.length > 0;
-  const stats = intel.reading_stats ?? { total_digests: 0, avg_open_rate: 0, avg_click_rate: 0 };
-
   return (
     <div className="settings-section bk-card">
       {/* ── Header ── */}
       <div className="bk-header">
         <h2 className="bk-title">What Briefly knows about you</h2>
         <p className="bk-subtitle">
-          {intel.digest_day} day{intel.digest_day !== 1 ? "s" : ""} of learning — updates with every digest
+          {intel.digest_day > 0
+            ? `${intel.digest_day} day${intel.digest_day !== 1 ? "s" : ""} of learning — profile updates with every digest`
+            : "Profile built from your preferences — learning begins with your first digest"}
         </p>
       </div>
 
       {/* ── Stats row ── */}
-      <div className="bk-stats-row">
-        <div className="bk-stat-box">
-          <span className="bk-stat-num">{stats.total_digests}</span>
-          <span className="bk-stat-label">digests read</span>
+      {(stats.total_digests > 0 || streak > 0) && (
+        <div className="bk-stats-row">
+          {stats.total_digests > 0 && (
+            <div className="bk-stat-box">
+              <span className="bk-stat-num">{stats.total_digests}</span>
+              <span className="bk-stat-label">digests read</span>
+            </div>
+          )}
+          {stats.avg_open_rate > 0 && (
+            <div className="bk-stat-box">
+              <span className="bk-stat-num">{stats.avg_open_rate}%</span>
+              <span className="bk-stat-label">avg open rate</span>
+            </div>
+          )}
+          {stats.avg_click_rate > 0 && (
+            <div className="bk-stat-box">
+              <span className="bk-stat-num">{stats.avg_click_rate}%</span>
+              <span className="bk-stat-label">avg click rate</span>
+            </div>
+          )}
+          {streak > 0 && (
+            <div className="bk-stat-box">
+              <span className="bk-stat-num">{streak}</span>
+              <span className="bk-stat-label">day streak 🔥</span>
+            </div>
+          )}
         </div>
-        {stats.avg_open_rate > 0 && (
-          <div className="bk-stat-box">
-            <span className="bk-stat-num">{stats.avg_open_rate}%</span>
-            <span className="bk-stat-label">avg open rate</span>
+      )}
+
+      {/* ── What you've told Briefly (always visible) ── */}
+      {hasDeclared && (
+        <div className="bk-section">
+          <p className="bk-section-label">What you&apos;ve told Briefly</p>
+          <div className="bk-declared-grid">
+            {declared.role && (
+              <div className="bk-declared-item">
+                <span className="bk-declared-key">Role</span>
+                <span className="bk-declared-val">{declared.role}</span>
+              </div>
+            )}
+            {declared.goal && (
+              <div className="bk-declared-item">
+                <span className="bk-declared-key">Current focus</span>
+                <span className="bk-declared-val">{declared.goal}</span>
+              </div>
+            )}
+            {declared.interests.length > 0 && (
+              <div className="bk-declared-item bk-declared-item--full">
+                <span className="bk-declared-key">Topics to track</span>
+                <div className="bk-chips" style={{ marginTop: 6 }}>
+                  {declared.interests.map((t) => (
+                    <span key={t} className="bk-chip bk-chip-declared">{t}</span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        )}
-        {stats.avg_click_rate > 0 && (
-          <div className="bk-stat-box">
-            <span className="bk-stat-num">{stats.avg_click_rate}%</span>
-            <span className="bk-stat-label">avg click rate</span>
-          </div>
-        )}
-        {streak > 0 && (
-          <div className="bk-stat-box">
-            <span className="bk-stat-num">{streak}</span>
-            <span className="bk-stat-label">day streak 🔥</span>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ── Inferred interests with strength bars ── */}
-      {hasInterests && (
+      {hasLearnedInterests ? (
         <div className="bk-section">
-          <p className="bk-section-label">Interests Briefly has inferred</p>
+          <p className="bk-section-label">What Briefly has learned from your reading</p>
           <div className="bk-interest-list">
-            {topicEntries.length > 0
-              ? topicEntries.map(([topic, strength]) => (
-                  <InterestBar key={topic} topic={topic} strength={strength} />
-                ))
-              : intel.strongest_interests.map((t) => (
-                  <InterestBar key={t} topic={t} strength={0.65} />
-                ))}
+            {topicEntries.map(([topic, strength]) => (
+              <InterestBar key={topic} topic={topic} strength={strength} />
+            ))}
           </div>
-          {intel.emerging_interests?.length > 0 && (
+          {cleanEmerging.length > 0 && (
             <div className="bk-emerging">
               <span className="bk-emerging-label">Also noticing:</span>
-              {intel.emerging_interests.map((t) => (
+              {cleanEmerging.map((t) => (
                 <span key={t} className="bk-chip bk-chip-emerging">{t}</span>
               ))}
             </div>
           )}
         </div>
-      )}
+      ) : intel.digest_day > 0 ? (
+        <div className="bk-section">
+          <p className="bk-section-label">What Briefly has learned from your reading</p>
+          <p className="bk-empty-hint">
+            Briefly is still building your interest profile. Open and click on stories that matter to you — signals accumulate after a few more digests.
+          </p>
+        </div>
+      ) : null}
 
       {/* ── Active story threads ── */}
       {intel.active_threads.length > 0 && (
@@ -185,9 +248,7 @@ function BrieflyKnowsCard({ intel, streak }: { intel: ProfileIntelligence; strea
               <div key={t.topic} className="bk-thread-card">
                 <div className="bk-thread-card-header">
                   <span className="bk-thread-card-topic">{t.topic}</span>
-                  <span className="bk-thread-card-meta">
-                    {t.weeks}w · {t.appearances} items
-                  </span>
+                  <span className="bk-thread-card-meta">{t.weeks}w · {t.appearances} items</span>
                 </div>
                 {t.latest && (
                   <p className="bk-thread-card-latest">&ldquo;{t.latest}&rdquo;</p>
@@ -199,11 +260,11 @@ function BrieflyKnowsCard({ intel, streak }: { intel: ProfileIntelligence; strea
       )}
 
       {/* ── Source preferences ── */}
-      {intel.top_sources.length > 0 && (
+      {cleanSources.length > 0 && (
         <div className="bk-section">
-          <p className="bk-section-label">Sources Briefly prioritises for you</p>
+          <p className="bk-section-label">Sources Briefly has learned you prefer</p>
           <div className="bk-chips">
-            {intel.top_sources.map((s) => (
+            {cleanSources.map((s) => (
               <span key={s} className="bk-chip bk-chip-source">{s}</span>
             ))}
           </div>
@@ -211,23 +272,23 @@ function BrieflyKnowsCard({ intel, streak }: { intel: ProfileIntelligence; strea
       )}
 
       {/* ── Fading signals ── */}
-      {(intel.moved_away_from.length > 0 || intel.deprioritized_sources.length > 0) && (
+      {(cleanMovedAway.length > 0 || cleanDeprioritized.length > 0) && (
         <div className="bk-section bk-section-dim">
-          {intel.moved_away_from.length > 0 && (
+          {cleanMovedAway.length > 0 && (
             <>
               <p className="bk-section-label">Topics you&apos;ve moved away from</p>
-              <div className="bk-chips" style={{ marginBottom: intel.deprioritized_sources.length > 0 ? 12 : 0 }}>
-                {intel.moved_away_from.map((t) => (
+              <div className="bk-chips" style={{ marginBottom: cleanDeprioritized.length > 0 ? 12 : 0 }}>
+                {cleanMovedAway.map((t) => (
                   <span key={t} className="bk-chip bk-chip-faded">{t}</span>
                 ))}
               </div>
             </>
           )}
-          {intel.deprioritized_sources.length > 0 && (
+          {cleanDeprioritized.length > 0 && (
             <>
               <p className="bk-section-label">Sources with low engagement</p>
               <div className="bk-chips">
-                {intel.deprioritized_sources.map((s) => (
+                {cleanDeprioritized.map((s) => (
                   <span key={s} className="bk-chip bk-chip-faded">{s}</span>
                 ))}
               </div>
@@ -309,6 +370,9 @@ export default function SettingsPage() {
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
   const [intel, setIntel] = useState<ProfileIntelligence | null>(null);
   const [streak, setStreak] = useState(0);
+  const [declaredProfile, setDeclaredProfile] = useState<{
+    role: string; goal: string; interests: string[];
+  }>({ role: "", goal: "", interests: [] });
 
   // Local editable state
   const [role, setRole] = useState("");
@@ -351,6 +415,11 @@ export default function SettingsPage() {
           setTopics(p.interests?.map((i) => i.topic).filter(Boolean) ?? []);
           setNeverShow(p.never_show ?? []);
           setDeliveryTime(p.digest_time ?? "07:00");
+          setDeclaredProfile({
+            role: p.role ?? "",
+            goal: p.goal ?? "",
+            interests: p.interests?.map((i) => i.topic).filter(Boolean) ?? [],
+          });
         }
         if (intelData) setIntel(intelData);
       })
@@ -415,7 +484,7 @@ export default function SettingsPage() {
           <div className="settings-page">
 
             {/* ── What Briefly knows ── */}
-            {intel && <BrieflyKnowsCard intel={intel} streak={streak} />}
+            {intel && <BrieflyKnowsCard intel={intel} streak={streak} declared={declaredProfile} />}
 
             {/* ── Profile ── */}
             <Section

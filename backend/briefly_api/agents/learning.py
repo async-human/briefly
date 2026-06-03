@@ -179,7 +179,8 @@ async def _update_topic_clusters(ctx: PipelineContext, session) -> None:
         item_text = " ".join(filter(None, [
             sig_row.headline,
             sig_row.why_it_matters,
-            sig_row.section,
+            # section is an internal routing label ("What's new"), not a topic —
+            # including it would reinforce those labels as fake interest clusters.
             sig_row.source_name,
         ])).lower()
 

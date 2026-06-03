@@ -12447,6 +12447,63 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   white-space: nowrap;
 }
 
+/* Declared preferences grid */
+.bk-declared-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bk-declared-item {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: baseline;
+  gap: 12px;
+}
+.bk-declared-item--full {
+  grid-template-columns: 110px 1fr;
+  align-items: flex-start;
+}
+.bk-declared-key {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.bk-declared-val {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.bk-chip-declared {
+  color: var(--text-secondary);
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.1);
+  font-size: 12px;
+}
+
+/* Empty-state hint when learned interests not yet available */
+.bk-empty-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  font-style: italic;
+  margin: 0;
+  padding: 14px 16px;
+  background: rgba(0,0,0,0.02);
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+@media (max-width: 520px) {
+  .bk-declared-item,
+  .bk-declared-item--full {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}
+
 /* Thread cards */
 .bk-threads-list {
   display: flex;
