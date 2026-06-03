@@ -229,6 +229,35 @@ async def get_digest(
     return DigestOut.model_validate(digest)
 
 
+@router.get("/digests/{digest_id}/feedback")
+async def get_digest_feedback(
+    digest_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Return the user's saved/disliked signals for items in a digest.
+
+    Used by the reading UI to restore star/thumbs-down state when the user
+    returns to a brief they've already partially read.
+    Returns: {digest_item_id: "saved" | "disliked"}
+    When an item has both signals the most recent wins.
+    """
+    result = await db.execute(
+        select(BehavioralSignal.digest_item_id, BehavioralSignal.signal_type)
+        .where(
+            BehavioralSignal.user_id == user.id,
+            BehavioralSignal.digest_id == digest_id,
+            BehavioralSignal.signal_type.in_([SignalType.saved, SignalType.disliked]),
+        )
+        .order_by(BehavioralSignal.created_at.asc())
+    )
+    signals: dict[str, str] = {}
+    for row in result.all():
+        if row.digest_item_id:
+            signals[row.digest_item_id] = row.signal_type.value
+    return signals
+
+
 @router.get("/sources", response_model=list[SourceOut])
 async def list_sources(
     user: User = Depends(get_current_user),

@@ -428,6 +428,8 @@ export const api = {
   getLatestDigest: () => request<Digest | null>("/api/v1/digests/latest"),
   getDigests: () => request<DigestSummary[]>("/api/v1/digests"),
   getDigest: (id: string) => request<Digest>(`/api/v1/digests/${id}`),
+  getDigestFeedback: (id: string) =>
+    request<Record<string, "saved" | "disliked">>(`/api/v1/digests/${id}/feedback`),
   getSources: () => request<Source[]>("/api/v1/sources"),
   detectSource: (body: { identifier: string; source_type?: string }) =>
     request<SourceDetection>("/api/v1/sources/detect", {

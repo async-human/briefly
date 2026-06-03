@@ -6010,13 +6010,13 @@ footer {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 16px 32px 20px;
-  gap: 14px;
+  justify-content: center;
+  padding: 24px 36px 28px;
+  gap: 20px;
   overflow-x: hidden;
   overflow-y: auto;
   position: relative;
-  /* Warm ambient tint at top */
-  background: linear-gradient(180deg, rgba(158, 123, 63, 0.05) 0%, transparent 28%);
+  background: linear-gradient(180deg, rgba(158, 123, 63, 0.06) 0%, transparent 35%);
 }
 
 /* Meta row */
@@ -6048,9 +6048,9 @@ footer {
 }
 .read-meta-source {
   font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.13em;
-  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
   text-transform: uppercase;
 }
 .read-meta-sep {
@@ -6091,12 +6091,12 @@ footer {
 /* Large editorial background number */
 .read-bg-num {
   position: absolute;
-  bottom: -12px;
-  right: -8px;
+  bottom: -16px;
+  right: -4px;
   font-family: var(--serif);
-  font-size: clamp(100px, 20vw, 160px);
+  font-size: clamp(140px, 26vw, 220px);
   font-weight: 700;
-  color: rgba(212, 170, 106, 0.055);
+  color: rgba(212, 170, 106, 0.07);
   line-height: 1;
   pointer-events: none;
   user-select: none;
@@ -6104,10 +6104,10 @@ footer {
 }
 .read-headline-xl {
   font-family: var(--serif);
-  font-size: clamp(24px, 5.2vw, 42px);
+  font-size: clamp(26px, 5.5vw, 46px);
   font-weight: 400;
   letter-spacing: -0.04em;
-  line-height: 1.21;
+  line-height: 1.18;
   color: var(--text);
   margin: 0;
   position: relative;
@@ -6128,17 +6128,16 @@ footer {
 
 /* Why This Matters V2 */
 .read-why-v2 {
-  flex: 1 1 auto;
-  min-height: 120px;
+  flex-shrink: 0;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(145deg, rgba(158, 123, 63, 0.18) 0%, rgba(158, 123, 63, 0.09) 55%, rgba(158, 123, 63, 0.04) 100%);
-  border: 1px solid rgba(212, 170, 106, 0.24);
-  border-radius: 22px;
-  padding: 20px 24px;
+  background: linear-gradient(145deg, rgba(158, 123, 63, 0.15) 0%, rgba(158, 123, 63, 0.07) 60%, rgba(158, 123, 63, 0.03) 100%);
+  border: 1px solid rgba(212, 170, 106, 0.26);
+  border-radius: 18px;
+  padding: 22px 26px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 /* Golden left accent bar */
 .read-why-v2::before {
@@ -6177,16 +6176,18 @@ footer {
 .read-why-v2-label {
   font-family: var(--mono);
   font-size: 9px;
-  letter-spacing: 0.17em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--accent);
-  opacity: 0.9;
+  opacity: 0.95;
 }
 .read-why-v2-text {
-  font-size: clamp(13.5px, 2.8vw, 15.5px);
-  color: var(--text-secondary);
-  line-height: 1.68;
+  font-size: clamp(15px, 3vw, 17px);
+  color: var(--text);
+  line-height: 1.7;
   margin: 0;
+  font-weight: 300;
+  letter-spacing: -0.01em;
 }
 
 /* Memory connection V2 */
@@ -6216,8 +6217,9 @@ footer {
 
 /* Mobile adjustments */
 @media (max-width: 640px) {
-  .read-stage { padding: 14px 20px 18px; gap: 12px; }
-  .read-why-v2 { padding: 16px 18px; }
+  .read-stage { padding: 20px 22px 24px; gap: 16px; }
+  .read-why-v2 { padding: 18px 20px; }
+  .read-headline-xl { font-size: clamp(22px, 7vw, 32px); }
 }
 .read-card {
   position: relative;
@@ -6322,20 +6324,21 @@ footer {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
   cursor: pointer;
   color: var(--text-muted);
-  transition: color 0.2s, border-color 0.2s, transform 0.15s;
+  transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.15s;
   flex-shrink: 0;
 }
 .read-save-btn:hover {
   color: var(--accent);
   border-color: var(--accent-line);
-  transform: scale(1.04);
+  background: var(--accent-dim);
+  transform: scale(1.06);
 }
 .read-save-btn.saved {
   color: var(--accent);
@@ -6357,28 +6360,26 @@ footer {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
   cursor: pointer;
-  color: var(--text-muted);
-  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  color: rgba(255,255,255,0.2);
+  transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.15s;
   flex-shrink: 0;
-  opacity: 0.6;
 }
 .read-dislike-btn:hover {
   color: #e05252;
-  border-color: rgba(224, 82, 82, 0.3);
-  background: rgba(224, 82, 82, 0.06);
-  opacity: 1;
+  border-color: rgba(224, 82, 82, 0.35);
+  background: rgba(224, 82, 82, 0.08);
+  transform: scale(1.06);
 }
 .read-dislike-btn.disliked {
   color: #e05252;
-  border-color: rgba(224, 82, 82, 0.3);
-  background: rgba(224, 82, 82, 0.08);
-  opacity: 1;
+  border-color: rgba(224, 82, 82, 0.35);
+  background: rgba(224, 82, 82, 0.1);
 }
 
 /* Memory callout — "Briefly remembers" box, shown once per digest */

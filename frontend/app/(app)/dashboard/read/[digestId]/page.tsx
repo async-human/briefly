@@ -517,12 +517,21 @@ export default function ReadingPage() {
   const startRef  = useRef(Date.now());
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load digest + streak
+  // Load digest, streak, and persisted save/dislike signals in one shot
   useEffect(() => {
-    Promise.all([api.getDigest(digestId), api.getMe()])
-      .then(([d, me]) => {
+    Promise.all([
+      api.getDigest(digestId),
+      api.getMe(),
+      api.getDigestFeedback(digestId).catch(() => ({} as Record<string, "saved" | "disliked">)),
+    ])
+      .then(([d, me, feedback]) => {
         setDigest(d);
         setStreak(me.reading_streak);
+        // Restore saved/disliked state so stars and thumbs-downs persist across sessions
+        const savedIds  = new Set(Object.entries(feedback).filter(([, v]) => v === "saved").map(([k]) => k));
+        const dislikedIds = new Set(Object.entries(feedback).filter(([, v]) => v === "disliked").map(([k]) => k));
+        if (savedIds.size)    setSaved(savedIds);
+        if (dislikedIds.size) setDisliked(dislikedIds);
         setLoading(false);
       })
       .catch(() => router.replace("/dashboard"));
