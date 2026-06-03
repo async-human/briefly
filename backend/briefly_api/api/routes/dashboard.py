@@ -721,6 +721,17 @@ async def bulk_create_sources(
 
 # ── Behavioral intelligence helper ───────────────────────────────────────────
 
+def _topic_keywords(topic: str) -> set[str]:
+    """Extract match tokens from a declared topic (supports short terms like 'ai')."""
+    normalized = topic.strip().lower().replace("-", " ")
+    keywords: set[str] = set()
+    for word in normalized.split():
+        cleaned = word.strip(".,;:!?\"'()[]")
+        if len(cleaned) >= 2:
+            keywords.add(cleaned)
+    return keywords
+
+
 async def _compute_behavioral_intelligence(
     user_id: str,
     profile,
@@ -740,6 +751,7 @@ async def _compute_behavioral_intelligence(
             DigestItem.headline,
             DigestItem.source_name,
             DigestItem.why_it_matters,
+            DigestItem.summary,
         )
         .join(DigestItem, BehavioralSignal.digest_item_id == DigestItem.id)
         .where(
@@ -785,29 +797,43 @@ async def _compute_behavioral_intelligence(
         if v >= 3
     }
 
-    # Per-declared-topic actual engagement via keyword matching on headlines
+    # Per-declared-topic actual engagement via keyword / phrase matching
     declared_topics = [
-        (i.get("topic") or "").lower()
+        (i.get("topic") or "").strip().lower()
         for i in (profile.interests or [])
         if i.get("topic")
     ]
     declared_word_set: set[str] = set()
     for t in declared_topics:
-        declared_word_set.update(w for w in t.split() if len(w) > 3)
+        declared_word_set.update(_topic_keywords(t))
+
+    def _item_text(s) -> str:
+        return " ".join(
+            filter(None, [s.headline, s.summary, s.why_it_matters, s.source_name])
+        ).lower()
+
+    def _topic_matches(topic: str, text: str) -> bool:
+        topic = topic.strip().lower()
+        if not topic or not text:
+            return False
+        if topic in text:
+            return True
+        keywords = _topic_keywords(topic)
+        if not keywords:
+            return False
+        return any(kw in text for kw in keywords)
 
     topic_actual: dict[str, dict] = {}
     for topic in declared_topics:
-        words = {w for w in topic.split() if len(w) > 3}
-        if not words:
-            continue
         pos = neg = 0
         for s in signals:
-            text = (s.headline or "").lower()
-            if any(w in text for w in words):
-                if s.signal_type in pos_types:
-                    pos += 1
-                else:
-                    neg += 1
+            text = _item_text(s)
+            if not _topic_matches(topic, text):
+                continue
+            if s.signal_type in pos_types:
+                pos += 1
+            elif s.signal_type in neg_types:
+                neg += 1
         tot = pos + neg
         if tot >= 2:
             topic_actual[topic] = {

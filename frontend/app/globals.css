@@ -12478,7 +12478,22 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
 }
 .bk-topic-tile--declared {
   border-color: rgba(158,123,63,0.07);
-  opacity: 0.8;
+  opacity: 0.85;
+}
+.bk-topic-tile--declared::before {
+  display: none;
+}
+.bk-topic-pct--muted {
+  color: var(--text-secondary);
+  font-size: 16px;
+}
+.bk-topic-sub {
+  font-size: 10px;
+  color: var(--text-secondary);
+  opacity: 0.75;
+  position: relative;
+  z-index: 1;
+  line-height: 1.2;
 }
 .bk-topic-pct {
   font-family: var(--serif);

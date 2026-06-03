@@ -90,24 +90,45 @@ function isCleanLabel(s: string) {
 
 // ── Topic tile: animated fill from bottom ────────────────────────────────────
 
+function lookupTopicStrength(strengths: Record<string, number>, topic: string): number {
+  if (strengths[topic] !== undefined) return strengths[topic];
+  const lower = topic.toLowerCase();
+  const match = Object.entries(strengths).find(([k]) => k.toLowerCase() === lower);
+  return match ? match[1] : 0.5;
+}
+
 function TopicTile({
-  topic, pct, isActual, aboveExpectation,
+  topic, pct, isActual, aboveExpectation, sampleTotal,
 }: {
   topic: string;
-  pct: number;
+  pct: number | null;
   isActual: boolean;
   aboveExpectation: boolean | null;
+  sampleTotal?: number;
 }) {
   const variant = !isActual ? "declared"
     : aboveExpectation === true ? "above"
     : "engaged";
+  const fill = pct !== null ? `${pct}%` : "0%";
   return (
     <div
       className={`bk-topic-tile bk-topic-tile--${variant}`}
-      style={{ "--bk-fill": `${pct}%` } as React.CSSProperties}
+      style={{ "--bk-fill": fill } as React.CSSProperties}
+      title={
+        isActual && sampleTotal
+          ? `${pct}% engaged across ${sampleTotal} signals on this topic`
+          : "Open or save stories on this topic to measure engagement"
+      }
     >
-      <span className="bk-topic-pct">{pct}%</span>
+      {isActual && pct !== null ? (
+        <span className="bk-topic-pct">{pct}%</span>
+      ) : (
+        <span className="bk-topic-pct bk-topic-pct--muted">—</span>
+      )}
       <span className="bk-topic-name">{topic}</span>
+      {!isActual && (
+        <span className="bk-topic-sub">Need more signals</span>
+      )}
     </div>
   );
 }
@@ -122,21 +143,28 @@ function BrieflyKnowsCard({
   const stats       = intel.reading_stats ?? { total_digests: 0, avg_open_rate: 0, avg_click_rate: 0 };
   const beh         = intel.behavioral    ?? {};
   const insights    = beh.insights        ?? [];
-  const topicActual = beh.topic_actual    ?? {};
+  const topicActual = beh.topic_actual ?? {};
   const srcEngage   = beh.source_engagement ?? {};
   const emerging    = (beh.emerging_topics ?? []).filter(isCleanLabel).slice(0, 6);
 
-  const hasBehavioral = insights.length > 0 || Object.keys(topicActual).length > 0;
+  const topicsWithEngagement = Object.values(topicActual).filter((t) => (t.total ?? 0) >= 2).length;
+  const hasTopicEngagement = topicsWithEngagement > 0;
 
   const comparisonRows = declared.interests
     .filter(isCleanLabel)
-    .map((t) => ({
-      topic:    t,
-      declared: (intel.topic_strengths ?? {})[t] ?? 0.5,
-      actual:   topicActual[t.toLowerCase()]?.rate ?? null,
-    }))
+    .map((t) => {
+      const key = t.toLowerCase();
+      const actualData = topicActual[key];
+      const hasActual = Boolean(actualData && (actualData.total ?? 0) >= 2);
+      return {
+        topic: t,
+        declared: lookupTopicStrength(intel.topic_strengths ?? {}, t),
+        actual: hasActual ? actualData!.rate : null,
+        sampleTotal: hasActual ? actualData!.total : 0,
+      };
+    })
     .filter((r) => r.declared > 0)
-    .sort((a, b) => (b.actual ?? b.declared) - (a.actual ?? a.declared))
+    .sort((a, b) => (b.actual ?? -1) - (a.actual ?? -1) || b.declared - a.declared)
     .slice(0, 12);
 
   const cleanSources       = (intel.top_sources           ?? []).filter(isCleanLabel);
@@ -213,28 +241,30 @@ function BrieflyKnowsCard({
         <div className="bk-section">
           <div className="bk-section-head-row">
             <p className="bk-section-label">
-              {hasBehavioral ? "Topic engagement" : "Your tracked topics"}
+              {hasTopicEngagement ? "Topic engagement" : "Your tracked topics"}
             </p>
-            {hasBehavioral && (
-              <span className="bk-section-hint">fill height = engagement</span>
+            {hasTopicEngagement && (
+              <span className="bk-section-hint">% = open/save rate on matching stories</span>
             )}
           </div>
-          {!hasBehavioral && (
+          {!hasTopicEngagement && (
             <p className="bk-declared-hint">
-              Open and save stories to see your actual engagement.
+              Open and save stories to see your actual engagement per topic.
             </p>
           )}
           <div className="bk-topics-grid">
-            {comparisonRows.map(({ topic, declared: d, actual: a }) => {
-              const pct  = a !== null ? Math.round(a * 100) : Math.round(d * 100);
-              const diff = a !== null ? Math.round(a * 100) - Math.round(d * 100) : null;
+            {comparisonRows.map(({ topic, declared: d, actual: a, sampleTotal }) => {
+              const hasActual = a !== null;
+              const pct = hasActual ? Math.round(a * 100) : null;
+              const diff = hasActual ? Math.round(a * 100) - Math.round(d * 100) : null;
               return (
                 <TopicTile
                   key={topic}
                   topic={topic}
                   pct={pct}
-                  isActual={a !== null}
+                  isActual={hasActual}
                   aboveExpectation={diff !== null ? diff > 10 : null}
+                  sampleTotal={sampleTotal}
                 />
               );
             })}
