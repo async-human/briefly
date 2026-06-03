@@ -81,6 +81,14 @@ class User(Base):
     email_token: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)  # for catch-all inbox
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Subscription
+    plan: Mapped[str] = mapped_column(String(20), default="free")  # free | pro
+    is_founding_member: Mapped[bool] = mapped_column(Boolean, default=False)
+    ls_customer_id: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    ls_subscription_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    subscribed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

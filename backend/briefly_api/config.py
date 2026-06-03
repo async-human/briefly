@@ -186,6 +186,13 @@ class Settings(BaseSettings):
     # UTC hour to run the weekly analysis
     weekly_intelligence_hour: int = 2
 
+    # ── Lemon Squeezy ─────────────────────────────────────────────────────────
+    lemon_squeezy_webhook_secret: str = ""
+    # Variant IDs — set these after creating products in Lemon Squeezy dashboard
+    ls_founding_variant_id: str = ""   # "Founding Pro" variant ($9/mo)
+    ls_pro_variant_id: str = ""        # "Pro" variant (future price)
+    founding_member_cap: int = 200
+
     # ── Admin ────────────────────────────────────────────────────────────────
     admin_key: str = "change-me-admin-key"
 
