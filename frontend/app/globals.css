@@ -11952,6 +11952,60 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
 }
 .brain-dump-listening-wave:nth-child(2) { animation-delay: 0.15s; height: 26px; }
 .brain-dump-listening-wave:nth-child(3) { animation-delay: 0.3s; height: 14px; }
+.brain-dump-listening-wave:nth-child(4) { animation-delay: 0.45s; height: 22px; }
+.brain-dump-listening-wave:nth-child(5) { animation-delay: 0.6s; height: 16px; }
+.brain-dump-recording-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 220px;
+  padding: 32px 20px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface-elevated, rgba(255, 255, 255, 0.6));
+  border: 1px solid var(--border-subtle, rgba(28, 24, 18, 0.08));
+}
+.brain-dump-recording-ring {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  height: 48px;
+  margin-bottom: 8px;
+}
+.brain-dump-recording-label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.brain-dump-recording-sublabel {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.brain-dump-processing-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 220px;
+  padding: 32px 20px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface-elevated, rgba(255, 255, 255, 0.6));
+  border: 1px solid var(--border-subtle, rgba(28, 24, 18, 0.08));
+}
+.brain-dump-processing-label {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 280px;
+  line-height: 1.5;
+}
 @keyframes brain-dump-wave {
   0%, 100% { transform: scaleY(0.45); opacity: 0.35; }
   50% { transform: scaleY(1); opacity: 0.85; }
@@ -12033,11 +12087,16 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
 }
 .brain-dump-live-committed {
   color: var(--text);
+  transition: color 0.1s ease;
 }
 .brain-dump-live-interim {
   color: var(--text-muted);
+  opacity: 0.72;
   font-style: italic;
-  opacity: 0.88;
+  transition: opacity 0.15s ease;
+}
+.brain-dump-recording-stage-fallback {
+  min-height: 200px;
 }
 .brain-dump-stt-warning {
   margin: -8px 0 14px;
