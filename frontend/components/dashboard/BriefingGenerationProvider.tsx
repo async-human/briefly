@@ -54,9 +54,19 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
   const generatingStartRef = useRef<number>(0);
 
   const pollBriefingUntilDone = useCallback(async (): Promise<{ digest: Digest; warnings: string[] }> => {
-    const maxAttempts = 300;
-    for (let i = 0; i < maxAttempts; i++) {
-      await sleep(2000);
+    const POLL_INTERVAL_MS = 2000;
+    const HARD_TIMEOUT_MS  = 5 * 60 * 1000; // 5 min absolute cap
+    // After 3 min, also check the latest digest directly — the status field
+    // can be stuck at "running" if a late fire-and-forget progress write
+    // overwrote the terminal "complete" state before the race-condition guard
+    // landed in production.
+    const DIGEST_FALLBACK_MS = 3 * 60 * 1000;
+    const startedAt = Date.now();
+
+    while (true) {
+      await sleep(POLL_INTERVAL_MS);
+      const elapsed = Date.now() - startedAt;
+
       const status = await api.getBriefingGenerationStatus();
       if (status.label) {
         setGeneratingLabel(status.label);
@@ -73,14 +83,32 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
       if (status.status === "error") {
         throw new Error(status.error || "Briefing generation failed");
       }
+
+      // After 3 min, bypass the status field and check the digest directly.
+      // This escapes the race condition where stale progress writes stuck the
+      // status at "running" even though the briefing is actually complete.
+      if (elapsed >= DIGEST_FALLBACK_MS) {
+        const latest = await api.getLatestDigest();
+        if (latest) {
+          const digestDate = latest.digest_date;
+          const todayStr = new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD
+          if (digestDate === todayStr) {
+            return { digest: latest, warnings: [] };
+          }
+        }
+      }
+
+      // Hard cap — give up after 5 min and surface an error.
+      if (elapsed >= HARD_TIMEOUT_MS) {
+        const latest = await api.getLatestDigest();
+        if (latest) {
+          return { digest: latest, warnings: [] };
+        }
+        throw new Error(
+          "Briefing is taking longer than expected. Try refreshing in a moment.",
+        );
+      }
     }
-    const latest = await api.getLatestDigest();
-    if (latest) {
-      return { digest: latest, warnings: [] };
-    }
-    throw new Error(
-      "Briefing generation is taking longer than expected. Try refreshing in a moment.",
-    );
   }, []);
 
   const runPollCycle = useCallback(

@@ -306,9 +306,26 @@ _AGENT_PROGRESS_LABELS: dict[str, str] = {
     "DeliveryAgent": "Preparing delivery…",
 }
 
+# Hard per-agent wall-clock limits. An agent that exceeds its budget is
+# cancelled and the pipeline continues with whatever state it had before.
+_AGENT_TIMEOUTS: dict[str, float] = {
+    "SourceCollectorAgent":   60.0,
+    "ContentCleanerAgent":    15.0,
+    "DeduplicationAgent":     15.0,
+    "RelevanceAgent":         30.0,
+    "NoveltyAgent":           15.0,
+    "MemoryAgent":            15.0,
+    "BriefingPlannerAgent":   30.0,
+    "BriefingWriterAgent":    60.0,   # LLM has own 45s inner timeout
+    "BrainDumpInjectorAgent": 15.0,
+    "CitationVerifierAgent":  30.0,
+    "AudioAgent":             30.0,
+    "DeliveryAgent":          30.0,   # Resend has own 20s inner timeout
+}
+
 
 async def _run_agent(name: str, fn, ctx: PipelineContext) -> PipelineContext:
-    """Run a single agent with error isolation and stage timing."""
+    """Run a single agent with error isolation, stage timing, and a hard timeout."""
     label = _AGENT_PROGRESS_LABELS.get(name)
     if label and ctx.user.user_id:
         try:
@@ -325,10 +342,15 @@ async def _run_agent(name: str, fn, ctx: PipelineContext) -> PipelineContext:
         except Exception:
             log.debug("Could not report briefing progress for %s", name, exc_info=True)
 
+    timeout = _AGENT_TIMEOUTS.get(name, 30.0)
     started = time.perf_counter()
     try:
-        log.debug("Running agent: %s", name)
-        ctx = await fn(ctx)
+        log.debug("Running agent: %s (timeout=%.0fs)", name, timeout)
+        ctx = await asyncio.wait_for(fn(ctx), timeout=timeout)
+    except asyncio.TimeoutError:
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
+        log.warning("Agent %s timed out after %dms — skipping", name, elapsed_ms)
+        ctx.log_error(name, f"Agent timed out after {timeout:.0f}s")
     except Exception as e:
         log.exception("Agent %s failed: %s", name, e)
         ctx.log_error(name, str(e))

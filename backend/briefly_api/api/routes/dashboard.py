@@ -426,7 +426,10 @@ async def _briefing_worker(user_id: str) -> None:
                 )
                 return
 
-            digest, warnings = await generate_briefing_now(user, session, get_settings())
+            digest, warnings = await asyncio.wait_for(
+                generate_briefing_now(user, session, get_settings()),
+                timeout=240.0,  # 4-min wall clock — catches hangs the inner 3-min pipeline timeout misses
+            )
             await report_briefing_progress(
                 user_id,
                 status="complete",
@@ -434,6 +437,15 @@ async def _briefing_worker(user_id: str) -> None:
                 label="Briefing ready!",
                 digest_id=digest.id,
                 warnings=warnings,
+            )
+        except asyncio.TimeoutError:
+            log.error("Briefing worker timed out (>4 min) for user %s", user_id)
+            await report_briefing_progress(
+                user_id,
+                status="error",
+                step="error",
+                label="Briefing failed.",
+                error="Briefing took too long to generate. Please try again.",
             )
         except ValueError as exc:
             log.warning("Briefing worker failed for user %s: %s", user_id, exc)
