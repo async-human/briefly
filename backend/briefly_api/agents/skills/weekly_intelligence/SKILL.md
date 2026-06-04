@@ -7,7 +7,7 @@ description: >
   story-thread threshold), coverage_gaps (tracked interests with no recent
   content), depth_trend, current_focus, and weekly_synthesis. Output is
   persisted to BehavioralFingerprint and read by NarrativeSkill.
-model: claude-sonnet-4-5
+model: gpt-4o
 max_tokens: 600
 ---
 

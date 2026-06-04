@@ -7,7 +7,7 @@ description: >
   ContentEnrichmentCache and given to the briefing writer so it can reference
   past reading without re-deriving it under time pressure. Requires full
   context window — runs on a mid-tier model.
-model: claude-sonnet-4-5
+model: gpt-4o
 max_tokens: 200
 ---
 

@@ -37,8 +37,8 @@ class Settings(BaseSettings):
 
     # ── LLM — fully agnostic ─────────────────────────────────────────────────
     # Swap provider + model from .env with zero code changes
-    llm_provider: Literal["anthropic", "openai", "groq"] = "anthropic"
-    llm_model: str = "claude-sonnet-4-5"
+    llm_provider: Literal["anthropic", "openai", "groq"] = "openai"
+    llm_model: str = "gpt-4o-mini"
     llm_temperature: float = 0.3
     llm_max_tokens: int = 4096
 

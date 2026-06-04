@@ -33,6 +33,13 @@ async def report_briefing_progress(
 
         meta = dict(profile.ingestion_meta or {})
         prev = meta.get("briefing_generation") or {}
+
+        # Never let a late-arriving per-agent progress write overwrite a terminal
+        # state that was already committed by _briefing_worker. Fire-and-forget
+        # agent tasks can land after "complete"/"error" is written.
+        if prev.get("status") in ("complete", "error") and status == "running":
+            return
+
         now = datetime.now(timezone.utc).isoformat()
 
         entry: dict = {

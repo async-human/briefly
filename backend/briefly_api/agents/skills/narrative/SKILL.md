@@ -9,7 +9,7 @@ description: >
   ContentEnrichmentCache so it assembles rather than derives from scratch.
   Produces headline, summary, why_it_matters_to_you, memory_reference,
   confidence_signal, evolution_note for every item plus subject_line.
-model: gpt-5-mini
+model: gpt-4o-mini
 max_tokens: 1500
 ---
 

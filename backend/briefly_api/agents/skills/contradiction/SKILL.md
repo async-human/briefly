@@ -6,7 +6,7 @@ description: >
   by ContextBuilderAgent when cosine similarity between items crosses 0.70 —
   the similarity gate avoids running this on unrelated items. Output is cached
   in ContentEnrichmentCache.contradiction_flag. Runs on a fast/cheap model.
-model: gpt-5-mini
+model: gpt-4o-mini
 max_tokens: 120
 ---
 
