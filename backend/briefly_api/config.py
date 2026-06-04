@@ -101,7 +101,7 @@ class Settings(BaseSettings):
     # Medium digest: drop expanded articles older than this (days)
     medium_max_article_age_days: int = 21
     # Medium digest: min cosine similarity (title vs profile) to include a recommendation
-    medium_min_profile_similarity: float = 0.48
+    medium_min_profile_similarity: float = 0.52
     # V1.5 — pre-ingested content pool
     use_preingested_pool: bool = True
     pool_max_age_hours: int = 48

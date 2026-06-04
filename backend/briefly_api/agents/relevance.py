@@ -86,6 +86,10 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         except Exception as exc:
             log.warning("RelevanceAgent: batch pre-embed failed, will embed per-item: %s", exc)
 
+    threshold = s.relevance_threshold
+    if len(items) < s.quality_gate_min_pool:
+        threshold = max(0.45, threshold - 0.08)
+
     scored: list[RawItem] = []
     dropped: list[RawItem] = []
 
@@ -115,6 +119,13 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         )
         final = round(min(1.0, max(0.0, final)), 4)
         item.relevance_score = final
+
+        if final < threshold:
+            item.drop_reason = "low_relevance"
+            dropped.append(item)
+            log.debug("Dropped (low relevance %.2f): %s", final, item.title[:60])
+            continue
+
         scored.append(item)
 
     scored.sort(key=lambda x: x.relevance_score, reverse=True)
@@ -124,8 +135,11 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     ctx.total_after_relevance = len(scored)
 
     log.info(
-        "RelevanceAgent: %d items scored, %d blocked by never-show",
-        len(scored), len(dropped),
+        "RelevanceAgent: %d items passed, %d dropped (never-show=%d, low_relevance=%d)",
+        len(scored),
+        len(dropped),
+        sum(1 for i in dropped if i.drop_reason == "never_show"),
+        sum(1 for i in dropped if i.drop_reason == "low_relevance"),
     )
 
     return ctx

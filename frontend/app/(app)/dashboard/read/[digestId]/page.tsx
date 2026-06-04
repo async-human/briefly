@@ -369,9 +369,10 @@ function CompletionScreen({
                   transition={{ duration: 0.3 }}
                 >
                   <p className="read-more-today-desc">
-                    Briefly caps your daily digest at {digest.items.length} items to keep it
-                    scannable. These {moreToday.length} articles also scored well today — open
-                    any you want to read.
+                    These {moreToday.length} articles matched your interests but didn&apos;t fit
+                    in today&apos;s brief — usually because Briefly limits how many items one
+                    source can contribute. Open any you want; unrelated topics belong in{" "}
+                    <a href="/settings">Preferences → Never show</a>.
                   </p>
                   <div className="read-more-today-list">
                     {moreToday.map((item, i) => (

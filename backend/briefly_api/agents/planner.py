@@ -71,10 +71,19 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     s = get_settings()
     items = ctx.enriched_items
     priority_map = build_priority_map(ctx.user.sources or [])
+    thin_pool = len(items) < s.quality_gate_min_pool
 
     if not items:
         log.warning("BriefingPlannerAgent: no enriched items to plan")
         return ctx
+
+    def source_cap(source_id: str) -> int:
+        cap = max_items_for_source(source_id, priority_map)
+        if thin_pool:
+            # On thin days, don't let per-source caps choke the briefing —
+            # e.g. when Gmail/Medium is the only source with fresh content.
+            return min(s.digest_max_items, cap + 3)
+        return cap
 
     def combined_score(item: RawItem) -> float:
         base = 0.55 * item.relevance_score + 0.25 * item.novelty_score + 0.20 * _recency_component(item)
@@ -84,7 +93,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         return base
 
     def _source_at_cap(source_id: str) -> bool:
-        return source_counts[source_id] >= max_items_for_source(source_id, priority_map)
+        return source_counts[source_id] >= source_cap(source_id)
 
     def _recency_component(item: RawItem) -> float:
         age = _age_days(item)
@@ -135,6 +144,8 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             break
         candidate = group[0]
         min_rel = s.freshness_min_relevance
+        if thin_pool:
+            min_rel = max(0.32, min_rel - 0.08)
         if priority_sort_key(source_id, priority_map) == 0:
             min_rel = max(min_rel, 0.42)
         if candidate.relevance_score < min_rel:
@@ -151,6 +162,8 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             if _source_at_cap(source_id):
                 break
             min_rel = s.freshness_min_relevance
+            if thin_pool:
+                min_rel = max(0.32, min_rel - 0.08)
             if priority_sort_key(source_id, priority_map) == 0:
                 min_rel = max(min_rel, 0.42)
             if candidate.relevance_score < min_rel:
@@ -238,11 +251,12 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     ctx.crowded_out_items = [i for i in items if i.id not in selected_id_set]
 
     log.info(
-        "BriefingPlannerAgent: selected %d (fresh=%d relevant=%d backfill=%d, crowded_out=%d)",
+        "BriefingPlannerAgent: selected %d (fresh=%d relevant=%d backfill=%d, crowded_out=%d, thin_pool=%s)",
         len(ordered),
         len(fresh_items),
         len(relevant_items),
         len(backfill_whats_new) + len(backfill_relevant),
         len(ctx.crowded_out_items),
+        thin_pool,
     )
     return ctx

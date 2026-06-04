@@ -42,7 +42,7 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
 def _title_matches_keywords(title: str, keywords: set[str]) -> bool:
     if not keywords:
-        return True
+        return False
     blob = title.lower()
     return any(kw in blob for kw in keywords)
 
@@ -63,7 +63,8 @@ async def _filter_previews_by_profile(
         return keyword_hits
 
     if not profile_embedding:
-        return previews
+        log.info("medium: no profile embedding — skipping %d off-profile previews", len(previews))
+        return []
 
     try:
         from briefly_api.embeddings.adapter import get_embedding_adapter
@@ -72,8 +73,8 @@ async def _filter_previews_by_profile(
         titles = [p.get("title") or "Medium article" for p in previews]
         title_embs = await embedder.embed_batch(titles)
     except Exception:
-        log.debug("medium: title embedding filter skipped", exc_info=True)
-        return previews
+        log.warning("medium: title embedding filter failed — skipping digest previews", exc_info=True)
+        return []
 
     kept: list[dict[str, str]] = []
     for preview, emb in zip(previews, title_embs):

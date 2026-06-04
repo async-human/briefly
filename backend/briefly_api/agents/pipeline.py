@@ -417,7 +417,12 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
 
     # Good fit but cut for length — these are bonus reading, not rejections
     crowded_out = list(getattr(ctx, "crowded_out_items", []))
-    more_today = sorted(crowded_out, key=lambda i: i.relevance_score, reverse=True)
+    bonus_threshold = get_settings().relevance_threshold
+    more_today = sorted(
+        [i for i in crowded_out if i.relevance_score >= bonus_threshold],
+        key=lambda i: i.relevance_score,
+        reverse=True,
+    )
     more_today_preview = [
         {
             "title":  item.title,

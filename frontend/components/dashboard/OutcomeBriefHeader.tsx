@@ -103,12 +103,10 @@ export function SafeToIgnorePanel({
             <span className="outcome-more-today-heading">
               More from today
               <span className="outcome-more-today-sub">
-                {bonus.length} articles that also scored well — didn&apos;t make today&apos;s {
-                  /* show item cap dynamically */
-                  filteredCount > 0
-                    ? `top ${filteredCount > 0 ? bonus.length + filteredCount : bonus.length} cut`
-                    : "cut"
-                }
+                {bonus.length} on-profile articles that didn&apos;t fit in today&apos;s brief
+                {filteredCount > 0
+                  ? ` (top ${filteredCount + bonus.length} selected)`
+                  : ""}
               </span>
             </span>
             <span className="outcome-more-today-chevron" aria-hidden>
