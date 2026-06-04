@@ -146,24 +146,50 @@
 
 /* ── F2 sticky-scroll stack (Features) ────────────────────────────────── */
 
+.study-linear .features-v2,
+.study-linear .features-v2-inner,
+.study-linear .features-sticky-stack {
+  overflow: visible !important;
+}
+
 .study-linear .features-sticky-stack {
   display: grid;
   grid-template-columns: minmax(260px, 380px) minmax(0, 1fr);
   gap: clamp(32px, 5vw, 64px);
-  align-items: start;
+  align-items: stretch;
+}
+
+/* Column stretches to full row height (all cards); inner pane sticks within it */
+.study-linear .features-sticky-col {
+  min-height: 100%;
 }
 
 .study-linear .features-sticky-pane {
   position: sticky;
   top: calc(var(--landing-nav-h, 80px) + 24px);
-  align-self: start;
   z-index: 2;
+  width: 100%;
 }
 
 .study-linear .features-sticky-pane .section-header-centered {
   margin: 0;
   text-align: left;
   max-width: none;
+}
+
+.study-linear .features-sticky-intro {
+  animation: features-sticky-in var(--liner-dur-reveal) var(--liner-ease-out) both;
+}
+
+@keyframes features-sticky-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .study-linear .features-sticky-pane .section-body {
@@ -174,6 +200,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  padding-bottom: min(12vh, 120px);
 }
 
 .study-linear .features-scroll-item .bento-cell {
@@ -196,6 +223,12 @@
 @media (prefers-reduced-motion: no-preference) {
   .study-linear .landing-reveal {
     --reveal-y: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .study-linear .features-sticky-intro {
+    animation: none;
   }
 }
 
@@ -223,6 +256,11 @@
 @media (max-width: 900px) {
   .study-linear .features-sticky-stack {
     grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .study-linear .features-sticky-col {
+    min-height: 0;
   }
 
   .study-linear .features-sticky-pane {

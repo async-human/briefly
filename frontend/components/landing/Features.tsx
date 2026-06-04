@@ -340,9 +340,9 @@ export function Features() {
     <section className="features-v2 landing-section landing-band-sage" id="features">
       <div className="features-v2-inner landing-section-inner">
         <div className="features-sticky-stack">
-          <aside className="features-sticky-pane">
-            <Reveal>
-              <div className="section-header-centered">
+          <div className="features-sticky-col">
+            <aside className="features-sticky-pane">
+              <div className="section-header-centered features-sticky-intro">
                 <p className="section-eyebrow">In practice</p>
                 <h2 className="section-heading">Four ideas behind every briefing</h2>
                 <p className="section-body">
@@ -350,8 +350,8 @@ export function Features() {
                   Briefly works in the background — and meets you each morning with exactly what matters.
                 </p>
               </div>
-            </Reveal>
-          </aside>
+            </aside>
+          </div>
 
           <div className="features-scroll-pane">
             {features.map((f, i) => (
