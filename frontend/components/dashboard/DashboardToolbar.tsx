@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getTimeGreeting, type TimeGreeting } from "@/lib/greeting";
+import { AppPageHeader } from "./AppPageHeader";
 
 type DashboardToolbarProps = {
   name: string;
@@ -35,68 +36,56 @@ export function DashboardToolbar({
 
   const hasBrief = Boolean(digestId && !generating && (itemCount ?? 0) > 0);
 
+  const stats = !generating
+    ? [
+        ...(itemCount != null
+          ? [{ value: itemCount, label: "In brief" }]
+          : []),
+        ...(savedMinutes != null && savedMinutes > 0
+          ? [{ value: `~${savedMinutes}m`, label: "Saved" }]
+          : []),
+        ...(sourceCount > 0
+          ? [{ value: sourceCount, label: "Sources" }]
+          : []),
+        ...(streak > 0
+          ? [{ value: streak, label: "Day streak", accent: true }]
+          : []),
+      ]
+    : [];
+
   return (
-    <header className="dash-page-header">
-      <div className="dash-page-header-main">
-        <p className="dash-page-eyebrow">{greeting?.briefingLabel ?? "Today"}</p>
-        <h1 className="dash-page-title">
-          {greeting?.label ?? "Hello"}, {name}
-        </h1>
-        <p className="dash-page-subtitle">{dateLabel}</p>
-        {generating && (
+    <AppPageHeader
+      eyebrow={greeting?.briefingLabel ?? "Today"}
+      title={`${greeting?.label ?? "Hello"}, ${name}`}
+      subtitle={dateLabel}
+      status={
+        generating ? (
           <p className="dash-page-status">
             <span className="dash-page-status-dot" aria-hidden />
             Preparing your briefing
           </p>
-        )}
-      </div>
-
-      <div className="dash-page-header-actions">
-        {hasBrief && digestId && (
-          <Link href={`/dashboard/read/${digestId}`} className="dash-btn dash-btn-primary">
-            Open briefing
-          </Link>
-        )}
-        {onRefresh && sourceCount > 0 && (
-          <button
-            type="button"
-            className="dash-btn dash-btn-secondary"
-            onClick={onRefresh}
-            disabled={generating}
-          >
-            {generating ? "Refreshing…" : "Refresh"}
-          </button>
-        )}
-      </div>
-
-      {!generating && (itemCount != null || sourceCount > 0 || streak > 0) && (
-        <ul className="dash-stat-row" aria-label="Summary">
-          {itemCount != null && (
-            <li className="dash-stat-chip">
-              <span className="dash-stat-value">{itemCount}</span>
-              <span className="dash-stat-label">In brief</span>
-            </li>
+        ) : undefined
+      }
+      actions={
+        <>
+          {hasBrief && digestId && (
+            <Link href={`/dashboard/read/${digestId}`} className="dash-btn dash-btn-primary">
+              Open briefing
+            </Link>
           )}
-          {savedMinutes != null && savedMinutes > 0 && (
-            <li className="dash-stat-chip">
-              <span className="dash-stat-value">~{savedMinutes}m</span>
-              <span className="dash-stat-label">Saved</span>
-            </li>
+          {onRefresh && sourceCount > 0 && (
+            <button
+              type="button"
+              className="dash-btn dash-btn-secondary"
+              onClick={onRefresh}
+              disabled={generating}
+            >
+              {generating ? "Refreshing…" : "Refresh"}
+            </button>
           )}
-          {sourceCount > 0 && (
-            <li className="dash-stat-chip">
-              <span className="dash-stat-value">{sourceCount}</span>
-              <span className="dash-stat-label">Sources</span>
-            </li>
-          )}
-          {streak > 0 && (
-            <li className="dash-stat-chip dash-stat-chip-accent">
-              <span className="dash-stat-value">{streak}</span>
-              <span className="dash-stat-label">Day streak</span>
-            </li>
-          )}
-        </ul>
-      )}
-    </header>
+        </>
+      }
+      stats={stats}
+    />
   );
 }

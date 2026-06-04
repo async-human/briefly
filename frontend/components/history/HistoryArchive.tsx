@@ -185,7 +185,7 @@ function DigestReader({
       )}
 
       <div className="history-reader-footer">
-        <Link href={`/dashboard/read/${digest.id}`} className="history-read-mode-link">
+        <Link href={`/dashboard/read/${digest.id}`} className="dash-btn dash-btn-primary">
           Open in reading mode
         </Link>
       </div>

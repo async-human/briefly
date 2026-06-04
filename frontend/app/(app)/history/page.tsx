@@ -4,57 +4,21 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type DigestSummary } from "@/lib/api";
+import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { HistoryArchive } from "@/components/history/HistoryArchive";
 import { getToken } from "@/lib/auth";
 
 function HistorySkeleton() {
   return (
-    <>
-      <div className="dash-skeleton-hero dash-skeleton-hero-v2">
-        <div className="dash-skeleton-hero-main">
-          <span className="skeleton-block" style={{ width: 60, height: 10, display: "block" }} />
-          <span className="skeleton-block" style={{ width: 200, height: 34, display: "block", marginTop: 10 }} />
-          <span className="skeleton-block" style={{ width: 120, height: 13, display: "block", marginTop: 10 }} />
-        </div>
-        <div className="dash-skeleton-hero-stats">
-          {[1, 2].map((i) => (
-            <div key={i} className="dash-skeleton-stat">
-              <span className="skeleton-block" style={{ width: 28, height: 28, display: "block" }} />
-              <span className="skeleton-block" style={{ width: 52, height: 11, display: "block", marginTop: 6 }} />
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="history-skeleton-shell">
-        <div className="history-skeleton-rail">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="history-skeleton-day">
-              <span className="skeleton-block" style={{ width: 80, height: 10, display: "block" }} />
-              <span className="skeleton-block" style={{ width: "85%", height: 13, display: "block", marginTop: 8 }} />
-              <span className="skeleton-block" style={{ width: "65%", height: 13, display: "block", marginTop: 8 }} />
-              <span className="skeleton-block" style={{ width: 60, height: 10, display: "block", marginTop: 8 }} />
-            </div>
-          ))}
-        </div>
-        <div className="history-skeleton-detail">
-          <div className="history-skeleton-detail-head">
-            <span className="skeleton-block" style={{ width: 220, height: 11, display: "block" }} />
-          </div>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="history-skeleton-item">
-              <span className="skeleton-block" style={{ width: 24, height: 14, display: "block", flexShrink: 0 }} />
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 9 }}>
-                <span className="skeleton-block" style={{ width: "45%", height: 10, display: "block" }} />
-                <span className="skeleton-block" style={{ width: "80%", height: 17, display: "block" }} />
-                <span className="skeleton-block" style={{ width: "65%", height: 17, display: "block" }} />
-                <span className="skeleton-block" style={{ width: "92%", height: 13, display: "block" }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
+    <div className="dash-page">
+      <header className="dash-page-header dash-page-header-skeleton">
+        <span className="skeleton-block" style={{ width: 72, height: 12, display: "block" }} />
+        <span className="skeleton-block" style={{ width: 220, height: 32, display: "block", marginTop: 12 }} />
+        <span className="skeleton-block" style={{ width: 160, height: 14, display: "block", marginTop: 10 }} />
+      </header>
+      <div className="dash-surface dash-surface-history" style={{ minHeight: 480 }} />
+    </div>
   );
 }
 
@@ -84,57 +48,67 @@ export default function HistoryPage() {
 
   return (
     <DashboardShell userName={me?.name ?? null} avatarUrl={me?.avatar_url}>
-        {loading ? (
-          <HistorySkeleton />
-        ) : (
-          <>
-            <header className="dash-hero dash-hero-v2 history-page-hero">
-              <div className="dash-hero-main">
-                <p className="dash-hero-label">Archive</p>
-                <h1 className="dash-hero-title">Past briefings</h1>
-                <p className="dash-hero-date">
-                  {digests.length > 0
-                    ? `${digests.length} day${digests.length !== 1 ? "s" : ""} saved`
-                    : "Your reading history lives here"}
-                </p>
-              </div>
-              {digests.length > 0 && (
-                <ul className="dash-hero-stats" aria-label="Archive summary">
-                  <li>
-                    <span className="dash-hero-stat-value">{digests.length}</span>
-                    <span className="dash-hero-stat-label">briefings</span>
-                  </li>
-                  <li>
-                    <span className="dash-hero-stat-value">{totalItems}</span>
-                    <span className="dash-hero-stat-label">items read</span>
-                  </li>
-                </ul>
-              )}
-            </header>
+      {loading ? (
+        <HistorySkeleton />
+      ) : (
+        <div className="dash-page">
+          <AppPageHeader
+            eyebrow="History"
+            title="Past briefings"
+            subtitle={
+              digests.length > 0
+                ? `${digests.length} saved briefing${digests.length !== 1 ? "s" : ""} — pick a day to read`
+                : "Your reading archive will appear here after your first brief"
+            }
+            stats={
+              digests.length > 0
+                ? [
+                    { value: digests.length, label: "Briefings" },
+                    { value: totalItems, label: "Items" },
+                  ]
+                : undefined
+            }
+            actions={
+              <Link href="/dashboard" className="dash-btn dash-btn-secondary">
+                Today
+              </Link>
+            }
+          />
 
-            {digests.length === 0 ? (
-              <div className="history-empty">
-                <div className="briefing-empty-icon">
-                  <span className="briefing-empty-ring" />
-                </div>
-                <h2 className="briefing-empty-title">No past briefings yet</h2>
-                <p className="briefing-empty-desc">
-                  Generate your first briefing from Today&apos;s dashboard — each day you refresh,
-                  a new entry appears here.
+          {digests.length === 0 ? (
+            <div className="dash-surface dash-surface-empty">
+              <div className="dash-empty-state">
+                <h2 className="dash-empty-title">No past briefings yet</h2>
+                <p className="dash-empty-desc">
+                  Generate your first briefing from Today — each day you refresh, a new entry
+                  appears here.
                 </p>
-                <Link href="/dashboard" className="btn-primary history-empty-cta">
+                <Link href="/dashboard" className="dash-btn dash-btn-primary">
                   Go to Today
                 </Link>
               </div>
-            ) : (
-              <HistoryArchive
-                digests={digests}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-              />
-            )}
-          </>
-        )}
+            </div>
+          ) : (
+            <div className="dash-surface dash-surface-history">
+              <div className="dash-surface-head dash-surface-head-inline">
+                <div>
+                  <h2 className="dash-surface-title">Archive</h2>
+                  <p className="dash-surface-desc">
+                    Timeline on the left · full briefing on the right
+                  </p>
+                </div>
+              </div>
+              <div className="dash-surface-body dash-surface-body-flush">
+                <HistoryArchive
+                  digests={digests}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </DashboardShell>
   );
 }

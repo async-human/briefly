@@ -1,27 +1,31 @@
-/* Briefly app UI — Linear / Notion inspired
+/* Briefly app UI — Linear-inspired
  * Sidebar + canvas + elevated surfaces + clear hierarchy
  */
 
 .app-shell {
   --app-sidebar-w: 15.5rem;
-  --app-sidebar-bg: #f7f7f5;
+  --app-sidebar-bg: #f4f5f8;
   --app-canvas: #ffffff;
   --app-surface: #ffffff;
-  --app-surface-muted: #fbfbfa;
-  --app-ink: #37352f;
-  --app-ink-secondary: #6f6e69;
-  --app-muted: #9b9a97;
-  --app-border: rgba(15, 15, 15, 0.08);
-  --app-border-strong: rgba(15, 15, 15, 0.12);
-  --app-accent: #9a7b4f;
-  --app-accent-soft: rgba(154, 123, 79, 0.1);
-  --app-accent-ring: rgba(154, 123, 79, 0.35);
-  --app-focus: #5b8def;
-  --app-radius: 10px;
-  --app-radius-sm: 8px;
-  --app-shadow-surface: 0 1px 2px rgba(15, 15, 15, 0.04), 0 0 0 1px var(--app-border);
+  --app-surface-muted: #f9f9fb;
+  --app-ink: #1f2328;
+  --app-ink-secondary: #6b6f76;
+  --app-muted: #8a8f98;
+  --app-border: rgba(31, 35, 40, 0.08);
+  --app-border-strong: rgba(31, 35, 40, 0.14);
+  --app-linear: #5e6ad2;
+  --app-linear-soft: rgba(94, 106, 210, 0.1);
+  --app-linear-ring: rgba(94, 106, 210, 0.35);
+  --app-accent: #5e6ad2;
+  --app-accent-soft: rgba(94, 106, 210, 0.1);
+  --app-accent-ring: rgba(94, 106, 210, 0.35);
+  --app-brand: #9a7b4f;
+  --app-focus: #5e6ad2;
+  --app-radius: 8px;
+  --app-radius-sm: 6px;
+  --app-shadow-surface: 0 1px 2px rgba(31, 35, 40, 0.04), 0 0 0 1px var(--app-border);
   --app-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --app-dur: 180ms;
+  --app-dur: 160ms;
 
   /* Map legacy dash tokens */
   --bg: var(--app-canvas);
@@ -122,14 +126,14 @@
 }
 
 .app-sidebar-link:hover {
-  background: rgba(15, 15, 15, 0.05);
+  background: rgba(31, 35, 40, 0.05);
   color: var(--app-ink);
 }
 
 .app-sidebar-link.is-active {
   background: var(--app-canvas);
   color: var(--app-ink);
-  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.06);
+  box-shadow: 0 0 0 1px var(--app-border), 0 1px 2px rgba(31, 35, 40, 0.05);
 }
 
 .app-sidebar-link-icon {
@@ -141,7 +145,7 @@
 }
 
 .app-sidebar-link.is-active .app-sidebar-link-icon {
-  color: var(--app-accent);
+  color: var(--app-linear);
 }
 
 .app-sidebar-link-icon svg {
@@ -343,7 +347,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--app-accent);
+  background: var(--app-linear);
   animation: dash-pulse 1.4s ease-in-out infinite;
 }
 
@@ -377,12 +381,12 @@
 
 .dash-btn-primary {
   border: none;
-  background: var(--app-ink);
+  background: var(--app-linear);
   color: #fff;
 }
 
 .dash-btn-primary:hover {
-  opacity: 0.9;
+  filter: brightness(1.06);
 }
 
 .dash-btn-secondary {
@@ -424,8 +428,8 @@
 }
 
 .dash-stat-chip-accent {
-  border-color: color-mix(in srgb, var(--app-accent) 30%, var(--app-border));
-  background: var(--app-accent-soft);
+  border-color: color-mix(in srgb, var(--app-linear) 28%, var(--app-border));
+  background: var(--app-linear-soft);
 }
 
 .dash-stat-value {
@@ -506,7 +510,7 @@
 }
 
 .dash-surface-body-flush {
-  padding: 0 1rem 1rem;
+  padding: 0;
 }
 
 .dash-surface-body-flush .dash-card-embedded {
@@ -620,7 +624,7 @@
 }
 
 .app-shell .briefing-preview-cta:hover {
-  color: var(--app-accent);
+  color: var(--app-linear);
 }
 
 .app-shell .bgl-panel {
@@ -659,7 +663,7 @@
 }
 
 .app-shell .brain-dump-fab:hover {
-  border-color: var(--app-accent-ring);
+  border-color: var(--app-linear-ring);
   transform: translateY(-1px);
 }
 
@@ -668,37 +672,376 @@
   display: none;
 }
 
-/* History / settings pages inside app shell */
-.app-shell .dash-hero-v2,
-.app-shell .history-page-hero {
-  max-width: 72rem;
-  margin: 0 auto;
-  padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1.25rem, 4vw, 2rem) 1rem;
-  border: none;
-  background: transparent;
+/* Shared page layouts */
+.dash-page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.app-shell .dash-hero-label {
-  font-size: 0.75rem;
+.dash-page-settings {
+  max-width: 44rem;
+}
+
+.dash-surface-head-inline {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dash-surface-empty {
+  padding: 3rem 1.5rem;
+}
+
+.dash-empty-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--app-ink);
+}
+
+.dash-empty-desc {
+  margin: 0;
+  max-width: 28rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--app-muted);
+  text-align: center;
+}
+
+.dash-surface-body-form {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.dash-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--app-border);
+  margin-top: 0.25rem;
+}
+
+.dash-saved-badge {
+  font-size: 0.8125rem;
   font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  color: var(--app-linear);
+}
+
+/* Settings form fields inside surfaces */
+.app-shell .dash-surface-settings .settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.app-shell .dash-surface-settings .settings-field-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--app-ink);
+}
+
+.app-shell .dash-surface-settings .settings-field-hint,
+.app-shell .dash-surface-settings .settings-optional {
+  font-size: 0.8125rem;
   color: var(--app-muted);
 }
 
-.app-shell .dash-hero-title {
-  font-family: var(--font-sans), sans-serif;
-  font-size: clamp(1.5rem, 4vw, 2rem);
-  font-weight: 600;
-  letter-spacing: -0.04em;
+.app-shell .dash-surface-settings .onboard-input,
+.app-shell .dash-surface-settings .onboard-textarea,
+.app-shell .dash-surface-settings .onboard-time-input {
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-canvas);
+  color: var(--app-ink);
+  font-family: inherit;
+  font-size: 0.875rem;
 }
 
-.app-shell .history-skeleton-shell,
-.app-shell .history-archive,
-.app-shell .history-empty {
-  max-width: 72rem;
-  margin: 0 auto;
-  padding: 0 clamp(1.25rem, 4vw, 2rem) 2rem;
+.app-shell .dash-surface-settings .onboard-input:focus,
+.app-shell .dash-surface-settings .onboard-textarea:focus {
+  outline: none;
+  border-color: var(--app-linear-ring);
+  box-shadow: 0 0 0 3px var(--app-linear-soft);
+}
+
+.app-shell .dash-surface-settings .onboard-role-pill {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-canvas);
+  color: var(--app-ink-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  transition: background var(--app-dur) var(--app-ease),
+    border-color var(--app-dur) var(--app-ease),
+    color var(--app-dur) var(--app-ease);
+}
+
+.app-shell .dash-surface-settings .onboard-role-pill:hover {
+  background: var(--app-surface-muted);
+  color: var(--app-ink);
+}
+
+.app-shell .dash-surface-settings .onboard-role-pill.selected {
+  border-color: var(--app-linear-ring);
+  background: var(--app-linear-soft);
+  color: var(--app-ink);
+}
+
+.app-shell .dash-surface-settings .tag-input-wrap {
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-canvas);
+}
+
+.app-shell .dash-surface-settings .tag-chip {
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
+  color: var(--app-ink);
+  font-size: 0.8125rem;
+}
+
+.app-shell .dash-surface-settings .tag-suggestion {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-canvas);
+  color: var(--app-ink-secondary);
+  font-size: 0.75rem;
+}
+
+/* Briefly Knows inside surface */
+.dash-surface-knows {
+  overflow: visible;
+}
+
+.dash-surface-body-knows {
+  padding: 0;
+}
+
+.app-shell .dash-surface-knows .bk-card {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 1.25rem;
+  gap: 1.5rem;
+}
+
+.app-shell .dash-surface-knows .bk-eyebrow {
+  font-family: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--app-muted);
+  opacity: 1;
+}
+
+.app-shell .dash-surface-knows .bk-title {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.app-shell .dash-surface-knows .bk-section-label {
+  font-family: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--app-muted);
+}
+
+.app-shell .dash-surface-knows .bk-stat-n {
+  font-family: inherit;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.app-shell .dash-surface-knows .bk-stat--streak .bk-stat-n {
+  color: var(--app-linear);
+}
+
+/* History archive inside surface */
+.dash-surface-history {
+  padding: 0;
+  overflow: hidden;
+}
+
+.dash-surface-history .dash-surface-body-flush {
+  padding: 0;
+}
+
+.app-shell .dash-surface-history .history-shell {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  min-height: 32rem;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+}
+
+.app-shell .dash-surface-history .history-rail-head {
+  display: none;
+}
+
+.app-shell .dash-surface-history .history-rail {
+  border-right: 1px solid var(--app-border);
+  background: var(--app-surface-muted);
+  max-height: min(70vh, 640px);
+  padding: 0.75rem 0.625rem 1rem;
+}
+
+.app-shell .dash-surface-history .history-day-card {
+  border-radius: var(--app-radius-sm);
+  padding: 0.75rem 0.625rem;
+}
+
+.app-shell .dash-surface-history .history-day-card:hover {
+  background: rgba(31, 35, 40, 0.04);
+  border-color: var(--app-border);
+}
+
+.app-shell .dash-surface-history .history-day-card.active {
+  background: var(--app-linear-soft);
+  border-color: color-mix(in srgb, var(--app-linear) 35%, var(--app-border));
+  box-shadow: inset 2px 0 0 var(--app-linear);
+}
+
+.app-shell .dash-surface-history .history-day-num {
+  font-family: inherit;
+  font-size: 1.375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  width: auto;
+  color: var(--app-ink);
+}
+
+.app-shell .dash-surface-history .history-day-relative,
+.app-shell .dash-surface-history .history-reader-relative {
+  font-family: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--app-linear);
+}
+
+.app-shell .dash-surface-history .history-day-weekday,
+.app-shell .dash-surface-history .history-day-month,
+.app-shell .dash-surface-history .history-day-count {
+  font-family: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0;
+}
+
+.app-shell .dash-surface-history .history-day-count {
+  background: var(--app-canvas);
+  border-color: var(--app-border);
+}
+
+.app-shell .dash-surface-history .history-day-preview {
+  font-size: 0.8125rem;
+  color: var(--app-ink-secondary);
+}
+
+.app-shell .dash-surface-history .history-status-pill {
+  font-family: inherit;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--app-muted);
+  background: var(--app-canvas);
+  border-color: var(--app-border);
+}
+
+.app-shell .dash-surface-history .history-reader-panel {
+  max-height: min(70vh, 640px);
+  background: var(--app-canvas);
+}
+
+.app-shell .dash-surface-history .history-reader-header {
+  padding: 1.25rem 1.5rem 1rem;
+  border-bottom-color: var(--app-border);
+}
+
+.app-shell .dash-surface-history .history-reader-title {
+  font-family: inherit;
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.app-shell .dash-surface-history .history-reader-subtitle,
+.app-shell .dash-surface-history .history-reader-count,
+.app-shell .dash-surface-history .history-reader-lede {
+  font-family: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.app-shell .dash-surface-history .history-reader-lede {
+  padding: 0.75rem 1.5rem 0;
+  font-style: normal;
+  color: var(--app-ink-secondary);
+}
+
+.app-shell .dash-surface-history .history-preview-item {
+  padding: 0.875rem 1.5rem;
+  border-bottom-color: var(--app-border);
+}
+
+.app-shell .dash-surface-history .history-preview-index,
+.app-shell .dash-surface-history .history-preview-section {
+  font-family: inherit;
+}
+
+.app-shell .dash-surface-history .history-preview-headline {
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.app-shell .dash-surface-history .history-reader-footer {
+  padding: 1rem 1.5rem 1.25rem;
+  border-top-color: var(--app-border);
+  background: var(--app-surface-muted);
+}
+
+.app-shell .dash-surface-history .history-mobile-back {
+  color: var(--app-linear);
+  font-size: 0.8125rem;
+}
+
+.app-shell .dash-surface-history .history-briefing-item {
+  border-bottom-color: var(--app-border);
+}
+
+@media (max-width: 768px) {
+  .app-shell .dash-surface-history .history-shell {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .app-shell .dash-surface-history .history-shell--detail {
+    background: transparent;
+  }
+
+  .app-shell .dash-surface-history .history-shell--detail .history-reader-panel {
+    border: none;
+    border-radius: 0;
+    background: var(--app-canvas);
+  }
+
+  .app-shell .dash-surface-history .history-rail {
+    max-height: none;
+    border-right: none;
+  }
 }
 
 /* ── Mobile ── */

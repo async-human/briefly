@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type ProfileIntelligence } from "@/lib/api";
+import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { getToken } from "@/lib/auth";
 
@@ -386,23 +387,29 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="settings-section">
-      <div className="settings-section-head">
-        <h2 className="settings-section-title">{title}</h2>
-        {description && <p className="settings-section-desc">{description}</p>}
+    <div className="dash-surface dash-surface-settings">
+      <div className="dash-surface-head">
+        <h2 className="dash-surface-title">{title}</h2>
+        {description ? <p className="dash-surface-desc">{description}</p> : null}
       </div>
-      <div className="settings-section-body">
+      <div className="dash-surface-body dash-surface-body-form">
         {children}
-        <div className="settings-save-row">
+        <div className="dash-form-actions">
           <button
             type="button"
-            className="btn-primary settings-save-btn"
+            className="dash-btn dash-btn-primary"
             onClick={onSave}
             disabled={saving}
           >
-            {saving ? <><span className="btn-spinner btn-spinner-light" /> Saving…</> : "Save"}
+            {saving ? (
+              <>
+                <span className="btn-spinner btn-spinner-light" aria-hidden /> Saving…
+              </>
+            ) : (
+              "Save"
+            )}
           </button>
-          {saved && <span className="settings-saved-badge">✓ Saved</span>}
+          {saved && <span className="dash-saved-badge">Saved</span>}
         </div>
       </div>
     </div>
@@ -413,18 +420,9 @@ function Section({
 
 function SettingsSkeleton() {
   return (
-    <div className="settings-page">
+    <div className="dash-page-stack">
       {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="settings-section">
-          <div className="settings-section-head">
-            <span className="skeleton-block" style={{ width: 120, height: 18, marginBottom: 8 }} />
-            <span className="skeleton-block" style={{ width: "70%", height: 13 }} />
-          </div>
-          <div className="settings-section-body">
-            <span className="skeleton-block" style={{ width: "100%", height: 44, marginBottom: 12 }} />
-            <span className="skeleton-block" style={{ width: 64, height: 36 }} />
-          </div>
-        </div>
+        <div key={i} className="dash-surface" style={{ minHeight: 140 }} />
       ))}
     </div>
   );
@@ -538,21 +536,29 @@ export default function SettingsPage() {
 
   return (
     <DashboardShell userName={me?.name ?? null} avatarUrl={me?.avatar_url}>
-        <header className="dash-hero dash-hero-v2">
-          <div className="dash-hero-main">
-            <p className="dash-hero-label">Account</p>
-            <h1 className="dash-hero-title">Preferences</h1>
-            <p className="dash-hero-date">Adjust how Briefly works for you</p>
-          </div>
-        </header>
+      <div className="dash-page dash-page-settings">
+        <AppPageHeader
+          eyebrow="Settings"
+          title="Preferences"
+          subtitle="Adjust how Briefly works for you"
+          stats={
+            streak > 0
+              ? [{ value: streak, label: "Day streak", accent: true }]
+              : undefined
+          }
+        />
 
         {loading ? (
           <SettingsSkeleton />
         ) : (
-          <div className="settings-page">
-
-            {/* ── What Briefly knows ── */}
-            {intel && <BrieflyKnowsCard intel={intel} streak={streak} declared={declaredProfile} />}
+          <div className="dash-page-stack">
+            {intel && (
+              <div className="dash-surface dash-surface-knows">
+                <div className="dash-surface-body dash-surface-body-knows">
+                  <BrieflyKnowsCard intel={intel} streak={streak} declared={declaredProfile} />
+                </div>
+              </div>
+            )}
 
             {/* ── Profile ── */}
             <Section
@@ -664,9 +670,9 @@ export default function SettingsPage() {
                 </p>
               </div>
             </Section>
-
           </div>
         )}
+      </div>
     </DashboardShell>
   );
 }
