@@ -33,20 +33,21 @@ function SkeletonBlock({ w, h, mb = 0 }: { w: number | string; h: number; mb?: n
 
 function DashboardSkeleton() {
   return (
-    <>
-      <div className="dash-toolbar dash-toolbar-skeleton">
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <SkeletonBlock w={120} h={10} />
-          <SkeletonBlock w={280} h={28} />
+    <div className="dash-page">
+      <header className="dash-page-header dash-page-header-skeleton">
+        <SkeletonBlock w={80} h={12} mb={12} />
+        <SkeletonBlock w={280} h={32} mb={8} />
+        <SkeletonBlock w={200} h={16} />
+      </header>
+      <div className="dash-page-grid">
+        <div className="dash-surface dash-surface-briefing">
+          <div style={{ minHeight: 360 }} />
+        </div>
+        <div className="dash-surface dash-surface-sources">
+          <div style={{ minHeight: 240 }} />
         </div>
       </div>
-      <div className="dash-skeleton-grid dash-layout-v3">
-        <div className="briefing-panel dash-main-col" style={{ overflow: "hidden", minHeight: 360 }} />
-        <aside className="dash-aside-col" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="dash-card" style={{ minHeight: 180 }} />
-        </aside>
-      </div>
-    </>
+    </div>
   );
 }
 
@@ -70,9 +71,7 @@ function DashboardContent() {
   const [showDiscovery, setShowDiscovery] = useState(false);
   const [error, setError] = useState("");
   const [connectBanner, setConnectBanner] = useState<string | null>(null);
-  const [showSources, setShowSources] = useState(false);
   const [discoveryRunning, setDiscoveryRunning] = useState(false);
-  // In-render guard — prevents double-trigger within one mount lifecycle.
   const autoGenerateChecked = useRef(false);
 
   useEffect(() => {
@@ -146,7 +145,7 @@ function DashboardContent() {
         }
 
         const digestTimezone = meData.profile?.digest_timezone;
-        const hasSources    = sourcesData.some((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
+        const hasSources = sourcesData.some((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
 
         const todayDigestOk =
           todayDigest && !needsBriefingForToday(todayDigest, digestTimezone);
@@ -156,14 +155,11 @@ function DashboardContent() {
           return;
         }
 
-        // localStorage alone is not enough — only skip auto-generate if we also
-        // confirmed today's digest exists (guards against failed prior attempts).
         if (hasBriefingGeneratedToday(meData.user.id, digestTimezone)) {
           clearBriefingGeneratedToday(meData.user.id);
         }
 
         if (genStatus?.status === "running") {
-          // Resume polling; provider restarts a zombie worker after ~3 min.
           ensureBriefing();
           return;
         }
@@ -245,9 +241,11 @@ function DashboardContent() {
 
   if (discoveryRunning) {
     return (
-      <div className="outcome-discovery-loading">
-        <span className="btn-spinner" aria-hidden />
-        <p>Briefly is learning your sources — your first brief is on the way…</p>
+      <div className="dash-page dash-page-centered">
+        <div className="dash-empty-state">
+          <span className="btn-spinner" aria-hidden />
+          <p>Briefly is learning your sources — your first brief is on the way…</p>
+        </div>
       </div>
     );
   }
@@ -265,7 +263,7 @@ function DashboardContent() {
   }
 
   return (
-    <>
+    <div className="dash-page">
       <DashboardToolbar
         name={greeting}
         dateLabel={today}
@@ -278,25 +276,50 @@ function DashboardContent() {
         onRefresh={runGenerate}
       />
 
-      <div className="dash-layout-v3">
-        <div className="dash-main-col">
+      <div className="dash-page-grid">
+        <section className="dash-surface dash-surface-briefing" aria-labelledby="briefing-surface-title">
+          <div className="dash-surface-head">
+            <div>
+              <h2 id="briefing-surface-title" className="dash-surface-title">
+                Today&apos;s briefing
+              </h2>
+              <p className="dash-surface-desc">
+                Curated stories ranked by relevance — open any item for the full read.
+              </p>
+            </div>
+          </div>
+          <div className="dash-surface-body">
             <BriefingPanel
-            digest={digest}
-            sources={fetchableSources}
-            sourcesCount={fetchableSources.length}
-            generating={generating}
-            generatingLabel={generatingLabel}
-            generatingElapsedSec={generatingElapsedSec}
-            generateError={generateError}
-            generateWarnings={generateWarnings}
-            onRegenerate={() => {
-              if (me) clearBriefingGeneratedToday(me.user.id);
-              runGenerate();
-            }}
-          />
-        </div>
-        <aside className="dash-aside-col">
-          {showSources ? (
+              digest={digest}
+              sources={fetchableSources}
+              sourcesCount={fetchableSources.length}
+              generating={generating}
+              generatingLabel={generatingLabel}
+              generatingElapsedSec={generatingElapsedSec}
+              generateError={generateError}
+              generateWarnings={generateWarnings}
+              onRegenerate={() => {
+                if (me) clearBriefingGeneratedToday(me.user.id);
+                runGenerate();
+              }}
+            />
+          </div>
+        </section>
+
+        <aside className="dash-surface dash-surface-sources" aria-labelledby="sources-surface-title">
+          <div className="dash-surface-head">
+            <div>
+              <h2 id="sources-surface-title" className="dash-surface-title">
+                Sources
+              </h2>
+              <p className="dash-surface-desc">
+                {fetchableSources.length > 0
+                  ? `${fetchableSources.length} connected — Briefly reads these in the background`
+                  : "Connect where Briefly finds your newsletters and feeds"}
+              </p>
+            </div>
+          </div>
+          <div className="dash-surface-body dash-surface-body-flush">
             <SourcesSidebar
               ingestionEmail={me.ingestion_email}
               sources={sources}
@@ -310,25 +333,11 @@ function DashboardContent() {
                 )
               }
               onRediscover={() => void handleRediscover()}
-              onClose={() => setShowSources(false)}
             />
-          ) : (
-            <button
-              type="button"
-              className="outcome-sources-toggle"
-              onClick={() => setShowSources(true)}
-            >
-              <span className="outcome-sources-toggle-label">Sources</span>
-              <span className="outcome-sources-toggle-hint">
-                {fetchableSources.length > 0
-                  ? `${fetchableSources.length} connected`
-                  : "Connect where Briefly reads"}
-              </span>
-            </button>
-          )}
+          </div>
         </aside>
       </div>
-    </>
+    </div>
   );
 }
 

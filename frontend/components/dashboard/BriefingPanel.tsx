@@ -41,7 +41,6 @@ export function SourcesSidebar({
   onSourceRemoved,
   onSourceUpdated,
   onRediscover,
-  onClose,
 }: SourcesSidebarProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [priorityId, setPriorityId] = useState<string | null>(null);
@@ -79,26 +78,13 @@ export function SourcesSidebar({
   const hiddenCount = sources.length - SOURCE_PREVIEW;
 
   return (
-    <aside className="dash-sidebar dash-aside-col">
-      {/* ── Source list — primary focus ── */}
-      <div className="dash-card dash-card-primary">
-        <div className="dash-card-head">
-          <div>
-            <h2 className="dash-card-title">Briefly&apos;s sources</h2>
-            {sources.length > 0 && (
-              <p className="dash-card-desc dash-card-desc-tight">
-                {sources.length} connected · star any to prioritise it
-              </p>
-            )}
-          </div>
-          <div className="dash-card-head-actions">
-            {onClose && (
-              <button type="button" className="outcome-sources-close" onClick={onClose} aria-label="Close sources">
-                ×
-              </button>
-            )}
-          </div>
-        </div>
+    <aside className="dash-sidebar dash-sidebar-embedded">
+      <div className="dash-card dash-card-embedded">
+        {sources.length > 0 && (
+          <p className="dash-sidebar-hint">
+            Star any source to prioritise it in your briefings.
+          </p>
+        )}
 
         {sources.length > 0 && (
           <>
@@ -670,7 +656,7 @@ export function BriefingPanel({
   const moreToday = digest.meta?.more_today;
 
   return (
-    <div className="briefing-panel briefing-panel-outcome">
+    <div className="briefing-panel briefing-panel-outcome briefing-panel-embedded">
       <OutcomeBriefHeader
         outcome={outcome}
         generating={false}

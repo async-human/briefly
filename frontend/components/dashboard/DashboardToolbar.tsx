@@ -36,73 +36,67 @@ export function DashboardToolbar({
   const hasBrief = Boolean(digestId && !generating && (itemCount ?? 0) > 0);
 
   return (
-    <header className="dash-toolbar">
-      <div className="dash-toolbar-intro">
-        <div className="dash-toolbar-heading-row">
-          <h1 className="dash-toolbar-title">
-            {greeting?.label ?? "Hello"}, {name}
-          </h1>
-          <span className="dash-toolbar-date">{dateLabel}</span>
-        </div>
+    <header className="dash-page-header">
+      <div className="dash-page-header-main">
+        <p className="dash-page-eyebrow">{greeting?.briefingLabel ?? "Today"}</p>
+        <h1 className="dash-page-title">
+          {greeting?.label ?? "Hello"}, {name}
+        </h1>
+        <p className="dash-page-subtitle">{dateLabel}</p>
         {generating && (
-          <p className="dash-toolbar-status">
-            <span className="briefing-generating-dot" aria-hidden />
-            Your brief is being prepared
+          <p className="dash-page-status">
+            <span className="dash-page-status-dot" aria-hidden />
+            Preparing your briefing
           </p>
         )}
       </div>
 
-      <div className="dash-toolbar-end">
-        {!generating && (itemCount != null || sourceCount > 0 || streak > 0) && (
-          <p className="dash-toolbar-meta">
-            {itemCount != null && (
-              <span>
-                <strong>{itemCount}</strong>
-                {itemCount === 1 ? " item" : " items"}
-              </span>
-            )}
-            {savedMinutes != null && savedMinutes > 0 && (
-              <span>
-                {itemCount != null ? " · " : ""}
-                ~<strong>{savedMinutes}</strong> min saved
-              </span>
-            )}
-            {sourceCount > 0 && (
-              <span>
-                {(itemCount != null || (savedMinutes != null && savedMinutes > 0)) ? " · " : ""}
-                <strong>{sourceCount}</strong>
-                {sourceCount === 1 ? " source" : " sources"}
-              </span>
-            )}
-            {streak > 0 && (
-              <span>
-                {" · "}
-                <strong>{streak}</strong>-day streak
-                {streak >= 7 ? " 🔥" : ""}
-              </span>
-            )}
-          </p>
+      <div className="dash-page-header-actions">
+        {hasBrief && digestId && (
+          <Link href={`/dashboard/read/${digestId}`} className="dash-btn dash-btn-primary">
+            Open briefing
+          </Link>
         )}
-
-        <div className="dash-toolbar-actions">
-          {hasBrief && digestId && (
-            <Link href={`/dashboard/read/${digestId}`} className="dash-toolbar-primary">
-              Read briefing
-              <span className="dash-toolbar-primary-arrow" aria-hidden>→</span>
-            </Link>
-          )}
-          {onRefresh && sourceCount > 0 && (
-            <button
-              type="button"
-              className="dash-toolbar-secondary"
-              onClick={onRefresh}
-              disabled={generating}
-            >
-              {generating ? "Refreshing…" : "Refresh"}
-            </button>
-          )}
-        </div>
+        {onRefresh && sourceCount > 0 && (
+          <button
+            type="button"
+            className="dash-btn dash-btn-secondary"
+            onClick={onRefresh}
+            disabled={generating}
+          >
+            {generating ? "Refreshing…" : "Refresh"}
+          </button>
+        )}
       </div>
+
+      {!generating && (itemCount != null || sourceCount > 0 || streak > 0) && (
+        <ul className="dash-stat-row" aria-label="Summary">
+          {itemCount != null && (
+            <li className="dash-stat-chip">
+              <span className="dash-stat-value">{itemCount}</span>
+              <span className="dash-stat-label">In brief</span>
+            </li>
+          )}
+          {savedMinutes != null && savedMinutes > 0 && (
+            <li className="dash-stat-chip">
+              <span className="dash-stat-value">~{savedMinutes}m</span>
+              <span className="dash-stat-label">Saved</span>
+            </li>
+          )}
+          {sourceCount > 0 && (
+            <li className="dash-stat-chip">
+              <span className="dash-stat-value">{sourceCount}</span>
+              <span className="dash-stat-label">Sources</span>
+            </li>
+          )}
+          {streak > 0 && (
+            <li className="dash-stat-chip dash-stat-chip-accent">
+              <span className="dash-stat-value">{streak}</span>
+              <span className="dash-stat-label">Day streak</span>
+            </li>
+          )}
+        </ul>
+      )}
     </header>
   );
 }

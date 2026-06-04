@@ -1,6 +1,8 @@
 "use client";
 
-import { DashboardNav } from "./DashboardNav";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { AppSidebar } from "./AppSidebar";
 import { BrainDumpFab } from "./BrainDumpFab";
 
 type DashboardShellProps = {
@@ -10,10 +12,49 @@ type DashboardShellProps = {
 };
 
 export function DashboardShell({ children, userName, avatarUrl }: DashboardShellProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [sidebarOpen]);
+
   return (
-    <div className="dash-shell dash-hallmark">
-      <DashboardNav userName={userName} avatarUrl={avatarUrl} />
-      <main className="dash-main">{children}</main>
+    <div className="app-shell">
+      <AppSidebar
+        userName={userName}
+        avatarUrl={avatarUrl}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+      <div className="app-main">
+        <header className="app-mobile-bar">
+          <button
+            type="button"
+            className="app-mobile-menu"
+            aria-expanded={sidebarOpen}
+            onClick={() => setSidebarOpen(true)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M4 7h16M4 12h16M4 17h16"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span className="sr-only">Open menu</span>
+          </button>
+          <Link href="/dashboard" className="app-mobile-brand" onClick={() => setSidebarOpen(false)}>
+            Briefly
+          </Link>
+        </header>
+        <div className="app-main-scroll">{children}</div>
+      </div>
       <BrainDumpFab />
     </div>
   );

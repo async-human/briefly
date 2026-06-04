@@ -1,0 +1,756 @@
+/* Briefly app UI — Linear / Notion inspired
+ * Sidebar + canvas + elevated surfaces + clear hierarchy
+ */
+
+.app-shell {
+  --app-sidebar-w: 15.5rem;
+  --app-sidebar-bg: #f7f7f5;
+  --app-canvas: #ffffff;
+  --app-surface: #ffffff;
+  --app-surface-muted: #fbfbfa;
+  --app-ink: #37352f;
+  --app-ink-secondary: #6f6e69;
+  --app-muted: #9b9a97;
+  --app-border: rgba(15, 15, 15, 0.08);
+  --app-border-strong: rgba(15, 15, 15, 0.12);
+  --app-accent: #9a7b4f;
+  --app-accent-soft: rgba(154, 123, 79, 0.1);
+  --app-accent-ring: rgba(154, 123, 79, 0.35);
+  --app-focus: #5b8def;
+  --app-radius: 10px;
+  --app-radius-sm: 8px;
+  --app-shadow-surface: 0 1px 2px rgba(15, 15, 15, 0.04), 0 0 0 1px var(--app-border);
+  --app-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --app-dur: 180ms;
+
+  /* Map legacy dash tokens */
+  --bg: var(--app-canvas);
+  --bg-elevated: var(--app-surface-muted);
+  --surface: #f1f1ef;
+  --surface-hover: #ebebea;
+  --border: var(--app-border);
+  --border-strong: var(--app-border-strong);
+  --text: var(--app-ink);
+  --text-secondary: var(--app-ink-secondary);
+  --text-muted: var(--app-muted);
+  --accent: var(--app-accent);
+  --accent-dim: var(--app-accent-soft);
+  --accent-line: var(--app-accent-ring);
+
+  display: grid;
+  grid-template-columns: var(--app-sidebar-w) minmax(0, 1fr);
+  min-height: 100dvh;
+  background: var(--app-canvas);
+  color: var(--app-ink);
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+/* ── Sidebar ── */
+
+.app-sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: rgba(15, 15, 15, 0.32);
+  cursor: pointer;
+}
+
+.app-sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 0.75rem;
+  background: var(--app-sidebar-bg);
+  border-right: 1px solid var(--app-border);
+}
+
+.app-sidebar-brand {
+  padding: 0.25rem 0.5rem 1.25rem;
+}
+
+.app-sidebar-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--app-ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.app-sidebar-mark {
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 6px;
+  background: linear-gradient(145deg, #c4a574 0%, #9a7b4f 100%);
+  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.12);
+  flex-shrink: 0;
+}
+
+.app-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+}
+
+.app-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--app-radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--app-ink-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background var(--app-dur) var(--app-ease),
+    color var(--app-dur) var(--app-ease);
+}
+
+.app-sidebar-link:hover {
+  background: rgba(15, 15, 15, 0.05);
+  color: var(--app-ink);
+}
+
+.app-sidebar-link.is-active {
+  background: var(--app-canvas);
+  color: var(--app-ink);
+  box-shadow: 0 1px 2px rgba(15, 15, 15, 0.06);
+}
+
+.app-sidebar-link-icon {
+  display: flex;
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--app-muted);
+  flex-shrink: 0;
+}
+
+.app-sidebar-link.is-active .app-sidebar-link-icon {
+  color: var(--app-accent);
+}
+
+.app-sidebar-link-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.app-sidebar-link-pip {
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--app-accent);
+  flex-shrink: 0;
+}
+
+.app-sidebar-foot {
+  margin-top: auto;
+  padding: 0.75rem 0.5rem 0.25rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.app-sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  margin-bottom: 0.5rem;
+}
+
+.app-sidebar-avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--app-border);
+}
+
+.app-sidebar-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--app-ink-secondary);
+  background: var(--app-canvas);
+}
+
+.app-sidebar-user-name {
+  font-size: 0.8125rem;
+  color: var(--app-ink-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-sidebar-signout {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-radius: var(--app-radius-sm);
+  background: transparent;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-sidebar-signout:hover {
+  background: rgba(15, 15, 15, 0.05);
+  color: var(--app-ink);
+}
+
+/* ── Main canvas ── */
+
+.app-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--app-canvas);
+}
+
+.app-mobile-bar {
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--app-border);
+  background: var(--app-canvas);
+}
+
+.app-mobile-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-muted);
+  color: var(--app-ink);
+  cursor: pointer;
+}
+
+.app-mobile-menu svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.app-mobile-brand {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--app-ink);
+  text-decoration: none;
+}
+
+.app-main-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.app-shell .dash-main {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Dashboard page ── */
+
+.dash-page {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1.25rem, 4vw, 2rem)
+    clamp(2rem, 6vw, 3rem);
+}
+
+.dash-page-centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+}
+
+.dash-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: var(--app-muted);
+  font-size: 0.9375rem;
+}
+
+/* Page header — Notion-style title block */
+.dash-page-header {
+  display: grid;
+  gap: 1.25rem;
+  margin-bottom: 1.75rem;
+}
+
+.dash-page-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+.dash-page-title {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 2.125rem);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+  color: var(--app-ink);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.dash-page-subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--app-muted);
+}
+
+.dash-page-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+  color: var(--app-ink-secondary);
+}
+
+.dash-page-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--app-accent);
+  animation: dash-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes dash-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.dash-page-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dash-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.375rem;
+  padding: 0 0.875rem;
+  border-radius: var(--app-radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--app-dur) var(--app-ease),
+    border-color var(--app-dur) var(--app-ease),
+    opacity var(--app-dur) var(--app-ease);
+}
+
+.dash-btn-primary {
+  border: none;
+  background: var(--app-ink);
+  color: #fff;
+}
+
+.dash-btn-primary:hover {
+  opacity: 0.9;
+}
+
+.dash-btn-secondary {
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-canvas);
+  color: var(--app-ink-secondary);
+}
+
+.dash-btn-secondary:hover:not(:disabled) {
+  background: var(--app-surface-muted);
+  color: var(--app-ink);
+}
+
+.dash-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Stat chips — Linear-style metrics row */
+.dash-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  grid-column: 1 / -1;
+}
+
+.dash-stat-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 4.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--app-radius-sm);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-muted);
+}
+
+.dash-stat-chip-accent {
+  border-color: color-mix(in srgb, var(--app-accent) 30%, var(--app-border));
+  background: var(--app-accent-soft);
+}
+
+.dash-stat-value {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--app-ink);
+}
+
+.dash-stat-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+@media (min-width: 40rem) {
+  .dash-page-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+
+  .dash-page-header-actions {
+    justify-self: end;
+    padding-top: 1.5rem;
+  }
+}
+
+/* Two-column content grid */
+.dash-page-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 56rem) {
+  .dash-page-grid {
+    grid-template-columns: minmax(0, 1.65fr) minmax(16rem, 1fr);
+    gap: 1rem;
+  }
+}
+
+/* Surfaces — Notion blocks */
+.dash-surface {
+  background: var(--app-surface);
+  border-radius: var(--app-radius);
+  box-shadow: var(--app-shadow-surface);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.dash-surface-head {
+  padding: 1.125rem 1.25rem 0.875rem;
+  border-bottom: 1px solid var(--app-border);
+  background: var(--app-surface-muted);
+}
+
+.dash-surface-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--app-ink);
+}
+
+.dash-surface-desc {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--app-muted);
+}
+
+.dash-surface-body {
+  padding: 0;
+}
+
+.dash-surface-body-flush {
+  padding: 0 1rem 1rem;
+}
+
+.dash-surface-body-flush .dash-card-embedded {
+  border: none;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+
+.dash-sidebar-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+  line-height: 1.45;
+}
+
+/* Briefing panel inside surface */
+.app-shell .briefing-panel-embedded .outcome-brief-header {
+  display: none;
+}
+
+.app-shell .briefing-panel-outcome {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  max-width: none;
+}
+
+.app-shell .briefing-section-head {
+  padding: 1rem 1.25rem 0.5rem;
+  background: var(--app-surface-muted);
+  border-bottom: 1px solid var(--app-border);
+}
+
+.app-shell .briefing-section-badge,
+.app-shell .briefing-section-badge-top,
+.app-shell .briefing-section-badge-fresh,
+.app-shell .briefing-section-badge-relevant,
+.app-shell .briefing-section-badge-thoughts {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--app-ink-secondary);
+}
+
+.app-shell .briefing-section-sub {
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+}
+
+.app-shell .briefing-preview-item {
+  padding: 0.875rem 1.25rem;
+  gap: 1rem;
+  border-bottom: 1px solid var(--app-border);
+  transition: background var(--app-dur) var(--app-ease);
+}
+
+.app-shell .briefing-preview-link:hover,
+.app-shell .briefing-preview-item:hover {
+  background: var(--app-surface-muted);
+}
+
+.app-shell .briefing-preview-index {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--app-muted);
+}
+
+.app-shell .briefing-preview-meta {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 0.75rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--app-muted);
+}
+
+.app-shell .briefing-preview-headline {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
+}
+
+.app-shell .briefing-preview-why {
+  font-size: 0.8125rem;
+  color: var(--app-ink-secondary);
+  line-height: 1.5;
+}
+
+.app-shell .briefing-preview-footer {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--app-border);
+  background: var(--app-surface-muted);
+}
+
+.app-shell .briefing-preview-cta {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--app-ink);
+}
+
+.app-shell .briefing-preview-cta:hover {
+  color: var(--app-accent);
+}
+
+.app-shell .bgl-panel {
+  padding: 1.25rem;
+}
+
+.app-shell .bgl-panel-header {
+  border-bottom-color: var(--app-border);
+}
+
+.app-shell .dash-collapsible {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  margin-top: 0.75rem;
+  background: var(--app-surface-muted);
+}
+
+/* Sources list */
+.app-shell .source-list-connected .source-list-item {
+  border-bottom: 1px solid var(--app-border);
+}
+
+.app-shell .dash-sidebar-footnote {
+  font-size: 0.75rem;
+  color: var(--app-muted);
+}
+
+/* Brain dump FAB */
+.app-shell .brain-dump-fab {
+  right: max(1.25rem, env(safe-area-inset-right));
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-canvas);
+  box-shadow: 0 4px 20px rgba(15, 15, 15, 0.08);
+  font-size: 0.8125rem;
+}
+
+.app-shell .brain-dump-fab:hover {
+  border-color: var(--app-accent-ring);
+  transform: translateY(-1px);
+}
+
+/* Hide legacy top nav if present */
+.app-shell .dash-nav {
+  display: none;
+}
+
+/* History / settings pages inside app shell */
+.app-shell .dash-hero-v2,
+.app-shell .history-page-hero {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1.25rem, 4vw, 2rem) 1rem;
+  border: none;
+  background: transparent;
+}
+
+.app-shell .dash-hero-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+.app-shell .dash-hero-title {
+  font-family: var(--font-sans), sans-serif;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+.app-shell .history-skeleton-shell,
+.app-shell .history-archive,
+.app-shell .history-empty {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 clamp(1.25rem, 4vw, 2rem) 2rem;
+}
+
+/* ── Mobile ── */
+@media (max-width: 56rem) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 90;
+    width: min(var(--app-sidebar-w), 88vw);
+    transform: translateX(-100%);
+    transition: transform var(--app-dur) var(--app-ease);
+    box-shadow: none;
+  }
+
+  .app-sidebar.is-open {
+    transform: translateX(0);
+    box-shadow: 8px 0 32px rgba(15, 15, 15, 0.12);
+  }
+
+  .app-sidebar-backdrop.is-visible {
+    display: block;
+  }
+
+  .app-mobile-bar {
+    display: flex;
+  }
+
+  .dash-page-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-page-header-actions {
+    padding-top: 0;
+    width: 100%;
+  }
+
+  .dash-page-header-actions .dash-btn {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-page-status-dot {
+    animation: none;
+  }
+
+  .app-sidebar {
+    transition: none;
+  }
+}

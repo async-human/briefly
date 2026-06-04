@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Playfair_Display, DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
-import "../styles/hallmark-dashboard.css";
+import "../styles/app-dashboard.css";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
