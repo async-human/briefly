@@ -14,7 +14,7 @@ const SOURCES = [
 
 export function SourcesStrip() {
   return (
-    <div className="sources-strip">
+    <div className="sources-strip landing-band-base">
       <Reveal>
         <p className="sources-strip-label">Works with what you already follow</p>
         <div className="sources-strip-icons">

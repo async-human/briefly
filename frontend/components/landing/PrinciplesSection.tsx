@@ -59,9 +59,9 @@ function PrincipleRow({
     <motion.li
       ref={ref}
       className="principle-row"
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.5, delay: index * 0.05, ease: EASE }}
+      transition={{ duration: 0.42, delay: Math.min(index * 0.05, 0.25), ease: EASE }}
     >
       <span className="principle-num" aria-hidden>
         {principle.num}
@@ -79,7 +79,7 @@ function PrincipleRow({
 
 export function PrinciplesSection() {
   return (
-    <section className="principles-section landing-section" id="why">
+    <section className="principles-section landing-section landing-band-warm" id="why">
       <div className="landing-section-inner principles-inner">
         <Reveal>
           <div className="section-header-centered">

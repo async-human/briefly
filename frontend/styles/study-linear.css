@@ -353,7 +353,7 @@ body[data-landing-theme="light"].study-linear-body {
 
 .study-linear .landing-section {
   padding: 88px 64px;
-  border-top: 1px solid var(--border);
+  border-top: none;
 }
 
 .study-linear .section-header-centered {
@@ -508,7 +508,7 @@ body[data-landing-theme="light"].study-linear-body {
 
 .study-linear .cta-linear {
   padding: 0;
-  border-top: 1px solid var(--border);
+  border-top: none;
 }
 
 .study-linear .cta-linear-inner {

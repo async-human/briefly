@@ -1,0 +1,259 @@
+/* Hallmark · studied-DNA overlay · source: https://liner.com/
+ * bands: semantic tints · motion: fade-up 8px · layout: F2 sticky-scroll
+ */
+
+.study-linear {
+  --liner-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --liner-ease-material: cubic-bezier(0.4, 0, 0.2, 1);
+  --liner-dur-reveal: 420ms;
+  --liner-divider: oklch(52% 0.14 275 / 0.14);
+}
+
+.study-linear[data-theme="light"] {
+  --band-base: oklch(99% 0.004 270);
+  --band-cool: oklch(94% 0.028 250 / 0.38);
+  --band-warm: oklch(95% 0.022 95 / 0.38);
+  --band-sage: oklch(94% 0.024 155 / 0.32);
+  --band-mint: oklch(95% 0.03 275 / 0.55);
+  --band-accent: oklch(93% 0.035 275 / 0.65);
+  --band-card: oklch(97% 0.008 270 / 0.55);
+  --band-card-mid: oklch(94% 0.012 270 / 0.35);
+}
+
+.study-linear[data-theme="dark"] {
+  --band-base: oklch(14% 0.012 270);
+  --band-cool: oklch(22% 0.03 250 / 0.45);
+  --band-warm: oklch(20% 0.02 95 / 0.35);
+  --band-sage: oklch(19% 0.025 155 / 0.35);
+  --band-mint: oklch(18% 0.028 275 / 0.5);
+  --band-accent: oklch(17% 0.032 275 / 0.65);
+  --band-card: oklch(20% 0.016 270 / 0.7);
+  --band-card-mid: oklch(23% 0.018 270 / 0.45);
+}
+
+/* ── Semantic section bands ───────────────────────────────────────────── */
+
+.study-linear .landing-band-base {
+  background: var(--band-base);
+  border-top: 0.5px solid var(--liner-divider);
+}
+
+.study-linear .landing-band-cool {
+  background: var(--band-cool);
+  border-top: 0.5px solid var(--liner-divider);
+  border-bottom: 0.5px solid var(--liner-divider);
+}
+
+.study-linear .landing-band-warm {
+  background: var(--band-warm);
+  border-top: 0.5px solid var(--liner-divider);
+  border-bottom: 0.5px solid var(--liner-divider);
+}
+
+.study-linear .landing-band-sage {
+  background: var(--band-sage);
+  border-top: 0.5px solid var(--liner-divider);
+  border-bottom: 0.5px solid var(--liner-divider);
+}
+
+.study-linear .landing-band-mint {
+  background: var(--band-mint);
+  border-top: 0.5px solid var(--liner-divider);
+  border-bottom: 0.5px solid var(--liner-divider);
+}
+
+.study-linear .landing-band-accent {
+  background: var(--band-accent);
+  border-top: 0.5px solid var(--liner-divider);
+}
+
+.study-linear .hero-linear.landing-band-base {
+  border-top: none;
+  border-bottom: 0.5px solid var(--liner-divider);
+}
+
+.study-linear .sources-strip.landing-band-base {
+  padding: 56px 64px;
+  border-top: none;
+  border-bottom: 0.5px solid var(--liner-divider);
+}
+
+/* Override globals amber dividers when liner bands active */
+.study-linear .landing-section,
+.study-linear .livedemo-section,
+.study-linear .features-v2,
+.study-linear .principles-section,
+.study-linear .roadmap-section,
+.study-linear .pricing-v2,
+.study-linear .cta-linear {
+  border-top: none !important;
+}
+
+.study-linear .landing-section {
+  padding: 88px 64px;
+}
+
+.study-linear .livedemo-section,
+.study-linear .features-v2,
+.study-linear .principles-section,
+.study-linear .roadmap-section,
+.study-linear .pricing-v2 {
+  padding: 88px 64px;
+}
+
+/* Card surfaces within tinted sections */
+.study-linear .landing-band-cool .livedemo-chrome,
+.study-linear .landing-band-sage .bento-card,
+.study-linear .landing-band-warm .principle-row,
+.study-linear .landing-band-mint .pricing-card {
+  background: var(--band-card);
+  border-color: var(--liner-divider);
+}
+
+.study-linear .landing-band-warm .principle-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 20px;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 12px;
+  border: 0.5px solid var(--liner-divider);
+  border-bottom: 0.5px solid var(--liner-divider);
+  background: var(--band-card);
+  transition: background-color 220ms var(--liner-ease-out);
+}
+
+.study-linear .landing-band-warm .principle-row:first-child {
+  padding-top: 20px;
+}
+
+.study-linear .landing-band-warm .principle-row:last-child {
+  margin-bottom: 0;
+  padding-bottom: 20px;
+}
+
+.study-linear .landing-band-warm .principle-row:hover {
+  background: var(--band-card-mid);
+}
+
+.study-linear .landing-band-warm .principles-list {
+  max-width: 720px;
+}
+
+.study-linear .features-v2-ambient {
+  display: none !important;
+}
+
+/* ── F2 sticky-scroll stack (Features) ────────────────────────────────── */
+
+.study-linear .features-sticky-stack {
+  display: grid;
+  grid-template-columns: minmax(260px, 380px) minmax(0, 1fr);
+  gap: clamp(32px, 5vw, 64px);
+  align-items: start;
+}
+
+.study-linear .features-sticky-pane {
+  position: sticky;
+  top: calc(var(--landing-nav-h, 80px) + 24px);
+  align-self: start;
+  z-index: 2;
+}
+
+.study-linear .features-sticky-pane .section-header-centered {
+  margin: 0;
+  text-align: left;
+  max-width: none;
+}
+
+.study-linear .features-sticky-pane .section-body {
+  margin: 0;
+}
+
+.study-linear .features-scroll-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.study-linear .features-scroll-item .bento-cell {
+  width: 100%;
+}
+
+.study-linear .features-scroll-item .bento-cell.bento-large,
+.study-linear .features-scroll-item .bento-cell.bento-wide {
+  grid-column: auto;
+}
+
+.study-linear .features-scroll-pane .bento-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Restrained motion ─────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: no-preference) {
+  .study-linear .landing-reveal {
+    --reveal-y: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .study-linear .landing-reveal {
+    --reveal-y: 0px;
+  }
+}
+
+/* ── Footer gradient edge (Liner learn→faq handoff) ───────────────────── */
+
+.study-linear .cta-linear.landing-band-accent {
+  background: linear-gradient(
+    0deg,
+    var(--band-base) 12%,
+    var(--band-accent) 100%
+  );
+}
+
+.study-linear footer.footer-linear {
+  background: var(--band-base);
+  border-top: 0.5px solid var(--liner-divider);
+}
+
+@media (max-width: 900px) {
+  .study-linear .features-sticky-stack {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .study-linear .features-sticky-pane {
+    position: static;
+  }
+
+  .study-linear .features-sticky-pane .section-header-centered {
+    text-align: center;
+    max-width: 640px;
+    margin: 0 auto 32px;
+  }
+
+  .study-linear .features-sticky-pane .section-body {
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .study-linear .sources-strip.landing-band-base,
+  .study-linear .landing-section,
+  .study-linear .livedemo-section,
+  .study-linear .features-v2,
+  .study-linear .principles-section,
+  .study-linear .roadmap-section,
+  .study-linear .pricing-v2 {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .study-linear .sources-strip.landing-band-base {
+    padding-top: 40px;
+    padding-bottom: 40px;
+  }
+}

@@ -25,12 +25,12 @@ const VALUE_PROPS = [
 
 export function Hero() {
   return (
-    <section className="hero-linear">
+    <section className="hero-linear landing-band-base">
       <motion.div
         className="hero-linear-intro"
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: EASE }}
+        transition={{ duration: 0.42, ease: EASE }}
       >
         <p className="hero-linear-eyebrow">
           <a href="#demo">Morning briefing →</a>
@@ -63,10 +63,10 @@ export function Hero() {
           <motion.div
             key={item.fig}
             className="hero-value-card"
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 8 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-40px" }}
-            transition={{ duration: 0.5, delay: i * 0.08, ease: EASE }}
+            viewport={{ once: true, margin: "-48px" }}
+            transition={{ duration: 0.42, delay: Math.min(i * 0.06, 0.3), ease: EASE }}
           >
             <p className="hero-value-fig">{item.fig}</p>
             <h2 className="hero-value-title">{item.title}</h2>

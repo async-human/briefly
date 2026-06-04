@@ -37,7 +37,7 @@ function Check({ dim }: { dim?: boolean }) {
 
 export function Pricing() {
   return (
-    <section className="pricing-v2" id="pricing">
+    <section className="pricing-v2 landing-section landing-band-mint" id="pricing">
       <div className="pricing-v2-inner">
         <Reveal>
           <div className="section-header-centered">

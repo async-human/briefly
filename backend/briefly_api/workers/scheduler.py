@@ -191,7 +191,6 @@ async def _run_weekly_intelligence() -> None:
     from briefly_api.agents.skills.weekly_intelligence_skill import WeeklyIntelligenceSkill
     from datetime import timedelta
     from sqlalchemy import select as sa_select, update as sa_update
-    from sqlalchemy.orm import flag_modified
 
     s = get_settings()
     if not s.weekly_intelligence_enabled:
@@ -294,8 +293,6 @@ async def _run_weekly_intelligence() -> None:
                     fp.mind_shifts      = wi_result.mind_shifts
                     fp.coverage_gaps    = wi_result.coverage_gaps
                     fp.current_focus    = wi_result.current_focus
-                    flag_modified(fp, "mind_shifts")
-                    flag_modified(fp, "coverage_gaps")
                     await session.flush()
                 else:
                     fp = BehavioralFingerprint(

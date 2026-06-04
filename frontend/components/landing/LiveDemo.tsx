@@ -303,7 +303,7 @@ export function LiveDemo() {
   }, [phase, phaseIdx, paused, goToPhase]);
 
   return (
-    <section className="livedemo-section" id="demo">
+    <section className="livedemo-section landing-section landing-band-cool" id="demo">
       <div className="livedemo-inner">
         <div className="section-header-centered livedemo-header">
           <p className="section-eyebrow">Live demo</p>

@@ -504,7 +504,7 @@ export function Roadmap() {
 
   return (
     <section
-      className="roadmap-section rm3-section"
+      className="roadmap-section rm3-section landing-section landing-band-cool"
       id="roadmap"
       ref={sectionRef}
     >

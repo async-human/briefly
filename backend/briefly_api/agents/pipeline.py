@@ -10,6 +10,7 @@ Any agent failure is caught, logged, and the pipeline continues
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from datetime import datetime, timezone
@@ -191,8 +192,7 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
         # These agents improve future digests but have zero effect on what the
         # user is about to read RIGHT NOW.  Run them in a separate background
         # task so the pipeline can return the digest_id immediately.
-        import asyncio as _asyncio
-        _asyncio.create_task(_run_post_pipeline_agents(user_id))
+        asyncio.create_task(_run_post_pipeline_agents(user_id))
         log.info("Pipeline: scheduled post-pipeline agents for user %s", user_id)
 
         duration_ms = ctx.pipeline_duration_ms

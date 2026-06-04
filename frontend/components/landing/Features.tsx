@@ -321,7 +321,6 @@ function FeatureCard({ feature, accent = false }: { feature: Feature; accent?: b
   return (
     <motion.div
       className={`bento-cell${isLarge ? " bento-large" : ""}${isWide ? " bento-wide" : ""}`}
-      whileHover={{ y: -6, transition: { duration: 0.25, ease: EASE } }}
     >
       <SpotlightCard variant={feature.variant} accent={accent}>
         <div className="bento-top">
@@ -338,29 +337,29 @@ function FeatureCard({ feature, accent = false }: { feature: Feature; accent?: b
 
 export function Features() {
   return (
-    <section className="features-v2" id="features">
-      <div className="features-v2-ambient" aria-hidden>
-        <span className="features-orb features-orb-a" />
-        <span className="features-orb features-orb-b" />
-      </div>
-      <div className="features-v2-inner">
-        <Reveal>
-          <div className="section-header-centered">
-            <p className="section-eyebrow">In practice</p>
-            <h2 className="section-heading">Four ideas behind every briefing</h2>
-            <p className="section-body">
-              Most tools wait for you to save, sort, and revisit.
-              Briefly works in the background — and meets you each morning with exactly what matters.
-            </p>
-          </div>
-        </Reveal>
-
-        <div className="bento-grid">
-          {features.map((f, i) => (
-            <Reveal key={f.num} delay={i * 0.1} className="bento-reveal-cell">
-              <FeatureCard feature={f} accent={i === 0} />
+    <section className="features-v2 landing-section landing-band-sage" id="features">
+      <div className="features-v2-inner landing-section-inner">
+        <div className="features-sticky-stack">
+          <aside className="features-sticky-pane">
+            <Reveal>
+              <div className="section-header-centered">
+                <p className="section-eyebrow">In practice</p>
+                <h2 className="section-heading">Four ideas behind every briefing</h2>
+                <p className="section-body">
+                  Most tools wait for you to save, sort, and revisit.
+                  Briefly works in the background — and meets you each morning with exactly what matters.
+                </p>
+              </div>
             </Reveal>
-          ))}
+          </aside>
+
+          <div className="features-scroll-pane">
+            {features.map((f, i) => (
+              <Reveal key={f.num} delay={i * 0.06} className="features-scroll-item">
+                <FeatureCard feature={f} accent={i === 0} />
+              </Reveal>
+            ))}
+          </div>
         </div>
       </div>
     </section>
