@@ -1,0 +1,8 @@
+{
+  "font_stack": "Playfair Display + DM Sans + DM Mono (next/font, layout.tsx)",
+  "palette": "CSS variables in globals.css — preserved",
+  "motion": "framer-motion installed",
+  "framework": "Next.js 14 app router",
+  "preserved": ["font stack", "routes", "component ownership"],
+  "introduced": ["hallmark-landing.css", "editorial macrostructure", "masthead nav"]
+}

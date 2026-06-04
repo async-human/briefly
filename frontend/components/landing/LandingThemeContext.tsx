@@ -117,7 +117,7 @@ export function LandingThemeProvider({ children }: { children: React.ReactNode }
   return (
     <LandingThemeContext.Provider value={value}>
       {/* suppressHydrationWarning: data-theme is intentionally set after mount */}
-      <div className="landing-page" data-theme={theme} suppressHydrationWarning>
+      <div className="landing-page hallmark-landing" data-theme={theme} suppressHydrationWarning>
         {children}
       </div>
     </LandingThemeContext.Provider>
