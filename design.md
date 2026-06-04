@@ -5,7 +5,7 @@ Landing/marketing uses editorial Hallmark separately; app pages read this file.
 
 ## Genre
 
-modern-minimal — product workbench, calm infrastructure, hairline structure.
+modern-minimal — quiet editorial app: sans-led type, hairline dividers, no card chrome.
 
 ## Macrostructure family
 

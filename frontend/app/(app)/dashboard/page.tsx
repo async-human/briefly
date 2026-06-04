@@ -318,8 +318,12 @@ function DashboardContent() {
               className="outcome-sources-toggle"
               onClick={() => setShowSources(true)}
             >
-              <span className="outcome-sources-toggle-label">Briefly&apos;s sources</span>
-              <span className="outcome-sources-toggle-hint">Optional — Briefly reads in the background</span>
+              <span className="outcome-sources-toggle-label">Sources</span>
+              <span className="outcome-sources-toggle-hint">
+                {fetchableSources.length > 0
+                  ? `${fetchableSources.length} connected`
+                  : "Connect where Briefly reads"}
+              </span>
             </button>
           )}
         </aside>

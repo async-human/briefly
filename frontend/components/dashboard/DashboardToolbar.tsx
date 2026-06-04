@@ -34,12 +34,10 @@ export function DashboardToolbar({
   }, []);
 
   const hasBrief = Boolean(digestId && !generating && (itemCount ?? 0) > 0);
-  const showStats = itemCount != null || sourceCount > 0;
 
   return (
     <header className="dash-toolbar">
       <div className="dash-toolbar-intro">
-        <p className="dash-toolbar-eyebrow">{greeting?.briefingLabel ?? "Your outcome"}</p>
         <div className="dash-toolbar-heading-row">
           <h1 className="dash-toolbar-title">
             {greeting?.label ?? "Hello"}, {name}
@@ -49,44 +47,41 @@ export function DashboardToolbar({
         {generating && (
           <p className="dash-toolbar-status">
             <span className="briefing-generating-dot" aria-hidden />
-            Delivering your brief in the background…
+            Your brief is being prepared
           </p>
         )}
       </div>
 
       <div className="dash-toolbar-end">
-        {showStats && (
-          <ul className="dash-toolbar-stats" aria-label="Summary">
+        {!generating && (itemCount != null || sourceCount > 0 || streak > 0) && (
+          <p className="dash-toolbar-meta">
             {itemCount != null && (
-              <li>
-                <span className="dash-toolbar-stat-value">{itemCount}</span>
-                <span className="dash-toolbar-stat-label">items selected</span>
-              </li>
+              <span>
+                <strong>{itemCount}</strong>
+                {itemCount === 1 ? " item" : " items"}
+              </span>
             )}
             {savedMinutes != null && savedMinutes > 0 && (
-              <li>
-                <span className="dash-toolbar-stat-value">~{savedMinutes}m</span>
-                <span className="dash-toolbar-stat-label">reading saved</span>
-              </li>
-            )}
-            <li className="dash-toolbar-stat-hidden-mobile">
-              <span className="dash-toolbar-stat-value">{sourceCount}</span>
-              <span className="dash-toolbar-stat-label">
-                {sourceCount === 1 ? "source" : "sources"}
+              <span>
+                {itemCount != null ? " · " : ""}
+                ~<strong>{savedMinutes}</strong> min saved
               </span>
-            </li>
-            {streak > 0 && (
-              <li className="dash-toolbar-stat-streak">
-                <span className="dash-toolbar-stat-value dash-toolbar-stat-streak-value">
-                  {streak}
-                  {streak >= 7 && <span className="dash-streak-fire" aria-hidden> 🔥</span>}
-                </span>
-                <span className="dash-toolbar-stat-label">
-                  {streak === 1 ? "day streak" : "day streak"}
-                </span>
-              </li>
             )}
-          </ul>
+            {sourceCount > 0 && (
+              <span>
+                {(itemCount != null || (savedMinutes != null && savedMinutes > 0)) ? " · " : ""}
+                <strong>{sourceCount}</strong>
+                {sourceCount === 1 ? " source" : " sources"}
+              </span>
+            )}
+            {streak > 0 && (
+              <span>
+                {" · "}
+                <strong>{streak}</strong>-day streak
+                {streak >= 7 ? " 🔥" : ""}
+              </span>
+            )}
+          </p>
         )}
 
         <div className="dash-toolbar-actions">
@@ -103,7 +98,7 @@ export function DashboardToolbar({
               onClick={onRefresh}
               disabled={generating}
             >
-              {generating ? "Refreshing…" : "Refresh brief"}
+              {generating ? "Refreshing…" : "Refresh"}
             </button>
           )}
         </div>
