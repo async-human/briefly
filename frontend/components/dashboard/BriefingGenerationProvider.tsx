@@ -40,8 +40,28 @@ type BriefingGenerationContextValue = {
 const BriefingGenerationContext = createContext<BriefingGenerationContextValue | null>(null);
 
 const DEFAULT_LABEL = "Fetching from your sources…";
+const STALE_RUNNING_MS = 3 * 60 * 1000;
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function runningAgeMs(status: { started_at?: string | null } | null): number {
+  if (!status?.started_at) return Infinity;
+  const started = new Date(status.started_at).getTime();
+  return Number.isNaN(started) ? Infinity : Date.now() - started;
+}
+
+function shouldKickOffGeneration(
+  status: { status?: string; started_at?: string | null } | null,
+  restart: boolean,
+): boolean {
+  if (!status || status.status === "idle" || status.status === "error" || status.status === "complete") {
+    return true;
+  }
+  if (status.status === "running") {
+    return restart || runningAgeMs(status) > STALE_RUNNING_MS;
+  }
+  return true;
+}
 
 function isValidTodayDigest(
   digest: Digest | null | undefined,
@@ -176,8 +196,8 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
             userTriggeredRef.current = false;
             return;
           }
-          if (existing?.status !== "running") {
-            const started = await api.generateDigest({ force: true });
+          if (shouldKickOffGeneration(existing, restart)) {
+            const started = await api.generateDigest({ force: true, restart });
             if (started.status === "complete" && isValidTodayDigest(started.digest, digestTimezoneRef.current)) {
               setDigest(started.digest!);
               setGenerateWarnings(started.warnings ?? []);
@@ -198,6 +218,10 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
           const existing = await api.getBriefingGenerationStatus().catch(() => null);
           if (existing?.label) {
             setGeneratingLabel(existing.label);
+          }
+          const todayAlready = await resolveTodayDigest();
+          if (!todayAlready && shouldKickOffGeneration(existing, false)) {
+            await api.generateDigest({ force: true }).catch(() => null);
           }
           if (existing?.started_at) {
             const startedMs = new Date(existing.started_at).getTime();
@@ -255,7 +279,7 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
   );
 
   const runGenerate = useCallback(() => {
-    void runPollCycle(true, true);
+    void runPollCycle(true, true, true);
   }, [runPollCycle]);
 
   const ensureBriefing = useCallback(() => {
@@ -291,7 +315,7 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
 
         const alreadyHaveToday = isValidTodayDigest(todayDigest, tz);
         if (status?.status === "running" && !alreadyHaveToday) {
-          resumePolling();
+          ensureBriefing();
         }
       } catch {
         /* non-fatal */
@@ -302,7 +326,7 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
     return () => {
       cancelled = true;
     };
-  }, [resumePolling]);
+  }, [ensureBriefing]);
 
   const value: BriefingGenerationContextValue = {
     digest,

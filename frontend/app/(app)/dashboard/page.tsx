@@ -164,7 +164,8 @@ function DashboardContent() {
         }
 
         if (genStatus?.status === "running") {
-          resumePolling();
+          // Resume polling; provider restarts a zombie worker after ~3 min.
+          ensureBriefing();
           return;
         }
 

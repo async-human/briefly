@@ -467,11 +467,16 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ priority }),
     }),
-  generateDigest: (options?: { force?: boolean }) =>
-    request<GenerateDigestResponse>(
-      `/api/v1/digests/generate${options?.force ? "?force=true" : ""}`,
+  generateDigest: (options?: { force?: boolean; restart?: boolean }) => {
+    const params = new URLSearchParams();
+    if (options?.force) params.set("force", "true");
+    if (options?.restart) params.set("restart", "true");
+    const qs = params.toString();
+    return request<GenerateDigestResponse>(
+      `/api/v1/digests/generate${qs ? `?${qs}` : ""}`,
       { method: "POST" },
-    ),
+    );
+  },
   getBriefingGenerationStatus: () =>
     request<BriefingGenerationStatus>("/api/v1/digests/generate/status"),
   getIngestionSummary: () =>

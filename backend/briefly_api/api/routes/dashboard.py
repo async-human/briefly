@@ -432,7 +432,9 @@ async def _briefing_worker(user_id: str) -> None:
     from briefly_api.config import get_settings
     from briefly_api.services.briefing import generate_briefing_now
     from briefly_api.services.briefing_generation import report_briefing_progress
+    from briefly_api.services.digest_failure import handle_scheduled_digest_failure
 
+    log.info("Briefing worker started for user %s", user_id)
     async with SessionLocal() as session:
         try:
             await report_briefing_progress(
@@ -469,15 +471,23 @@ async def _briefing_worker(user_id: str) -> None:
                 digest_id=digest.id,
                 warnings=warnings,
             )
+            log.info(
+                "Briefing worker completed for user %s (digest_id=%s items=%s)",
+                user_id,
+                digest.id,
+                digest.total_items_shown,
+            )
         except asyncio.TimeoutError:
             log.error("Briefing worker timed out (>4 min) for user %s", user_id)
+            msg = "Briefing took too long to generate. Please try again."
             await report_briefing_progress(
                 user_id,
                 status="error",
                 step="error",
                 label="Briefing failed.",
-                error="Briefing took too long to generate. Please try again.",
+                error=msg,
             )
+            await handle_scheduled_digest_failure(user_id, msg)
         except ValueError as exc:
             log.warning("Briefing worker failed for user %s: %s", user_id, exc)
             await report_briefing_progress(
@@ -487,6 +497,7 @@ async def _briefing_worker(user_id: str) -> None:
                 label="Briefing failed.",
                 error=str(exc),
             )
+            await handle_scheduled_digest_failure(user_id, str(exc))
         except Exception as exc:
             log.exception("Briefing worker failed for user %s", user_id)
             message = str(exc).strip() or "Briefing generation failed. Please try again."
@@ -499,6 +510,7 @@ async def _briefing_worker(user_id: str) -> None:
                 label="Briefing failed.",
                 error=message,
             )
+            await handle_scheduled_digest_failure(user_id, message)
 
 
 @router.get("/digests/generate/status", response_model=BriefingGenerationStatusOut)
@@ -506,12 +518,49 @@ async def get_briefing_generation_status(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> BriefingGenerationStatusOut:
+    from briefly_api.utils.dates import local_date_string
+
     profile = user.profile
     if not profile:
         return BriefingGenerationStatusOut(status="idle")
 
-    meta = profile.ingestion_meta or {}
+    meta = dict(profile.ingestion_meta or {})
     gen = dict(meta.get("briefing_generation") or {"status": "idle"})
+
+    # Auto-clear zombie "running" left by a crashed worker so clients can restart.
+    if gen.get("status") == "running":
+        started_raw = gen.get("started_at", "")
+        age_minutes = 999.0
+        if started_raw:
+            try:
+                started_dt = datetime.fromisoformat(started_raw.replace("Z", "+00:00"))
+                if started_dt.tzinfo is None:
+                    started_dt = started_dt.replace(tzinfo=timezone.utc)
+                age_minutes = (datetime.now(timezone.utc) - started_dt).total_seconds() / 60
+            except Exception:
+                age_minutes = 999.0
+        if age_minutes > 15:
+            local_today = local_date_string(profile.digest_timezone or "UTC")
+            today_digest = await db.scalar(
+                select(Digest.id).where(
+                    Digest.user_id == user.id,
+                    Digest.digest_date == local_today,
+                )
+            )
+            if not today_digest:
+                now = datetime.now(timezone.utc).isoformat()
+                gen = {
+                    "status": "error",
+                    "step": "error",
+                    "label": "Briefing failed.",
+                    "error": "Briefing generation timed out. Please refresh to try again.",
+                    "started_at": gen.get("started_at"),
+                    "updated_at": now,
+                }
+                meta["briefing_generation"] = gen
+                profile.ingestion_meta = meta
+                flag_modified(profile, "ingestion_meta")
+                await db.commit()
 
     digest_out: DigestOut | None = None
     digest_id = gen.get("digest_id")
@@ -542,6 +591,7 @@ async def get_briefing_generation_status(
 async def generate_digest_now(
     background_tasks: BackgroundTasks,
     force: bool = False,
+    restart: bool = False,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> GenerateDigestOut:
@@ -585,16 +635,32 @@ async def generate_digest_now(
             except Exception:
                 age_minutes = 999.0
         is_stale = age_minutes > 15
-        # Take over a zombie worker when today's digest still doesn't exist.
-        can_takeover = force or is_stale or age_minutes > 3
+        # restart=true (Refresh brief) always takes over; auto-generate waits ~3 min.
+        can_takeover = restart or is_stale or age_minutes > 3
         if not can_takeover:
             return GenerateDigestOut(status="running", digest=None, warnings=[])
         log.info(
-            "Taking over briefing generation for user %s (force=%s age=%.1fm)",
+            "Taking over briefing generation for user %s (restart=%s force=%s age=%.1fm)",
             user.id,
+            restart,
             force,
             age_minutes,
         )
+
+    from briefly_api.db.models import DigestFailure
+
+    failure = await db.scalar(
+        select(DigestFailure).where(
+            DigestFailure.user_id == user.id,
+            DigestFailure.digest_date == local_today,
+            DigestFailure.resolved_at.is_(None),
+        )
+    )
+    if failure:
+        failure.retry_count = 0
+        failure.next_retry_at = None
+        failure.error_message = ""
+        failure.updated_at = datetime.now(timezone.utc)
 
     now = datetime.now(timezone.utc).isoformat()
     meta["briefing_generation"] = {
@@ -608,6 +674,7 @@ async def generate_digest_now(
     flag_modified(profile, "ingestion_meta")
     await db.commit()
 
+    log.info("Starting briefing worker for user %s (digest_date=%s)", user.id, local_today)
     background_tasks.add_task(_briefing_worker, user.id)
     return GenerateDigestOut(status="running", digest=None, warnings=[])
 
