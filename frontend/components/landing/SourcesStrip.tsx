@@ -2,21 +2,26 @@ import { Reveal } from "./Reveal";
 import { SourceIcon } from "@/components/SourceIcon";
 
 const SOURCES = [
-  { name: "Gmail",        type: "gmail"   },
-  { name: "YouTube",      type: "youtube" },
-  { name: "Reddit",       type: "reddit"  },
-  { name: "RSS",          type: "rss"     },
-  { name: "Substack",     type: "rss",    nameOverride: "Substack"      },
-  { name: "Readwise",     type: "readwise"                               },
-  { name: "Hacker News",  type: "rss",    nameOverride: "Hacker News"   },
-  { name: "Any URL",      type: "url"     },
+  { name: "Gmail", type: "gmail" },
+  { name: "YouTube", type: "youtube" },
+  { name: "Reddit", type: "reddit" },
+  { name: "RSS", type: "rss" },
+  { name: "Substack", type: "rss", nameOverride: "Substack" },
+  { name: "Readwise", type: "readwise" },
+  { name: "Hacker News", type: "rss", nameOverride: "Hacker News" },
+  { name: "Any URL", type: "url" },
 ];
 
 export function SourcesStrip() {
   return (
-    <div className="sources-strip">
+    <section className="sources-strip sources-strip-section">
       <Reveal>
-        <p className="sources-strip-label">Works with what you already follow</p>
+        <div className="section-block-header">
+          <h2 className="section-block-title">Sources we connect</h2>
+          <p className="section-block-sub">
+            Works with what you already follow — connect once, no manual lists.
+          </p>
+        </div>
         <div className="sources-strip-icons">
           {SOURCES.map((s) => (
             <div key={s.name} className="source-chip">
@@ -28,6 +33,6 @@ export function SourcesStrip() {
           ))}
         </div>
       </Reveal>
-    </div>
+    </section>
   );
 }

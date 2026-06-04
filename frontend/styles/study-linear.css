@@ -1,6 +1,6 @@
-/* Hallmark · studied-DNA · source: https://linear.app/
- * genre: modern-minimal · macrostructure: Workbench + Narrative Workflow
- * theme: Cobalt-adjacent · nav: N5 · footer: Ft2 · pre-emit: P4 H5 E4 S4 R4 V5
+/* Hallmark · studied-DNA · sources: linear.app + auditcue.com
+ * Linear: product-first hero, floating pill nav, dark register
+ * AuditCue: light B2B section rhythm, stage cards, framework strip, footer columns
  */
 
 .study-linear {
@@ -28,18 +28,21 @@
 }
 
 .study-linear[data-theme="light"] {
-  --bg: oklch(99% 0.004 270);
-  --bg-elevated: oklch(97% 0.006 270);
-  --surface: oklch(96% 0.008 270);
-  --surface-hover: oklch(94% 0.01 270);
-  --border: oklch(20% 0.02 270 / 0.08);
-  --border-strong: oklch(20% 0.02 270 / 0.12);
-  --text: oklch(18% 0.02 270);
-  --text-secondary: oklch(42% 0.018 270);
-  --text-muted: oklch(58% 0.014 270);
-  --accent: oklch(52% 0.2 275);
-  --accent-dim: oklch(52% 0.2 275 / 0.1);
-  --accent-line: oklch(52% 0.2 275 / 0.28);
+  --bg: oklch(99.5% 0.003 250);
+  --bg-elevated: oklch(97.5% 0.006 250);
+  --surface: oklch(100% 0 0);
+  --surface-hover: oklch(96% 0.008 250);
+  --border: oklch(22% 0.02 250 / 0.08);
+  --border-strong: oklch(22% 0.02 250 / 0.12);
+  --text: oklch(22% 0.03 260);
+  --text-secondary: oklch(45% 0.02 260);
+  --text-muted: oklch(58% 0.018 260);
+  /* AuditCue-style trust blue on light */
+  --accent: oklch(52% 0.17 250);
+  --accent-dim: oklch(52% 0.17 250 / 0.08);
+  --accent-line: oklch(52% 0.17 250 / 0.25);
+  --linear-accent: var(--accent);
+  --linear-glow: oklch(52% 0.17 250 / 0.06);
 }
 
 body[data-landing-theme="dark"].study-linear-body {
@@ -162,21 +165,163 @@ body[data-landing-theme="light"].study-linear-body {
 }
 
 .study-linear .hero-linear-eyebrow {
+  display: none;
+}
+
+.study-linear .hero-linear-badge {
+  display: inline-block;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 500;
   letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--accent);
-  margin-bottom: 20px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  padding: 6px 14px;
+  margin-bottom: 24px;
 }
 
-.study-linear .hero-linear-eyebrow a {
-  color: inherit;
+/* ── AuditCue-style section blocks (shared) ─────────────────────────────── */
+
+.study-linear .section-block-header {
+  max-width: 640px;
+  margin: 0 auto 40px;
+  text-align: center;
+}
+
+.study-linear .section-block-title {
+  font-family: var(--sans);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.study-linear .section-block-sub {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* ── Hero stage cards (AuditCue “Where are you today”) ──────────────────── */
+
+.study-linear .hero-stages {
+  padding: 64px 64px 80px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.study-linear .hero-stages-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.study-linear .hero-stage-card {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 2px oklch(0% 0 0 / 0.04);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.study-linear[data-theme="light"] .hero-stage-card {
+  box-shadow:
+    0 1px 2px oklch(0% 0 0 / 0.04),
+    0 8px 24px -12px oklch(0% 0 0 / 0.08);
+}
+
+.study-linear .hero-stage-card:hover {
+  border-color: var(--accent-line);
+}
+
+.study-linear .hero-stage-title {
+  font-family: var(--sans);
+  font-size: 1.125rem;
+  font-weight: 600;
+  font-style: normal;
+  color: var(--text);
+  margin: 0;
+}
+
+.study-linear .hero-stage-body {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0;
+  flex: 1;
+}
+
+.study-linear .hero-stage-link {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--accent);
   text-decoration: none;
+  margin-top: 4px;
 }
 
-.study-linear .hero-linear-eyebrow a:hover {
+.study-linear .hero-stage-link:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+/* ── Sources strip (AuditCue frameworks row) ────────────────────────────── */
+
+.study-linear .sources-strip-section {
+  padding: 72px 64px;
+  border-top: 1px solid var(--border);
+}
+
+.study-linear .sources-strip-section::before {
+  display: none;
+}
+
+.study-linear .sources-strip-label {
+  display: none;
+}
+
+.study-linear .source-chip {
+  border-radius: 10px;
+  padding: 10px 16px;
+}
+
+.study-linear[data-theme="light"] .source-chip {
+  background: var(--surface);
+  box-shadow: 0 1px 2px oklch(0% 0 0 / 0.04);
+}
+
+/* ── Middle sections — align with AuditCue rhythm ───────────────────────── */
+
+.study-linear .principles-headline .hero-light-gradient {
+  color: var(--accent);
+  background: none;
+  -webkit-text-fill-color: unset;
+}
+
+.study-linear .principles-section,
+.study-linear .features-v2,
+.study-linear .roadmap-section,
+.study-linear .pricing-v2 {
+  border-top: 1px solid var(--border);
+}
+
+.study-linear[data-theme="light"] .livedemo-section {
+  background: var(--bg);
+}
+
+.study-linear[data-theme="light"] .hero-stages {
+  background: oklch(97.5% 0.006 250);
 }
 
 .study-linear .hero-linear-headline {
@@ -301,43 +446,10 @@ body[data-landing-theme="light"].study-linear-body {
   padding: 14px 22px;
 }
 
-/* ── Value props (Linear FIG row) ─────────────────────────────────────── */
+/* ── Value props (Linear FIG row) — removed; see hero-stages ───────────── */
 
 .study-linear .hero-value-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
-  max-width: 960px;
-  margin: 64px auto 0;
-  padding: 0 24px;
-}
-
-.study-linear .hero-value-card {
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
-}
-
-.study-linear .hero-value-fig {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  margin-bottom: 12px;
-}
-
-.study-linear .hero-value-title {
-  font-family: var(--sans);
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 8px;
-  font-style: normal;
-}
-
-.study-linear .hero-value-body {
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--text-secondary);
+  display: none;
 }
 
 /* ── Section rhythm ───────────────────────────────────────────────────── */
@@ -429,46 +541,75 @@ body[data-landing-theme="light"].study-linear-body {
 
 .study-linear .footer-linear {
   border-top: 1px solid var(--border);
-  padding: 24px 64px 40px;
+  padding: 48px 64px 40px;
+  background: var(--bg-elevated);
 }
 
 .study-linear .footer-linear-inner {
   max-width: 1120px;
   margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr auto;
+  gap: 32px 48px;
+  align-items: start;
+}
+
+.study-linear .footer-linear-brand-block {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  font-size: 13px;
-  color: var(--text-muted);
+  flex-direction: column;
+  gap: 8px;
 }
 
 .study-linear .footer-linear-brand {
   font-family: var(--sans);
+  font-size: 1rem;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--text);
 }
 
-.study-linear .footer-linear-nav {
-  display: flex;
-  align-items: center;
-  gap: 20px;
+.study-linear .footer-linear-tagline {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  max-width: 22ch;
 }
 
-.study-linear .footer-linear-nav a {
+.study-linear .footer-linear-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.study-linear .footer-linear-col-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.study-linear .footer-linear-col a {
+  font-size: 0.875rem;
   color: var(--text-secondary);
   text-decoration: none;
   transition: color 180ms ease;
 }
 
-.study-linear .footer-linear-nav a:hover {
+.study-linear .footer-linear-col a:hover {
   color: var(--text);
 }
 
 .study-linear .footer-linear-copy {
-  margin-left: auto;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  align-self: end;
+  margin: 0;
+}
+
+.study-linear .footer-linear-nav {
+  display: none;
 }
 
 @media (max-width: 768px) {
@@ -507,10 +648,6 @@ body[data-landing-theme="light"].study-linear-body {
     max-width: calc(100% - 24px);
   }
 
-  .study-linear .hero-value-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .study-linear .hero-linear {
     padding-top: calc(var(--landing-nav-h, 64px) + 56px);
   }
@@ -525,13 +662,23 @@ body[data-landing-theme="light"].study-linear-body {
     padding-right: 24px;
   }
 
+  .study-linear .hero-stages-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .study-linear .hero-stages,
+  .study-linear .sources-strip-section {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
   .study-linear .footer-linear-inner {
-    flex-direction: column;
-    align-items: flex-start;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
   }
 
   .study-linear .footer-linear-copy {
-    margin-left: 0;
+    align-self: start;
   }
 }
 

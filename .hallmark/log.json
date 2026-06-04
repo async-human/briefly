@@ -1,16 +1,16 @@
 [
   {
     "date": "2026-05-28",
+    "macrostructure": "Workbench + Bento stages",
+    "theme": "studied-DNA (Linear dark + AuditCue light)",
+    "enrichment": "DigestPreview product mock",
+    "brief": "Briefly landing · linear.app + auditcue.com hybrid"
+  },
+  {
+    "date": "2026-05-28",
     "macrostructure": "Workbench + Narrative Workflow",
     "theme": "studied-DNA (Linear)",
     "enrichment": "none — DigestPreview product mock",
     "brief": "Briefly landing · hallmark study linear.app"
-  },
-  {
-    "date": "2026-05-28",
-    "macrostructure": "Long Document",
-    "theme": "Newsprint-warm",
-    "enrichment": "none",
-    "brief": "Briefly landing page Hallmark redesign — reverted"
   }
 ]
