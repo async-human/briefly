@@ -44,6 +44,9 @@ async def generate_briefing_now(
     if not digest_id:
         raise ValueError("Briefing pipeline completed without a digest.")
 
+    # The pipeline committed in its own session; expire the outer session's
+    # identity map so the SELECT below reads from DB, not a stale cache.
+    await db.rollback()
     loaded = await db.execute(
         select(Digest)
         .options(selectinload(Digest.items))

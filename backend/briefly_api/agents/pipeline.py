@@ -314,11 +314,13 @@ async def _run_agent(name: str, fn, ctx: PipelineContext) -> PipelineContext:
         try:
             from briefly_api.services.briefing_generation import report_briefing_progress
 
-            await report_briefing_progress(
-                ctx.user.user_id,
-                status="running",
-                step=name,
-                label=label,
+            asyncio.create_task(
+                report_briefing_progress(
+                    ctx.user.user_id,
+                    status="running",
+                    step=name,
+                    label=label,
+                )
             )
         except Exception:
             log.debug("Could not report briefing progress for %s", name, exc_info=True)
