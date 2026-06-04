@@ -1,7 +1,6 @@
 "use client";
 
 import "@/styles/study-linear.css";
-import "@/styles/study-linear-sections.css";
 
 import { LandingThemeProvider } from "./LandingThemeContext";
 

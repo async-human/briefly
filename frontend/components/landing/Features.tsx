@@ -338,8 +338,12 @@ function FeatureCard({ feature, accent = false }: { feature: Feature; accent?: b
 
 export function Features() {
   return (
-    <section className="features-v2 landing-section" id="features">
-      <div className="landing-section-inner features-v2-inner">
+    <section className="features-v2" id="features">
+      <div className="features-v2-ambient" aria-hidden>
+        <span className="features-orb features-orb-a" />
+        <span className="features-orb features-orb-b" />
+      </div>
+      <div className="features-v2-inner">
         <Reveal>
           <div className="section-header-centered">
             <p className="section-eyebrow">In practice</p>

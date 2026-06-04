@@ -27,38 +27,18 @@ const proFeatures = [
 
 function Check({ dim }: { dim?: boolean }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }} aria-hidden>
-      <circle
-        cx="7"
-        cy="7"
-        r="6.5"
-        stroke={dim ? "var(--border-strong)" : "var(--accent-line)"}
-      />
-      {!dim && (
-        <path
-          d="M4 7l2 2 4-4"
-          stroke="var(--accent)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      )}
-      {dim && (
-        <path
-          d="M5 7h4"
-          stroke="var(--text-muted)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-      )}
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+      <circle cx="7" cy="7" r="6.5" stroke={dim ? "rgba(255,255,255,0.12)" : "rgba(201,184,150,0.4)"} />
+      {!dim && <path d="M4 7l2 2 4-4" stroke="#c9b896" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />}
+      {dim && <path d="M5 7h4" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" strokeLinecap="round" />}
     </svg>
   );
 }
 
 export function Pricing() {
   return (
-    <section className="pricing-v2 landing-section" id="pricing">
-      <div className="landing-section-inner pricing-v2-inner">
+    <section className="pricing-v2" id="pricing">
+      <div className="pricing-v2-inner">
         <Reveal>
           <div className="section-header-centered">
             <p className="section-eyebrow">Pricing</p>

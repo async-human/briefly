@@ -504,11 +504,13 @@ export function Roadmap() {
 
   return (
     <section
-      className="roadmap-section rm3-section landing-section"
+      className="roadmap-section rm3-section"
       id="roadmap"
       ref={sectionRef}
     >
-      <div className="landing-section-inner roadmap-inner">
+      <div className="rm3-bg-grid" aria-hidden />
+
+      <div className="roadmap-inner">
         <Reveal>
           <div className="section-header-centered rm3-header">
             <p className="section-eyebrow">Roadmap</p>

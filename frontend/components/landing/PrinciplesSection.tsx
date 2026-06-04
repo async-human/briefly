@@ -4,7 +4,7 @@ import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
 import { Reveal } from "./Reveal";
 
-const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 const principles = [
   {
@@ -28,19 +28,19 @@ const principles = [
   {
     num: "04",
     title: "Every item answers why you.",
-    body: "Not why it's generally important — why it matters to your role, your goals, and what you read last week.",
+    body: "Not why it's generally important — why it matters to your role, your goals, and what you read last week. Personal relevance on every line.",
     tag: "Why it matters",
   },
   {
     num: "05",
-    title: "Curated, not comprehensive.",
-    body: "Briefly reads widely and shows what fits your morning. Skipped items come with a reason — so you trust what you see and what you don't.",
+    title: "Ten items, not fifty.",
+    body: "Briefly reads dozens and shows only what fits your morning. Every skip is logged with a reason — so you trust what you see and what you don't.",
     tag: "Confident curation",
   },
   {
     num: "06",
     title: "Smarter with every briefing.",
-    body: "Clicks, saves, and follow-ups shape what lands tomorrow. Memory compounds as your interests evolve.",
+    body: "Clicks, saves, and follow-ups shape what lands tomorrow. New sources are suggested as your interests evolve. Memory that compounds.",
     tag: "Continuous learning",
   },
 ] as const;
@@ -59,9 +59,9 @@ function PrincipleRow({
     <motion.li
       ref={ref}
       className="principle-row"
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.45, delay: index * 0.05, ease: EASE }}
+      transition={{ duration: 0.5, delay: index * 0.05, ease: EASE }}
     >
       <span className="principle-num" aria-hidden>
         {principle.num}
@@ -79,31 +79,37 @@ function PrincipleRow({
 
 export function PrinciplesSection() {
   return (
-    <section className="principles-section landing-section" id="why">
-      <div className="landing-section-inner">
-        <Reveal>
-          <div className="section-header-centered">
+    <section className="principles-section" id="why">
+      <div className="principles-inner">
+        <div className="principles-layout">
+          <Reveal className="principles-intro">
             <p className="section-eyebrow">Why Briefly</p>
-            <h2 className="section-heading">
-              A chief-of-staff briefing, not another app to maintain.
+            <h2 className="principles-headline">
+              A chief-of-staff briefing,
+              <br />
+              <span className="hero-light-gradient">not another app to maintain.</span>
             </h2>
-            <p className="section-body">
+            <p className="principles-lede">
               Briefly is built on a simple promise: your information diet runs itself.
               You wake up informed — without highlighting, filing, or drowning in tabs.
             </p>
-          </div>
-        </Reveal>
+            <div className="principles-pullquote" aria-hidden>
+              <span className="principles-pullquote-mark">&ldquo;</span>
+              <p>Connect once. Read ten. Trust the rest.</p>
+            </div>
+          </Reveal>
 
-        <Reveal delay={0.1}>
-          <ol className="principles-list">
-            {principles.map((p, i) => (
-              <PrincipleRow key={p.num} principle={p} index={i} />
-            ))}
-          </ol>
-          <p className="principles-footnote">
-            Every item links to its original source. Claims are verified before delivery.
-          </p>
-        </Reveal>
+          <Reveal delay={0.12}>
+            <ol className="principles-list">
+              {principles.map((p, i) => (
+                <PrincipleRow key={p.num} principle={p} index={i} />
+              ))}
+            </ol>
+            <p className="principles-footnote">
+              Every item links to its original source. Claims are verified before delivery — no black-box paraphrasing.
+            </p>
+          </Reveal>
+        </div>
       </div>
     </section>
   );
