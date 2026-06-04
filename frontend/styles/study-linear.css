@@ -270,13 +270,16 @@ body[data-landing-theme="light"].study-linear-body {
 
 .study-linear .hero-light-gradient,
 .study-linear .hero-gradient-text {
-  color: var(--text);
-  background: none;
-  -webkit-text-fill-color: unset;
+  color: inherit !important;
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  -webkit-text-fill-color: currentColor !important;
+  background-clip: unset !important;
+  animation: none !important;
 }
 
 .study-linear .principles-headline .hero-light-gradient {
-  color: var(--accent);
+  color: inherit !important;
 }
 
 .study-linear .btn-light-primary,
@@ -340,6 +343,136 @@ body[data-landing-theme="light"].study-linear-body {
   color: var(--text-secondary);
 }
 
+/* ── Unified section typography (all sections) ──────────────────────────── */
+
+.study-linear .landing-section-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.study-linear .landing-section {
+  padding: 88px 64px;
+  border-top: 1px solid var(--border);
+}
+
+.study-linear .section-header-centered {
+  max-width: 640px;
+  margin: 0 auto 40px;
+  text-align: center;
+}
+
+.study-linear .section-eyebrow,
+.study-linear .cta-linear-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+
+.study-linear .section-heading,
+.study-linear .principles-headline,
+.study-linear .features-v2-headline,
+.study-linear .cta-linear-headline {
+  font-family: var(--sans) !important;
+  font-size: clamp(1.625rem, 3.2vw, 2.25rem) !important;
+  font-weight: 600 !important;
+  font-style: normal !important;
+  letter-spacing: -0.025em !important;
+  line-height: 1.15 !important;
+  color: var(--text) !important;
+  margin-bottom: 14px;
+}
+
+.study-linear .section-body,
+.study-linear .principles-lede,
+.study-linear .rm3-subcopy,
+.study-linear .cta-linear-sub {
+  font-family: var(--sans);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+.study-linear .principles-section,
+.study-linear .features-v2,
+.study-linear .roadmap-section,
+.study-linear .pricing-v2,
+.study-linear .livedemo-section {
+  padding-left: 64px;
+  padding-right: 64px;
+}
+
+.study-linear .principles-inner,
+.study-linear .features-v2-inner,
+.study-linear .roadmap-inner,
+.study-linear .pricing-v2-inner,
+.study-linear .livedemo-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.study-linear .workflow-section::before,
+.study-linear .workflow-section::after,
+.study-linear .features-v2::before,
+.study-linear .features-v2::after,
+.study-linear .roadmap-section::before,
+.study-linear .roadmap-section::after,
+.study-linear .principles-section::before,
+.study-linear .principles-section::after,
+.study-linear .pricing-v2::before,
+.study-linear .pricing-v2::after,
+.study-linear .livedemo-section::before {
+  display: none !important;
+}
+
+.study-linear .rm3-bg-grid {
+  display: none;
+}
+
+.study-linear .principles-pullquote {
+  display: none;
+}
+
+.study-linear .principles-layout {
+  display: block;
+}
+
+.study-linear .principles-list {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.study-linear .principle-title {
+  font-family: var(--sans) !important;
+  font-weight: 600;
+  font-style: normal;
+}
+
+.study-linear .principle-num {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.study-linear .rm3-watermark {
+  font-family: var(--mono);
+  color: color-mix(in oklch, var(--text) 8%, transparent) !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+.study-linear .rm3-spotlight h3,
+.study-linear .rm3-spotlight-title {
+  font-family: var(--sans) !important;
+  font-weight: 600;
+  font-style: normal;
+}
+
 /* ── Section rhythm ───────────────────────────────────────────────────── */
 
 .study-linear .section-eyebrow,
@@ -371,50 +504,21 @@ body[data-landing-theme="light"].study-linear-body {
   background: var(--surface);
 }
 
-/* ── Closing CTA (Linear-style) ─────────────────────────────────────────── */
+/* ── Closing CTA — centered like other sections ─────────────────────────── */
 
 .study-linear .cta-linear {
-  padding: 96px 64px 80px;
+  padding: 0;
   border-top: 1px solid var(--border);
 }
 
 .study-linear .cta-linear-inner {
-  max-width: 1120px;
-  margin: 0 auto;
-}
-
-.study-linear .cta-linear-eyebrow {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--accent);
-  margin-bottom: 16px;
-}
-
-.study-linear .cta-linear-headline {
-  font-family: var(--sans);
-  font-size: clamp(1.75rem, 3.5vw, 2.5rem);
-  font-weight: 500;
-  font-style: normal;
-  letter-spacing: -0.03em;
-  line-height: 1.12;
-  color: var(--text);
-  max-width: 20ch;
-  margin-bottom: 16px;
-}
-
-.study-linear .cta-linear-sub {
-  font-size: 1.0625rem;
-  line-height: 1.65;
-  color: var(--text-secondary);
-  max-width: 42ch;
-  margin-bottom: 28px;
+  text-align: center;
 }
 
 .study-linear .cta-linear-actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 12px 16px;
   margin-bottom: 12px;
@@ -423,22 +527,27 @@ body[data-landing-theme="light"].study-linear-body {
 .study-linear .cta-linear-fine {
   font-size: 12px;
   color: var(--text-muted);
+  text-align: center;
 }
 
-/* ── Footer (Ft2 inline rule) ───────────────────────────────────────────── */
+/* ── Footer — align to same 1120px column as sections ─────────────────── */
 
-.study-linear .footer-linear {
+.study-linear footer.footer-linear {
+  display: block;
+  text-align: left;
   border-top: 1px solid var(--border);
-  padding: 24px 64px 40px;
+  padding: 40px 64px 48px;
+  background: var(--bg-elevated);
 }
 
 .study-linear .footer-linear-inner {
   max-width: 1120px;
   margin: 0 auto;
+  width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-start;
+  gap: 32px;
   flex-wrap: wrap;
   font-size: 13px;
   color: var(--text-muted);
@@ -449,15 +558,18 @@ body[data-landing-theme="light"].study-linear-body {
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--text);
+  margin-right: auto;
 }
 
 .study-linear .footer-linear-nav {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
 }
 
 .study-linear .footer-linear-nav a {
+  font-family: var(--sans);
+  font-size: 13px;
   color: var(--text-secondary);
   text-decoration: none;
   transition: color 180ms ease;
@@ -468,7 +580,10 @@ body[data-landing-theme="light"].study-linear-body {
 }
 
 .study-linear .footer-linear-copy {
-  margin-left: auto;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-left: 0;
 }
 
 @media (max-width: 768px) {
@@ -520,14 +635,31 @@ body[data-landing-theme="light"].study-linear-body {
   }
 
   .study-linear .cta-linear,
-  .study-linear .footer-linear {
+  .study-linear .footer-linear,
+  .study-linear .landing-section,
+  .study-linear .principles-section,
+  .study-linear .features-v2,
+  .study-linear .roadmap-section,
+  .study-linear .pricing-v2,
+  .study-linear .livedemo-section {
     padding-left: 24px;
     padding-right: 24px;
   }
 
+  .study-linear footer.footer-linear {
+    text-align: left;
+  }
+
   .study-linear .footer-linear-inner {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 20px;
+  }
+
+  .study-linear .footer-linear-brand {
+    margin-right: 0;
+    width: 100%;
   }
 
   .study-linear .footer-linear-copy {

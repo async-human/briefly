@@ -1,15 +1,17 @@
 export function CTA() {
   return (
-    <section className="cta-linear" id="start">
-      <div className="cta-linear-inner">
-        <p className="cta-linear-eyebrow">Get started</p>
-        <h2 className="cta-linear-headline">
-          Built for mornings. Available tonight.
-        </h2>
-        <p className="cta-linear-sub">
-          Connect your sources once. Briefly runs on your schedule — your first
-          briefing is ready when you are.
-        </p>
+    <section className="cta-linear landing-section" id="start">
+      <div className="landing-section-inner cta-linear-inner">
+        <div className="section-header-centered">
+          <p className="section-eyebrow">Get started</p>
+          <h2 className="section-heading">
+            Built for mornings. Available tonight.
+          </h2>
+          <p className="section-body">
+            Connect your sources once. Briefly runs on your schedule — your first
+            briefing is ready when you are.
+          </p>
+        </div>
         <div className="cta-linear-actions">
           <a href="/login" className="btn-light-primary">
             Start free →

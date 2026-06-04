@@ -79,37 +79,31 @@ function PrincipleRow({
 
 export function PrinciplesSection() {
   return (
-    <section className="principles-section" id="why">
-      <div className="principles-inner">
-        <div className="principles-layout">
-          <Reveal className="principles-intro">
+    <section className="principles-section landing-section" id="why">
+      <div className="landing-section-inner principles-inner">
+        <Reveal>
+          <div className="section-header-centered">
             <p className="section-eyebrow">Why Briefly</p>
-            <h2 className="principles-headline">
-              A chief-of-staff briefing,
-              <br />
-              <span className="hero-light-gradient">not another app to maintain.</span>
+            <h2 className="section-heading">
+              A chief-of-staff briefing, not another app to maintain.
             </h2>
-            <p className="principles-lede">
+            <p className="section-body">
               Briefly is built on a simple promise: your information diet runs itself.
               You wake up informed — without highlighting, filing, or drowning in tabs.
             </p>
-            <div className="principles-pullquote" aria-hidden>
-              <span className="principles-pullquote-mark">&ldquo;</span>
-              <p>Connect once. Read ten. Trust the rest.</p>
-            </div>
-          </Reveal>
+          </div>
+        </Reveal>
 
-          <Reveal delay={0.12}>
-            <ol className="principles-list">
-              {principles.map((p, i) => (
-                <PrincipleRow key={p.num} principle={p} index={i} />
-              ))}
-            </ol>
-            <p className="principles-footnote">
-              Every item links to its original source. Claims are verified before delivery — no black-box paraphrasing.
-            </p>
-          </Reveal>
-        </div>
+        <Reveal delay={0.12}>
+          <ol className="principles-list">
+            {principles.map((p, i) => (
+              <PrincipleRow key={p.num} principle={p} index={i} />
+            ))}
+          </ol>
+          <p className="principles-footnote">
+            Every item links to its original source. Claims are verified before delivery.
+          </p>
+        </Reveal>
       </div>
     </section>
   );

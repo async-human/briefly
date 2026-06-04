@@ -515,9 +515,7 @@ export function Roadmap() {
           <div className="section-header-centered rm3-header">
             <p className="section-eyebrow">Roadmap</p>
             <h2 className="section-heading">
-              You&apos;re joining at V1.
-              <br />
-              <span className="hero-gradient-text">Here&apos;s the journey ahead.</span>
+              You&apos;re joining at V1. Here&apos;s the journey ahead.
             </h2>
             <p className="section-body rm3-subcopy">
               Tap a version to explore. Each release stands on its own — Pro includes them all.
