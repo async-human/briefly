@@ -10,6 +10,10 @@ import {
   type ReactNode,
 } from "react";
 import { api, type Digest } from "@/lib/api";
+import {
+  clearBriefingGeneratedToday,
+  markBriefingGeneratedToday,
+} from "@/lib/briefingStorage";
 import { needsBriefingForToday } from "@/lib/localDate";
 import { BriefingReadyToast } from "./BriefingReadyToast";
 
@@ -21,9 +25,10 @@ type ReadyNotice = {
 type BriefingGenerationContextValue = {
   digest: Digest | null;
   setDigest: (digest: Digest | null) => void;
+  digestTimezone: string | null;
   generating: boolean;
   generatingLabel: string;
-  generatingElapsedSec: number;   // seconds since generation started
+  generatingElapsedSec: number;
   generateError: string;
   generateWarnings: string[];
   runGenerate: () => void;
@@ -38,8 +43,18 @@ const DEFAULT_LABEL = "Fetching from your sources…";
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+function isValidTodayDigest(
+  digest: Digest | null | undefined,
+  digestTimezone?: string | null,
+): digest is Digest {
+  if (!digest) return false;
+  return !needsBriefingForToday(digest, digestTimezone);
+}
+
 export function BriefingGenerationProvider({ children }: { children: ReactNode }) {
   const [digest, setDigest] = useState<Digest | null>(null);
+  const [digestTimezone, setDigestTimezone] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generatingLabel, setGeneratingLabel] = useState(DEFAULT_LABEL);
   const [generatingElapsedSec, setGeneratingElapsedSec] = useState(0);
@@ -52,14 +67,28 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
   const userTriggeredRef = useRef(false);
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const generatingStartRef = useRef<number>(0);
+  const digestTimezoneRef = useRef<string | null>(null);
+  const userIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    digestTimezoneRef.current = digestTimezone;
+  }, [digestTimezone]);
+
+  useEffect(() => {
+    userIdRef.current = userId;
+  }, [userId]);
+
+  const resolveTodayDigest = useCallback(async (): Promise<Digest | null> => {
+    const todayDigest = await api.getTodayDigest().catch(() => null);
+    if (isValidTodayDigest(todayDigest, digestTimezoneRef.current)) {
+      return todayDigest;
+    }
+    return null;
+  }, []);
 
   const pollBriefingUntilDone = useCallback(async (): Promise<{ digest: Digest; warnings: string[] }> => {
     const POLL_INTERVAL_MS = 2000;
-    const HARD_TIMEOUT_MS  = 5 * 60 * 1000; // 5 min absolute cap
-    // After 3 min, also check the latest digest directly — the status field
-    // can be stuck at "running" if a late fire-and-forget progress write
-    // overwrote the terminal "complete" state before the race-condition guard
-    // landed in production.
+    const HARD_TIMEOUT_MS = 5 * 60 * 1000;
     const DIGEST_FALLBACK_MS = 3 * 60 * 1000;
     const startedAt = Date.now();
 
@@ -71,45 +100,44 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
       if (status.label) {
         setGeneratingLabel(status.label);
       }
+
       if (status.status === "complete") {
+        const fromStatus =
+          status.digest && isValidTodayDigest(status.digest, digestTimezoneRef.current)
+            ? status.digest
+            : null;
+        const fromId =
+          !fromStatus && status.digest_id
+            ? await api.getDigest(status.digest_id).catch(() => null)
+            : null;
         const nextDigest =
-          status.digest ??
-          (status.digest_id ? await api.getDigest(status.digest_id) : null) ??
-          (await api.getLatestDigest());
+          fromStatus ??
+          (isValidTodayDigest(fromId, digestTimezoneRef.current) ? fromId : null) ??
+          (await resolveTodayDigest());
         if (nextDigest) {
           return { digest: nextDigest, warnings: status.warnings ?? [] };
         }
+        // Status says complete but today's digest isn't in DB — keep polling.
       }
+
       if (status.status === "error") {
         throw new Error(status.error || "Briefing generation failed");
       }
 
-      // After 3 min, bypass the status field and check the digest directly.
-      // This escapes the race condition where stale progress writes stuck the
-      // status at "running" even though the briefing is actually complete.
       if (elapsed >= DIGEST_FALLBACK_MS) {
-        const latest = await api.getLatestDigest();
-        if (latest) {
-          const digestDate = latest.digest_date;
-          const todayStr = new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD
-          if (digestDate === todayStr) {
-            return { digest: latest, warnings: [] };
-          }
+        const todayDigest = await resolveTodayDigest();
+        if (todayDigest) {
+          return { digest: todayDigest, warnings: [] };
         }
       }
 
-      // Hard cap — give up after 5 min and surface an error.
       if (elapsed >= HARD_TIMEOUT_MS) {
-        const latest = await api.getLatestDigest();
-        if (latest) {
-          return { digest: latest, warnings: [] };
-        }
         throw new Error(
-          "Briefing is taking longer than expected. Try refreshing in a moment.",
+          "Today's briefing didn't finish in time. Try refreshing — if it keeps failing, check that your sources have recent content.",
         );
       }
     }
-  }, []);
+  }, [resolveTodayDigest]);
 
   const runPollCycle = useCallback(
     async (startJob: boolean, notifyOnComplete: boolean) => {
@@ -125,7 +153,6 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
         userTriggeredRef.current = notifyOnComplete;
         setGenerateWarnings([]);
         setGeneratingLabel(DEFAULT_LABEL);
-        // Start elapsed-time counter
         generatingStartRef.current = Date.now();
         setGeneratingElapsedSec(0);
         if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
@@ -140,15 +167,27 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
           if (existing?.label) {
             setGeneratingLabel(existing.label);
           }
+          const todayAlready = await resolveTodayDigest();
+          if (todayAlready) {
+            setDigest(todayAlready);
+            if (userIdRef.current) {
+              markBriefingGeneratedToday(userIdRef.current, digestTimezoneRef.current);
+            }
+            userTriggeredRef.current = false;
+            return;
+          }
           if (existing?.status !== "running") {
-            const started = await api.generateDigest({ force: userTriggeredRef.current });
-            if (started.status === "complete" && started.digest) {
-              setDigest(started.digest);
+            const started = await api.generateDigest({ force: true });
+            if (started.status === "complete" && isValidTodayDigest(started.digest, digestTimezoneRef.current)) {
+              setDigest(started.digest!);
               setGenerateWarnings(started.warnings ?? []);
+              if (userIdRef.current) {
+                markBriefingGeneratedToday(userIdRef.current, digestTimezoneRef.current);
+              }
               if (userTriggeredRef.current) {
                 setReadyNotice({
-                  itemCount: started.digest.total_items_shown ?? started.digest.items?.length ?? 0,
-                  digestId: started.digest.id,
+                  itemCount: started.digest!.total_items_shown ?? started.digest!.items?.length ?? 0,
+                  digestId: started.digest!.id,
                 });
               }
               userTriggeredRef.current = false;
@@ -160,19 +199,14 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
           if (existing?.label) {
             setGeneratingLabel(existing.label);
           }
-          // Resume elapsed timer from the backend's started_at, but only if
-          // it's recent. A stale "running" status (e.g. from a previous day's
-          // generation that never wrote "complete" due to the JSONB bug) would
-          // otherwise show absurd elapsed times like "2175m 20s".
           if (existing?.started_at) {
             const startedMs = new Date(existing.started_at).getTime();
             const ageMs = Date.now() - startedMs;
-            const MAX_RESUME_AGE_MS = 20 * 60 * 1000; // 20 minutes
+            const MAX_RESUME_AGE_MS = 20 * 60 * 1000;
             if (!isNaN(startedMs) && ageMs < MAX_RESUME_AGE_MS) {
               generatingStartRef.current = startedMs;
               setGeneratingElapsedSec(Math.floor(ageMs / 1000));
             } else {
-              // Stale started_at — reset clock to now so elapsed reads 0s
               generatingStartRef.current = Date.now();
               setGeneratingElapsedSec(0);
             }
@@ -186,6 +220,9 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
         const result = await pollBriefingUntilDone();
         setDigest(result.digest);
         setGenerateWarnings(result.warnings);
+        if (userIdRef.current) {
+          markBriefingGeneratedToday(userIdRef.current, digestTimezoneRef.current);
+        }
         if (userTriggeredRef.current) {
           setReadyNotice({
             itemCount: result.digest.total_items_shown ?? result.digest.items?.length ?? 0,
@@ -194,6 +231,9 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
         }
         userTriggeredRef.current = false;
       } catch (err) {
+        if (userIdRef.current) {
+          clearBriefingGeneratedToday(userIdRef.current);
+        }
         setGenerateError(err instanceof Error ? err.message : "Failed to generate briefing");
         userTriggeredRef.current = false;
       } finally {
@@ -211,7 +251,7 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
         }
       }
     },
-    [pollBriefingUntilDone],
+    [pollBriefingUntilDone, resolveTodayDigest],
   );
 
   const runGenerate = useCallback(() => {
@@ -231,18 +271,25 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
 
     async function bootstrap() {
       try {
-        const [latest, status] = await Promise.all([
+        const [me, todayDigest, latestDigest, status] = await Promise.all([
+          api.getMe().catch(() => null),
+          api.getTodayDigest().catch(() => null),
           api.getLatestDigest().catch(() => null),
           api.getBriefingGenerationStatus().catch(() => null),
         ]);
         if (cancelled) return;
-        if (latest) setDigest(latest);
 
-        // Only resume polling when generation is genuinely in progress.
-        // If we already have today's valid digest, ignore a stale "running"
-        // status — the JSONB persistence bug previously left status stuck at
-        // "running" after completion, causing a spurious spinner on every visit.
-        const alreadyHaveToday = latest && !needsBriefingForToday(latest);
+        const tz = me?.profile?.digest_timezone ?? null;
+        setDigestTimezone(tz);
+        setUserId(me?.user.id ?? null);
+
+        const displayDigest =
+          (isValidTodayDigest(todayDigest, tz) ? todayDigest : null) ??
+          (isValidTodayDigest(latestDigest, tz) ? latestDigest : null) ??
+          latestDigest;
+        if (displayDigest) setDigest(displayDigest);
+
+        const alreadyHaveToday = isValidTodayDigest(todayDigest, tz);
         if (status?.status === "running" && !alreadyHaveToday) {
           resumePolling();
         }
@@ -260,6 +307,7 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
   const value: BriefingGenerationContextValue = {
     digest,
     setDigest,
+    digestTimezone,
     generating,
     generatingLabel,
     generatingElapsedSec,

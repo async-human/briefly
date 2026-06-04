@@ -12,7 +12,7 @@ from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, flag_modified
 
 from briefly_api.api.schemas import (
     BulkSourceCreate,
@@ -208,6 +208,36 @@ async def get_latest_digest(
     )
     digest = result.scalar_one_or_none()
     if not digest:
+        return None
+    return DigestOut.model_validate(digest)
+
+
+@router.get("/digests/today", response_model=DigestOut | None)
+async def get_today_digest(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> DigestOut | None:
+    """Return today's digest in the user's digest_timezone, or null if missing."""
+    from briefly_api.utils.dates import local_date_string
+
+    profile = user.profile
+    tz_name = (profile.digest_timezone if profile else None) or "UTC"
+    local_today = local_date_string(tz_name)
+
+    result = await db.execute(
+        select(Digest)
+        .options(selectinload(Digest.items))
+        .where(
+            Digest.user_id == user.id,
+            Digest.digest_date == local_today,
+        )
+        .limit(1)
+    )
+    digest = result.scalar_one_or_none()
+    if not digest:
+        return None
+    item_count = (digest.total_items_shown or 0) or len(digest.items or [])
+    if item_count <= 0:
         return None
     return DigestOut.model_validate(digest)
 
@@ -519,29 +549,6 @@ async def generate_digest_now(
     if not profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
 
-    meta = dict(profile.ingestion_meta or {})
-    gen = meta.get("briefing_generation") or {}
-    if gen.get("status") == "running":
-        # Guard against stale "running" state left by a crashed worker.
-        # If started_at is older than 15 minutes, the worker is gone — clear it.
-        started_raw = gen.get("started_at", "")
-        is_stale = True
-        if started_raw:
-            try:
-                started_dt = datetime.fromisoformat(started_raw.replace("Z", "+00:00"))
-                if started_dt.tzinfo is None:
-                    started_dt = started_dt.replace(tzinfo=timezone.utc)
-                age_minutes = (datetime.now(timezone.utc) - started_dt).total_seconds() / 60
-                is_stale = age_minutes > 15
-            except Exception:
-                is_stale = True
-        if not is_stale:
-            return GenerateDigestOut(status="running", digest=None, warnings=[])
-
-    # Always check for an existing today's digest before regenerating —
-    # even when force=True. "Force" means "don't block on a running worker",
-    # not "delete a complete brief and start over", which would leave the user
-    # with nothing if the new run fails.
     from briefly_api.utils.dates import local_date_string
 
     local_today = local_date_string(profile.digest_timezone or "UTC")
@@ -562,6 +569,32 @@ async def generate_digest_now(
             warnings=[],
         )
 
+    meta = dict(profile.ingestion_meta or {})
+    gen = meta.get("briefing_generation") or {}
+    if gen.get("status") == "running":
+        # Guard against stale "running" state left by a crashed worker.
+        started_raw = gen.get("started_at", "")
+        age_minutes = 999.0
+        if started_raw:
+            try:
+                started_dt = datetime.fromisoformat(started_raw.replace("Z", "+00:00"))
+                if started_dt.tzinfo is None:
+                    started_dt = started_dt.replace(tzinfo=timezone.utc)
+                age_minutes = (datetime.now(timezone.utc) - started_dt).total_seconds() / 60
+            except Exception:
+                age_minutes = 999.0
+        is_stale = age_minutes > 15
+        # Take over a zombie worker when today's digest still doesn't exist.
+        can_takeover = force or is_stale or age_minutes > 3
+        if not can_takeover:
+            return GenerateDigestOut(status="running", digest=None, warnings=[])
+        log.info(
+            "Taking over briefing generation for user %s (force=%s age=%.1fm)",
+            user.id,
+            force,
+            age_minutes,
+        )
+
     now = datetime.now(timezone.utc).isoformat()
     meta["briefing_generation"] = {
         "status": "running",
@@ -571,6 +604,7 @@ async def generate_digest_now(
         "updated_at": now,
     }
     profile.ingestion_meta = meta
+    flag_modified(profile, "ingestion_meta")
     await db.commit()
 
     background_tasks.add_task(_briefing_worker, user.id)

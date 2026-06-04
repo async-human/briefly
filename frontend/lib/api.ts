@@ -447,6 +447,7 @@ export type BrainDump = {
 export const api = {
   getMe: () => request<MeResponse>("/api/v1/me"),
   getLatestDigest: () => request<Digest | null>("/api/v1/digests/latest"),
+  getTodayDigest: () => request<Digest | null>("/api/v1/digests/today"),
   getDigests: () => request<DigestSummary[]>("/api/v1/digests"),
   getDigest: (id: string) => request<Digest>(`/api/v1/digests/${id}`),
   getDigestFeedback: (id: string) =>

@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import select
+from sqlalchemy.orm import flag_modified
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +62,7 @@ async def report_briefing_progress(
 
         meta["briefing_generation"] = entry
         profile.ingestion_meta = meta
+        flag_modified(profile, "ingestion_meta")
         await session.commit()
 
 

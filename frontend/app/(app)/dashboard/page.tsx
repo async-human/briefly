@@ -9,7 +9,12 @@ import { DashboardToolbar } from "@/components/dashboard/DashboardToolbar";
 import { SourceDiscoveryWizard } from "@/components/dashboard/SourceDiscoveryWizard";
 import { useBriefingGeneration } from "@/components/dashboard/BriefingGenerationProvider";
 import { getDigestOutcome } from "@/lib/digestOutcome";
-import { needsBriefingForToday, localDateString } from "@/lib/localDate";
+import { needsBriefingForToday } from "@/lib/localDate";
+import {
+  clearBriefingGeneratedToday,
+  hasBriefingGeneratedToday,
+  markBriefingGeneratedToday,
+} from "@/lib/briefingStorage";
 import { runSilentSourceDiscovery } from "@/lib/silentDiscovery";
 
 const FETCHABLE_SOURCE_TYPES = new Set([
@@ -101,9 +106,9 @@ function DashboardContent() {
   useEffect(() => {
     async function init() {
       try {
-        const [meData, digestData, sourcesData, genStatus] = await Promise.all([
+        const [meData, todayDigest, sourcesData, genStatus] = await Promise.all([
           api.getMe(),
-          api.getLatestDigest(),
+          api.getTodayDigest(),
           api.getSources(),
           api.getBriefingGenerationStatus().catch(() => null),
         ]);
@@ -114,11 +119,8 @@ function DashboardContent() {
         }
 
         setMe(meData);
-        // Only update context digest if the API returned something newer than what we already have.
-        // Prevents init() from overwriting a freshly-generated digest with a stale API response
-        // when the user navigates away and back mid-generation or right after it completes.
-        if (digestData && (!digest || digestData.digest_date >= digest.digest_date)) {
-          setDigest(digestData);
+        if (todayDigest && (!digest || todayDigest.digest_date >= digest.digest_date)) {
+          setDigest(todayDigest);
         }
         setSources(sourcesData);
         setLoading(false);
@@ -145,43 +147,31 @@ function DashboardContent() {
         }
 
         const digestTimezone = meData.profile?.digest_timezone;
-        const localToday    = localDateString(digestTimezone);
-        const lsKey         = `briefly_gen_${meData.user.id}`;
         const hasSources    = sourcesData.some((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
 
-        // ── GUARD 1: today's digest already exists ───────────────────────────
-        // This MUST be the first check — before the generation-status branch.
-        // A stale "running" status in the DB (from a prior generation that
-        // never wrote "complete") would otherwise short-circuit here and call
-        // resumePolling(), showing the spinner even though the brief is ready.
-        const apiDigestOk = digestData && !needsBriefingForToday(digestData, digestTimezone);
-        const ctxDigestOk = digest     && !needsBriefingForToday(digest,     digestTimezone);
-        if (apiDigestOk || ctxDigestOk) {
-          // Stamp localStorage so every subsequent navigation returns from
-          // Guard 2 without any further API calls or logic.
-          if (typeof localStorage !== "undefined") localStorage.setItem(lsKey, localToday);
+        const todayDigestOk =
+          todayDigest && !needsBriefingForToday(todayDigest, digestTimezone);
+        const ctxDigestOk = digest && !needsBriefingForToday(digest, digestTimezone);
+        if (todayDigestOk || ctxDigestOk) {
+          markBriefingGeneratedToday(meData.user.id, digestTimezone);
           return;
         }
 
-        // ── GUARD 2: localStorage says we already generated today ────────────
-        const lastGenDate = typeof localStorage !== "undefined"
-          ? localStorage.getItem(lsKey) : null;
-        if (lastGenDate === localToday) return;
+        // localStorage alone is not enough — only skip auto-generate if we also
+        // confirmed today's digest exists (guards against failed prior attempts).
+        if (hasBriefingGeneratedToday(meData.user.id, digestTimezone)) {
+          clearBriefingGeneratedToday(meData.user.id);
+        }
 
-        // ── GUARD 3: generation is already running on the backend ────────────
-        // Only reached when we genuinely don't have today's digest yet.
         if (genStatus?.status === "running") {
           resumePolling();
           return;
         }
 
-        // ── GUARD 4: only trigger once per component mount ───────────────────
         if (autoGenerateChecked.current) return;
         autoGenerateChecked.current = true;
 
-        // ── Generate ─────────────────────────────────────────────────────────
         if (hasSources && !generating) {
-          if (typeof localStorage !== "undefined") localStorage.setItem(lsKey, localToday);
           ensureBriefing();
         }
       } catch (err) {
@@ -300,10 +290,7 @@ function DashboardContent() {
             generateError={generateError}
             generateWarnings={generateWarnings}
             onRegenerate={() => {
-              // Clear the daily guard so a manual refresh always works
-              if (me && typeof localStorage !== "undefined") {
-                localStorage.removeItem(`briefly_gen_${me.user.id}`);
-              }
+              if (me) clearBriefingGeneratedToday(me.user.id);
               runGenerate();
             }}
           />
