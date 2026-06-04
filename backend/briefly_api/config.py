@@ -10,7 +10,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _VALID_AUDIO_VOICES = frozenset({*(f"M{i}" for i in range(1, 6)), *(f"F{i}" for i in range(1, 6))})
@@ -51,12 +51,16 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
 
     # ── Speech-to-text — fully agnostic ───────────────────────────────────────
-    # openai → gpt-4o-transcribe (best accuracy, technical terms — recommended)
-    # openai → gpt-4o-mini-transcribe (cheaper, still better than Whisper)
-    # openai → whisper-1 (legacy)
-    # groq   → whisper-large-v3 (fast + cheap)
-    stt_provider: Literal["groq", "openai"] = "openai"
+    # SPEECH_TO_TEXT_PROVIDER (alias: STT_PROVIDER): openai | deepgram | groq
+    # openai   → STT_MODEL=gpt-4o-transcribe (OPENAI_API_KEY)
+    # deepgram → STT_MODEL=nova-2 or nova-3 (DEEPGRAM_API_KEY)
+    # groq     → STT_MODEL=whisper-large-v3 (GROQ_API_KEY)
+    speech_to_text_provider: Literal["openai", "deepgram", "groq"] = Field(
+        default="openai",
+        validation_alias=AliasChoices("speech_to_text_provider", "stt_provider"),
+    )
     stt_model: str = "gpt-4o-transcribe"
+    deepgram_api_key: str = ""
 
     # ── Embeddings — fully agnostic ───────────────────────────────────────────
     embedding_provider: Literal["voyage", "openai"] = "voyage"
@@ -119,6 +123,11 @@ class Settings(BaseSettings):
     magic_link_expire_minutes: int = 15
     google_client_id: str = ""
     google_client_secret: str = ""
+
+    @property
+    def stt_provider(self) -> Literal["openai", "deepgram", "groq"]:
+        """Backward-compatible alias for speech_to_text_provider."""
+        return self.speech_to_text_provider
 
     @property
     def cors_origin_list(self) -> list[str]:

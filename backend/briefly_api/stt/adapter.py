@@ -4,15 +4,16 @@ briefly_api/stt/adapter.py
 Provider-agnostic speech-to-text adapter.
 Switch provider + model entirely from .env — zero code changes.
 
-Supported providers:
-  openai → gpt-4o-transcribe (best accuracy — recommended)
-  openai → gpt-4o-mini-transcribe, whisper-1
-  groq   → whisper-large-v3 (fast, budget option)
+Supported providers (SPEECH_TO_TEXT_PROVIDER / STT_PROVIDER):
+  openai   → gpt-4o-transcribe (best accuracy — recommended)
+  deepgram → nova-2, nova-3, etc.
+  groq     → whisper-large-v3 (fast, budget option)
 """
 from __future__ import annotations
 
 import json
 import logging
+import re
 
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -22,6 +23,14 @@ from briefly_api.stt.audio_utils import convert_to_wav, normalize_upload
 from briefly_api.stt.prompts import build_transcription_prompt
 
 log = logging.getLogger(__name__)
+
+_DEEPGRAM_URL = "https://api.deepgram.com/v1/listen"
+
+_KEYTERM_STOPWORDS = frozenset({
+    "a", "an", "and", "are", "as", "at", "be", "briefly", "by", "for", "from",
+    "ignore", "in", "is", "it", "of", "on", "only", "or", "primary", "speaker",
+    "that", "the", "this", "to", "transcribe", "with", "your",
+})
 
 
 def _is_gpt4o_transcribe(model: str) -> bool:
@@ -49,7 +58,7 @@ class STTAdapter:
         Args:
             context_prompt: Optional vocabulary/style hint (user interests, tech terms).
         """
-        provider = self._s.stt_provider
+        provider = self._s.speech_to_text_provider
         model = self._s.stt_model
         content_type, filename = normalize_upload(content_type, filename)
         prompt = (context_prompt or build_transcription_prompt()).strip()
@@ -63,6 +72,8 @@ class STTAdapter:
             return await self._groq(audio_bytes, filename, content_type, model, language, prompt)
         if provider == "openai":
             return await self._openai(audio_bytes, filename, content_type, model, language, prompt)
+        if provider == "deepgram":
+            return await self._deepgram(audio_bytes, filename, content_type, model, language, prompt)
         raise ValueError(f"Unknown STT provider: {provider}")
 
     async def _groq(
@@ -190,6 +201,80 @@ class STTAdapter:
             upload_type,
         )
 
+    @retry(
+        retry=retry_if_exception_type((httpx.TimeoutException,)),
+        wait=wait_exponential(multiplier=1, min=2, max=20),
+        stop=stop_after_attempt(3),
+        reraise=True,
+    )
+    async def _deepgram(
+        self,
+        audio_bytes: bytes,
+        filename: str,
+        content_type: str,
+        model: str,
+        language: str | None,
+        prompt: str,
+    ) -> str:
+        if not self._s.deepgram_api_key:
+            raise RuntimeError(
+                "DEEPGRAM_API_KEY not set (required for SPEECH_TO_TEXT_PROVIDER=deepgram)",
+            )
+
+        suffix = "." + filename.rsplit(".", 1)[-1] if "." in filename else ".webm"
+        ct = (content_type or "").split(";")[0].strip().lower()
+
+        try:
+            return await self._deepgram_request(
+                audio_bytes, filename, content_type, model, language, prompt,
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 400:
+                raise
+            if ct in {"audio/webm", "video/webm"} or suffix == ".webm":
+                wav_bytes = convert_to_wav(audio_bytes, input_suffix=suffix)
+                if wav_bytes:
+                    log.info("STT: Deepgram rejected WebM, retrying with ffmpeg WAV")
+                    return await self._deepgram_request(
+                        wav_bytes, "recording.wav", "audio/wav", model, language, prompt,
+                    )
+            raise
+
+    async def _deepgram_request(
+        self,
+        audio_bytes: bytes,
+        filename: str,
+        content_type: str,
+        model: str,
+        language: str | None,
+        prompt: str,
+    ) -> str:
+        params: list[tuple[str, str]] = [
+            ("model", model),
+            ("smart_format", "true"),
+            ("punctuate", "true"),
+            ("language", language or "en"),
+        ]
+        for term in _deepgram_keyterms_from_prompt(prompt):
+            params.append(("keyterm", term))
+
+        headers = {
+            "Authorization": f"Token {self._s.deepgram_api_key}",
+            "Content-Type": content_type or "application/octet-stream",
+        }
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(
+                _DEEPGRAM_URL,
+                params=params,
+                content=audio_bytes,
+                headers=headers,
+            )
+            if resp.status_code >= 400:
+                log.error("STT Deepgram error %s: %s", resp.status_code, resp.text[:800])
+            resp.raise_for_status()
+            return _parse_deepgram_transcript(resp.json())
+
     async def _post_transcription(
         self,
         url: str,
@@ -214,6 +299,34 @@ class STTAdapter:
                 parsed = json.loads(body)
                 return str(parsed.get("text") or "").strip()
             return body
+
+
+def _parse_deepgram_transcript(body: object) -> str:
+    if not isinstance(body, dict):
+        return ""
+    try:
+        channels = body["results"]["channels"]
+        alternatives = channels[0]["alternatives"]
+        return str(alternatives[0].get("transcript") or "").strip()
+    except (KeyError, IndexError, TypeError):
+        log.warning("STT: unexpected Deepgram response shape: %s", str(body)[:400])
+        return ""
+
+
+def _deepgram_keyterms_from_prompt(prompt: str, *, limit: int = 12) -> list[str]:
+    """Extract vocabulary hints for Deepgram keyterm boosting."""
+    words = re.findall(r"\b[A-Za-z][A-Za-z0-9_-]{2,}\b", prompt)
+    seen: set[str] = set()
+    terms: list[str] = []
+    for word in words:
+        key = word.lower()
+        if key in _KEYTERM_STOPWORDS or key in seen:
+            continue
+        seen.add(key)
+        terms.append(word)
+        if len(terms) >= limit:
+            break
+    return terms
 
 
 def get_stt_adapter(settings: Settings | None = None) -> STTAdapter:
