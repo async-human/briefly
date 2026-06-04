@@ -11,7 +11,7 @@ type DashboardShellProps = {
 
 export function DashboardShell({ children, userName, avatarUrl }: DashboardShellProps) {
   return (
-    <div className="dash-shell">
+    <div className="dash-shell dash-hallmark">
       <DashboardNav userName={userName} avatarUrl={avatarUrl} />
       <main className="dash-main">{children}</main>
       <BrainDumpFab />

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Playfair_Display, DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
+import "../styles/hallmark-dashboard.css";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -24,7 +25,13 @@ const dmMono = DM_Mono({
 export const metadata: Metadata = {
   title: "Briefly — Your personal AI briefing agent",
   description:
-    "Briefly reads everything you follow and sends one sharp, cited, personalised briefing every morning.",
+    "Briefly reads everything you follow and sends one sharp, cited, personalised briefing every morning",
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover" as const,
 };
 
 export default function RootLayout({
