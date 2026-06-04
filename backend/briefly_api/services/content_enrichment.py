@@ -24,6 +24,7 @@ async def enrich_medium_content(
     user_id: str,
     *,
     source_name: str | None,
+    source_id: str | None = None,
     per_digest_limit: int,
 ) -> list[NormalizedContent]:
     if not items:
@@ -33,6 +34,7 @@ async def enrich_medium_content(
     return await expand_medium_digest_items(
         items,
         source_name=source_name,
+        source_id=source_id,
         per_digest_limit=per_digest_limit,
         interest_keywords=keywords,
         profile_embedding=profile_embedding,

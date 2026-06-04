@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from briefly_api.agents.context import RawItem
+from briefly_api.agents.context import PipelineContext, RawItem
 from briefly_api.db.models import ContentStatus, RawContent
 
 log = logging.getLogger(__name__)
@@ -70,6 +70,7 @@ async def persist_live_raw_items(
     for item in live:
         item.meta["live_fetch"] = True
         if not item.source_id:
+            log.debug("Skipping live persist — no source_id for %r", (item.title or "")[:60])
             continue
 
         existing = await _find_existing_row(session, item)
@@ -121,6 +122,7 @@ async def _persist_live_raw_items_safe(
     saved = 0
     for item in live:
         if not item.source_id:
+            log.debug("Skipping live persist — no source_id for %r", (item.title or "")[:60])
             continue
         item.meta["live_fetch"] = True
         try:
@@ -158,10 +160,23 @@ async def _persist_live_raw_items_safe(
                 saved += 1
             else:
                 log.warning(
-                    "Skipping live item %s — duplicate content_hash=%s source=%s",
-                    item.id,
-                    item.content_hash,
-                    item.source_id,
+                    "Could not persist live item %r — remapping by content_hash failed",
+                    (item.title or "")[:60],
                 )
 
     log.info("Persisted %d live item(s) to raw_contents (safe mode) for user %s", saved, user_id)
+
+
+async def ensure_digest_content_links(session: AsyncSession, ctx: PipelineContext) -> None:
+    """Safety net: upsert raw_contents rows for digest items before FK insert."""
+    selected_ids = {d.content_id for d in ctx.digest_items if d.content_id}
+    if not selected_ids:
+        return
+
+    by_id = {i.id: i for i in ctx.enriched_items}
+    to_persist = [by_id[iid] for iid in selected_ids if iid in by_id]
+    if not to_persist:
+        return
+
+    await persist_live_raw_items(session, ctx.user.user_id, to_persist)
+    await session.flush()

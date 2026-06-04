@@ -40,13 +40,17 @@ def _build_script(ctx: PipelineContext) -> str:
 def _synthesize(script: str, output_path: str, voice_name: str) -> bool:
     """Run Supertonic TTS synchronously — called via asyncio.to_thread."""
     try:
+        # Supertonic occasionally logs strings with bare % — guard the handler.
+        for logger_name in ("supertonic", "supertonic.pipeline"):
+            logging.getLogger(logger_name).propagate = True
+
         from supertonic import TTS  # noqa: PLC0415
 
         tts = TTS(auto_download=True)
         style = tts.get_voice_style(voice_name=voice_name)
         wav, duration = tts.synthesize(script, voice_style=style, lang="en")
         tts.save_audio(wav, output_path)
-        log.info("AudioAgent: synthesized %.1fs of audio → %s", duration, output_path)
+        log.info("AudioAgent: synthesized %.1fs of audio -> %s", duration, output_path)
         return True
     except ImportError:
         log.error("AudioAgent: supertonic not installed — run: pip install supertonic")
@@ -79,8 +83,8 @@ async def run(ctx: PipelineContext) -> PipelineContext:
 
     if success:
         ctx.__dict__["audio_url"] = f"{s.backend_url}/audio/{filename}"
-        log.info("AudioAgent: audio ready for user %s → %s", ctx.user.user_id, filename)
+        log.info("AudioAgent: audio ready for user %s -> %s", ctx.user.user_id, filename)
     else:
-        ctx.log_error("AudioAgent", "TTS synthesis failed — digest will be text-only")
+        log.warning("AudioAgent: TTS synthesis failed — digest will be text-only")
 
     return ctx

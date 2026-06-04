@@ -461,7 +461,7 @@ async def _briefing_worker(user_id: str) -> None:
 
             digest, warnings = await asyncio.wait_for(
                 generate_briefing_now(user, session, get_settings()),
-                timeout=240.0,  # 4-min wall clock — catches hangs the inner 3-min pipeline timeout misses
+                timeout=360.0,
             )
             await report_briefing_progress(
                 user_id,

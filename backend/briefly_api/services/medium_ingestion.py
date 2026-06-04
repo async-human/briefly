@@ -139,6 +139,7 @@ def _fallback_items(
     previews: list[dict[str, str]],
     *,
     source_name: str,
+    source_id: str | None = None,
     digest_received_at: datetime | None,
 ) -> list[NormalizedContent]:
     items: list[NormalizedContent] = []
@@ -155,6 +156,7 @@ def _fallback_items(
                 title=title,
                 url=url,
                 source_name=source_name,
+                source_id=source_id,
                 source_type="url",
                 section="Articles",
                 author="Medium",
@@ -192,6 +194,7 @@ async def expand_medium_digest_items(
     items: list[NormalizedContent],
     *,
     source_name: str | None = None,
+    source_id: str | None = None,
     per_digest_limit: int = 6,
     interest_keywords: set[str] | None = None,
     profile_embedding: list[float] | None = None,
@@ -229,6 +232,8 @@ async def expand_medium_digest_items(
         if fetched:
             for article in fetched:
                 article.source_name = label
+                if source_id:
+                    article.source_id = source_id
                 article.meta = {**article.meta, "from_medium_digest": True}
             fetched = _filter_by_age(fetched, max_age_days=s.medium_max_article_age_days)
             if fetched:
@@ -242,6 +247,7 @@ async def expand_medium_digest_items(
         fallbacks = _fallback_items(
             previews,
             source_name=label,
+            source_id=source_id,
             digest_received_at=item.published_at,
         )
         fallbacks = _filter_by_age(fallbacks, max_age_days=s.medium_max_article_age_days)

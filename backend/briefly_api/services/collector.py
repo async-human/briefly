@@ -124,8 +124,14 @@ async def collect_from_sources(
                             fetch_session,
                             user_id,
                             source_name=display_name,
+                            source_id=source.id,
                             per_digest_limit=min(6, source_limit),
                         )
+                    for item in fetched or []:
+                        if not item.source_id:
+                            item.source_id = source.id
+                        if display_name:
+                            item.source_name = display_name
                     return source, fetched, None
                 except asyncio.TimeoutError:
                     label = display_name or source.identifier

@@ -70,7 +70,7 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
         async with get_session_factory()() as session:
             return await asyncio.wait_for(
                 _run_pipeline(session, user_id, run_date, s),
-                timeout=180.0,  # 3-minute hard cap — never leave user waiting longer
+                timeout=300.0,  # match briefing worker budget (+ audio)
             )
     except asyncio.TimeoutError:
         log.error("Pipeline timed out (>3 min) for user %s", user_id)
@@ -174,8 +174,11 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
 
         digest_id = await _persist_digest(session, ctx)
 
-        # Mark ingested pool rows as processed
-        content_ids = [
+        # Mark ingested pool rows as processed (only rows that exist in raw_contents)
+        from sqlalchemy import select as sa_select
+        from briefly_api.db.models import RawContent
+
+        candidate_ids = [
             d.content_id for d in ctx.digest_items
             if d.content_id and any(
                 i.id == d.content_id
@@ -183,10 +186,18 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
                 for i in ctx.enriched_items
             )
         ]
-        if content_ids:
-            from briefly_api.services.content_ingestion import mark_contents_processed
-            await mark_contents_processed(session, content_ids)
-            await session.commit()
+        if candidate_ids:
+            rows = await session.execute(
+                sa_select(RawContent.id).where(
+                    RawContent.user_id == ctx.user.user_id,
+                    RawContent.id.in_(candidate_ids),
+                )
+            )
+            content_ids = [row[0] for row in rows.all()]
+            if content_ids:
+                from briefly_api.services.content_ingestion import mark_contents_processed
+                await mark_contents_processed(session, content_ids)
+                await session.commit()
 
         # ── Post-delivery learning & discovery ───────────────────────────────
         # These agents improve future digests but have zero effect on what the
@@ -319,9 +330,12 @@ _AGENT_TIMEOUTS: dict[str, float] = {
     "BriefingWriterAgent":    60.0,   # LLM has own 45s inner timeout
     "BrainDumpInjectorAgent": 15.0,
     "CitationVerifierAgent":  30.0,
-    "AudioAgent":             30.0,
+    "AudioAgent":             120.0,
     "DeliveryAgent":          30.0,   # Resend has own 20s inner timeout
 }
+
+# Agents whose failure/timeout is non-fatal — logged but not counted as pipeline errors.
+_OPTIONAL_AGENTS = frozenset({"AudioAgent"})
 
 
 async def _run_agent(name: str, fn, ctx: PipelineContext) -> PipelineContext:
@@ -350,7 +364,8 @@ async def _run_agent(name: str, fn, ctx: PipelineContext) -> PipelineContext:
     except asyncio.TimeoutError:
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         log.warning("Agent %s timed out after %dms — skipping", name, elapsed_ms)
-        ctx.log_error(name, f"Agent timed out after {timeout:.0f}s")
+        if name not in _OPTIONAL_AGENTS:
+            ctx.log_error(name, f"Agent timed out after {timeout:.0f}s")
     except Exception as e:
         log.exception("Agent %s failed: %s", name, e)
         ctx.log_error(name, str(e))
@@ -367,6 +382,9 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
     from sqlalchemy import select
 
     from briefly_api.db.models import RawContent
+    from briefly_api.services.live_content_pool import ensure_digest_content_links
+
+    await ensure_digest_content_links(session, ctx)
 
     existing = await session.execute(
         select(Digest).where(
@@ -455,8 +473,8 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
             draft.content_id if draft.content_id in valid_content_ids else None
         )
         if draft.content_id and content_id is None:
-            log.warning(
-                "Digest persist: orphan content_id %s — omitting FK for %r",
+            log.debug(
+                "Digest persist: no raw_contents row for content_id %s — omitting FK for %r",
                 draft.content_id,
                 (draft.headline or "")[:80],
             )

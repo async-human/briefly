@@ -66,7 +66,7 @@ async def _refresh_priority_source_items(
         expanded_fetch=True,
     )
     for w in warnings:
-        ctx.log_error("SourceCollectorAgent", w)
+        log.warning("SourceCollectorAgent: %s", w)
 
     kept = [item for item in existing if item.source_id not in priority_ids]
     replaced = [item for item in existing if item.source_id in priority_ids]
@@ -123,7 +123,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             )
         except Exception as exc:
             log.exception("Priority source refresh failed for user %s", ctx.user.user_id)
-            ctx.log_error("SourceCollectorAgent", f"Priority refresh failed: {exc}")
+            log.warning("SourceCollectorAgent: priority refresh failed: %s", exc)
         from_pool = sum(1 for i in raw_items if i.meta.get("from_pool"))
 
     min_needed = s.min_pool_items_before_live_fetch
@@ -137,7 +137,6 @@ async def run(ctx: PipelineContext) -> PipelineContext:
                 )
             except Exception as exc:
                 log.warning("Inline ingestion failed: %s", exc)
-                ctx.log_error("SourceCollectorAgent", f"Ingestion top-up failed: {exc}")
 
         if len(raw_items) < min_needed:
             articles, warnings = await collect_from_sources(
@@ -149,7 +148,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
                 expanded_fetch=True,
             )
             for w in warnings:
-                ctx.log_error("SourceCollectorAgent", w)
+                log.warning("SourceCollectorAgent: %s", w)
 
             existing_ids = {item.content_hash for item in raw_items if item.content_hash}
             source_rank: dict[str, int] = defaultdict(int)
@@ -170,7 +169,6 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         except Exception as exc:
             await session.rollback()
             log.warning("Could not persist live items to pool: %s", exc)
-            ctx.log_error("SourceCollectorAgent", f"Live pool persist failed: {exc}")
 
     ctx.raw_items = raw_items
     ctx.total_ingested = len(raw_items)
