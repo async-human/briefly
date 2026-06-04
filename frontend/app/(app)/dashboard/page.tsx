@@ -62,7 +62,6 @@ function DashboardContent() {
     generateWarnings,
     runGenerate,
     ensureBriefing,
-    resumePolling,
   } = useBriefingGeneration();
 
   const [me, setMe] = useState<MeResponse | null>(null);
