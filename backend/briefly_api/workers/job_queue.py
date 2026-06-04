@@ -31,10 +31,13 @@ async def job_lock(key: str, *, ttl_seconds: int = 900):
 
         client = Redis.from_url(redis_url, decode_responses=True)
         acquired = await client.set(key, "1", nx=True, ex=ttl_seconds)
-        yield bool(acquired)
     except Exception as exc:
         log.warning("Redis lock unavailable (%s) — proceeding without lock", exc)
         yield True
+        return
+
+    try:
+        yield bool(acquired)
     finally:
         if client:
             try:

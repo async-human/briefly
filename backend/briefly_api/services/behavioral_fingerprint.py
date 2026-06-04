@@ -19,7 +19,6 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
-from sqlalchemy.orm import flag_modified
 
 from briefly_api.db.models import (
     BehavioralFingerprint,
@@ -205,9 +204,6 @@ async def build_and_save(session, user_id: str) -> BehavioralFingerprint | None:
         fp.mind_shifts            = mind_shifts[:6]
         fp.current_focus          = current_focus
         fp.total_signals_analyzed = len(signals)
-        flag_modified(fp, "high_engagement_topics")
-        flag_modified(fp, "low_engagement_topics")
-        flag_modified(fp, "mind_shifts")
     else:
         fp = BehavioralFingerprint(
             user_id=user_id,
