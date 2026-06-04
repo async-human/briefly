@@ -160,7 +160,7 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
   }, [resolveTodayDigest]);
 
   const runPollCycle = useCallback(
-    async (startJob: boolean, notifyOnComplete: boolean) => {
+    async (startJob: boolean, notifyOnComplete: boolean, restart = false) => {
       if (pollingRef.current) {
         if (startJob) pendingGenerateRef.current = true;
         return;
@@ -271,7 +271,7 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
         pollingRef.current = false;
         if (pendingGenerateRef.current) {
           pendingGenerateRef.current = false;
-          void runPollCycle(true, true);
+          void runPollCycle(true, true, true);
         }
       }
     },
