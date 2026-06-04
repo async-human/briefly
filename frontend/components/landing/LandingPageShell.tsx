@@ -1,6 +1,6 @@
 "use client";
 
-import "@/styles/hallmark-landing.css";
+import "@/styles/study-linear.css";
 
 import { LandingThemeProvider } from "./LandingThemeContext";
 

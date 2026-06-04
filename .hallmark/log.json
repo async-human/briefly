@@ -1,9 +1,16 @@
 [
   {
     "date": "2026-05-28",
+    "macrostructure": "Workbench + Narrative Workflow",
+    "theme": "studied-DNA (Linear)",
+    "enrichment": "none — DigestPreview product mock",
+    "brief": "Briefly landing · hallmark study linear.app"
+  },
+  {
+    "date": "2026-05-28",
     "macrostructure": "Long Document",
     "theme": "Newsprint-warm",
     "enrichment": "none",
-    "brief": "Briefly landing page Hallmark redesign — editorial letter hero, masthead nav"
+    "brief": "Briefly landing page Hallmark redesign — reverted"
   }
 ]
