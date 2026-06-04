@@ -33,7 +33,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     for dump in pending:
         brain_drafts.append(
             DigestItemDraft(
-                content_id=dump.id,
+                content_id=None,
                 position=0,
                 section=brain_dump_service.BRAIN_DUMP_SECTION,
                 headline=dump.title,

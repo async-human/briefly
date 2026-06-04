@@ -50,7 +50,7 @@ class RawItem:
 @dataclass
 class DigestItemDraft:
     """A digest item being constructed by the BriefingWriterAgent."""
-    content_id: str
+    content_id: str | None
     position: int
     section: str
     headline: str

@@ -366,6 +366,8 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
 
     from sqlalchemy import select
 
+    from briefly_api.db.models import RawContent
+
     existing = await session.execute(
         select(Digest).where(
             Digest.user_id == ctx.user.user_id,
@@ -437,10 +439,27 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
     )
     session.add(digest)
 
-    pool_content_ids = {i.id for i in ctx.enriched_items}
+    candidate_ids = {d.content_id for d in ctx.digest_items if d.content_id}
+    valid_content_ids: set[str] = set()
+    if candidate_ids:
+        rows = await session.execute(
+            select(RawContent.id).where(
+                RawContent.user_id == ctx.user.user_id,
+                RawContent.id.in_(candidate_ids),
+            )
+        )
+        valid_content_ids = {row[0] for row in rows.all()}
 
     for draft in ctx.digest_items:
-        content_id = draft.content_id if draft.content_id in pool_content_ids else None
+        content_id = (
+            draft.content_id if draft.content_id in valid_content_ids else None
+        )
+        if draft.content_id and content_id is None:
+            log.warning(
+                "Digest persist: orphan content_id %s — omitting FK for %r",
+                draft.content_id,
+                (draft.headline or "")[:80],
+            )
         item = DigestItem(
             digest_id=digest_id,
             content_id=content_id,
