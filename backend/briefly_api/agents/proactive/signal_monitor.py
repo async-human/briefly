@@ -19,7 +19,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
-from sqlalchemy.orm import flag_modified
+from sqlalchemy.orm.attributes import flag_modified
 
 from briefly_api.config import get_settings
 from briefly_api.db.models import (

@@ -28,7 +28,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
-from sqlalchemy.orm import flag_modified
+from sqlalchemy.orm.attributes import flag_modified
 
 from briefly_api.agents.context import PipelineContext
 from briefly_api.db.models import (
