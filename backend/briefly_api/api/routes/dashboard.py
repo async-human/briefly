@@ -538,26 +538,29 @@ async def generate_digest_now(
         if not is_stale:
             return GenerateDigestOut(status="running", digest=None, warnings=[])
 
-    if not force:
-        from briefly_api.utils.dates import local_date_string
+    # Always check for an existing today's digest before regenerating —
+    # even when force=True. "Force" means "don't block on a running worker",
+    # not "delete a complete brief and start over", which would leave the user
+    # with nothing if the new run fails.
+    from briefly_api.utils.dates import local_date_string
 
-        local_today = local_date_string(profile.digest_timezone or "UTC")
-        existing = await db.execute(
-            select(Digest)
-            .options(selectinload(Digest.items))
-            .where(
-                Digest.user_id == user.id,
-                Digest.digest_date == local_today,
-            )
+    local_today = local_date_string(profile.digest_timezone or "UTC")
+    existing = await db.execute(
+        select(Digest)
+        .options(selectinload(Digest.items))
+        .where(
+            Digest.user_id == user.id,
+            Digest.digest_date == local_today,
         )
-        digest = existing.scalar_one_or_none()
-        item_count = (digest.total_items_shown if digest else 0) or len(digest.items if digest else [])
-        if digest and item_count > 0:
-            return GenerateDigestOut(
-                status="complete",
-                digest=DigestOut.model_validate(digest),
-                warnings=[],
-            )
+    )
+    digest = existing.scalar_one_or_none()
+    item_count = (digest.total_items_shown if digest else 0) or len(digest.items if digest else [])
+    if digest and item_count > 0:
+        return GenerateDigestOut(
+            status="complete",
+            digest=DigestOut.model_validate(digest),
+            warnings=[],
+        )
 
     now = datetime.now(timezone.utc).isoformat()
     meta["briefing_generation"] = {

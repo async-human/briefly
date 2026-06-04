@@ -44,15 +44,17 @@ async def generate_briefing_now(
     if not digest_id:
         raise ValueError("Briefing pipeline completed without a digest.")
 
-    # The pipeline committed in its own session; expire the outer session's
-    # identity map so the SELECT below reads from DB, not a stale cache.
-    await db.rollback()
-    loaded = await db.execute(
-        select(Digest)
-        .options(selectinload(Digest.items))
-        .where(Digest.id == digest_id)
-    )
-    digest = loaded.scalar_one_or_none()
+    # Load the digest in a brand-new session. The outer session (db) has been
+    # open throughout the 30-180s pipeline run and its connection may be stale.
+    # A fresh session is guaranteed to see the just-committed digest.
+    from briefly_api.db.engine import get_session_factory
+    async with get_session_factory()() as fresh:
+        loaded = await fresh.execute(
+            select(Digest)
+            .options(selectinload(Digest.items))
+            .where(Digest.id == digest_id)
+        )
+        digest = loaded.scalar_one_or_none()
     if not digest:
         raise ValueError("Briefing was generated but could not be loaded.")
 
