@@ -41,6 +41,12 @@ async def lifespan(_app: FastAPI):
         logger.exception("Database startup failed — check DATABASE_URL and Supabase SSL/password")
         raise
 
+    try:
+        from briefly_api.services.digest_failure import reschedule_stuck_failures
+        await reschedule_stuck_failures()
+    except Exception:
+        logger.warning("Could not reschedule stuck failures — non-fatal", exc_info=True)
+
     scheduler_task   = asyncio.create_task(digest_scheduler_loop())
     enrichment_task  = asyncio.create_task(continuous_enrichment_loop())
     logger.info("Digest scheduler + enrichment worker started")

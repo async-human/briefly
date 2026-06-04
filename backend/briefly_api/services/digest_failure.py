@@ -143,7 +143,10 @@ async def retry_failed_digest(failure_id: str) -> None:
             except Exception as exc:
                 failure.retry_count += 1
                 failure.error_message = str(exc)[:2000]
-                failure.next_retry_at = None
+                if failure.retry_count < failure.max_retries:
+                    failure.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=RETRY_DELAY_SECONDS)
+                else:
+                    failure.next_retry_at = None
                 await session.commit()
                 log.warning("Digest retry failed for user %s: %s", user.id, exc)
 
@@ -163,3 +166,30 @@ async def process_pending_digest_retries(now_utc: datetime | None = None) -> Non
 
     for failure_id in failure_ids:
         asyncio.create_task(retry_failed_digest(failure_id))
+
+
+async def reschedule_stuck_failures() -> None:
+    """
+    Called once at startup. Finds failures that ran out of retries because the
+    old default was max_retries=1 and the retry logic never rescheduled on failure.
+    Bumps max_retries to 3 and sets next_retry_at so they get picked up within
+    5 minutes of server start.
+    """
+    from sqlalchemy import update
+    now = datetime.now(timezone.utc)
+    retry_at = now + timedelta(minutes=5)
+
+    async with SessionLocal() as session:
+        await session.execute(
+            update(DigestFailure)
+            .where(
+                DigestFailure.resolved_at.is_(None),
+                DigestFailure.next_retry_at.is_(None),
+            )
+            .values(
+                max_retries=3,
+                next_retry_at=retry_at,
+            )
+        )
+        await session.commit()
+    log.info("digest_failure: rescheduled stuck failures (retry in 5 min)")

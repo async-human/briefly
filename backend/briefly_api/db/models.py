@@ -210,7 +210,7 @@ class DigestFailure(Base):
     digest_date: Mapped[str] = mapped_column(String(10), nullable=False)
     error_message: Mapped[str] = mapped_column(Text, nullable=False)
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
-    max_retries: Mapped[int] = mapped_column(Integer, default=1)
+    max_retries: Mapped[int] = mapped_column(Integer, default=3)
     notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
