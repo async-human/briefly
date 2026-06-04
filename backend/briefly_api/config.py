@@ -212,9 +212,22 @@ class Settings(BaseSettings):
             )
         return voice
 
+    # Comma-separated emails that bypass Pro gates (internal testing / founders).
+    pro_bypass_emails: str = (
+        "sharshal499@gmail.com,kkrharsh16@gmail.com,shindeharshal338@gmail.com"
+    )
+
     # ── Sentry ────────────────────────────────────────────────────────────────
     sentry_dsn: str = ""
     sentry_traces_sample_rate: float = 0.1  # 10% of requests traced
+
+    @property
+    def pro_bypass_email_set(self) -> frozenset[str]:
+        return frozenset(
+            e.strip().lower()
+            for e in self.pro_bypass_emails.split(",")
+            if e.strip()
+        )
 
     # ── Admin ────────────────────────────────────────────────────────────────
     admin_key: str = "change-me-admin-key"

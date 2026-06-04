@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.auth.deps import get_current_user
+from briefly_api.config import get_settings
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import Source, User
 
@@ -13,8 +14,15 @@ FREE_HISTORY_DAYS = 7
 FREE_DIGEST_ITEMS = 5
 
 
+def has_pro_access(user: User) -> bool:
+    if user.plan == "pro":
+        return True
+    email = (user.email or "").strip().lower()
+    return email in get_settings().pro_bypass_email_set
+
+
 def require_pro(user: User = Depends(get_current_user)) -> User:
-    if user.plan != "pro":
+    if not has_pro_access(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This feature is available on the Pro plan. Upgrade at sendbriefly.app/#pricing.",
@@ -26,7 +34,7 @@ async def check_source_limit(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    if user.plan == "pro":
+    if has_pro_access(user):
         return user
     result = await db.execute(
         select(func.count()).select_from(Source).where(Source.user_id == user.id)
