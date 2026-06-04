@@ -1,7 +1,7 @@
 export function CTA() {
   return (
-    <section className="cta-linear" id="start">
-      <div className="cta-linear-inner">
+    <section className="cta-linear landing-section" id="start">
+      <div className="landing-section-inner cta-linear-inner">
         <p className="cta-linear-eyebrow">Get started</p>
         <h2 className="cta-linear-headline">
           Built for mornings. Available tonight.

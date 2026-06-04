@@ -14,7 +14,8 @@ const SOURCES = [
 
 export function SourcesStrip() {
   return (
-    <section className="sources-strip sources-strip-section">
+    <section className="sources-strip sources-strip-section landing-section">
+      <div className="landing-section-inner">
       <Reveal>
         <div className="section-block-header">
           <h2 className="section-block-title">Sources we connect</h2>
@@ -33,6 +34,7 @@ export function SourcesStrip() {
           ))}
         </div>
       </Reveal>
+      </div>
     </section>
   );
 }

@@ -57,7 +57,8 @@ export function Hero() {
         </div>
       </section>
 
-      <section className="hero-stages" aria-labelledby="hero-stages-title">
+      <section className="hero-stages landing-section" aria-labelledby="hero-stages-title">
+        <div className="landing-section-inner">
         <div className="section-block-header">
           <h2 id="hero-stages-title" className="section-block-title">
             How Briefly fits your morning
@@ -83,6 +84,7 @@ export function Hero() {
               </a>
             </motion.article>
           ))}
+        </div>
         </div>
       </section>
     </>
