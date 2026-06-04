@@ -10,7 +10,10 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_VALID_AUDIO_VOICES = frozenset({*(f"M{i}" for i in range(1, 6)), *(f"F{i}" for i in range(1, 6))})
 
 
 class Settings(BaseSettings):
@@ -197,6 +200,17 @@ class Settings(BaseSettings):
     audio_enabled: bool = False
     audio_storage_path: str = "/tmp/briefly_audio"
     audio_voice_name: str = "M1"
+
+    @field_validator("audio_voice_name", mode="before")
+    @classmethod
+    def normalize_audio_voice_name(cls, value: object) -> str:
+        voice = str(value or "M1").strip().upper()
+        if voice not in _VALID_AUDIO_VOICES:
+            raise ValueError(
+                f"Invalid AUDIO_VOICE_NAME {value!r} — use one of "
+                f"{sorted(_VALID_AUDIO_VOICES)}"
+            )
+        return voice
 
     # ── Sentry ────────────────────────────────────────────────────────────────
     sentry_dsn: str = ""

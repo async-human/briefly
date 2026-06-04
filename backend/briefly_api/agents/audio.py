@@ -21,6 +21,36 @@ from briefly_api.config import get_settings
 
 log = logging.getLogger(__name__)
 
+_VALID_VOICES = frozenset({*(f"M{i}" for i in range(1, 6)), *(f"F{i}" for i in range(1, 6))})
+
+
+def _normalize_voice(voice_name: str) -> str:
+    voice = (voice_name or "M1").strip().upper()
+    if voice not in _VALID_VOICES:
+        log.warning("Unknown voice %r — using M1", voice_name)
+        return "M1"
+    return voice
+
+
+def _audio_filename(user_id: str, run_date: str, voice_name: str) -> str:
+    return f"{user_id}_{run_date}_{_normalize_voice(voice_name)}.wav"
+
+
+def _purge_stale_audio(audio_dir: Path, user_id: str, run_date: str, keep_filename: str) -> None:
+    """Remove older WAVs for the same user/day (legacy paths + prior voice)."""
+    patterns = [
+        f"{user_id}_{run_date}.wav",
+        f"{user_id}_{run_date}_*.wav",
+    ]
+    for pattern in patterns:
+        for path in audio_dir.glob(pattern):
+            if path.name != keep_filename and path.is_file():
+                try:
+                    path.unlink()
+                    log.info("AudioAgent: removed stale audio %s", path.name)
+                except OSError as exc:
+                    log.warning("AudioAgent: could not remove stale audio %s: %s", path.name, exc)
+
 
 def _build_script(ctx: PipelineContext) -> str:
     """Build clean spoken text from digest items — no markdown, no URLs."""
@@ -47,7 +77,7 @@ def _synthesize(script: str, output_path: str, voice_name: str) -> bool:
         from supertonic import TTS  # noqa: PLC0415
 
         tts = TTS(auto_download=True)
-        style = tts.get_voice_style(voice_name=voice_name)
+        style = tts.get_voice_style(voice_name=_normalize_voice(voice_name))
         wav, duration = tts.synthesize(script, voice_style=style, lang="en")
         tts.save_audio(wav, output_path)
         log.info("AudioAgent: synthesized %.1fs of audio -> %s", duration, output_path)
@@ -72,14 +102,17 @@ async def run(ctx: PipelineContext) -> PipelineContext:
 
     script = _build_script(ctx)
 
+    voice = _normalize_voice(s.audio_voice_name)
+    log.info("AudioAgent: synthesizing with voice=%s (AUDIO_VOICE_NAME=%s)", voice, s.audio_voice_name)
+
     audio_dir = Path(s.audio_storage_path)
     audio_dir.mkdir(parents=True, exist_ok=True)
 
-    # Deterministic filename — safe to regenerate
-    filename = f"{ctx.user.user_id}_{ctx.run_date}.wav"
+    filename = _audio_filename(ctx.user.user_id, ctx.run_date, voice)
     output_path = str(audio_dir / filename)
+    _purge_stale_audio(audio_dir, ctx.user.user_id, ctx.run_date, filename)
 
-    success = await asyncio.to_thread(_synthesize, script, output_path, s.audio_voice_name)
+    success = await asyncio.to_thread(_synthesize, script, output_path, voice)
 
     if success:
         ctx.__dict__["audio_url"] = f"{s.backend_url}/audio/{filename}"
