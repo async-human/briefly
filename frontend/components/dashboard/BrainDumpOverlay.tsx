@@ -5,6 +5,18 @@ import { AnimatePresence, motion } from "framer-motion";
 import { api, ApiError, type BrainDump } from "@/lib/api";
 import { BrainDumpHistory } from "./BrainDumpHistory";
 import {
+  buildRecordingBlob,
+  canUseLiveSpeechWithRecorder,
+  createMediaRecorder,
+  getRecordingStream,
+  isMediaRecorderSupported,
+  isMobileDevice,
+  minRecordingBytes,
+  pickRecorderFormat,
+  shouldUseRecorderTimeslice,
+  type RecorderFormat,
+} from "@/lib/mediaRecording";
+import {
   buildTranscriptFromResults,
   createSpeechRecognition,
   formatLiveTranscript,
@@ -26,14 +38,6 @@ type BrainDumpOverlayProps = {
 };
 
 const RECORDER_TIMESLICE_MS = 1_000;
-
-const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
-  echoCancellation: true,
-  noiseSuppression: true,
-  autoGainControl: true,
-  channelCount: 1,
-  sampleRate: { ideal: 48_000 },
-};
 
 export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
   const [phase, setPhase] = useState<Phase>("capture");
@@ -57,8 +61,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
   const webSpeechInterimRef = useRef("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const liveTranscriptElRef = useRef<HTMLDivElement>(null);
-  const recordingMimeRef = useRef("");
-  const recordingExtRef = useRef("webm");
+  const recordingFormatRef = useRef<RecorderFormat | null>(null);
 
   const stopLiveSpeech = useCallback(() => {
     const recognition = speechRecognitionRef.current;
@@ -86,7 +89,7 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
   }, [stopLiveSpeech]);
 
   const startLiveSpeech = useCallback(() => {
-    if (!isLiveSpeechSupported()) return;
+    if (!canUseLiveSpeechWithRecorder()) return;
 
     const attachHandlers = (recognition: BrowserSpeechRecognition) => {
       recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -244,38 +247,37 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
     webSpeechCommittedRef.current = "";
     webSpeechInterimRef.current = "";
 
+    if (!isMediaRecorderSupported()) {
+      setError("Voice recording isn't supported in this browser. Try Chrome/Safari or type instead.");
+      setPhase("capture");
+      return;
+    }
+
+    const format = pickRecorderFormat();
+    if (!format) {
+      setError("Voice recording isn't supported in this browser. Use text instead.");
+      setPhase("capture");
+      return;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
+      const stream = await getRecordingStream();
       mediaStreamRef.current = stream;
+      recordingFormatRef.current = format;
 
-      const mimeCandidates = [
-        "audio/webm;codecs=opus",
-        "audio/webm",
-        "audio/mp4",
-        "audio/ogg;codecs=opus",
-        "audio/ogg",
-      ];
-      const mimeType = mimeCandidates.find((t) => MediaRecorder.isTypeSupported(t));
-      if (!mimeType) {
-        setError("Voice recording is not supported in this browser. Use text instead.");
-        stream.getTracks().forEach((t) => t.stop());
-        mediaStreamRef.current = null;
-        setPhase("capture");
-        return;
-      }
-
-      const ext = mimeType.includes("mp4") ? "mp4" : mimeType.includes("ogg") ? "ogg" : "webm";
-      recordingMimeRef.current = mimeType.split(";")[0];
-      recordingExtRef.current = ext;
-
-      const recorder = new MediaRecorder(stream, {
-        mimeType,
-        audioBitsPerSecond: 128_000,
-      });
+      const recorder = createMediaRecorder(stream, format);
       chunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onerror = () => {
+        if (!recordingActiveRef.current) return;
+        setError("Recording failed. Try again or type your thoughts.");
+        stopRecordingSession();
+        stream.getTracks().forEach((t) => t.stop());
+        setPhase("capture");
       };
 
       recorder.onstop = async () => {
@@ -287,20 +289,29 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
           timerRef.current = null;
         }
 
-        const blob = new Blob(chunksRef.current, { type: recordingMimeRef.current });
-        const fallback = browserTranscriptFallback();
+        // iOS may deliver the final chunk slightly after stop()
+        await new Promise((r) => setTimeout(r, isMobileDevice() ? 200 : 0));
 
-        if (blob.size < 1000) {
+        const fmt = recordingFormatRef.current ?? format;
+        const blob = buildRecordingBlob(chunksRef.current, fmt.blobType);
+        const fallback = browserTranscriptFallback();
+        const minBytes = minRecordingBytes();
+
+        if (blob.size < minBytes) {
           if (fallback.length >= 3) {
             await submitTranscript(fallback, false);
           } else {
-            setError("Recording too short. Speak for at least a second, then stop.");
+            setError(
+              isMobileDevice()
+                ? "No audio captured. Hold the mic permission, speak for a few seconds, then tap Stop."
+                : "Recording too short. Speak for at least a second, then stop.",
+            );
             setPhase("capture");
           }
           return;
         }
 
-        await submitAudio(blob, `recording.${recordingExtRef.current}`);
+        await submitAudio(blob, `recording.${fmt.ext}`);
       };
 
       mediaRecorderRef.current = recorder;
@@ -311,24 +322,52 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
       setInterimText("");
       setError(null);
       timerRef.current = setInterval(() => setRecordingSec((s) => s + 1), 1000);
-      recorder.start(RECORDER_TIMESLICE_MS);
+
+      if (shouldUseRecorderTimeslice()) {
+        recorder.start(RECORDER_TIMESLICE_MS);
+      } else {
+        recorder.start();
+      }
       startLiveSpeech();
-    } catch {
-      setError("Microphone access denied. Use text input instead.");
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        setError("Microphone access denied. Allow the mic in browser settings, then try again.");
+      } else if (name === "NotFoundError") {
+        setError("No microphone found on this device.");
+      } else {
+        setError("Could not start recording. Try again or type your thoughts.");
+      }
       setPhase("capture");
     }
   }
 
   function stopRecording() {
-    if (mediaRecorderRef.current?.state === "recording") {
-      setProcessingLabel("Finishing up…");
-      setPhase("processing");
+    const recorder = mediaRecorderRef.current;
+    if (recorder?.state !== "recording") return;
+
+    setProcessingLabel("Finishing up…");
+    setPhase("processing");
+
+    const finalizeStop = () => {
       try {
-        mediaRecorderRef.current.requestData();
+        recorder.stop();
       } catch {
-        /* ignore */
+        setError("Could not finish recording. Try again.");
+        setPhase("capture");
       }
-      mediaRecorderRef.current.stop();
+    };
+
+    try {
+      recorder.requestData();
+    } catch {
+      /* ignore */
+    }
+
+    if (isMobileDevice()) {
+      setTimeout(finalizeStop, 120);
+    } else {
+      finalizeStop();
     }
   }
 
@@ -345,9 +384,13 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
 
   const isBusy = phase === "processing" || phase === "starting";
   const isRecording = phase === "recording";
+  const liveCaptionsAvailable = canUseLiveSpeechWithRecorder();
   const hasLiveContent = Boolean(text.trim() || interimText.trim());
-  const showLiveTranscript = isRecording && (hasLiveContent || liveSpeechActive);
-  const showListeningEmpty = isRecording && !hasLiveContent;
+  const showLiveTranscript =
+    isRecording && liveCaptionsAvailable && (hasLiveContent || liveSpeechActive);
+  const showListeningEmpty =
+    isRecording && liveCaptionsAvailable && !hasLiveContent;
+  const showMobileRecording = isRecording && !liveCaptionsAvailable;
 
   return (
     <AnimatePresence>
@@ -503,9 +546,11 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                   {isRecording
                     ? liveSpeechActive
                       ? "Words appear as you speak. Briefly polishes the full recording when you stop."
-                      : isLiveSpeechSupported()
-                        ? "Recording audio — live captions will appear when your browser allows them."
-                        : "Recording audio — a polished transcript appears when you stop."
+                      : showMobileRecording
+                        ? "Recording on your phone — speak clearly, then tap Stop. Your transcript appears after."
+                        : isLiveSpeechSupported()
+                          ? "Recording audio — live captions will appear when your browser allows them."
+                          : "Recording audio — a polished transcript appears when you stop."
                     : isBusy
                       ? "Hang tight while Briefly processes your recording."
                       : "Stream of consciousness is fine. Briefly cleans it up and feeds your second brain."}
@@ -522,7 +567,11 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                     <div className="brain-dump-live-bar">
                       <span className="brain-dump-live-dot" aria-hidden />
                       <span>
-                        {liveSpeechActive ? "Listening · live captions" : "Recording"}
+                        {liveSpeechActive
+                          ? "Listening · live captions"
+                          : showMobileRecording
+                            ? "Recording audio"
+                            : "Recording"}
                       </span>
                       <span className="brain-dump-live-timer">{recordingSec}s</span>
                     </div>
@@ -556,14 +605,20 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
                           <span className="brain-dump-live-interim">{interimText}</span>
                         ) : null}
                       </div>
-                    ) : isRecording ? (
-                      <div className="brain-dump-recording-stage brain-dump-recording-stage-fallback" aria-hidden>
+                    ) : showMobileRecording ? (
+                      <div
+                        className="brain-dump-recording-stage brain-dump-mobile-recording"
+                        aria-live="polite"
+                      >
                         <div className="brain-dump-recording-ring">
                           <span className="brain-dump-listening-wave" />
                           <span className="brain-dump-listening-wave" />
                           <span className="brain-dump-listening-wave" />
                         </div>
-                        <p className="brain-dump-recording-sublabel">Waiting for speech…</p>
+                        <p className="brain-dump-recording-label">Recording {recordingSec}s</p>
+                        <p className="brain-dump-recording-sublabel">
+                          Speak now — tap Stop when finished
+                        </p>
                       </div>
                     ) : isBusy ? (
                       <div className="brain-dump-processing-stage" aria-live="polite">

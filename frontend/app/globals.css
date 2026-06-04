@@ -12095,8 +12095,15 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   font-style: italic;
   transition: opacity 0.15s ease;
 }
-.brain-dump-recording-stage-fallback {
+.brain-dump-recording-stage-fallback,
+.brain-dump-mobile-recording {
   min-height: 200px;
+}
+.brain-dump-mobile-recording .brain-dump-recording-label {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 12px;
 }
 .brain-dump-stt-warning {
   margin: -8px 0 14px;
