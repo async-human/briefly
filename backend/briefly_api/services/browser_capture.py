@@ -245,6 +245,75 @@ def why_it_matters_for_capture(
     return " ".join(parts)
 
 
+@dataclass
+class BrowserCaptureListItem:
+    id: str
+    title: str
+    url: str | None
+    summary: str
+    user_note: str | None
+    created_at: datetime
+    in_briefing: bool
+    connection_sentence: str | None
+    thread_label: str | None
+    why_relevant: str | None
+
+
+async def list_recent_captures(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    limit: int = 50,
+) -> list[BrowserCaptureListItem]:
+    """All extension captures for the Saved page, newest first."""
+    source = await _get_or_create_source(db, user_id)
+
+    result = await db.execute(
+        select(RawContent)
+        .where(
+            RawContent.user_id == user_id,
+            RawContent.source_id == source.id,
+        )
+        .order_by(RawContent.ingested_at.desc())
+        .limit(limit)
+    )
+    rows = result.scalars().all()
+    if not rows:
+        return []
+
+    row_ids = [r.id for r in rows]
+    enrich_result = await db.execute(
+        select(ContentEnrichmentCache).where(
+            ContentEnrichmentCache.user_id == user_id,
+            ContentEnrichmentCache.content_id.in_(row_ids),
+        )
+    )
+    enrich_by_id = {e.content_id: e for e in enrich_result.scalars().all()}
+
+    items: list[BrowserCaptureListItem] = []
+    for row in rows:
+        meta = row.meta or {}
+        if not meta.get("browser_capture"):
+            continue
+        enrichment = enrich_by_id.get(row.id)
+        thread_key = enrichment.thread_key if enrichment else None
+        items.append(
+            BrowserCaptureListItem(
+                id=row.id,
+                title=row.title or "Saved article",
+                url=row.url,
+                summary=(row.summary or row.clean_text or "")[:400],
+                user_note=meta.get("user_note"),
+                created_at=row.ingested_at or datetime.now(timezone.utc),
+                in_briefing=bool(meta.get("injected_at") or meta.get("injected_digest_id")),
+                connection_sentence=enrichment.connection_sentence if enrichment else None,
+                thread_label=_thread_label(thread_key) if thread_key else None,
+                why_relevant=enrichment.why_relevant if enrichment else None,
+            )
+        )
+    return items
+
+
 def build_capture_feedback(
     row: RawContent,
     enrichment: ContentEnrichmentCache | None,

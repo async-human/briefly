@@ -444,6 +444,19 @@ export type BrainDump = {
   injected_digest_id?: string | null;
 };
 
+export type BrowserCapture = {
+  id: string;
+  title: string;
+  url: string | null;
+  summary: string;
+  user_note: string | null;
+  created_at: string;
+  in_briefing: boolean;
+  connection_sentence: string | null;
+  thread_label: string | null;
+  why_relevant: string | null;
+};
+
 export const api = {
   getMe: () => request<MeResponse>("/api/v1/me"),
   getLatestDigest: () => request<Digest | null>("/api/v1/digests/latest"),
@@ -598,6 +611,9 @@ export const api = {
       body: JSON.stringify({ api_key }),
     }),
   disconnectReadwise: () => request<void>("/api/v1/auth/readwise", { method: "DELETE" }),
+
+  // Browser captures (extension)
+  listCaptures: () => request<BrowserCapture[]>("/api/v1/captures"),
 
   // Brain Dump
   listBrainDumps: () => request<BrainDump[]>("/api/v1/brain-dumps"),

@@ -17,6 +17,20 @@ const NAV = [
     ),
   },
   {
+    href: "/saved",
+    label: "Saved",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M7 4.5h10a1.5 1.5 0 0 1 1.5 1.5v13.8L12 16.5 5.5 19.8V6A1.5 1.5 0 0 1 7 4.5Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/history",
     label: "History",
     icon: (

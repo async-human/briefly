@@ -18,6 +18,7 @@ from briefly_api.api.schemas import (
     UrlCaptureFeedbackOut,
     UrlCaptureIn,
     UrlCaptureOut,
+    BrowserCaptureListOut,
 )
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
@@ -88,6 +89,30 @@ async def create_text_brain_dump(
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     return _to_out(result)
+
+
+@router.get("/captures", response_model=list[BrowserCaptureListOut])
+async def list_browser_captures(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[BrowserCaptureListOut]:
+    """Articles saved via the browser extension."""
+    rows = await browser_capture_service.list_recent_captures(db, user.id)
+    return [
+        BrowserCaptureListOut(
+            id=r.id,
+            title=r.title,
+            url=r.url,
+            summary=r.summary,
+            user_note=r.user_note,
+            created_at=r.created_at,
+            in_briefing=r.in_briefing,
+            connection_sentence=r.connection_sentence,
+            thread_label=r.thread_label,
+            why_relevant=r.why_relevant,
+        )
+        for r in rows
+    ]
 
 
 @router.post("/capture/url", response_model=UrlCaptureOut, status_code=status.HTTP_201_CREATED)

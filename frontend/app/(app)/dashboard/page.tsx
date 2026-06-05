@@ -225,6 +225,7 @@ function DashboardContent() {
   }
 
   const fetchableSources = sources.filter((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
+  const sidebarSources = fetchableSources;
   const outcome = getDigestOutcome(digest);
   const greeting = me?.user.name?.split(" ")[0] ?? "there";
   const today = new Date().toLocaleDateString("en-US", {
@@ -319,10 +320,10 @@ function DashboardContent() {
               </p>
             </div>
           </div>
-          <div className="dash-surface-body dash-surface-body-flush">
+          <div className="dash-surface-body dash-surface-body-sources">
             <SourcesSidebar
               ingestionEmail={me.ingestion_email}
-              sources={sources}
+              sources={sidebarSources}
               gmailConnected={me.gmail_connected}
               autoSuggestions={me.auto_suggestions ?? []}
               onSourceAdded={handleSourceAdded}

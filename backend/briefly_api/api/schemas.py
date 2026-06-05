@@ -358,3 +358,16 @@ class UrlCaptureOut(BaseModel):
     enrichment_status: Literal["complete", "partial", "pending"] = "pending"
     enrichment: UrlCaptureFeedbackOut = Field(default_factory=UrlCaptureFeedbackOut)
 
+
+class BrowserCaptureListOut(BaseModel):
+    id: str
+    title: str
+    url: str | None = None
+    summary: str
+    user_note: str | None = None
+    created_at: datetime
+    in_briefing: bool = False
+    connection_sentence: str | None = None
+    thread_label: str | None = None
+    why_relevant: str | None = None
+
