@@ -1,21 +1,36 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from briefly_api.agents.proactive.enrich_item import (
+    count_thread_captures_this_week,
+    enrich_content_item,
+)
 from briefly_api.api.plan_limits import require_pro
-from briefly_api.api.schemas import BrainDumpOut, BrainDumpTextIn, BrainDumpTranscribeOut
+from briefly_api.api.schemas import (
+    BrainDumpOut,
+    BrainDumpTextIn,
+    BrainDumpTranscribeOut,
+    UrlCaptureFeedbackOut,
+    UrlCaptureIn,
+    UrlCaptureOut,
+)
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import User
 from briefly_api.services import brain_dump as brain_dump_service
+from briefly_api.services import browser_capture as browser_capture_service
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["capture"])
+
+CAPTURE_ENRICH_TIMEOUT_SEC = 10.0
 
 ALLOWED_AUDIO_TYPES = {
     "audio/webm",
@@ -73,6 +88,100 @@ async def create_text_brain_dump(
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     return _to_out(result)
+
+
+@router.post("/capture/url", response_model=UrlCaptureOut, status_code=status.HTTP_201_CREATED)
+async def capture_page_url(
+    body: UrlCaptureIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> UrlCaptureOut:
+    """
+    Save an article from the browser extension.
+    Scrapes the URL, persists to the content pool, and runs immediate enrichment
+    for connection feedback in the extension popup (10s timeout).
+    """
+    try:
+        result = await browser_capture_service.capture_url(
+            db,
+            user.id,
+            body.url,
+            page_title=body.title,
+            user_note=body.note,
+            settings=settings,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    enrichment_status = "pending"
+    feedback = UrlCaptureFeedbackOut()
+
+    try:
+        force_enrich = result.already_saved and bool(result.user_note)
+        cache = await asyncio.wait_for(
+            enrich_content_item(
+                db,
+                user.id,
+                result.id,
+                user_note=result.user_note,
+                force=force_enrich,
+            ),
+            timeout=CAPTURE_ENRICH_TIMEOUT_SEC,
+        )
+        await db.commit()
+
+        thread_count = 0
+        if cache.thread_key:
+            thread_count = await count_thread_captures_this_week(db, user.id, cache.thread_key)
+
+        from sqlalchemy import select
+        from briefly_api.db.models import RawContent
+
+        row_result = await db.execute(select(RawContent).where(RawContent.id == result.id))
+        row = row_result.scalar_one()
+
+        feedback_data = browser_capture_service.build_capture_feedback(
+            row,
+            cache,
+            thread_item_count=thread_count,
+        )
+        feedback = UrlCaptureFeedbackOut(**feedback_data)
+        enrichment_status = (
+            "complete" if feedback.connection_sentence or feedback.why_relevant else "partial"
+        )
+    except asyncio.TimeoutError:
+        log.warning("Capture enrichment timed out for user %s content %s", user.id, result.id)
+        enrichment_status = "partial"
+        feedback = UrlCaptureFeedbackOut(
+            briefing_message=(
+                "Added to Briefly. Connection analysis is still running — "
+                "check tomorrow's briefing."
+            ),
+        )
+        await db.commit()
+    except Exception:
+        log.exception("Capture enrichment failed for user %s content %s", user.id, result.id)
+        enrichment_status = "partial"
+        feedback = UrlCaptureFeedbackOut(
+            briefing_message="Added to Briefly. Will appear in tomorrow's briefing.",
+        )
+        try:
+            await db.commit()
+        except Exception:
+            await db.rollback()
+
+    return UrlCaptureOut(
+        id=result.id,
+        title=result.title,
+        url=result.url,
+        summary=result.summary,
+        user_note=result.user_note,
+        created_at=result.created_at,
+        already_saved=result.already_saved,
+        enrichment_status=enrichment_status,  # type: ignore[arg-type]
+        enrichment=feedback,
+    )
 
 
 @router.post("/brain-dumps/transcribe-preview", response_model=BrainDumpTranscribeOut)

@@ -39,6 +39,7 @@ class SourceType:
     reddit = "reddit"
     url = "url"
     brain_dump = "brain_dump"
+    browser_capture = "browser_capture"
 
 class SourceStatus(str, enum.Enum):
     active   = "active"

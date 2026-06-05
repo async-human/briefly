@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -329,4 +330,31 @@ class BrainDumpOut(BaseModel):
     created_at: datetime
     injected_at: datetime | None = None
     injected_digest_id: str | None = None
+
+
+class UrlCaptureIn(BaseModel):
+    url: str = Field(..., min_length=8, max_length=2048)
+    title: str | None = Field(None, max_length=500)
+    note: str | None = Field(None, max_length=2000)
+
+
+class UrlCaptureFeedbackOut(BaseModel):
+    connection_sentence: str | None = None
+    thread_key: str | None = None
+    thread_label: str | None = None
+    thread_item_count: int | None = None
+    why_relevant: str | None = None
+    briefing_message: str | None = None
+
+
+class UrlCaptureOut(BaseModel):
+    id: str
+    title: str
+    url: str
+    summary: str
+    user_note: str | None = None
+    created_at: datetime
+    already_saved: bool = False
+    enrichment_status: Literal["complete", "partial", "pending"] = "pending"
+    enrichment: UrlCaptureFeedbackOut = Field(default_factory=UrlCaptureFeedbackOut)
 

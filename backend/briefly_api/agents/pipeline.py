@@ -30,6 +30,7 @@ from briefly_api.agents import (
     citation_verifier,
     relevance,
     brain_dump_injector,
+    browser_capture_injector,
 )
 from briefly_api.agents.context import PipelineContext, UserContext
 from briefly_api.config import get_settings
@@ -155,6 +156,7 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
                 ctx.preview_text = ctx.digest_items[0].headline[:120]
 
         ctx = await _run_agent("BrainDumpInjectorAgent", brain_dump_injector.run, ctx)
+        ctx = await _run_agent("BrowserCaptureInjectorAgent", browser_capture_injector.run, ctx)
         ctx = await _run_agent("CitationVerifierAgent",  citation_verifier.run, ctx)
         ctx = await _run_agent("AudioAgent",             audio.run,            ctx)
         ctx = await _run_agent("DeliveryAgent",          delivery.run,         ctx)
@@ -510,6 +512,12 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
     if injected_ids and ctx.db_session:
         from briefly_api.services import brain_dump as brain_dump_service
         await brain_dump_service.mark_dumps_injected(session, injected_ids, digest_id)
+        await session.commit()
+
+    capture_ids = ctx.__dict__.get("injected_browser_capture_ids") or []
+    if capture_ids and ctx.db_session:
+        from briefly_api.services import browser_capture as browser_capture_service
+        await browser_capture_service.mark_captures_injected(session, capture_ids, digest_id)
         await session.commit()
 
     return digest_id

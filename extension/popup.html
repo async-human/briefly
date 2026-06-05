@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Briefly</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="header">
+        <span class="mark" aria-hidden="true"></span>
+        <span class="brand">Briefly</span>
+      </header>
+
+      <div id="state-connect" class="panel hidden">
+        <p class="lead">Connect your Briefly account to start feeding your second brain.</p>
+        <button type="button" id="btn-connect" class="btn btn-primary">Connect to Briefly</button>
+      </div>
+
+      <div id="state-loading" class="panel">
+        <div class="spinner" aria-hidden="true"></div>
+        <p class="lead">Adding to Briefly…</p>
+        <p class="muted" id="loading-url"></p>
+      </div>
+
+      <div id="state-success" class="panel hidden">
+        <p class="success-label">✓ Added to Briefly</p>
+        <h1 id="result-title" class="title"></h1>
+        <p id="result-connection" class="connection hidden"></p>
+        <p id="result-briefing" class="briefing"></p>
+
+        <div id="note-section" class="note-section hidden">
+          <label for="note-input" class="note-label">Add a thought</label>
+          <textarea
+            id="note-input"
+            rows="3"
+            placeholder="Why this caught your eye…"
+            maxlength="2000"
+          ></textarea>
+          <button type="button" id="btn-save-note" class="btn btn-secondary">Save note</button>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="btn-add-thought" class="btn btn-ghost">Add a thought</button>
+          <a id="btn-view" class="btn btn-primary" href="#" target="_blank" rel="noopener">View in Briefly</a>
+        </div>
+      </div>
+
+      <div id="state-error" class="panel hidden">
+        <p class="error-label">Couldn&apos;t save</p>
+        <p id="error-message" class="lead"></p>
+        <button type="button" id="btn-retry" class="btn btn-primary">Try again</button>
+      </div>
+    </div>
+    <script src="config.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

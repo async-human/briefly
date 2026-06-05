@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Briefly — Feed your second brain",
+  "version": "0.1.0",
+  "description": "Save any article to Briefly. See what it connects to in your reading threads instantly.",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "https://api.sendbriefly.app/*",
+    "https://*.sendbriefly.app/*"
+  ],
+  "action": {
+    "default_title": "Add to Briefly",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "externally_connectable": {
+    "matches": [
+      "http://localhost:3000/*",
+      "https://sendbriefly.app/*",
+      "https://*.sendbriefly.app/*"
+    ]
+  }
+}
