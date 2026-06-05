@@ -5,7 +5,6 @@
   "description": "Save any article to Briefly. See what it connects to in your reading threads instantly.",
   "permissions": ["activeTab", "storage"],
   "host_permissions": [
-    "http://localhost:8000/*",
     "https://api.sendbriefly.app/*",
     "https://*.sendbriefly.app/*"
   ],
@@ -28,7 +27,6 @@
   },
   "externally_connectable": {
     "matches": [
-      "http://localhost:3000/*",
       "https://sendbriefly.app/*",
       "https://*.sendbriefly.app/*"
     ]

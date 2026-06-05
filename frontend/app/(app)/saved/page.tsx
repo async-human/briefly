@@ -1,13 +1,17 @@
 "use client";
 
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, type BrowserCapture } from "@/lib/api";
 import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { SaveLinkPanel } from "@/components/saved/SaveLinkPanel";
 import { SavedCapturesList } from "@/components/saved/SavedCapturesList";
 import { getToken } from "@/lib/auth";
+import { urlFromShareParams } from "@/lib/shareUrl";
+
+const CHROME_STORE_URL = process.env.NEXT_PUBLIC_CHROME_STORE_URL ?? "";
 
 function SavedSkeleton() {
   return (
@@ -21,11 +25,13 @@ function SavedSkeleton() {
   );
 }
 
-export default function SavedPage() {
+function SavedPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [captures, setCaptures] = useState<BrowserCapture[]>([]);
   const [loading, setLoading] = useState(true);
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
+  const sharedUrl = urlFromShareParams(searchParams);
 
   useEffect(() => {
     if (!getToken()) {
@@ -41,59 +47,120 @@ export default function SavedPage() {
       .finally(() => setLoading(false));
   }, [router]);
 
+  function handleSaved(item: BrowserCapture) {
+    setCaptures((prev) => {
+      const without = prev.filter((c) => c.id !== item.id);
+      return [item, ...without];
+    });
+  }
+
   const queued = captures.filter((c) => !c.in_briefing).length;
+
+  if (loading) {
+    return <SavedSkeleton />;
+  }
 
   return (
     <DashboardShell userName={me?.name ?? null} avatarUrl={me?.avatar_url}>
-      {loading ? (
-        <SavedSkeleton />
-      ) : (
-        <div className="dash-page">
-          <AppPageHeader
-            eyebrow="Extension"
-            title="Saved"
-            subtitle={
-              captures.length > 0
-                ? "Articles you fed to Briefly from the web — processed into your second brain"
-                : "Save articles with the Briefly extension — they appear here instantly"
-            }
-            stats={
-              captures.length > 0
-                ? [
-                    { value: captures.length, label: "Saved" },
-                    ...(queued > 0 ? [{ value: queued, label: "Queued", accent: true }] : []),
-                  ]
-                : undefined
-            }
-            actions={
-              <Link href="/dashboard" className="dash-btn dash-btn-secondary">
-                Today
-              </Link>
-            }
-          />
+      <div className="dash-page">
+        <AppPageHeader
+          eyebrow="Save"
+          title="Saved"
+          subtitle="Feed articles to your second brain — extension on desktop, share or paste on mobile"
+          stats={
+            captures.length > 0
+              ? [
+                  { value: captures.length, label: "Saved" },
+                  ...(queued > 0 ? [{ value: queued, label: "Queued", accent: true }] : []),
+                ]
+              : undefined
+          }
+          actions={
+            <Link href="/dashboard" className="dash-btn dash-btn-secondary">
+              Today
+            </Link>
+          }
+        />
+
+        <div className="dash-page-stack">
+          <div className="dash-surface dash-surface-save-form">
+            <div className="dash-surface-body">
+              <SaveLinkPanel initialUrl={sharedUrl} onSaved={handleSaved} />
+            </div>
+          </div>
+
+          <div className="dash-surface dash-surface-install-hint">
+            <div className="dash-surface-body install-hint-body">
+              <div>
+                <h2 className="install-hint-title">Desktop — Chrome extension</h2>
+                <p className="install-hint-desc">
+                  One click on any article. Available from the Chrome Web Store once published.
+                </p>
+              </div>
+              {CHROME_STORE_URL ? (
+                <a
+                  href={CHROME_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="dash-btn dash-btn-primary"
+                >
+                  Get extension
+                </a>
+              ) : (
+                <span className="install-hint-badge">Store listing coming soon</span>
+              )}
+            </div>
+            <div className="install-hint-divider" />
+            <div className="dash-surface-body install-hint-body">
+              <div>
+                <h2 className="install-hint-title">Mobile — Share to Briefly</h2>
+                <p className="install-hint-desc">
+                  Add Briefly to your home screen once. On any article, tap Share → Briefly — it
+                  saves instantly and returns you to the page. Or paste a URL above.
+                </p>
+                <ol className="install-hint-steps">
+                  <li>
+                    <strong>iPhone:</strong> Safari → Share → Add to Home Screen
+                  </li>
+                  <li>
+                    <strong>Android:</strong> Chrome menu → Install app / Add to Home screen
+                  </li>
+                  <li>On any article: Share → Briefly</li>
+                </ol>
+              </div>
+            </div>
+          </div>
 
           {captures.length === 0 ? (
             <div className="dash-surface dash-surface-empty">
               <div className="dash-empty-state">
-                <h2 className="dash-empty-title">Nothing saved yet</h2>
+                <h2 className="dash-empty-title">Your feed is empty</h2>
                 <p className="dash-empty-desc">
-                  Install the Briefly browser extension, connect your account, and click it on
-                  any article. You&apos;ll see what it connects to — and it&apos;ll land here.
+                  Save your first article with the form above, the extension, or your phone&apos;s
+                  share sheet.
                 </p>
-                <Link href="/dashboard" className="dash-btn dash-btn-primary">
-                  Go to Today
-                </Link>
               </div>
             </div>
           ) : (
             <div className="dash-surface dash-surface-saved">
-              <div className="dash-surface-body">
+              <div className="dash-surface-head">
+                <h2 className="dash-surface-title">Your saves</h2>
+              </div>
+              <div className="dash-surface-body dash-surface-body-flush-saved">
                 <SavedCapturesList captures={captures} />
               </div>
             </div>
           )}
         </div>
-      )}
+      </div>
     </DashboardShell>
+  );
+}
+
+export default function SavedPage() {
+  return (
+    <Suspense fallback={<SavedSkeleton />}>
+      <SavedPageContent />
+    </Suspense>
   );
 }

@@ -22,12 +22,18 @@ def write_png(path: Path, size: int, rgb: tuple[int, int, int]) -> None:
 
 
 def main() -> None:
-    out = Path(__file__).resolve().parent.parent / "icons"
-    out.mkdir(parents=True, exist_ok=True)
+    repo = Path(__file__).resolve().parent.parent.parent
+    ext_out = repo / "extension" / "icons"
+    web_out = repo / "frontend" / "public" / "icons"
+    ext_out.mkdir(parents=True, exist_ok=True)
+    web_out.mkdir(parents=True, exist_ok=True)
     color = (154, 123, 79)  # Briefly brand gold
     for size in (16, 48, 128):
-        write_png(out / f"icon{size}.png", size, color)
-    print(f"Wrote icons to {out}")
+        write_png(ext_out / f"icon{size}.png", size, color)
+    for size in (192, 512):
+        write_png(web_out / f"icon{size}.png", size, color)
+    print(f"Wrote extension icons to {ext_out}")
+    print(f"Wrote PWA icons to {web_out}")
 
 
 if __name__ == "__main__":

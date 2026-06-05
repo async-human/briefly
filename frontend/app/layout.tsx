@@ -26,6 +26,12 @@ export const metadata: Metadata = {
   title: "Briefly — Your personal AI briefing agent",
   description:
     "Briefly reads everything you follow and sends one sharp, cited, personalised briefing every morning",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Briefly",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport = {

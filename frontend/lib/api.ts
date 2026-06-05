@@ -457,6 +457,25 @@ export type BrowserCapture = {
   why_relevant: string | null;
 };
 
+export type UrlCaptureResponse = {
+  id: string;
+  title: string;
+  url: string;
+  summary: string;
+  user_note: string | null;
+  created_at: string;
+  already_saved: boolean;
+  enrichment_status: "complete" | "partial" | "pending";
+  enrichment: {
+    connection_sentence: string | null;
+    thread_key: string | null;
+    thread_label: string | null;
+    thread_item_count: number | null;
+    why_relevant: string | null;
+    briefing_message: string | null;
+  };
+};
+
 export const api = {
   getMe: () => request<MeResponse>("/api/v1/me"),
   getLatestDigest: () => request<Digest | null>("/api/v1/digests/latest"),
@@ -612,8 +631,14 @@ export const api = {
     }),
   disconnectReadwise: () => request<void>("/api/v1/auth/readwise", { method: "DELETE" }),
 
-  // Browser captures (extension)
+  // Browser captures (extension + mobile share)
   listCaptures: () => request<BrowserCapture[]>("/api/v1/captures"),
+  captureUrl: (body: { url: string; title?: string; note?: string }) =>
+    request<UrlCaptureResponse>(
+      "/api/v1/capture/url",
+      { method: "POST", body: JSON.stringify(body) },
+      20_000,
+    ),
 
   // Brain Dump
   listBrainDumps: () => request<BrainDump[]>("/api/v1/brain-dumps"),

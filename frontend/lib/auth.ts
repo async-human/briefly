@@ -1,6 +1,19 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export const TOKEN_KEY = "briefly_token";
+const AUTH_NEXT_KEY = "briefly_auth_next";
+
+export function setAuthNext(path: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(AUTH_NEXT_KEY, path);
+}
+
+export function consumeAuthNext(): string | null {
+  if (typeof window === "undefined") return null;
+  const path = localStorage.getItem(AUTH_NEXT_KEY);
+  localStorage.removeItem(AUTH_NEXT_KEY);
+  return path;
+}
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;

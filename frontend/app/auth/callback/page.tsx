@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { setToken } from "@/lib/auth";
+import { setToken, consumeAuthNext } from "@/lib/auth";
 import { api } from "@/lib/api";
 
 function CallbackHandler() {
@@ -19,6 +19,11 @@ function CallbackHandler() {
       }
       setToken(token);
       try {
+        const returnTo = consumeAuthNext();
+        if (returnTo) {
+          router.replace(returnTo);
+          return;
+        }
         const status = await api.getOnboardingStatus();
         router.replace(status.onboarding_completed ? "/dashboard" : "/onboarding");
       } catch {

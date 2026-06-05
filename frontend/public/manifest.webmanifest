@@ -1,0 +1,41 @@
+{
+  "name": "Briefly",
+  "short_name": "Briefly",
+  "description": "Save articles to your personal AI briefing",
+  "start_url": "/saved",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#5e6ad2",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "share_target": {
+    "action": "/saved/capture",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "Save a link",
+      "url": "/saved",
+      "description": "Feed an article to Briefly"
+    }
+  ]
+}

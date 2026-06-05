@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { getToken, googleLoginUrl } from "@/lib/auth";
+import { getToken, googleLoginUrl, setAuthNext, consumeAuthNext } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { TimeGreetingBadge, TimeGreetingCardTitle } from "@/components/TimeGreeting";
 import { SourceIcon } from "@/components/SourceIcon";
@@ -197,26 +197,36 @@ function BriefingPreview() {
   );
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    const next = searchParams.get("next");
+    if (next) setAuthNext(next);
+
     const token = getToken();
-    if (!token) { setChecking(false); return; }
+    if (!token) {
+      setChecking(false);
+      return;
+    }
+
     api.getMe()
       .then((me) => {
+        const returnTo = consumeAuthNext() || next;
+        if (returnTo) {
+          router.replace(returnTo);
+          return;
+        }
         if (me.onboarding_completed) {
-          // Returning user — take them straight to their digest feed
           router.replace("/dashboard");
         } else {
-          // Has a token but hasn't finished setup — show the sign-in page so
-          // they can re-authenticate and proceed through onboarding normally
           setChecking(false);
         }
       })
       .catch(() => setChecking(false));
-  }, [router]);
+  }, [router, searchParams]);
 
   return (
     <div className="login-shell">
@@ -335,5 +345,27 @@ export default function LoginPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="login-shell">
+          <div className="login-right">
+            <div className="login-card" style={{ gap: 16 }}>
+              <span
+                className="btn-spinner"
+                style={{ borderColor: "var(--border-strong)", borderTopColor: "var(--accent)" }}
+              />
+              <p className="auth-loading">Loading…</p>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }
