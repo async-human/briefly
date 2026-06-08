@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type KnowledgeGraphResponse } from "@/lib/api";
-import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { GraphPageSkeleton } from "@/components/graph/GraphPageSkeleton";
 import { KnowledgeGraphView } from "@/components/graph/KnowledgeGraphView";
@@ -36,8 +35,6 @@ function GraphPageContent() {
       .finally(() => setLoading(false));
   }, [router]);
 
-  const stats = graph?.stats;
-
   return (
     <DashboardShell userName={me?.name ?? null} avatarUrl={me?.avatar_url}>
       {loading ? (
@@ -47,24 +44,7 @@ function GraphPageContent() {
           <p className="form-error">{error}</p>
         </div>
       ) : graph ? (
-        <div className="dash-page dash-page-graph">
-          <AppPageHeader
-            eyebrow="Memory"
-            title="Knowledge graph"
-            subtitle="Connections Briefly discovered from your reading, saves, and thoughts — not links you typed"
-            stats={
-              stats
-                ? [
-                    { value: stats.topic_count, label: "Topics" },
-                    { value: stats.thread_count, label: "Threads" },
-                    { value: stats.item_count, label: "Articles" },
-                    ...(stats.thought_count > 0
-                      ? [{ value: stats.thought_count, label: "Thoughts" }]
-                      : []),
-                  ]
-                : undefined
-            }
-          />
+        <div className="dash-page-graph">
           <KnowledgeGraphView data={graph} />
         </div>
       ) : null}

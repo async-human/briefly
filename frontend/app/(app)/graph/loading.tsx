@@ -4,7 +4,9 @@ import { GraphPageSkeleton } from "@/components/graph/GraphPageSkeleton";
 export default function GraphLoading() {
   return (
     <DashboardShell userName={null} avatarUrl={null}>
-      <GraphPageSkeleton />
+      <div className="dash-page-graph">
+        <GraphPageSkeleton />
+      </div>
     </DashboardShell>
   );
 }

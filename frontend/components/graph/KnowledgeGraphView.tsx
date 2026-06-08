@@ -228,13 +228,13 @@ export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
   const focusNode = filtered.nodes.find((n) => n.id === selected?.id) ?? selected;
 
   useEffect(() => {
-    if (!mobile || !focusNode) return;
+    if (!focusNode) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [mobile, focusNode]);
+  }, [focusNode]);
 
   const fitPadding = mobile ? 80 : 48;
 
@@ -302,124 +302,103 @@ export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
         </a>
       ) : null}
     </>
-  ) : (
-    <div className="kg-inspector-placeholder">
-      <p className="kg-inspector-placeholder-title">Your second brain, mapped</p>
-      <p className="kg-inspector-placeholder-desc">
-        {mobile
-          ? "Pinch to zoom, drag to pan. Tap any node to inspect it."
-          : "Drag to explore. Click any node to inspect connections Briefly discovered from your reading, saves, and thoughts."}
-      </p>
-      <ul className="kg-legend">
-        {ALL_TYPES.map((type) => (
-          <li key={type}>
-            <span className="kg-filter-dot" style={{ background: NODE_COLORS[type] }} />
-            {NODE_LABELS[type]}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+  ) : null;
 
   return (
-    <div className={`kg-layout${mobile ? " kg-layout-mobile" : ""}`}>
-      <div className="kg-toolbar">
-        <div className="kg-filters-scroll">
-          <div className="kg-filters" role="group" aria-label="Filter node types">
-            {ALL_TYPES.map((type) => {
-              const on = activeTypes.has(type);
-              const count = data.nodes.filter((n) => n.type === type).length;
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  className={`kg-filter-btn${on ? " is-active" : ""}`}
-                  onClick={() => toggleType(type)}
-                  aria-pressed={on}
-                >
-                  <span className="kg-filter-dot" style={{ background: NODE_COLORS[type] }} />
-                  {mobile ? FILTER_SHORT[type] : NODE_LABELS[type]}
-                  <span className="kg-filter-count">{count}</span>
-                </button>
-              );
-            })}
+    <div className={`kg-stage${mobile ? " kg-stage-mobile" : ""}`}>
+      <div className="kg-canvas-wrap">
+        {filtered.nodes.length === 0 ? (
+          <div className="kg-empty">
+            <p className="kg-empty-title">No nodes to show</p>
+            <p className="kg-empty-desc">Turn on a node type below, or keep reading to grow your graph.</p>
           </div>
-        </div>
-        <div className="kg-toolbar-actions">
+        ) : (
+          <ForceGraph2D
+            ref={graphRef}
+            graphData={filtered}
+            backgroundColor="transparent"
+            nodeRelSize={1}
+            nodeVal={(n) => (n as KnowledgeGraphNode).size}
+            nodeLabel=""
+            nodeColor={(n) => NODE_COLORS[(n as KnowledgeGraphNode).type]}
+            nodeCanvasObject={renderNode}
+            nodeCanvasObjectMode={() => "replace"}
+            nodePointerAreaPaint={(node, color, ctx) => {
+              const n = node as ForceNode;
+              const hit = Math.sqrt(Math.max(n.size, 4)) * (mobile ? 3.4 : 2.8);
+              ctx.beginPath();
+              ctx.arc(n.x ?? 0, n.y ?? 0, hit, 0, 2 * Math.PI);
+              ctx.fillStyle = color;
+              ctx.fill();
+            }}
+            linkWidth={(link) => 0.5 + (link.weight ?? 0.3) * 2.5}
+            linkColor={() => "rgba(94, 106, 210, 0.22)"}
+            linkDirectionalParticles={0}
+            onNodeClick={(node) => handleNodeClick(node as ForceNode)}
+            onNodeHover={canHover ? (node) => setHovered(node as KnowledgeGraphNode | null) : undefined}
+            onBackgroundClick={() => setSelected(null)}
+            onEngineStop={() => {
+              if (!didFit) {
+                graphRef.current?.zoomToFit(400, fitPadding);
+                setDidFit(true);
+              }
+            }}
+            cooldownTicks={mobile ? 60 : 80}
+            d3AlphaDecay={0.03}
+            d3VelocityDecay={0.4}
+          />
+        )}
+
+        {canHover && hovered && !focusNode ? (
+          <div className="kg-hover-tip" role="status">
+            <span className="kg-hover-tip-dot" style={{ background: NODE_COLORS[hovered.type] }} />
+            {hovered.label}
+          </div>
+        ) : null}
+
+        {!focusNode && filtered.nodes.length > 0 ? (
+          <p className="kg-float-hint">
+            {mobile ? "Tap a node to inspect" : "Click a node to inspect"}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="kg-float-bar">
+        <div className="kg-float-controls">
+          <div className="kg-filters-scroll">
+            <div className="kg-filters" role="group" aria-label="Filter node types">
+              {ALL_TYPES.map((type) => {
+                const on = activeTypes.has(type);
+                const count = data.nodes.filter((n) => n.type === type).length;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    className={`kg-filter-btn${on ? " is-active" : ""}`}
+                    onClick={() => toggleType(type)}
+                    aria-pressed={on}
+                    title={NODE_LABELS[type]}
+                  >
+                    <span className="kg-filter-dot" style={{ background: NODE_COLORS[type] }} />
+                    <span className="kg-filter-label">{mobile ? FILTER_SHORT[type] : NODE_LABELS[type]}</span>
+                    <span className="kg-filter-count">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <button
             type="button"
-            className="dash-btn dash-btn-secondary kg-fit-btn"
+            className="kg-fit-btn"
             onClick={() => graphRef.current?.zoomToFit(400, fitPadding)}
+            title="Fit graph to view"
           >
             {mobile ? "Fit" : "Fit view"}
           </button>
         </div>
       </div>
 
-      <div className="kg-main">
-        <div className="kg-canvas-wrap">
-          {filtered.nodes.length === 0 ? (
-            <div className="kg-empty">
-              <p className="kg-empty-title">No nodes to show</p>
-              <p className="kg-empty-desc">Turn on a node type above, or keep reading to grow your graph.</p>
-            </div>
-          ) : (
-            <ForceGraph2D
-              ref={graphRef}
-              graphData={filtered}
-              backgroundColor="transparent"
-              nodeRelSize={1}
-              nodeVal={(n) => (n as KnowledgeGraphNode).size}
-              nodeLabel=""
-              nodeColor={(n) => NODE_COLORS[(n as KnowledgeGraphNode).type]}
-              nodeCanvasObject={renderNode}
-              nodeCanvasObjectMode={() => "replace"}
-              nodePointerAreaPaint={(node, color, ctx) => {
-                const n = node as ForceNode;
-                const hit = Math.sqrt(Math.max(n.size, 4)) * (mobile ? 3.4 : 2.8);
-                ctx.beginPath();
-                ctx.arc(n.x ?? 0, n.y ?? 0, hit, 0, 2 * Math.PI);
-                ctx.fillStyle = color;
-                ctx.fill();
-              }}
-              linkWidth={(link) => 0.5 + (link.weight ?? 0.3) * 2.5}
-              linkColor={() => "rgba(94, 106, 210, 0.28)"}
-              linkDirectionalParticles={0}
-              onNodeClick={(node) => handleNodeClick(node as ForceNode)}
-              onNodeHover={canHover ? (node) => setHovered(node as KnowledgeGraphNode | null) : undefined}
-              onBackgroundClick={() => setSelected(null)}
-              onEngineStop={() => {
-                if (!didFit) {
-                  graphRef.current?.zoomToFit(400, fitPadding);
-                  setDidFit(true);
-                }
-              }}
-              cooldownTicks={mobile ? 60 : 80}
-              d3AlphaDecay={0.03}
-              d3VelocityDecay={0.4}
-            />
-          )}
-          {canHover && hovered && !focusNode ? (
-            <div className="kg-hover-tip" role="status">
-              <span className="kg-hover-tip-dot" style={{ background: NODE_COLORS[hovered.type] }} />
-              {hovered.label}
-            </div>
-          ) : null}
-          {mobile && focusNode ? (
-            <div className="kg-mobile-hint" role="status">
-              Tap outside or × to close
-            </div>
-          ) : null}
-        </div>
-
-        {!mobile ? (
-          <aside className={`kg-inspector${focusNode ? " is-open" : ""}`} aria-live="polite">
-            {inspectorContent}
-          </aside>
-        ) : null}
-      </div>
-
-      {mobile && focusNode ? (
+      {focusNode ? (
         <>
           <button
             type="button"
@@ -427,7 +406,7 @@ export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
             aria-label="Close details"
             onClick={() => setSelected(null)}
           />
-          <aside className="kg-inspector kg-inspector-sheet is-open" aria-live="polite">
+          <aside className="kg-inspector kg-inspector-drawer is-open" aria-live="polite">
             {inspectorContent}
           </aside>
         </>
