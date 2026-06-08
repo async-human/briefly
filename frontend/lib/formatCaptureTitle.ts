@@ -21,5 +21,16 @@ export function formatCaptureTitle(title: string, url?: string | null): string {
   t = t.replace(/\s*https?:\/\/t\.co\/\w+\s*/gi, " ").trim();
   t = t.replace(/\s+/g, " ").trim();
 
+  if (url) {
+    try {
+      const host = new URL(url).hostname.replace(/^www\./, "");
+      if (host === "linkedin.com") {
+        t = t.replace(/\s*\|\s*LinkedIn\s*$/i, "").trim();
+      }
+    } catch {
+      /* ignore invalid URLs */
+    }
+  }
+
   return t || title.trim();
 }
