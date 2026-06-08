@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api, type BrowserCapture, type UrlCaptureResponse } from "@/lib/api";
 import { captureResponseToBrowserCapture, enrichmentConnectionText } from "@/lib/captureUtils";
+import { formatCaptureTitle } from "@/lib/formatCaptureTitle";
 
 type SaveLinkPanelProps = {
   initialUrl?: string;
@@ -84,7 +85,9 @@ export function SaveLinkPanel({ initialUrl = "", onSaved }: SaveLinkPanelProps) 
           <p className="save-link-feedback-label">
             {feedback.already_saved ? "Already in Briefly" : "✓ Added to Briefly"}
           </p>
-          <p className="save-link-feedback-title">{feedback.title}</p>
+          <p className="save-link-feedback-title" title={feedback.title}>
+            {formatCaptureTitle(feedback.title, feedback.url)}
+          </p>
           {enrichmentConnectionText(feedback.enrichment) ? (
             <p className="save-link-feedback-connection">
               {enrichmentConnectionText(feedback.enrichment)}

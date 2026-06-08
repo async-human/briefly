@@ -1,6 +1,7 @@
 "use client";
 
 import type { BrowserCapture } from "@/lib/api";
+import { formatCaptureTitle } from "@/lib/formatCaptureTitle";
 
 function formatCaptureDate(iso: string) {
   const date = new Date(iso);
@@ -41,22 +42,12 @@ export function SavedCapturesList({ captures }: SavedCapturesListProps) {
           item.connection_sentence ||
           (item.thread_label ? `Connects to your ${item.thread_label} thread` : null);
 
+        const displayTitle = formatCaptureTitle(item.title, item.url);
+
         return (
           <li key={item.id} className="saved-capture-item">
             <div className="saved-capture-main">
-              <div className="saved-capture-head">
-                {item.url ? (
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="saved-capture-title"
-                  >
-                    {item.title}
-                  </a>
-                ) : (
-                  <h3 className="saved-capture-title">{item.title}</h3>
-                )}
+              <div className="saved-capture-meta">
                 <span
                   className={`saved-capture-status${
                     item.in_briefing ? " saved-capture-status-done" : ""
@@ -64,9 +55,24 @@ export function SavedCapturesList({ captures }: SavedCapturesListProps) {
                 >
                   {item.in_briefing ? "In briefing" : "Queued"}
                 </span>
+                {host ? <span className="saved-capture-host">{host}</span> : null}
               </div>
 
-              {host ? <p className="saved-capture-host">{host}</p> : null}
+              {item.url ? (
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="saved-capture-title"
+                  title={item.title}
+                >
+                  {displayTitle}
+                </a>
+              ) : (
+                <h3 className="saved-capture-title" title={item.title}>
+                  {displayTitle}
+                </h3>
+              )}
 
               {item.summary ? (
                 <p className="saved-capture-summary">{item.summary}</p>

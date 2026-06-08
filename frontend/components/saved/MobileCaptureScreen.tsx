@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api, type UrlCaptureResponse } from "@/lib/api";
 import { getToken, setAuthNext } from "@/lib/auth";
 import { enrichmentConnectionText } from "@/lib/captureUtils";
+import { formatCaptureTitle } from "@/lib/formatCaptureTitle";
 import { titleFromShareParams, urlFromShareParams } from "@/lib/shareUrl";
 
 type Phase = "auth" | "capturing" | "success" | "error" | "no-url";
@@ -87,7 +88,9 @@ export function MobileCaptureScreen() {
             <p className="mobile-capture-badge">
               {feedback.already_saved ? "Already in Briefly" : "Added to Briefly"}
             </p>
-            <p className="mobile-capture-heading">{feedback.title}</p>
+            <p className="mobile-capture-heading" title={feedback.title}>
+              {formatCaptureTitle(feedback.title, feedback.url)}
+            </p>
             {connectionText ? (
               <p className="mobile-capture-connection">{connectionText}</p>
             ) : (
