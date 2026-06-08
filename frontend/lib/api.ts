@@ -476,6 +476,39 @@ export type UrlCaptureResponse = {
   };
 };
 
+export type KnowledgeGraphNodeType = "topic" | "source" | "item" | "thought" | "thread";
+
+export type KnowledgeGraphNode = {
+  id: string;
+  type: KnowledgeGraphNodeType;
+  label: string;
+  size: number;
+  meta: Record<string, unknown>;
+};
+
+export type KnowledgeGraphEdge = {
+  id: string;
+  source: string;
+  target: string;
+  type: string;
+  weight: number;
+  label: string | null;
+};
+
+export type KnowledgeGraphResponse = {
+  nodes: KnowledgeGraphNode[];
+  edges: KnowledgeGraphEdge[];
+  stats: {
+    digest_day: number;
+    topic_count: number;
+    thread_count: number;
+    item_count: number;
+    thought_count: number;
+    source_count: number;
+    edge_count: number;
+  };
+};
+
 export const api = {
   getMe: () => request<MeResponse>("/api/v1/me"),
   getLatestDigest: () => request<Digest | null>("/api/v1/digests/latest"),
@@ -639,6 +672,9 @@ export const api = {
       { method: "POST", body: JSON.stringify(body) },
       20_000,
     ),
+
+  // Knowledge graph
+  getKnowledgeGraph: () => request<KnowledgeGraphResponse>("/api/v1/graph"),
 
   // Brain Dump
   listBrainDumps: () => request<BrainDump[]>("/api/v1/brain-dumps"),

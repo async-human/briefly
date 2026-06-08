@@ -23,6 +23,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  if (pathname.startsWith("/graph") && !token) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+    return NextResponse.redirect(loginUrl);
+  }
+
   return NextResponse.next();
 }
 
@@ -34,5 +40,7 @@ export const config = {
     "/login",
     "/saved",
     "/saved/:path*",
+    "/graph",
+    "/graph/:path*",
   ],
 };

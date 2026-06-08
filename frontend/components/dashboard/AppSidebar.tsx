@@ -31,6 +31,18 @@ const NAV = [
     ),
   },
   {
+    href: "/graph",
+    label: "Graph",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="6" cy="18" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="18" cy="6" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="18" cy="18" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M8.2 16.5 15.8 7.5M15.8 16.5l-4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/history",
     label: "History",
     icon: (
