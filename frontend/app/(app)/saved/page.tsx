@@ -8,22 +8,11 @@ import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { SaveLinkPanel } from "@/components/saved/SaveLinkPanel";
 import { SavedCapturesList } from "@/components/saved/SavedCapturesList";
+import { SavedPageSkeleton } from "@/components/saved/SavedPageSkeleton";
 import { getToken } from "@/lib/auth";
 import { urlFromShareParams } from "@/lib/shareUrl";
 
 const CHROME_STORE_URL = process.env.NEXT_PUBLIC_CHROME_STORE_URL ?? "";
-
-function SavedSkeleton() {
-  return (
-    <div className="dash-page">
-      <header className="dash-page-header dash-page-header-skeleton">
-        <span className="skeleton-block" style={{ width: 72, height: 12, display: "block" }} />
-        <span className="skeleton-block" style={{ width: 200, height: 32, display: "block", marginTop: 12 }} />
-      </header>
-      <div className="dash-surface" style={{ minHeight: 320 }} />
-    </div>
-  );
-}
 
 function SavedPageContent() {
   const router = useRouter();
@@ -56,12 +45,11 @@ function SavedPageContent() {
 
   const queued = captures.filter((c) => !c.in_briefing).length;
 
-  if (loading) {
-    return <SavedSkeleton />;
-  }
-
   return (
     <DashboardShell userName={me?.name ?? null} avatarUrl={me?.avatar_url}>
+      {loading ? (
+        <SavedPageSkeleton />
+      ) : (
       <div className="dash-page">
         <AppPageHeader
           eyebrow="Save"
@@ -153,13 +141,20 @@ function SavedPageContent() {
           )}
         </div>
       </div>
+      )}
     </DashboardShell>
   );
 }
 
 export default function SavedPage() {
   return (
-    <Suspense fallback={<SavedSkeleton />}>
+    <Suspense
+      fallback={
+        <DashboardShell userName={null} avatarUrl={null}>
+          <SavedPageSkeleton />
+        </DashboardShell>
+      }
+    >
       <SavedPageContent />
     </Suspense>
   );
