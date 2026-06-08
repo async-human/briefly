@@ -4,6 +4,8 @@ import { useState } from "react";
 import { api, type BrowserCapture, type UrlCaptureResponse } from "@/lib/api";
 import { captureResponseToBrowserCapture, enrichmentConnectionText } from "@/lib/captureUtils";
 import { formatCaptureTitle } from "@/lib/formatCaptureTitle";
+import { graphItemUrl } from "@/lib/graphLinks";
+import Link from "next/link";
 
 type SaveLinkPanelProps = {
   initialUrl?: string;
@@ -93,6 +95,9 @@ export function SaveLinkPanel({ initialUrl = "", onSaved }: SaveLinkPanelProps) 
               {enrichmentConnectionText(feedback.enrichment)}
             </p>
           ) : null}
+          <Link href={graphItemUrl(feedback.id)} className="save-link-graph-link">
+            View in graph →
+          </Link>
         </div>
       ) : null}
     </div>

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api, type AutoSuggestion, type Digest, type DigestItem, type Source } from "@/lib/api";
 import {
   groupDigestItemsBySection,
@@ -17,6 +18,7 @@ import { sourceDisplayName } from "./sourceLabels";
 import { SourceIcon } from "@/components/SourceIcon";
 import { OutcomeBriefHeader, SafeToIgnorePanel } from "./OutcomeBriefHeader";
 import { getDigestOutcome, splitTopPriorityItems } from "@/lib/digestOutcome";
+import { graphItemUrl } from "@/lib/graphLinks";
 
 const PREVIEW_LIMIT = 5;
 
@@ -392,6 +394,7 @@ function BriefingPreviewItem({
   index: number;
   digestId?: string;
 }) {
+  const router = useRouter();
   // Truncate why_it_matters to a single compact line
   const why = item.why_it_matters
     ? item.why_it_matters.length > 100
@@ -410,11 +413,24 @@ function BriefingPreviewItem({
           {hasMemory && (
             <span className="briefing-preview-memory-dot" title="Briefly remembers this story" aria-label="You've been following this story" />
           )}
+          {item.content_id ? (
+            <button
+              type="button"
+              className="briefing-graph-link"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                router.push(graphItemUrl(item.content_id!));
+              }}
+            >
+              Graph
+            </button>
+          ) : null}
         </div>
         <h3 className="briefing-preview-headline">{item.headline}</h3>
         {why && <p className="briefing-preview-why">{why}</p>}
       </div>
-      {digestId && <span className="briefing-preview-chevron" aria-hidden>→</span>}
+      {digestId ? <span className="briefing-preview-chevron" aria-hidden>→</span> : null}
     </>
   );
 

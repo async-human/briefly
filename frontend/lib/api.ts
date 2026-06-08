@@ -673,8 +673,17 @@ export const api = {
       20_000,
     ),
 
-  // Knowledge graph
   getKnowledgeGraph: () => request<KnowledgeGraphResponse>("/api/v1/graph"),
+  graphTopicAction: (body: { topic: string; action: "boost" | "mute" }) =>
+    request<{ topic: string; action: string; strength: number }>(
+      "/api/v1/graph/actions/topic",
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  graphSourceAction: (body: { source_id: string; action: "prioritize" | "deprioritize" }) =>
+    request<{ source_id: string; action: string; priority: string; weight: number }>(
+      "/api/v1/graph/actions/source",
+      { method: "POST", body: JSON.stringify(body) },
+    ),
 
   // Brain Dump
   listBrainDumps: () => request<BrainDump[]>("/api/v1/brain-dumps"),

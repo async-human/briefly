@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import type { BrowserCapture } from "@/lib/api";
 import { formatCaptureTitle } from "@/lib/formatCaptureTitle";
+import { graphItemUrl } from "@/lib/graphLinks";
 
 function formatCaptureDate(iso: string) {
   const date = new Date(iso);
@@ -89,9 +91,14 @@ export function SavedCapturesList({ captures }: SavedCapturesListProps) {
               ) : null}
             </div>
 
-            <time className="saved-capture-date" dateTime={item.created_at}>
-              {formatCaptureDate(item.created_at)}
-            </time>
+            <div className="saved-capture-aside">
+              <time className="saved-capture-date" dateTime={item.created_at}>
+                {formatCaptureDate(item.created_at)}
+              </time>
+              <Link href={graphItemUrl(item.id)} className="saved-capture-graph-link">
+                Graph
+              </Link>
+            </div>
           </li>
         );
       })}

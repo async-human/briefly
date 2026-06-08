@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ForceGraphMethods } from "react-force-graph-2d";
 import type { KnowledgeGraphNode, KnowledgeGraphNodeType, KnowledgeGraphResponse } from "@/lib/api";
+import { api } from "@/lib/api";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
@@ -157,9 +158,11 @@ function nodeDetail(node: KnowledgeGraphNode): { label: string; value: string }[
 
 type KnowledgeGraphViewProps = {
   data: KnowledgeGraphResponse;
+  initialFocusNodeId?: string | null;
+  onGraphUpdated?: () => void;
 };
 
-export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
+export function KnowledgeGraphView({ data, initialFocusNodeId, onGraphUpdated }: KnowledgeGraphViewProps) {
   const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
   const [didFit, setDidFit] = useState(false);
   const mobile = useMobileLayout();
@@ -169,6 +172,8 @@ export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
   );
   const [selected, setSelected] = useState<KnowledgeGraphNode | null>(null);
   const [hovered, setHovered] = useState<KnowledgeGraphNode | null>(null);
+  const [actionPending, setActionPending] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
 
   const filtered = useMemo(() => {
     const nodes = data.nodes.filter((n) => activeTypes.has(n.type));
@@ -209,6 +214,71 @@ export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
     });
   }, []);
 
+  const focusNode = filtered.nodes.find((n) => n.id === selected?.id) ?? selected;
+
+  useEffect(() => {
+    if (!initialFocusNodeId) return;
+    const node = data.nodes.find((n) => n.id === initialFocusNodeId);
+    if (node) {
+      setSelected(node);
+      setDidFit(false);
+    }
+  }, [initialFocusNodeId, data]);
+
+  useEffect(() => {
+    if (!initialFocusNodeId || !didFit) return;
+    const timer = window.setTimeout(() => {
+      const graph = graphRef.current;
+      if (!graph) return;
+      graph.zoomToFit(
+        500,
+        mobile ? 48 : 32,
+        (node) => (node as ForceNode).id === initialFocusNodeId,
+      );
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [initialFocusNodeId, didFit, mobile]);
+
+  async function runTopicAction(action: "boost" | "mute") {
+    if (!focusNode || focusNode.type !== "topic") return;
+    setActionPending(true);
+    setActionMessage("");
+    try {
+      const res = await api.graphTopicAction({ topic: focusNode.label, action });
+      setActionMessage(
+        action === "boost"
+          ? `Boosted — ${Math.round(res.strength * 100)}% strength`
+          : "Muted — fewer items like this in future briefs",
+      );
+      onGraphUpdated?.();
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setActionPending(false);
+    }
+  }
+
+  async function runSourceAction(action: "prioritize" | "deprioritize") {
+    if (!focusNode || focusNode.type !== "source") return;
+    const sourceId = focusNode.meta.source_id;
+    if (typeof sourceId !== "string") return;
+    setActionPending(true);
+    setActionMessage("");
+    try {
+      await api.graphSourceAction({ source_id: sourceId, action });
+      setActionMessage(
+        action === "prioritize"
+          ? "Source prioritized for future briefs"
+          : "Source deprioritized",
+      );
+      onGraphUpdated?.();
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setActionPending(false);
+    }
+  }
+
   const hoveredId = hovered?.id ?? null;
   const selectedId = selected?.id ?? null;
 
@@ -225,16 +295,14 @@ export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
     return () => window.clearTimeout(timer);
   }, [hoveredId, selectedId]);
 
-  const focusNode = filtered.nodes.find((n) => n.id === selected?.id) ?? selected;
-
   useEffect(() => {
-    if (!focusNode) return;
+    if (!mobile || !focusNode) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [focusNode]);
+  }, [mobile, focusNode]);
 
   const fitPadding = mobile ? 80 : 48;
 
@@ -301,6 +369,47 @@ export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
           Open article
         </a>
       ) : null}
+      {focusNode.type === "topic" ? (
+        <div className="kg-inspector-actions">
+          <button
+            type="button"
+            className="kg-action-btn kg-action-btn-primary"
+            disabled={actionPending}
+            onClick={() => void runTopicAction("boost")}
+          >
+            Boost in briefs
+          </button>
+          <button
+            type="button"
+            className="kg-action-btn"
+            disabled={actionPending}
+            onClick={() => void runTopicAction("mute")}
+          >
+            Mute topic
+          </button>
+        </div>
+      ) : null}
+      {focusNode.type === "source" && focusNode.meta.source_id ? (
+        <div className="kg-inspector-actions">
+          <button
+            type="button"
+            className="kg-action-btn kg-action-btn-primary"
+            disabled={actionPending}
+            onClick={() => void runSourceAction("prioritize")}
+          >
+            Prioritize source
+          </button>
+          <button
+            type="button"
+            className="kg-action-btn"
+            disabled={actionPending}
+            onClick={() => void runSourceAction("deprioritize")}
+          >
+            Deprioritize
+          </button>
+        </div>
+      ) : null}
+      {actionMessage ? <p className="kg-action-feedback">{actionMessage}</p> : null}
     </>
   ) : null;
 

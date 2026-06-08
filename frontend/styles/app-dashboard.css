@@ -1902,6 +1902,103 @@ a.saved-capture-title:hover {
   text-align: center;
 }
 
+.kg-inspector-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.kg-action-btn {
+  flex: 1;
+  min-width: 7rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface);
+  color: var(--app-ink-secondary);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--app-dur) var(--app-ease), border-color var(--app-dur) var(--app-ease);
+}
+
+.kg-action-btn:hover:not(:disabled) {
+  background: var(--app-surface-muted);
+  color: var(--app-ink);
+}
+
+.kg-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.kg-action-btn-primary {
+  background: var(--app-linear-soft);
+  border-color: color-mix(in srgb, var(--app-linear) 30%, var(--app-border));
+  color: var(--app-linear);
+}
+
+.kg-action-feedback {
+  margin: 0.75rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #2da44e;
+}
+
+.briefing-graph-link {
+  margin-left: auto;
+  padding: 0.1rem 0.45rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--app-linear-soft);
+  color: var(--app-linear);
+  font-family: inherit;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.briefing-graph-link:hover {
+  background: color-mix(in srgb, var(--app-linear) 18%, transparent);
+}
+
+.saved-capture-aside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.saved-capture-graph-link {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--app-linear);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.saved-capture-graph-link:hover {
+  text-decoration: underline;
+}
+
+.save-link-graph-link {
+  display: inline-block;
+  margin-top: 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--app-linear);
+  text-decoration: none;
+}
+
+.save-link-graph-link:hover {
+  text-decoration: underline;
+}
+
 .app-shell:has(.kg-inspector-drawer.is-open) .brain-dump-fab {
   opacity: 0;
   pointer-events: none;

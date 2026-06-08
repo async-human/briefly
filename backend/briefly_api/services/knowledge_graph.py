@@ -267,6 +267,7 @@ async def build_knowledge_graph(
                     size=8 + weight * 14,
                     meta={
                         "source_type": src.source_type,
+                        "source_id": src.id,
                         "weight": round(weight, 3),
                         "identifier": src.identifier,
                     },

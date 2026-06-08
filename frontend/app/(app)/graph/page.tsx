@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, type KnowledgeGraphResponse } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { GraphPageSkeleton } from "@/components/graph/GraphPageSkeleton";
@@ -10,10 +10,16 @@ import { getToken } from "@/lib/auth";
 
 function GraphPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const focusNodeId = searchParams.get("node");
   const [loading, setLoading] = useState(true);
   const [graph, setGraph] = useState<KnowledgeGraphResponse | null>(null);
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
   const [error, setError] = useState("");
+
+  const loadGraph = useCallback(() => {
+    return api.getKnowledgeGraph().then(setGraph);
+  }, []);
 
   useEffect(() => {
     if (!getToken()) {
@@ -45,7 +51,11 @@ function GraphPageContent() {
         </div>
       ) : graph ? (
         <div className="dash-page-graph">
-          <KnowledgeGraphView data={graph} />
+          <KnowledgeGraphView
+            data={graph}
+            initialFocusNodeId={focusNodeId}
+            onGraphUpdated={() => void loadGraph()}
+          />
         </div>
       ) : null}
     </DashboardShell>

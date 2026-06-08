@@ -7,6 +7,7 @@ import { api, type UrlCaptureResponse } from "@/lib/api";
 import { getToken, setAuthNext } from "@/lib/auth";
 import { enrichmentConnectionText } from "@/lib/captureUtils";
 import { formatCaptureTitle } from "@/lib/formatCaptureTitle";
+import { graphItemUrl } from "@/lib/graphLinks";
 import { titleFromShareParams, urlFromShareParams } from "@/lib/shareUrl";
 
 type Phase = "auth" | "capturing" | "success" | "error" | "no-url";
@@ -100,6 +101,9 @@ export function MobileCaptureScreen() {
               <button type="button" className="mobile-capture-btn-primary" onClick={handleBack}>
                 Back to article
               </button>
+              <Link href={graphItemUrl(feedback.id)} className="mobile-capture-btn-secondary">
+                View in graph
+              </Link>
               <Link href="/saved" className="mobile-capture-btn-secondary">
                 View all saves
               </Link>
