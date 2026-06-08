@@ -23,7 +23,67 @@ const NODE_LABELS: Record<KnowledgeGraphNodeType, string> = {
   thread: "Story threads",
 };
 
+const ANCHOR_TYPES = new Set<KnowledgeGraphNodeType>(["topic", "thread", "source"]);
+
+function truncateLabel(label: string, max: number): string {
+  if (label.length <= max) return label;
+  return `${label.slice(0, max - 1)}…`;
+}
+
+function shouldShowCanvasLabel(
+  node: KnowledgeGraphNode,
+  globalScale: number,
+  hoveredId: string | null,
+  selectedId: string | null,
+): boolean {
+  if (node.id === hoveredId || node.id === selectedId) return true;
+  if (node.type === "item" || node.type === "thought") return false;
+  if (!ANCHOR_TYPES.has(node.type)) return false;
+  return globalScale >= 1.35;
+}
+
 const ALL_TYPES: KnowledgeGraphNodeType[] = ["topic", "source", "item", "thought", "thread"];
+
+function drawNodeLabel(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  globalScale: number,
+  emphasized: boolean,
+) {
+  const fontSize = emphasized
+    ? Math.max(10, Math.min(12, 12 / globalScale))
+    : Math.max(8, Math.min(10, 10 / globalScale));
+  const maxLen = emphasized ? 42 : 18;
+  const display = truncateLabel(text, maxLen);
+
+  ctx.font = `${fontSize}px DM Sans, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+
+  if (emphasized) {
+    const metrics = ctx.measureText(display);
+    const padX = 6;
+    const padY = 3;
+    const w = metrics.width + padX * 2;
+    const h = fontSize + padY * 2;
+    const left = x - w / 2;
+    const top = y;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.94)";
+    ctx.strokeStyle = "rgba(15, 15, 15, 0.1)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(left, top, w, h, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillText(display, x, top + padY);
+  } else {
+    ctx.fillStyle = "rgba(26, 26, 26, 0.72)";
+    ctx.fillText(display, x, y);
+  }
+}
 
 type ForceNode = KnowledgeGraphNode & { x?: number; y?: number };
 
@@ -111,11 +171,53 @@ export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
     });
   }, []);
 
+  const hoveredId = hovered?.id ?? null;
+  const selectedId = selected?.id ?? null;
+
   useEffect(() => {
     setDidFit(false);
   }, [filtered.nodes.length, activeTypes]);
 
+  useEffect(() => {
+    const graph = graphRef.current;
+    if (!graph) return;
+    graph.pauseAnimation();
+    graph.resumeAnimation();
+    const timer = window.setTimeout(() => graph.pauseAnimation(), 120);
+    return () => window.clearTimeout(timer);
+  }, [hoveredId, selectedId]);
+
   const focusNode = filtered.nodes.find((n) => n.id === selected?.id) ?? selected;
+
+  const renderNode = useCallback(
+    (node: object, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const n = node as ForceNode;
+      const size = Math.sqrt(Math.max(n.size, 4)) * 2.2;
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      const isHovered = n.id === hoveredId;
+      const isSelected = n.id === selectedId;
+      const emphasized = isHovered || isSelected;
+
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, 2 * Math.PI);
+      ctx.fillStyle = NODE_COLORS[n.type];
+      ctx.fill();
+
+      if (emphasized) {
+        ctx.beginPath();
+        ctx.arc(x, y, size + 2.5, 0, 2 * Math.PI);
+        ctx.strokeStyle = isSelected ? NODE_COLORS[n.type] : "rgba(255, 255, 255, 0.95)";
+        ctx.lineWidth = isSelected ? 2.5 : 1.5;
+        ctx.stroke();
+      }
+
+      if (shouldShowCanvasLabel(n, globalScale, hoveredId, selectedId) && n.label) {
+        drawNodeLabel(ctx, n.label, x, y + size + 4 / globalScale, globalScale, emphasized);
+      }
+    },
+    [hoveredId, selectedId],
+  );
 
   return (
     <div className="kg-layout">
@@ -164,26 +266,10 @@ export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
               backgroundColor="transparent"
               nodeRelSize={1}
               nodeVal={(n) => (n as KnowledgeGraphNode).size}
-              nodeLabel={(n) => (n as KnowledgeGraphNode).label}
+              nodeLabel=""
               nodeColor={(n) => NODE_COLORS[(n as KnowledgeGraphNode).type]}
-              nodeCanvasObject={(node, ctx, globalScale) => {
-                const n = node as ForceNode;
-                const size = Math.sqrt(Math.max(n.size, 4)) * 2.2;
-                ctx.beginPath();
-                ctx.arc(n.x ?? 0, n.y ?? 0, size, 0, 2 * Math.PI);
-                ctx.fillStyle = NODE_COLORS[n.type];
-                ctx.fill();
-                if (globalScale > 1.1 && n.label) {
-                  ctx.font = `${Math.max(10, 12 / globalScale)}px DM Sans, sans-serif`;
-                  ctx.fillStyle = "#444";
-                  ctx.textAlign = "center";
-                  ctx.fillText(
-                    n.label.length > 36 ? `${n.label.slice(0, 34)}…` : n.label,
-                    n.x ?? 0,
-                    (n.y ?? 0) + size + 10 / globalScale,
-                  );
-                }
-              }}
+              nodeCanvasObject={renderNode}
+              nodeCanvasObjectMode={() => "replace"}
               linkWidth={(link) => 0.5 + (link.weight ?? 0.3) * 2.5}
               linkColor={() => "rgba(94, 106, 210, 0.28)"}
               linkDirectionalParticles={0}
@@ -201,8 +287,12 @@ export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
               d3VelocityDecay={0.35}
             />
           )}
-          {hovered && !selected ? (
+          {hovered ? (
             <div className="kg-hover-tip" role="status">
+              <span
+                className="kg-hover-tip-dot"
+                style={{ background: NODE_COLORS[hovered.type] }}
+              />
               {hovered.label}
             </div>
           ) : null}
