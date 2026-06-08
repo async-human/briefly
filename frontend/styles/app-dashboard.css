@@ -1614,6 +1614,11 @@ a.saved-capture-title:hover {
   padding: 0 1.25rem;
 }
 
+.kg-filters-scroll {
+  flex: 1;
+  min-width: 0;
+}
+
 .kg-filters {
   display: flex;
   flex-wrap: wrap;
@@ -1666,11 +1671,16 @@ a.saved-capture-title:hover {
 .kg-canvas-wrap {
   position: relative;
   min-height: 28rem;
-  height: calc(100dvh - 13rem);
+  height: calc(100dvh - 12rem);
   background:
     radial-gradient(circle at 50% 50%, var(--app-linear-soft) 0%, transparent 55%),
     var(--app-canvas);
   overflow: hidden;
+  touch-action: none;
+}
+
+.kg-canvas-wrap canvas {
+  touch-action: none;
 }
 
 .kg-canvas-skeleton {
@@ -1846,18 +1856,177 @@ a.saved-capture-title:hover {
 }
 
 @media (max-width: 56rem) {
-  .kg-main {
-    grid-template-columns: 1fr;
+  .dash-page-graph {
+    padding: 0;
   }
 
-  .kg-inspector {
-    border-left: none;
-    border-top: 1px solid var(--app-border);
-    min-height: 12rem;
+  .dash-page-graph .dash-page-header {
+    padding: 1rem 1rem 0.75rem;
+  }
+
+  .dash-page-graph .dash-page-subtitle {
+    display: none;
+  }
+
+  .dash-page-graph .dash-stat-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.5rem;
+    padding-bottom: 0.15rem;
+  }
+
+  .dash-page-graph .dash-stat-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dash-page-graph .dash-stat-chip {
+    flex-shrink: 0;
+    min-width: 4.5rem;
+    padding: 0.5rem 0.65rem;
+  }
+
+  .kg-layout-mobile {
+    gap: 0;
+    margin-top: 0;
+  }
+
+  .kg-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    background: var(--app-surface);
+    border-bottom: 1px solid var(--app-border);
+    max-width: none;
+  }
+
+  .kg-filters-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    mask-image: linear-gradient(to right, #000 92%, transparent);
+  }
+
+  .kg-filters-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .kg-filters {
+    flex-wrap: nowrap;
+    width: max-content;
+    padding-right: 0.5rem;
+  }
+
+  .kg-filter-btn {
+    flex-shrink: 0;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.6875rem;
+  }
+
+  .kg-fit-btn {
+    flex-shrink: 0;
+    padding: 0.45rem 0.75rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  .kg-main {
+    display: block;
+    min-height: 0;
+    border-top: none;
   }
 
   .kg-canvas-wrap {
-    height: 22rem;
-    min-height: 22rem;
+    height: calc(100dvh - 10.5rem - env(safe-area-inset-bottom, 0));
+    min-height: 18rem;
+  }
+
+  .kg-mobile-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 0.75rem;
+    transform: translateX(-50%);
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid var(--app-border);
+    font-size: 0.6875rem;
+    color: var(--app-muted);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  .kg-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 85;
+    border: none;
+    background: rgba(15, 15, 15, 0.35);
+    cursor: pointer;
+    animation: kg-fade-in 0.2s ease;
+  }
+
+  .kg-inspector-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 90;
+    max-height: min(58dvh, 28rem);
+    border: none;
+    border-top: 1px solid var(--app-border);
+    border-radius: 1rem 1rem 0 0;
+    box-shadow: 0 -12px 40px rgba(15, 15, 15, 0.14);
+    padding: 0 1rem calc(1rem + env(safe-area-inset-bottom, 0));
+    overflow-y: auto;
+    animation: kg-sheet-up 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .kg-sheet-handle {
+    width: 2.25rem;
+    height: 0.25rem;
+    margin: 0 auto 0.75rem;
+    border-radius: 999px;
+    background: var(--app-border-strong);
+  }
+
+  .kg-inspector-sheet .kg-inspector-head {
+    margin-bottom: 0.25rem;
+  }
+
+  .kg-inspector-sheet .kg-inspector-title {
+    font-size: 0.9375rem;
+  }
+
+  .app-shell:has(.kg-inspector-sheet) .brain-dump-fab {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+@keyframes kg-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes kg-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 56rem) and (hover: none) {
+  .kg-hover-tip {
+    display: none;
   }
 }

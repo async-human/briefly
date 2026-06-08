@@ -87,9 +87,41 @@ function drawNodeLabel(
 
 type ForceNode = KnowledgeGraphNode & { x?: number; y?: number };
 
-type KnowledgeGraphViewProps = {
-  data: KnowledgeGraphResponse;
+const FILTER_SHORT: Record<KnowledgeGraphNodeType, string> = {
+  topic: "Topics",
+  source: "Sources",
+  item: "Articles",
+  thought: "Thoughts",
+  thread: "Threads",
 };
+
+function useMobileLayout() {
+  const [mobile, setMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 56rem)");
+    const update = () => setMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  return mobile;
+}
+
+function useCanHover() {
+  const [canHover, setCanHover] = useState(true);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const update = () => setCanHover(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  return canHover;
+}
 
 function nodeDetail(node: KnowledgeGraphNode): { label: string; value: string }[] {
   const meta = node.meta;
@@ -123,9 +155,15 @@ function nodeDetail(node: KnowledgeGraphNode): { label: string; value: string }[
   return rows;
 }
 
+type KnowledgeGraphViewProps = {
+  data: KnowledgeGraphResponse;
+};
+
 export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
   const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
   const [didFit, setDidFit] = useState(false);
+  const mobile = useMobileLayout();
+  const canHover = useCanHover();
   const [activeTypes, setActiveTypes] = useState<Set<KnowledgeGraphNodeType>>(
     () => new Set(ALL_TYPES),
   );
@@ -189,10 +227,21 @@ export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
 
   const focusNode = filtered.nodes.find((n) => n.id === selected?.id) ?? selected;
 
+  useEffect(() => {
+    if (!mobile || !focusNode) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobile, focusNode]);
+
+  const fitPadding = mobile ? 80 : 48;
+
   const renderNode = useCallback(
     (node: object, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const n = node as ForceNode;
-      const size = Math.sqrt(Math.max(n.size, 4)) * 2.2;
+      const size = Math.sqrt(Math.max(n.size, 4)) * (mobile ? 2.6 : 2.2);
       const x = n.x ?? 0;
       const y = n.y ?? 0;
       const isHovered = n.id === hoveredId;
@@ -216,38 +265,93 @@ export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
         drawNodeLabel(ctx, n.label, x, y + size + 4 / globalScale, globalScale, emphasized);
       }
     },
-    [hoveredId, selectedId],
+    [hoveredId, selectedId, mobile],
+  );
+
+  const inspectorContent = focusNode ? (
+    <>
+      <div className="kg-inspector-head">
+        <span
+          className="kg-inspector-badge"
+          style={{ background: `${NODE_COLORS[focusNode.type]}22`, color: NODE_COLORS[focusNode.type] }}
+        >
+          {NODE_LABELS[focusNode.type].replace(/s$/, "")}
+        </span>
+        <button type="button" className="kg-inspector-close" onClick={() => setSelected(null)} aria-label="Close">
+          ×
+        </button>
+      </div>
+      {mobile ? <div className="kg-sheet-handle" aria-hidden /> : null}
+      <h3 className="kg-inspector-title">{focusNode.label}</h3>
+      <dl className="kg-inspector-meta">
+        {nodeDetail(focusNode).map((row) => (
+          <div key={row.label} className="kg-inspector-row">
+            <dt>{row.label}</dt>
+            <dd>{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {focusNode.type === "item" && focusNode.meta.url ? (
+        <a
+          href={String(focusNode.meta.url)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="dash-btn dash-btn-secondary kg-inspector-link"
+        >
+          Open article
+        </a>
+      ) : null}
+    </>
+  ) : (
+    <div className="kg-inspector-placeholder">
+      <p className="kg-inspector-placeholder-title">Your second brain, mapped</p>
+      <p className="kg-inspector-placeholder-desc">
+        {mobile
+          ? "Pinch to zoom, drag to pan. Tap any node to inspect it."
+          : "Drag to explore. Click any node to inspect connections Briefly discovered from your reading, saves, and thoughts."}
+      </p>
+      <ul className="kg-legend">
+        {ALL_TYPES.map((type) => (
+          <li key={type}>
+            <span className="kg-filter-dot" style={{ background: NODE_COLORS[type] }} />
+            {NODE_LABELS[type]}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 
   return (
-    <div className="kg-layout">
+    <div className={`kg-layout${mobile ? " kg-layout-mobile" : ""}`}>
       <div className="kg-toolbar">
-        <div className="kg-filters" role="group" aria-label="Filter node types">
-          {ALL_TYPES.map((type) => {
-            const on = activeTypes.has(type);
-            const count = data.nodes.filter((n) => n.type === type).length;
-            return (
-              <button
-                key={type}
-                type="button"
-                className={`kg-filter-btn${on ? " is-active" : ""}`}
-                onClick={() => toggleType(type)}
-                aria-pressed={on}
-              >
-                <span className="kg-filter-dot" style={{ background: NODE_COLORS[type] }} />
-                {NODE_LABELS[type]}
-                <span className="kg-filter-count">{count}</span>
-              </button>
-            );
-          })}
+        <div className="kg-filters-scroll">
+          <div className="kg-filters" role="group" aria-label="Filter node types">
+            {ALL_TYPES.map((type) => {
+              const on = activeTypes.has(type);
+              const count = data.nodes.filter((n) => n.type === type).length;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  className={`kg-filter-btn${on ? " is-active" : ""}`}
+                  onClick={() => toggleType(type)}
+                  aria-pressed={on}
+                >
+                  <span className="kg-filter-dot" style={{ background: NODE_COLORS[type] }} />
+                  {mobile ? FILTER_SHORT[type] : NODE_LABELS[type]}
+                  <span className="kg-filter-count">{count}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="kg-toolbar-actions">
           <button
             type="button"
             className="dash-btn dash-btn-secondary kg-fit-btn"
-            onClick={() => graphRef.current?.zoomToFit(400, 48)}
+            onClick={() => graphRef.current?.zoomToFit(400, fitPadding)}
           >
-            Fit view
+            {mobile ? "Fit" : "Fit view"}
           </button>
         </div>
       </div>
@@ -270,87 +374,64 @@ export function KnowledgeGraphView({ data }: KnowledgeGraphViewProps) {
               nodeColor={(n) => NODE_COLORS[(n as KnowledgeGraphNode).type]}
               nodeCanvasObject={renderNode}
               nodeCanvasObjectMode={() => "replace"}
+              nodePointerAreaPaint={(node, color, ctx) => {
+                const n = node as ForceNode;
+                const hit = Math.sqrt(Math.max(n.size, 4)) * (mobile ? 3.4 : 2.8);
+                ctx.beginPath();
+                ctx.arc(n.x ?? 0, n.y ?? 0, hit, 0, 2 * Math.PI);
+                ctx.fillStyle = color;
+                ctx.fill();
+              }}
               linkWidth={(link) => 0.5 + (link.weight ?? 0.3) * 2.5}
               linkColor={() => "rgba(94, 106, 210, 0.28)"}
               linkDirectionalParticles={0}
               onNodeClick={(node) => handleNodeClick(node as ForceNode)}
-              onNodeHover={(node) => setHovered(node as KnowledgeGraphNode | null)}
+              onNodeHover={canHover ? (node) => setHovered(node as KnowledgeGraphNode | null) : undefined}
               onBackgroundClick={() => setSelected(null)}
               onEngineStop={() => {
                 if (!didFit) {
-                  graphRef.current?.zoomToFit(400, 48);
+                  graphRef.current?.zoomToFit(400, fitPadding);
                   setDidFit(true);
                 }
               }}
-              cooldownTicks={80}
-              d3AlphaDecay={0.025}
-              d3VelocityDecay={0.35}
+              cooldownTicks={mobile ? 60 : 80}
+              d3AlphaDecay={0.03}
+              d3VelocityDecay={0.4}
             />
           )}
-          {hovered ? (
+          {canHover && hovered && !focusNode ? (
             <div className="kg-hover-tip" role="status">
-              <span
-                className="kg-hover-tip-dot"
-                style={{ background: NODE_COLORS[hovered.type] }}
-              />
+              <span className="kg-hover-tip-dot" style={{ background: NODE_COLORS[hovered.type] }} />
               {hovered.label}
+            </div>
+          ) : null}
+          {mobile && focusNode ? (
+            <div className="kg-mobile-hint" role="status">
+              Tap outside or × to close
             </div>
           ) : null}
         </div>
 
-        <aside className={`kg-inspector${focusNode ? " is-open" : ""}`} aria-live="polite">
-          {focusNode ? (
-            <>
-              <div className="kg-inspector-head">
-                <span
-                  className="kg-inspector-badge"
-                  style={{ background: `${NODE_COLORS[focusNode.type]}22`, color: NODE_COLORS[focusNode.type] }}
-                >
-                  {NODE_LABELS[focusNode.type].replace(/s$/, "")}
-                </span>
-                <button type="button" className="kg-inspector-close" onClick={() => setSelected(null)} aria-label="Close">
-                  ×
-                </button>
-              </div>
-              <h3 className="kg-inspector-title">{focusNode.label}</h3>
-              <dl className="kg-inspector-meta">
-                {nodeDetail(focusNode).map((row) => (
-                  <div key={row.label} className="kg-inspector-row">
-                    <dt>{row.label}</dt>
-                    <dd>{row.value}</dd>
-                  </div>
-                ))}
-              </dl>
-              {focusNode.type === "item" && focusNode.meta.url ? (
-                <a
-                  href={String(focusNode.meta.url)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="dash-btn dash-btn-secondary kg-inspector-link"
-                >
-                  Open article
-                </a>
-              ) : null}
-            </>
-          ) : (
-            <div className="kg-inspector-placeholder">
-              <p className="kg-inspector-placeholder-title">Your second brain, mapped</p>
-              <p className="kg-inspector-placeholder-desc">
-                Drag to explore. Click any node to inspect connections Briefly discovered from your reading,
-                saves, and thoughts.
-              </p>
-              <ul className="kg-legend">
-                {ALL_TYPES.map((type) => (
-                  <li key={type}>
-                    <span className="kg-filter-dot" style={{ background: NODE_COLORS[type] }} />
-                    {NODE_LABELS[type]}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </aside>
+        {!mobile ? (
+          <aside className={`kg-inspector${focusNode ? " is-open" : ""}`} aria-live="polite">
+            {inspectorContent}
+          </aside>
+        ) : null}
       </div>
+
+      {mobile && focusNode ? (
+        <>
+          <button
+            type="button"
+            className="kg-sheet-backdrop"
+            aria-label="Close details"
+            onClick={() => setSelected(null)}
+          />
+          <aside className="kg-inspector kg-inspector-sheet is-open" aria-live="polite">
+            {inspectorContent}
+          </aside>
+        </>
+      ) : null}
     </div>
   );
 }
