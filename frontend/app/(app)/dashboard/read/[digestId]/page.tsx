@@ -139,7 +139,7 @@ function ReadingCard({
   const articleUrl = isReadableArticleUrl(item.source_url) ? item.source_url : null;
 
   return (
-    <div className="read-stage">
+    <div className={`read-stage${mode === "deep" ? " read-stage--deep" : ""}`}>
 
       {/* ── Meta row ── */}
       <motion.div

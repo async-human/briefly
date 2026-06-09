@@ -6021,7 +6021,7 @@ footer {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 0;
   overflow: hidden;
   position: relative;
@@ -6079,24 +6079,34 @@ footer {
   width: 100%;
   max-width: 720px;
   flex: 1;
-  height: auto;
   min-height: 0;
   display: flex;
+  flex-direction: column;
   margin: 0 auto;
+  overflow: hidden;
 }
 
 /* ── Editorial stage layout ── */
 .read-stage {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 24px 36px 28px;
-  gap: 20px;
+  justify-content: flex-start;
+  align-items: stretch;
+  padding: 20px 36px 32px;
+  gap: 18px;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
   position: relative;
   background: linear-gradient(180deg, rgba(158, 123, 63, 0.06) 0%, transparent 35%);
+  -webkit-overflow-scrolling: touch;
+}
+
+.read-stage--deep {
+  gap: 16px;
+  padding-bottom: 40px;
 }
 
 /* Meta row */
@@ -6156,58 +6166,68 @@ footer {
   opacity: 0.65;
 }
 
-/* Headline zone — vertically centers headline in available space */
+/* Headline zone — fixed block; must not shrink (prevents overlap in deep mode) */
 .read-headline-zone {
-  flex: 0 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 18px;
+  gap: 14px;
   position: relative;
-  overflow: visible;
-  padding: 8px 0;
+  overflow: hidden;
+  padding: 12px 0 4px;
+  isolation: isolate;
 }
-/* Large editorial background number */
+/* Large editorial background number — behind headline only */
 .read-bg-num {
   position: absolute;
-  bottom: -16px;
-  right: -4px;
+  top: -12px;
+  right: 0;
   font-family: var(--serif);
-  font-size: clamp(140px, 26vw, 220px);
+  font-size: clamp(72px, 16vw, 128px);
   font-weight: 700;
   color: rgba(212, 170, 106, 0.07);
   line-height: 1;
   pointer-events: none;
   user-select: none;
   letter-spacing: -0.06em;
+  z-index: 0;
+}
+.read-stage--deep .read-bg-num {
+  font-size: clamp(56px, 13vw, 100px);
+  top: -8px;
+  color: rgba(212, 170, 106, 0.05);
 }
 .read-headline-xl {
   font-family: var(--serif);
   font-size: clamp(26px, 5.5vw, 46px);
   font-weight: 400;
   letter-spacing: -0.04em;
-  line-height: 1.18;
+  line-height: 1.22;
   color: var(--text);
   margin: 0;
-  position: relative;
-  z-index: 1;
-}
-.read-summary-v2 {
-  font-size: clamp(13px, 2.5vw, 15px);
-  color: var(--text-secondary);
-  line-height: 1.62;
-  margin: 0;
-  padding-left: 16px;
-  border-left: 2px solid rgba(212, 170, 106, 0.38);
   position: relative;
   z-index: 1;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+.read-summary-v2 {
+  font-size: clamp(13px, 2.5vw, 15px);
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin: 0;
+  padding: 2px 0 2px 16px;
+  border-left: 2px solid rgba(212, 170, 106, 0.38);
+  position: relative;
+  z-index: 1;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  flex-shrink: 0;
+}
 
 /* Why This Matters V2 */
 .read-why-v2 {
+  flex: 0 0 auto;
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
@@ -6217,7 +6237,8 @@ footer {
   padding: 22px 26px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  z-index: 1;
 }
 /* Golden left accent bar */
 .read-why-v2::before {
@@ -6247,6 +6268,8 @@ footer {
   display: flex;
   align-items: center;
   gap: 7px;
+  position: relative;
+  z-index: 1;
 }
 .read-why-v2-icon {
   font-size: 9px;
@@ -6268,6 +6291,10 @@ footer {
   margin: 0;
   font-weight: 300;
   letter-spacing: -0.01em;
+  position: relative;
+  z-index: 1;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Memory connection V2 */
@@ -6297,9 +6324,12 @@ footer {
 
 /* Mobile adjustments */
 @media (max-width: 640px) {
-  .read-stage { padding: 20px 22px 24px; gap: 16px; }
+  .read-stage { padding: 16px 20px 28px; gap: 14px; }
+  .read-stage--deep { padding-bottom: 36px; }
   .read-why-v2 { padding: 18px 20px; }
   .read-headline-xl { font-size: clamp(22px, 7vw, 32px); }
+  .read-headline-zone { padding-top: 8px; }
+  .read-bg-num { font-size: clamp(48px, 22vw, 72px); top: -4px; }
 }
 .read-card {
   position: relative;
@@ -6488,12 +6518,15 @@ footer {
 
 /* Confidence signal — subtle relevance note */
 .read-confidence-signal {
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.05em;
   color: var(--text-muted);
   opacity: 0.7;
+  position: relative;
+  z-index: 1;
+  line-height: 1.5;
 }
 
 /* Evolution note — surfaces behavior divergence */
@@ -6640,8 +6673,10 @@ footer {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: auto;
+  margin-top: 0.5rem;
   align-items: center;
+  position: relative;
+  z-index: 1;
 }
 
 .read-ask-link,
