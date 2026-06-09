@@ -2397,28 +2397,36 @@ a.saved-capture-title:hover {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  max-width: 40rem;
   width: 100%;
 }
 
 .ask-message {
   display: flex;
   align-items: flex-start;
-  max-width: 40rem;
+}
+
+.ask-message-assistant {
+  max-width: 42rem;
   width: 100%;
 }
 
 .ask-message-user {
   align-self: flex-end;
-  max-width: 32rem;
+  margin-left: auto;
+  max-width: min(34rem, 78%);
+  width: fit-content;
 }
 
 .ask-message-body {
   min-width: 0;
+}
+
+.ask-message-assistant .ask-message-body {
   width: 100%;
 }
 
 .ask-message-user .ask-message-body {
+  width: auto;
   background: var(--app-ink);
   color: #fff;
   border-radius: 1.125rem 1.125rem 0.375rem 1.125rem;
@@ -2433,7 +2441,7 @@ a.saved-capture-title:hover {
   white-space: pre-wrap;
 }
 
-.ask-message-assistant .ask-message-body {
+.ask-message-assistant:not(.ask-message-pending) .ask-message-body {
   background: var(--app-surface);
   border: 1px solid color-mix(in srgb, var(--app-border) 88%, var(--app-linear) 12%);
   border-radius: 0.75rem;
@@ -2442,7 +2450,12 @@ a.saved-capture-title:hover {
 }
 
 .ask-message-pending .ask-message-body {
+  width: auto;
   padding: 0.875rem 1.125rem;
+  background: var(--app-surface);
+  border: 1px solid color-mix(in srgb, var(--app-border) 88%, var(--app-linear) 12%);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 8px rgba(15, 15, 15, 0.035);
 }
 
 /* Markdown body */
