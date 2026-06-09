@@ -159,9 +159,9 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         if thin_pool:
             min_rel = max(0.32, min_rel - 0.08)
         else:
-            min_rel = max(min_rel, 0.46)
+            min_rel = max(min_rel, 0.42)
         if priority_sort_key(source_id, priority_map) == 0:
-            min_rel = max(min_rel, 0.50)
+            min_rel = max(min_rel, 0.46)
         if candidate.relevance_score < min_rel:
             continue
         _select(candidate, SECTION_WHATS_NEW, "fresh")
@@ -179,9 +179,9 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             if thin_pool:
                 min_rel = max(0.32, min_rel - 0.08)
             else:
-                min_rel = max(min_rel, 0.46)
+                min_rel = max(min_rel, 0.42)
             if priority_sort_key(source_id, priority_map) == 0:
-                min_rel = max(min_rel, 0.50)
+                min_rel = max(min_rel, 0.46)
             if candidate.relevance_score < min_rel:
                 continue
             _select(candidate, SECTION_WHATS_NEW, "fresh")
@@ -220,6 +220,16 @@ async def run(ctx: PipelineContext) -> PipelineContext:
                 else SECTION_WHATS_NEW
             )
             _select(item, section, "backfill")
+
+    # Last resort: if pool rules filtered everything, take the best-scoring items.
+    if not selected and items:
+        log.warning(
+            "BriefingPlannerAgent: pool rules selected 0/%d items — using relevance fallback",
+            len(items),
+        )
+        fallback = sorted(items, key=lambda i: i.relevance_score, reverse=True)
+        for item in fallback[: max(s.digest_min_items, 3)]:
+            _select(item, SECTION_HIGHLY_RELEVANT, "backfill")
 
     # Final order: highest personalization rank first (not freshness-first).
     # Pool selection above still guarantees source diversity and section mix.

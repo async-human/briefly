@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -463,6 +463,12 @@ async def _briefing_worker(user_id: str) -> None:
                 generate_briefing_now(user, session, get_settings()),
                 timeout=360.0,
             )
+            item_count = (digest.total_items_shown or 0) or len(digest.items or [])
+            if item_count <= 0:
+                raise ValueError(
+                    "No relevant stories found in your sources right now. "
+                    "Try refreshing sources, then generate again."
+                )
             await report_briefing_progress(
                 user_id,
                 status="complete",
@@ -539,7 +545,7 @@ async def get_briefing_generation_status(
                 age_minutes = (datetime.now(timezone.utc) - started_dt).total_seconds() / 60
             except Exception:
                 age_minutes = 999.0
-        if age_minutes > 15:
+        if age_minutes > 6:
             local_today = local_date_string(profile.digest_timezone or "UTC")
             today_digest = await db.scalar(
                 select(Digest.id).where(
@@ -572,7 +578,26 @@ async def get_briefing_generation_status(
         )
         digest = result.scalar_one_or_none()
         if digest:
-            digest_out = DigestOut.model_validate(digest)
+            item_count = (digest.total_items_shown or 0) or len(digest.items or [])
+            if item_count > 0:
+                digest_out = DigestOut.model_validate(digest)
+            else:
+                now = datetime.now(timezone.utc).isoformat()
+                gen = {
+                    "status": "error",
+                    "step": "error",
+                    "label": "Briefing failed.",
+                    "error": (
+                        "Briefing finished but had no items to show. "
+                        "Refresh your sources or try again shortly."
+                    ),
+                    "started_at": gen.get("started_at"),
+                    "updated_at": now,
+                }
+                meta["briefing_generation"] = gen
+                profile.ingestion_meta = meta
+                flag_modified(profile, "ingestion_meta")
+                await db.commit()
 
     return BriefingGenerationStatusOut(
         status=gen.get("status", "idle"),
@@ -589,7 +614,6 @@ async def get_briefing_generation_status(
 
 @router.post("/digests/generate", response_model=GenerateDigestOut)
 async def generate_digest_now(
-    background_tasks: BackgroundTasks,
     force: bool = False,
     restart: bool = False,
     user: User = Depends(get_current_user),
@@ -675,7 +699,8 @@ async def generate_digest_now(
     await db.commit()
 
     log.info("Starting briefing worker for user %s (digest_date=%s)", user.id, local_today)
-    background_tasks.add_task(_briefing_worker, user.id)
+    # create_task starts immediately in the event loop (more reliable than BackgroundTasks on some hosts).
+    asyncio.create_task(_briefing_worker(user.id))
     return GenerateDigestOut(status="running", digest=None, warnings=[])
 
 

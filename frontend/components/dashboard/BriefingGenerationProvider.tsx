@@ -137,7 +137,10 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
         if (nextDigest) {
           return { digest: nextDigest, warnings: status.warnings ?? [] };
         }
-        // Status says complete but today's digest isn't in DB — keep polling.
+        throw new Error(
+          status.error ||
+            "Briefing finished but nothing was saved. Try refreshing your sources, then generate again.",
+        );
       }
 
       if (status.status === "error") {

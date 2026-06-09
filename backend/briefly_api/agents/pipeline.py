@@ -162,14 +162,30 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
         ctx = await _run_agent("DeliveryAgent",          delivery.run,         ctx)
 
         # ── Persist digest to DB ──────────────────────────────────────────────
-        if ctx.selected_item_ids and not ctx.digest_items:
-            log.error(
-                "Pipeline: refusing to persist empty digest for user %s (%d items planned)",
-                user_id, len(ctx.selected_item_ids),
+        if not ctx.digest_items or ctx.total_shown <= 0:
+            if ctx.selected_item_ids:
+                log.error(
+                    "Pipeline: refusing to persist empty digest for user %s (%d items planned)",
+                    user_id,
+                    len(ctx.selected_item_ids),
+                )
+                return {
+                    "success": False,
+                    "error": "Briefing writer failed to produce items",
+                    "items": 0,
+                    "errors": ctx.pipeline_errors,
+                }
+            log.warning(
+                "Pipeline: no briefing items selected for user %s (scored=%d)",
+                user_id,
+                len(ctx.scored_items),
             )
             return {
                 "success": False,
-                "error": "Briefing writer failed to produce items",
+                "error": (
+                    "No relevant stories found in your sources right now. "
+                    "Try refreshing sources in the sidebar, or check back after overnight ingestion."
+                ),
                 "items": 0,
                 "errors": ctx.pipeline_errors,
             }
@@ -325,7 +341,7 @@ _AGENT_TIMEOUTS: dict[str, float] = {
     "SourceCollectorAgent":   60.0,
     "ContentCleanerAgent":    15.0,
     "DeduplicationAgent":     15.0,
-    "RelevanceAgent":         30.0,
+    "RelevanceAgent":         90.0,
     "NoveltyAgent":           15.0,
     "MemoryAgent":            15.0,
     "BriefingPlannerAgent":   30.0,
