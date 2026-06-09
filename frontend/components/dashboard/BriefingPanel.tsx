@@ -19,6 +19,7 @@ import { SourceIcon } from "@/components/SourceIcon";
 import { OutcomeBriefHeader, SafeToIgnorePanel } from "./OutcomeBriefHeader";
 import { getDigestOutcome, splitTopPriorityItems } from "@/lib/digestOutcome";
 import { graphItemUrl } from "@/lib/graphLinks";
+import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
 
 const PREVIEW_LIMIT = 5;
 
@@ -526,19 +527,6 @@ function buildGroupedPreview(items: DigestItem[], limit: number) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
-function BriefingItemSkeleton() {
-  return (
-    <article className="briefing-preview-item briefing-item-skeleton" aria-hidden>
-      <span className="skeleton-block" style={{ width: 24, height: 14, borderRadius: 3 }} />
-      <div className="briefing-preview-body" style={{ gap: 8, display: "flex", flexDirection: "column" }}>
-        <span className="skeleton-block" style={{ width: "40%", height: 10 }} />
-        <span className="skeleton-block" style={{ width: "88%", height: 16 }} />
-        <span className="skeleton-block" style={{ width: "35%", height: 11 }} />
-      </div>
-    </article>
-  );
-}
-
 const GENERATING_PHASES = [
   "Reading your sources…",
   "Scoring items for relevance…",
@@ -567,27 +555,6 @@ function fmtElapsed(sec: number): string {
   return `${m}m ${s.toString().padStart(2, "0")}s`;
 }
 
-// Map backend label text to a step index (0-3) so we don't do fragile string matching everywhere
-function labelToStepIndex(lbl: string): number {
-  const l = lbl.toLowerCase();
-  if (l.includes("collect") || l.includes("source") || l.includes("fetch") ||
-      l.includes("ingest") || l.includes("clean") || l.includes("normaliz")) return 0;
-  if (l.includes("relev") || l.includes("scor") || l.includes("novel") ||
-      l.includes("dedup") || l.includes("duplic")) return 1;
-  if (l.includes("memory") || l.includes("plann") || l.includes("history") ||
-      l.includes("thread") || l.includes("verif")) return 2;
-  if (l.includes("writ") || l.includes("dump") || l.includes("deliver") ||
-      l.includes("ready") || l.includes("done")) return 3;
-  return 0; // default to first step
-}
-
-const PIPELINE_STEPS = [
-  { label: "Reading your sources",      hint: "Fetching & cleaning content" },
-  { label: "Scoring relevance",         hint: "Matching to your interests" },
-  { label: "Connecting to your history",hint: "Memory, threads, dedup" },
-  { label: "Writing your briefing",     hint: "Personalised with Haiku" },
-];
-
 function GeneratingPanel({
   statusLabel,
   elapsedSec,
@@ -595,71 +562,21 @@ function GeneratingPanel({
 }: {
   statusLabel: string;
   elapsedSec: number;
-  isUpdate: boolean; // true = updating existing digest, false = first time
+  isUpdate: boolean;
 }) {
-  const activeStep = labelToStepIndex(statusLabel);
-
   return (
-    <div className="bgl-panel">
-      {/* ── Header ── */}
-      <div className="bgl-panel-header">
-        <span className="bgl-pulse-ring" aria-hidden />
-        <div className="bgl-panel-header-text">
-          <h2 className="bgl-panel-title">
-            {isUpdate ? "Generating today's brief" : "Building your first briefing"}
-          </h2>
-          <p className="bgl-panel-subtitle">
-            {elapsedSec > 0
-              ? fmtElapsed(elapsedSec)
-              : "Starting up…"}
-          </p>
-        </div>
-      </div>
-
-      {/* ── Current label from backend ── */}
-      <p className="bgl-panel-live-label">
-        <span className="bgl-panel-live-dot" aria-hidden />
+    <div className="bgl-panel bgl-panel-minimal" aria-busy="true" aria-live="polite">
+      <BriefLoaderArt />
+      <p className="bgl-panel-minimal-title">
+        {isUpdate ? "Preparing your briefing" : "Building your first briefing"}
+      </p>
+      <p className="bgl-panel-minimal-status">
+        <span className="dash-page-status-dot" aria-hidden />
         {statusLabel}
       </p>
-
-      {/* ── Pipeline steps ── */}
-      <div className="bgl-panel-steps">
-        {PIPELINE_STEPS.map((step, i) => {
-          const state =
-            i < activeStep ? "done" :
-            i === activeStep ? "active" :
-            "pending";
-          return (
-            <div key={step.label} className={`bgl-panel-step bgl-panel-step--${state}`}>
-              <div className="bgl-panel-step-indicator">
-                {state === "done" ? (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5"
-                      strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                ) : state === "active" ? (
-                  <span className="bgl-panel-step-pulse" aria-hidden />
-                ) : (
-                  <span className="bgl-panel-step-empty" aria-hidden />
-                )}
-              </div>
-              <div className="bgl-panel-step-body">
-                <span className="bgl-panel-step-label">{step.label}</span>
-                {state === "active" && (
-                  <span className="bgl-panel-step-hint">{step.hint}</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ── Ghost skeleton items ── */}
-      <div className="bgl-panel-ghost">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <BriefingItemSkeleton key={i} />
-        ))}
-      </div>
+      {elapsedSec > 0 && (
+        <p className="bgl-panel-minimal-elapsed">{fmtElapsed(elapsedSec)}</p>
+      )}
     </div>
   );
 }

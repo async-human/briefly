@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { BriefLoaderArt } from "./BriefLoaderArt";
 
 export type PageLoaderVariant = "dashboard" | "saved" | "history" | "settings" | "graph";
 
@@ -124,55 +125,6 @@ function Block({
   );
 }
 
-function DashboardLoaderArt() {
-  return (
-    <div className="dash-page app-dashboard-loader" aria-hidden>
-      <div className="app-dashboard-loader-toolbar">
-        <span className="app-dashboard-loader-line app-dashboard-loader-line-sm" />
-        <span className="app-dashboard-loader-line app-dashboard-loader-line-lg" />
-      </div>
-
-      <div className="dash-page-grid">
-        <div className="dash-surface dash-surface-briefing app-dashboard-loader-panel">
-          <div className="app-dashboard-loader-panel-head">
-            <span className="app-dashboard-loader-line app-dashboard-loader-line-title" />
-            <span className="app-dashboard-loader-line app-dashboard-loader-line-sub" />
-          </div>
-          <div className="app-dashboard-loader-items">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="app-dashboard-loader-item"
-                style={{ animationDelay: `${i * 0.15}s` }}
-              />
-            ))}
-          </div>
-          <p className="app-dashboard-loader-caption">
-            <span className="app-dashboard-loader-dot" aria-hidden />
-            {CAPTIONS.dashboard}
-          </p>
-        </div>
-
-        <div className="dash-surface dash-surface-sources app-dashboard-loader-panel app-dashboard-loader-panel-side">
-          <div className="app-dashboard-loader-panel-head">
-            <span className="app-dashboard-loader-line app-dashboard-loader-line-title" />
-            <span className="app-dashboard-loader-line app-dashboard-loader-line-sub" />
-          </div>
-          <div className="app-dashboard-loader-sources">
-            {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="app-dashboard-loader-source"
-                style={{ animationDelay: `${0.08 + i * 0.1}s` }}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function LayoutSkeleton({ variant }: { variant: Exclude<PageLoaderVariant, "graph" | "dashboard"> }) {
 
   if (variant === "saved") {
@@ -241,15 +193,15 @@ export function AnimatedPageSkeleton({ variant }: AnimatedPageSkeletonProps) {
         {isGraph ? (
           <GraphLoaderArt />
         ) : isDashboard ? (
-          <DashboardLoaderArt />
+          <BriefLoaderArt />
         ) : (
           <LayoutSkeleton variant={variant} />
         )}
-        {!isDashboard && (
-          <p className={`app-page-loader-caption${isGraph ? " app-page-loader-caption-graph" : ""}`}>
-            {CAPTIONS[variant]}
-          </p>
-        )}
+        <p
+          className={`app-page-loader-caption${isGraph ? " app-page-loader-caption-graph" : ""}${isDashboard ? " app-page-loader-caption-dashboard" : ""}`}
+        >
+          {CAPTIONS[variant]}
+        </p>
       </div>
     </div>
   );
