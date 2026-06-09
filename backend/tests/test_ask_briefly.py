@@ -4,6 +4,7 @@ from __future__ import annotations
 from briefly_api.services.ask_briefly import (
     _extract_citations,
     _format_context_pack,
+    is_saved_unread_query,
     rank_by_similarity,
     ContextChunk,
 )
@@ -38,6 +39,12 @@ def test_extract_citations_from_answer():
     assert len(cites) == 2
     assert cites[0]["ref"] == "S1"
     assert cites[1]["content_id"] == "c2"
+
+
+def test_is_saved_unread_query_detects_backlog_questions():
+    assert is_saved_unread_query("What did I save recently that I haven't read yet?")
+    assert is_saved_unread_query("show my unread saves")
+    assert not is_saved_unread_query("Summarize my active story threads.")
 
 
 def test_format_context_pack_includes_ref():

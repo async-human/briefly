@@ -30,13 +30,24 @@ from briefly_api.db.models import (
 )
 from briefly_api.embeddings.adapter import get_embedding_adapter
 from briefly_api.llm.adapter import Message, get_llm_adapter
+from briefly_api.services.browser_capture import list_recent_captures
 from briefly_api.services.profile_utils import cluster_label, iter_topic_clusters
 
 _CITATION_RE = re.compile(r"\[S(\d+)\]")
+_SAVED_UNREAD_QUERY = re.compile(
+    r"(?:"
+    r"what\s+(?:did|have)\s+i\s+save|saved\s+recently|"
+    r"(?:my\s+)?(?:saved|saves|reading\s+list|read(?:ing)?\s+list|backlog)|"
+    r"haven'?t\s+read|have\s+not\s+read|not\s+read\s+yet|unread|"
+    r"save(?:d)?\s+.+\s+(?:not\s+read|unread|yet\s+to\s+read)"
+    r")",
+    re.IGNORECASE,
+)
 _MAX_HISTORY = 8
 _MAX_RETRIEVAL_POOL = 250
 _MAX_CHUNKS = 8
 _MIN_SIMILARITY = 0.32
+_SAVED_UNREAD_LIMIT = 12
 
 
 @dataclass
@@ -105,6 +116,109 @@ def _never_show_block(text: str, never_show: list[str]) -> bool:
         return False
     hay = text.lower()
     return any(term.lower() in hay for term in never_show if term)
+
+
+def is_saved_unread_query(message: str) -> bool:
+    """True when the user is asking about their saved / unread backlog."""
+    return bool(_SAVED_UNREAD_QUERY.search(message.strip()))
+
+
+async def _retrieve_saved_unread(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    never_show: list[str],
+    limit: int = _SAVED_UNREAD_LIMIT,
+) -> list[ContextChunk]:
+    """
+  List items the user saved but has not opened in Briefly:
+  - Briefing items starred (was_saved) without a click
+  - Browser captures still queued (not yet surfaced in a briefing)
+  - Browser captures in a briefing whose digest item was never clicked
+    """
+    chunks: list[ContextChunk] = []
+    seen_content: set[str] = set()
+
+    digest_result = await db.execute(
+        select(DigestItem, Digest)
+        .join(Digest, DigestItem.digest_id == Digest.id)
+        .where(
+            Digest.user_id == user_id,
+            DigestItem.was_saved.is_(True),
+            DigestItem.was_clicked.is_(False),
+        )
+        .order_by(Digest.digest_date.desc(), DigestItem.position)
+        .limit(limit)
+    )
+    for item, digest in digest_result.all():
+        cid = item.content_id or f"digest-item:{item.id}"
+        if cid in seen_content:
+            continue
+        blob = f"{item.headline} {item.summary}"
+        if _never_show_block(blob, never_show):
+            continue
+        seen_content.add(cid)
+        snippet = (
+            f"Saved from briefing on {digest.digest_date}. Not yet opened.\n"
+            f"{item.summary}\n\nWhy it matters: {item.why_it_matters}"
+        )[:1200]
+        chunks.append(
+            ContextChunk(
+                ref="",
+                content_id=cid if not str(cid).startswith("digest-item:") else item.id,
+                title=item.headline,
+                url=item.source_url,
+                source_name=item.source_name or "Briefing",
+                snippet=snippet,
+                kind="saved_unread",
+            )
+        )
+
+    captures = await list_recent_captures(db, user_id, limit=limit)
+    clicked_content: set[str] = set()
+    if captures:
+        cap_ids = [c.id for c in captures]
+        clicked_result = await db.execute(
+            select(DigestItem.content_id)
+            .join(Digest, DigestItem.digest_id == Digest.id)
+            .where(
+                Digest.user_id == user_id,
+                DigestItem.content_id.in_(cap_ids),
+                DigestItem.was_clicked.is_(True),
+            )
+        )
+        clicked_content = {row[0] for row in clicked_result.all() if row[0]}
+
+    for cap in captures:
+        if len(chunks) >= limit:
+            break
+        if cap.id in seen_content:
+            continue
+        if cap.id in clicked_content:
+            continue
+        blob = f"{cap.title} {cap.summary}"
+        if _never_show_block(blob, never_show):
+            continue
+        seen_content.add(cap.id)
+        if cap.in_briefing:
+            status = "Surfaced in a briefing but not opened yet."
+        else:
+            status = "Saved via browser — queued, not yet in a briefing."
+        note = f"\nYour note: {cap.user_note}" if cap.user_note else ""
+        snippet = f"{status}\n{cap.summary}{note}"[:1200]
+        chunks.append(
+            ContextChunk(
+                ref="",
+                content_id=cap.id,
+                title=cap.title,
+                url=cap.url,
+                source_name="Saved",
+                snippet=snippet,
+                kind="saved_unread",
+            )
+        )
+
+    return chunks[:limit]
 
 
 async def _load_anchor_chunks(
@@ -305,7 +419,9 @@ You answer using ONLY the sources in the context pack, labeled [S1], [S2], etc.
 - If the sources don't contain enough information, say so honestly. Do not invent articles or URLs.
 - Be concise, direct, and personal (use what you know about the user from the profile).
 - Connect dots across sources when relevant.
-- Never mention that you are an AI or language model."""
+- Never mention that you are an AI or language model.
+- Never tell the user to check external apps (Reader, email, etc.) — Briefly IS their reading system.
+- When the pack is a SAVED/UNREAD INDEX, list each item by title with a short note on why it's unread. If the index is empty, say their saved queue is clear."""
 
 
 async def ask_briefly(
@@ -345,27 +461,40 @@ async def ask_briefly(
     if digest_item_id and not thread.digest_item_id:
         thread.digest_item_id = digest_item_id
 
-    embedder = get_embedding_adapter()
-    query_embedding = await embedder.embed(message)
+    saved_unread_mode = is_saved_unread_query(message) and not content_id and not digest_item_id
 
-    anchor_chunks = await _load_anchor_chunks(
-        db, user.id, content_id=content_id, digest_item_id=digest_item_id
-    )
-    exclude = {c.content_id for c in anchor_chunks if not c.content_id.startswith("digest-item")}
-    extra_limit = _MAX_CHUNKS - len(anchor_chunks)
-    extra: list[ContextChunk] = []
-    if extra_limit > 0:
-        extra = await _semantic_retrieve(
-            db,
-            user.id,
-            query_embedding,
-            exclude_ids=exclude,
-            never_show=never_show,
-            limit=extra_limit,
+    if saved_unread_mode:
+        saved_chunks = await _retrieve_saved_unread(db, user.id, never_show=never_show)
+        all_chunks = _assign_refs(saved_chunks, start_index=1)
+        if all_chunks:
+            context_pack = "SAVED/UNREAD INDEX:\n" + _format_context_pack(all_chunks)
+        else:
+            context_pack = (
+                "SAVED/UNREAD INDEX: No saved-but-unread items in Briefly right now "
+                "(no starred briefing items awaiting open, no queued browser saves)."
+            )
+    else:
+        embedder = get_embedding_adapter()
+        query_embedding = await embedder.embed(message)
+
+        anchor_chunks = await _load_anchor_chunks(
+            db, user.id, content_id=content_id, digest_item_id=digest_item_id
         )
+        exclude = {c.content_id for c in anchor_chunks if not c.content_id.startswith("digest-item")}
+        extra_limit = _MAX_CHUNKS - len(anchor_chunks)
+        extra: list[ContextChunk] = []
+        if extra_limit > 0:
+            extra = await _semantic_retrieve(
+                db,
+                user.id,
+                query_embedding,
+                exclude_ids=exclude,
+                never_show=never_show,
+                limit=extra_limit,
+            )
 
-    all_chunks = _assign_refs(anchor_chunks + extra, start_index=1)
-    context_pack = _format_context_pack(all_chunks) if all_chunks else "(No matching sources in your library yet.)"
+        all_chunks = _assign_refs(anchor_chunks + extra, start_index=1)
+        context_pack = _format_context_pack(all_chunks) if all_chunks else "(No matching sources in your library yet.)"
     profile_text = _profile_blurb(profile)
 
     history = list(thread.messages or [])[-_MAX_HISTORY:]
