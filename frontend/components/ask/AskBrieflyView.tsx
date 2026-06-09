@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, type AskCitation, type AskMessage, type AskThreadSummary } from "@/lib/api";
-import { graphItemUrl, graphThoughtUrl } from "@/lib/graphLinks";
+import { api, type AskMessage, type AskThreadSummary } from "@/lib/api";
+import { AskMessageContent, CitationSources } from "./AskMessageContent";
 
 const SUGGESTED = [
   "What have I been reading about most this month?",
@@ -19,56 +18,27 @@ type AskBrieflyViewProps = {
   anchorTitle?: string | null;
 };
 
-function CitationCard({ cite }: { cite: AskCitation }) {
-  const graphHref =
-    cite.kind === "brain_dump" || cite.kind === "thought"
-      ? graphThoughtUrl(cite.content_id)
-      : graphItemUrl(cite.content_id);
-
-  return (
-    <div className="ask-citation">
-      <div className="ask-citation-head">
-        <span className="ask-citation-ref">{cite.ref}</span>
-        {cite.source_name ? (
-          <span className="ask-citation-source">{cite.source_name}</span>
-        ) : null}
-      </div>
-      <p className="ask-citation-title">{cite.title}</p>
-      <p className="ask-citation-snippet">{cite.snippet}</p>
-      <div className="ask-citation-actions">
-        {cite.url ? (
-          <a
-            href={cite.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ask-citation-link"
-          >
-            Open source
-          </a>
-        ) : null}
-        {!cite.content_id.startsWith("digest-item") ? (
-          <Link href={graphHref} className="ask-citation-link">
-            View in graph
-          </Link>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 function MessageBubble({ message }: { message: AskMessage }) {
   const isUser = message.role === "user";
+
   return (
     <div className={`ask-message${isUser ? " ask-message-user" : " ask-message-assistant"}`}>
+      {!isUser ? (
+        <div className="ask-avatar" aria-hidden>
+          B
+        </div>
+      ) : null}
       <div className="ask-message-body">
-        <p className="ask-message-text">{message.content}</p>
-        {!isUser && message.citations && message.citations.length > 0 ? (
-          <div className="ask-citations">
-            {message.citations.map((c) => (
-              <CitationCard key={`${c.ref}-${c.content_id}`} cite={c} />
-            ))}
-          </div>
-        ) : null}
+        {isUser ? (
+          <p className="ask-message-text-user">{message.content}</p>
+        ) : (
+          <>
+            <AskMessageContent content={message.content} citations={message.citations} />
+            {message.citations && message.citations.length > 0 ? (
+              <CitationSources citations={message.citations} />
+            ) : null}
+          </>
+        )}
       </div>
     </div>
   );
@@ -91,6 +61,7 @@ export function AskBrieflyView({
 
   const contentId = initialContentId ?? null;
   const digestItemId = initialDigestItemId ?? null;
+  const hasConversation = messages.length > 0 || sending;
 
   const loadThreads = useCallback(() => {
     void api.listAskThreads().then((res) => setThreads(res.threads)).catch(() => {});
@@ -197,19 +168,23 @@ export function AskBrieflyView({
       </aside>
 
       <div className="ask-main">
-        <header className="ask-header">
+        <header className={`ask-header${hasConversation ? " ask-header-compact" : ""}`}>
           <div>
             <p className="ask-eyebrow">Ask Briefly</p>
-            <h1 className="ask-heading">Your second brain, on demand</h1>
-            <p className="ask-sub">
-              Answers grounded in your briefings, saves, and brain dumps — with citations.
-            </p>
+            <h1 className="ask-heading">
+              {hasConversation ? "Conversation" : "Your second brain, on demand"}
+            </h1>
+            {!hasConversation ? (
+              <p className="ask-sub">
+                Grounded answers from your briefings, saves, and brain dumps.
+              </p>
+            ) : null}
           </div>
         </header>
 
         {scopeTitle ? (
           <div className="ask-scope-banner" role="status">
-            <span className="ask-scope-label">Asking about</span>
+            <span className="ask-scope-label">Focused on</span>
             <span className="ask-scope-title">{scopeTitle}</span>
           </div>
         ) : null}
@@ -217,6 +192,22 @@ export function AskBrieflyView({
         <div className="ask-messages" aria-live="polite">
           {messages.length === 0 && !sending ? (
             <div className="ask-empty">
+              <div className="ask-empty-icon" aria-hidden>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M7 8.5h10M7 12h7M7 15.5h9"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M5 5.5h14a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H10l-4.5 3v-3H5a2 2 0 0 1-2-2V7.5a2 2 0 0 1 2-2Z"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
               <p className="ask-empty-title">What do you want to know?</p>
               <p className="ask-empty-desc">
                 Ask about trends in your reading, connections between topics, or where you saw
@@ -236,11 +227,25 @@ export function AskBrieflyView({
               </div>
             </div>
           ) : (
-            messages.map((m, i) => <MessageBubble key={`${m.role}-${i}`} message={m} />)
+            <div className="ask-thread">
+              {messages.map((m, i) => (
+                <MessageBubble key={`${m.role}-${i}-${m.content.slice(0, 24)}`} message={m} />
+              ))}
+            </div>
           )}
           {sending ? (
             <div className="ask-message ask-message-assistant ask-message-pending" role="status">
-              <span className="ask-typing">Briefly is thinking…</span>
+              <div className="ask-avatar" aria-hidden>
+                B
+              </div>
+              <div className="ask-message-body ask-typing-wrap">
+                <span className="ask-typing-dots" aria-hidden>
+                  <span />
+                  <span />
+                  <span />
+                </span>
+                <span className="ask-typing">Briefly is thinking</span>
+              </div>
             </div>
           ) : null}
           <div ref={bottomRef} />
@@ -255,23 +260,39 @@ export function AskBrieflyView({
             void handleSend();
           }}
         >
-          <textarea
-            className="ask-input"
-            rows={2}
-            placeholder="Ask anything about your reading…"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void handleSend();
-              }
-            }}
-            disabled={sending}
-          />
-          <button type="submit" className="dash-btn dash-btn-primary ask-send" disabled={sending || !input.trim()}>
-            Send
-          </button>
+          <div className="ask-composer-inner">
+            <textarea
+              className="ask-input"
+              rows={1}
+              placeholder="Ask anything about your reading…"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleSend();
+                }
+              }}
+              disabled={sending}
+            />
+            <button
+              type="submit"
+              className="ask-send"
+              disabled={sending || !input.trim()}
+              aria-label="Send message"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M5 12h14M13 6l6 6-6 6"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+          <p className="ask-composer-hint">Enter to send · Shift+Enter for new line</p>
         </form>
       </div>
     </div>
