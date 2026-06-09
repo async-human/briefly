@@ -28,7 +28,7 @@ type SourcesSidebarProps = {
   gmailConnected: boolean;
   autoSuggestions?: AutoSuggestion[];
   onSourceAdded: (source: Source) => void;
-  onSourceRemoved: (sourceId: string) => void;
+  onSourcesRemoved: (sourceIds: string[]) => void;
   onSourceUpdated?: (source: Source) => void;
   onRediscover?: () => void;
   onClose?: () => void;
@@ -40,23 +40,41 @@ export function SourcesSidebar({
   gmailConnected,
   autoSuggestions = [],
   onSourceAdded,
-  onSourceRemoved,
+  onSourcesRemoved,
   onSourceUpdated,
   onRediscover,
 }: SourcesSidebarProps) {
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<Set<string>>(() => new Set());
+  const [confirmingRemoval, setConfirmingRemoval] = useState(false);
   const [priorityId, setPriorityId] = useState<string | null>(null);
   const [showAllSources, setShowAllSources] = useState(false);
 
-  async function handleDelete(sourceId: string) {
-    setDeletingId(sourceId);
+  function togglePendingRemoval(sourceId: string) {
+    setPendingRemoval((prev) => {
+      const next = new Set(prev);
+      if (next.has(sourceId)) next.delete(sourceId);
+      else next.add(sourceId);
+      return next;
+    });
+  }
+
+  async function confirmRemovals() {
+    const ids = Array.from(pendingRemoval);
+    if (!ids.length) return;
+    setConfirmingRemoval(true);
     try {
-      await api.deleteSource(sourceId);
-      onSourceRemoved(sourceId);
-    } catch {
-      // keep in list on failure
+      const results = await Promise.allSettled(ids.map((id) => api.deleteSource(id)));
+      const succeeded = ids.filter((_, index) => results[index].status === "fulfilled");
+      setPendingRemoval((prev) => {
+        const next = new Set(prev);
+        succeeded.forEach((id) => next.delete(id));
+        return next;
+      });
+      if (succeeded.length) {
+        onSourcesRemoved(succeeded);
+      }
     } finally {
-      setDeletingId(null);
+      setConfirmingRemoval(false);
     }
   }
 
@@ -91,8 +109,13 @@ export function SourcesSidebar({
         {sources.length > 0 && (
           <>
             <ul className="source-list source-list-connected source-list-compact">
-              {visibleSources.map((source) => (
-                <li key={source.id} className="source-list-item">
+              {visibleSources.map((source) => {
+                const marked = pendingRemoval.has(source.id);
+                return (
+                <li
+                  key={source.id}
+                  className={`source-list-item${marked ? " is-pending-removal" : ""}`}
+                >
                   <span className="source-type-icon">
                     <SourceIcon
                       type={source.source_type}
@@ -124,16 +147,47 @@ export function SourcesSidebar({
                   </button>
                   <button
                     type="button"
-                    className="source-delete-btn"
-                    onClick={() => handleDelete(source.id)}
-                    disabled={deletingId === source.id}
-                    aria-label={`Remove ${sourceDisplayName(source)}`}
+                    className={`source-delete-btn${marked ? " is-marked" : ""}`}
+                    onClick={() => togglePendingRemoval(source.id)}
+                    disabled={confirmingRemoval}
+                    aria-label={
+                      marked
+                        ? `Undo remove ${sourceDisplayName(source)}`
+                        : `Mark ${sourceDisplayName(source)} for removal`
+                    }
+                    title={marked ? "Undo" : "Remove"}
                   >
-                    {deletingId === source.id ? "…" : "×"}
+                    {marked ? "↩" : "×"}
                   </button>
                 </li>
-              ))}
+              );
+              })}
             </ul>
+            {pendingRemoval.size > 0 && (
+              <div className="source-removal-bar" role="status">
+                <p className="source-removal-bar-text">
+                  {pendingRemoval.size} source{pendingRemoval.size === 1 ? "" : "s"} will be removed
+                </p>
+                <div className="source-removal-bar-actions">
+                  <button
+                    type="button"
+                    className="source-removal-cancel"
+                    onClick={() => setPendingRemoval(new Set())}
+                    disabled={confirmingRemoval}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="source-removal-confirm"
+                    onClick={() => void confirmRemovals()}
+                    disabled={confirmingRemoval}
+                  >
+                    {confirmingRemoval ? "Removing…" : "Confirm & refresh brief"}
+                  </button>
+                </div>
+              </div>
+            )}
             {hiddenCount > 0 && !showAllSources && (
               <button
                 type="button"
@@ -217,7 +271,7 @@ export function SourcesSidebar({
           <ReadwiseCard
             sources={sources}
             onAdded={onSourceAdded}
-            onRemoved={onSourceRemoved}
+            onRemoved={(id) => onSourcesRemoved([id])}
             compact
           />
         </CollapsibleCard>

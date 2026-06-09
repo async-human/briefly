@@ -185,16 +185,19 @@ function DashboardContent() {
     }
   }
 
-  function handleSourceRemoved(sourceId: string) {
+  function handleSourcesRemoved(sourceIds: string[]) {
+    if (!sourceIds.length) return;
+    const removing = new Set(sourceIds);
     let shouldRegenerate = false;
     setSources((prev) => {
-      const removed = prev.find((s) => s.id === sourceId);
-      if (removed && FETCHABLE_SOURCE_TYPES.has(removed.source_type)) {
-        shouldRegenerate = true;
-      }
-      return prev.filter((s) => s.id !== sourceId);
+      shouldRegenerate = prev.some(
+        (s) => removing.has(s.id) && FETCHABLE_SOURCE_TYPES.has(s.source_type),
+      );
+      return prev.filter((s) => !removing.has(s.id));
     });
     if (shouldRegenerate && !showDiscovery) {
+      if (me) clearBriefingGeneratedToday(me.user.id);
+      setDigest(null);
       runGenerate();
     }
   }
@@ -303,7 +306,7 @@ function DashboardContent() {
               gmailConnected={me.gmail_connected}
               autoSuggestions={me.auto_suggestions ?? []}
               onSourceAdded={handleSourceAdded}
-              onSourceRemoved={handleSourceRemoved}
+              onSourcesRemoved={handleSourcesRemoved}
               onSourceUpdated={(updated) =>
                 setSources((prev) =>
                   prev.map((s) => (s.id === updated.id ? updated : s)),

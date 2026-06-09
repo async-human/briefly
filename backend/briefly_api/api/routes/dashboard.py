@@ -613,7 +613,7 @@ async def generate_digest_now(
     )
     digest = existing.scalar_one_or_none()
     item_count = (digest.total_items_shown if digest else 0) or len(digest.items if digest else [])
-    if digest and item_count > 0:
+    if digest and item_count > 0 and not (force or restart):
         return GenerateDigestOut(
             status="complete",
             digest=DigestOut.model_validate(digest),

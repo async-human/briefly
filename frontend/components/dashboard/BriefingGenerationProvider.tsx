@@ -188,13 +188,16 @@ export function BriefingGenerationProvider({ children }: { children: ReactNode }
             setGeneratingLabel(existing.label);
           }
           const todayAlready = await resolveTodayDigest();
-          if (todayAlready) {
+          if (todayAlready && !restart) {
             setDigest(todayAlready);
             if (userIdRef.current) {
               markBriefingGeneratedToday(userIdRef.current, digestTimezoneRef.current);
             }
             userTriggeredRef.current = false;
             return;
+          }
+          if (restart) {
+            setDigest(null);
           }
           if (shouldKickOffGeneration(existing, restart)) {
             const started = await api.generateDigest({ force: true, restart });
