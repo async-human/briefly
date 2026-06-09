@@ -2552,6 +2552,11 @@ a.saved-capture-title:hover {
   box-shadow: none;
 }
 
+.ask-message-streaming .ask-md strong,
+.ask-message-streaming .ask-md em {
+  transition: none;
+}
+
 /* Markdown body */
 .ask-md {
   font-size: 0.9375rem;

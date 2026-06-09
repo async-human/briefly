@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -102,6 +103,39 @@ class LLMAdapter:
             return await self._openai(messages, system=system, model=_model, temperature=_temp, max_tokens=_max, json_mode=json_mode)
         elif provider == "groq":
             return await self._groq(messages, system=system, model=_model, temperature=_temp, max_tokens=_max)
+        else:
+            raise ValueError(f"Unknown LLM provider: {provider}")
+
+    async def stream_complete(
+        self,
+        messages: list[Message],
+        *,
+        system: str | None = None,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> AsyncIterator[str]:
+        """Yield text deltas from the configured provider's streaming API."""
+        provider = self._s.llm_provider
+        _model = model or self._s.llm_model
+        _temp = temperature if temperature is not None else self._s.llm_temperature
+        _max = max_tokens or self._s.llm_max_tokens
+
+        if provider == "anthropic":
+            async for delta in self._anthropic_stream(
+                messages, system=system, model=_model, temperature=_temp, max_tokens=_max,
+            ):
+                yield delta
+        elif provider in ("openai", "groq"):
+            async for delta in self._openai_stream(
+                messages,
+                system=system,
+                model=_model,
+                temperature=_temp,
+                max_tokens=_max,
+                provider=provider,
+            ):
+                yield delta
         else:
             raise ValueError(f"Unknown LLM provider: {provider}")
 
@@ -219,6 +253,56 @@ class LLMAdapter:
             provider="anthropic",
         )
 
+    async def _anthropic_stream(
+        self,
+        messages: list[Message],
+        *,
+        system: str | None,
+        model: str,
+        temperature: float,
+        max_tokens: int,
+    ) -> AsyncIterator[str]:
+        if not self._s.anthropic_api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY not set")
+
+        api_messages = [{"role": m.role, "content": m.content} for m in messages]
+        payload: dict[str, Any] = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": api_messages,
+            "stream": True,
+        }
+        if system:
+            payload["system"] = system
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            async with client.stream(
+                "POST",
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": self._s.anthropic_api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json=payload,
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    raw = line[6:].strip()
+                    if not raw or raw == "[DONE]":
+                        continue
+                    try:
+                        event = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    if event.get("type") == "content_block_delta":
+                        text = event.get("delta", {}).get("text")
+                        if text:
+                            yield text
+
     # ── OpenAI ────────────────────────────────────────────────────────────────
 
     @retry(
@@ -275,6 +359,66 @@ class LLMAdapter:
             model=model,
             provider="openai",
         )
+
+    async def _openai_stream(
+        self,
+        messages: list[Message],
+        *,
+        system: str | None,
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        provider: str,
+    ) -> AsyncIterator[str]:
+        if provider == "openai":
+            if not self._s.openai_api_key:
+                raise RuntimeError("OPENAI_API_KEY not set")
+            url = "https://api.openai.com/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {self._s.openai_api_key}",
+                "Content-Type": "application/json",
+            }
+        else:
+            if not self._s.groq_api_key:
+                raise RuntimeError("GROQ_API_KEY not set")
+            url = "https://api.groq.com/openai/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {self._s.groq_api_key}",
+                "Content-Type": "application/json",
+            }
+
+        all_messages = []
+        if system:
+            all_messages.append({"role": "system", "content": system})
+        all_messages.extend({"role": m.role, "content": m.content} for m in messages)
+
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": all_messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            async with client.stream("POST", url, headers=headers, json=payload) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    raw = line[6:].strip()
+                    if not raw or raw == "[DONE]":
+                        continue
+                    try:
+                        event = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = event.get("choices") or []
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta", {}).get("content")
+                    if delta:
+                        yield delta
 
     # ── Groq ──────────────────────────────────────────────────────────────────
 

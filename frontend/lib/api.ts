@@ -533,6 +533,36 @@ export type AskThread = {
   updated_at: string | null;
 };
 
+export type AskStreamEvent =
+  | { type: "thread_id"; thread_id: string }
+  | { type: "delta"; content: string }
+  | { type: "done"; citations: AskCitation[]; created_at: string }
+  | { type: "error"; message: string };
+
+async function* readAskStream(
+  stream: ReadableStream<Uint8Array>,
+): AsyncGenerator<AskStreamEvent> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() ?? "";
+    for (const part of parts) {
+      for (const line of part.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        const data = JSON.parse(line.slice(6)) as AskStreamEvent;
+        yield data;
+        if (data.type === "error") return;
+      }
+    }
+  }
+}
+
 export type KnowledgeGraphResponse = {
   nodes: KnowledgeGraphNode[];
   edges: KnowledgeGraphEdge[];
@@ -738,6 +768,45 @@ export const api = {
       thread_id: string;
       assistant: AskMessage & { created_at: string };
     }>("/api/v1/ask", { method: "POST", body: JSON.stringify(body) }, 60000),
+
+  askStream: async function* (
+    body: {
+      message: string;
+      thread_id?: string;
+      content_id?: string;
+      digest_item_id?: string;
+    },
+    signal?: AbortSignal,
+  ): AsyncGenerator<AskStreamEvent> {
+    const token = getToken();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const res = await fetch(`${API_URL}/api/v1/ask/stream`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal,
+    });
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      const detail = errBody.detail;
+      const message =
+        typeof detail === "string"
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join(", ")
+            : res.statusText;
+      throw new ApiError(message || res.statusText, res.status);
+    }
+
+    if (!res.body) {
+      throw new ApiError("No response stream", 0);
+    }
+
+    yield* readAskStream(res.body);
+  },
 
   listAskThreads: () =>
     request<{ threads: AskThreadSummary[] }>("/api/v1/ask/threads"),

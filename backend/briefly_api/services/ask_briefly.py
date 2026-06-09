@@ -6,7 +6,9 @@ persists to FollowUpThread.
 """
 from __future__ import annotations
 
+import json
 import re
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -59,6 +61,16 @@ class ContextChunk:
     source_name: str | None
     snippet: str
     kind: str  # article | brain_dump | brief_anchor
+
+
+@dataclass
+class AskPrepared:
+    thread: FollowUpThread
+    message: str
+    all_chunks: list[ContextChunk]
+    llm_messages: list[Message]
+    digest_item_id: str | None
+    user_id: str
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -424,7 +436,11 @@ You answer using ONLY the sources in the context pack, labeled [S1], [S2], etc.
 - When the pack is a SAVED/UNREAD INDEX, list each item by title with a short note on why it's unread. If the index is empty, say their saved queue is clear."""
 
 
-async def ask_briefly(
+def _sse_event(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+async def _prepare_ask(
     db: AsyncSession,
     user: User,
     message: str,
@@ -432,7 +448,7 @@ async def ask_briefly(
     thread_id: str | None = None,
     content_id: str | None = None,
     digest_item_id: str | None = None,
-) -> dict:
+) -> AskPrepared:
     profile = user.profile
     never_show = list(profile.never_show or []) if profile else []
 
@@ -495,6 +511,7 @@ async def ask_briefly(
 
         all_chunks = _assign_refs(anchor_chunks + extra, start_index=1)
         context_pack = _format_context_pack(all_chunks) if all_chunks else "(No matching sources in your library yet.)"
+
     profile_text = _profile_blurb(profile)
 
     history = list(thread.messages or [])[-_MAX_HISTORY:]
@@ -512,19 +529,25 @@ async def ask_briefly(
     )
     llm_messages.append(Message(role="user", content=user_prompt))
 
-    llm = get_llm_adapter()
-    response = await llm.complete(
-        llm_messages,
-        system=_ASK_SYSTEM,
-        temperature=0.35,
-        max_tokens=1200,
+    return AskPrepared(
+        thread=thread,
+        message=message.strip(),
+        all_chunks=all_chunks,
+        llm_messages=llm_messages,
+        digest_item_id=digest_item_id,
+        user_id=user.id,
     )
-    answer = response.content.strip()
-    citations = _extract_citations(answer, all_chunks)
 
+
+async def _persist_ask_response(
+    db: AsyncSession,
+    prepared: AskPrepared,
+    answer: str,
+    citations: list[dict],
+) -> str:
     now = datetime.now(timezone.utc).isoformat()
-    thread.messages = list(thread.messages or []) + [
-        {"role": "user", "content": message.strip(), "timestamp": now},
+    prepared.thread.messages = list(prepared.thread.messages or []) + [
+        {"role": "user", "content": prepared.message, "timestamp": now},
         {
             "role": "assistant",
             "content": answer,
@@ -533,11 +556,11 @@ async def ask_briefly(
         },
     ]
 
-    if digest_item_id:
+    if prepared.digest_item_id:
         item_result = await db.execute(
             select(DigestItem)
             .join(Digest, DigestItem.digest_id == Digest.id)
-            .where(DigestItem.id == digest_item_id, Digest.user_id == user.id)
+            .where(DigestItem.id == prepared.digest_item_id, Digest.user_id == prepared.user_id)
         )
         item = item_result.scalar_one_or_none()
         if item:
@@ -545,7 +568,7 @@ async def ask_briefly(
             item.follow_up_depth = (item.follow_up_depth or 0) + 1
             db.add(
                 BehavioralSignal(
-                    user_id=user.id,
+                    user_id=prepared.user_id,
                     signal_type=SignalType.followed_up,
                     digest_id=item.digest_id,
                     digest_item_id=item.id,
@@ -554,10 +577,41 @@ async def ask_briefly(
             )
 
     await db.commit()
-    await db.refresh(thread)
+    await db.refresh(prepared.thread)
+    return now
+
+
+async def ask_briefly(
+    db: AsyncSession,
+    user: User,
+    message: str,
+    *,
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    digest_item_id: str | None = None,
+) -> dict:
+    prepared = await _prepare_ask(
+        db,
+        user,
+        message,
+        thread_id=thread_id,
+        content_id=content_id,
+        digest_item_id=digest_item_id,
+    )
+
+    llm = get_llm_adapter()
+    response = await llm.complete(
+        prepared.llm_messages,
+        system=_ASK_SYSTEM,
+        temperature=0.35,
+        max_tokens=1200,
+    )
+    answer = response.content.strip()
+    citations = _extract_citations(answer, prepared.all_chunks)
+    now = await _persist_ask_response(db, prepared, answer, citations)
 
     return {
-        "thread_id": thread.id,
+        "thread_id": prepared.thread.id,
         "assistant": {
             "role": "assistant",
             "content": answer,
@@ -565,6 +619,43 @@ async def ask_briefly(
             "created_at": now,
         },
     }
+
+
+async def stream_ask_briefly(
+    db: AsyncSession,
+    user: User,
+    message: str,
+    *,
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    digest_item_id: str | None = None,
+) -> AsyncIterator[str]:
+    prepared = await _prepare_ask(
+        db,
+        user,
+        message,
+        thread_id=thread_id,
+        content_id=content_id,
+        digest_item_id=digest_item_id,
+    )
+
+    yield _sse_event({"type": "thread_id", "thread_id": prepared.thread.id})
+
+    llm = get_llm_adapter()
+    parts: list[str] = []
+    async for delta in llm.stream_complete(
+        prepared.llm_messages,
+        system=_ASK_SYSTEM,
+        temperature=0.35,
+        max_tokens=1200,
+    ):
+        parts.append(delta)
+        yield _sse_event({"type": "delta", "content": delta})
+
+    answer = "".join(parts).strip()
+    citations = _extract_citations(answer, prepared.all_chunks)
+    created_at = await _persist_ask_response(db, prepared, answer, citations)
+    yield _sse_event({"type": "done", "citations": citations, "created_at": created_at})
 
 
 async def list_threads(db: AsyncSession, user_id: str, *, limit: int = 30) -> list[dict]:

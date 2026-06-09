@@ -18,21 +18,37 @@ type AskBrieflyViewProps = {
   anchorTitle?: string | null;
 };
 
-function MessageBubble({ message }: { message: AskMessage }) {
+function MessageBubble({
+  message,
+  isStreaming = false,
+}: {
+  message: AskMessage;
+  isStreaming?: boolean;
+}) {
   const isUser = message.role === "user";
 
   return (
-    <div className={`ask-message${isUser ? " ask-message-user" : " ask-message-assistant"}`}>
+    <div
+      className={`ask-message${isUser ? " ask-message-user" : " ask-message-assistant"}${isStreaming ? " ask-message-streaming" : ""}`}
+    >
       <div className="ask-message-body">
         {isUser ? (
           <p className="ask-message-text-user">{message.content}</p>
-        ) : (
+        ) : message.content ? (
           <>
             <AskMessageContent content={message.content} citations={message.citations} />
             {message.citations && message.citations.length > 0 ? (
               <CitationSources citations={message.citations} />
             ) : null}
           </>
+        ) : (
+          <div className="ask-typing-wrap" aria-hidden>
+            <span className="ask-typing-dots">
+              <span />
+              <span />
+              <span />
+            </span>
+          </div>
         )}
       </div>
     </div>
@@ -90,21 +106,56 @@ export function AskBrieflyView({
     setError("");
     setInput("");
 
-    const optimistic: AskMessage = { role: "user", content: trimmed };
-    setMessages((prev) => [...prev, optimistic]);
+    const userMessage: AskMessage = { role: "user", content: trimmed };
+    const assistantPlaceholder: AskMessage = { role: "assistant", content: "" };
+    setMessages((prev) => [...prev, userMessage, assistantPlaceholder]);
 
     try {
-      const res = await api.ask({
+      for await (const event of api.askStream({
         message: trimmed,
         thread_id: threadId ?? undefined,
         content_id: contentId ?? undefined,
         digest_item_id: digestItemId ?? undefined,
-      });
-      setThreadId(res.thread_id);
-      setMessages((prev) => [...prev, res.assistant]);
+      })) {
+        if (event.type === "thread_id") {
+          setThreadId(event.thread_id);
+        } else if (event.type === "delta") {
+          setMessages((prev) => {
+            const next = [...prev];
+            const last = next[next.length - 1];
+            if (last?.role !== "assistant") return next;
+            next[next.length - 1] = { ...last, content: last.content + event.content };
+            return next;
+          });
+        } else if (event.type === "done") {
+          setMessages((prev) => {
+            const next = [...prev];
+            const last = next[next.length - 1];
+            if (last?.role !== "assistant") return next;
+            next[next.length - 1] = {
+              ...last,
+              citations: event.citations,
+              timestamp: event.created_at,
+            };
+            return next;
+          });
+        } else if (event.type === "error") {
+          throw new Error(event.message);
+        }
+      }
       loadThreads();
     } catch (err) {
-      setMessages((prev) => prev.filter((m) => m !== optimistic));
+      setMessages((prev) => {
+        if (
+          prev.length >= 2 &&
+          prev[prev.length - 1]?.role === "assistant" &&
+          prev[prev.length - 2]?.role === "user" &&
+          prev[prev.length - 2]?.content === trimmed
+        ) {
+          return prev.slice(0, -2);
+        }
+        return prev.filter((m) => m.content !== trimmed || m.role !== "user");
+      });
       setError(err instanceof Error ? err.message : "Could not get an answer.");
       setInput(trimmed);
     } finally {
@@ -196,21 +247,15 @@ export function AskBrieflyView({
               <div className="ask-messages" aria-live="polite">
                 <div className="ask-thread">
                   {messages.map((m, i) => (
-                    <MessageBubble key={`${m.role}-${i}-${m.content.slice(0, 24)}`} message={m} />
+                    <MessageBubble
+                      key={`${m.role}-${i}-${m.content.slice(0, 24)}`}
+                      message={m}
+                      isStreaming={
+                        sending && i === messages.length - 1 && m.role === "assistant"
+                      }
+                    />
                   ))}
                 </div>
-                {sending ? (
-                  <div className="ask-message ask-message-assistant ask-message-pending" role="status">
-                    <div className="ask-message-body ask-typing-wrap">
-                      <span className="ask-typing-dots" aria-hidden>
-                        <span />
-                        <span />
-                        <span />
-                      </span>
-                      <span className="ask-typing">Briefly is thinking</span>
-                    </div>
-                  </div>
-                ) : null}
                 <div ref={bottomRef} />
               </div>
             )}

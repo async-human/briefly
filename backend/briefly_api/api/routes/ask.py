@@ -1,13 +1,21 @@
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.auth.deps import get_current_user
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import User
-from briefly_api.services.ask_briefly import ask_briefly, get_thread, list_threads
+from briefly_api.services.ask_briefly import (
+    ask_briefly,
+    get_thread,
+    list_threads,
+    stream_ask_briefly,
+)
 
 router = APIRouter(tags=["ask"])
 
@@ -36,6 +44,37 @@ async def post_ask(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/ask/stream")
+async def post_ask_stream(
+    body: AskIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    async def event_generator():
+        try:
+            async for chunk in stream_ask_briefly(
+                db,
+                user,
+                body.message,
+                thread_id=body.thread_id,
+                content_id=body.content_id,
+                digest_item_id=body.digest_item_id,
+            ):
+                yield chunk
+        except ValueError as exc:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/ask/threads")
