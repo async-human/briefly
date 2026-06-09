@@ -135,14 +135,16 @@ export function AskBrieflyView({
     <div className="ask-layout">
       <aside className="ask-sidebar" aria-label="Past conversations">
         <div className="ask-sidebar-head">
-          <h2 className="ask-sidebar-title">Conversations</h2>
-          <button type="button" className="ask-new-btn" onClick={startNewThread}>
-            New
+          <button type="button" className="ask-new-chat-btn" onClick={startNewThread}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+            </svg>
+            New chat
           </button>
         </div>
         <ul className="ask-thread-list">
           {threads.length === 0 ? (
-            <li className="ask-thread-empty">No conversations yet</li>
+            <li className="ask-thread-empty">No chats yet</li>
           ) : (
             threads.map((t) => (
               <li key={t.id}>
@@ -152,9 +154,6 @@ export function AskBrieflyView({
                   onClick={() => openThread(t.id)}
                 >
                   <span className="ask-thread-item-title">{t.title}</span>
-                  {t.preview ? (
-                    <span className="ask-thread-item-preview">{t.preview}</span>
-                  ) : null}
                 </button>
               </li>
             ))
@@ -162,41 +161,30 @@ export function AskBrieflyView({
         </ul>
       </aside>
 
-      <div className={`ask-main${hasConversation ? "" : " ask-main-idle"}`}>
-        {hasConversation ? (
-          <header className="ask-header ask-header-compact">
-            <p className="ask-eyebrow">Ask Briefly</p>
-            <h1 className="ask-heading">Conversation</h1>
-          </header>
-        ) : null}
-
+      <div className={`ask-main${hasConversation ? " ask-main-chat" : " ask-main-idle"}`}>
         {scopeTitle && hasConversation ? (
-          <div className="ask-scope-banner" role="status">
-            <span className="ask-scope-label">Focused on</span>
-            <span className="ask-scope-title">{scopeTitle}</span>
+          <div className="ask-scope-pill" role="status">
+            Focused on <strong>{scopeTitle}</strong>
           </div>
         ) : null}
 
-        <div className="ask-content">
-          {!hasConversation ? (
-            <header className="ask-idle-intro">
-              <h1 className="ask-idle-title">Your second brain, on demand</h1>
-              <p className="ask-idle-sub">
-                Grounded answers from your briefings, saves, and brain dumps.
-              </p>
-            </header>
-          ) : null}
-
-          <div className="ask-messages" aria-live="polite">
-            {messages.length === 0 && !sending ? (
-              <div className="ask-suggestions-wrap">
-                <p className="ask-suggestions-label">Try asking</p>
-                <div className="ask-suggestions">
+        <div className="ask-stage">
+          <div className="ask-stage-inner">
+            {!hasConversation ? (
+              <div className="ask-hero">
+                <div className="ask-hero-mark" aria-hidden>
+                  B
+                </div>
+                <h1 className="ask-hero-title">What would you like to know?</h1>
+                <p className="ask-hero-sub">
+                  Answers grounded in your briefings, saves, and brain dumps.
+                </p>
+                <div className="ask-chips">
                   {SUGGESTED.map((s) => (
                     <button
                       key={s}
                       type="button"
-                      className="ask-suggestion"
+                      className="ask-chip"
                       onClick={() => void handleSend(s)}
                     >
                       {s}
@@ -205,69 +193,70 @@ export function AskBrieflyView({
                 </div>
               </div>
             ) : (
-              <div className="ask-thread">
-                {messages.map((m, i) => (
-                  <MessageBubble key={`${m.role}-${i}-${m.content.slice(0, 24)}`} message={m} />
-                ))}
+              <div className="ask-messages" aria-live="polite">
+                <div className="ask-thread">
+                  {messages.map((m, i) => (
+                    <MessageBubble key={`${m.role}-${i}-${m.content.slice(0, 24)}`} message={m} />
+                  ))}
+                </div>
+                {sending ? (
+                  <div className="ask-message ask-message-assistant ask-message-pending" role="status">
+                    <div className="ask-message-body ask-typing-wrap">
+                      <span className="ask-typing-dots" aria-hidden>
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                      <span className="ask-typing">Briefly is thinking</span>
+                    </div>
+                  </div>
+                ) : null}
+                <div ref={bottomRef} />
               </div>
             )}
-            {sending ? (
-              <div className="ask-message ask-message-assistant ask-message-pending" role="status">
-                <div className="ask-message-body ask-typing-wrap">
-                  <span className="ask-typing-dots" aria-hidden>
-                    <span />
-                    <span />
-                    <span />
-                  </span>
-                  <span className="ask-typing">Briefly is thinking</span>
-                </div>
-              </div>
-            ) : null}
-            <div ref={bottomRef} />
-          </div>
 
-          {error ? <p className="ask-error">{error}</p> : null}
-
-          <form
-            className="ask-composer"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleSend();
-            }}
-          >
-            <div className="ask-composer-inner">
-              <textarea
-                className="ask-input"
-                rows={1}
-                placeholder="Ask anything about your reading…"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void handleSend();
-                  }
+            <div className="ask-footer">
+              {error ? <p className="ask-error">{error}</p> : null}
+              <form
+                className="ask-composer"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleSend();
                 }}
-                disabled={sending}
-              />
-              <button
-                type="submit"
-                className="ask-send"
-                disabled={sending || !input.trim()}
-                aria-label="Send message"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path
-                    d="M5 12h14M13 6l6 6-6 6"
-                    stroke="currentColor"
-                    strokeWidth="1.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
+                <textarea
+                  className="ask-input"
+                  rows={1}
+                  placeholder="Message Briefly…"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void handleSend();
+                    }
+                  }}
+                  disabled={sending}
+                />
+                <button
+                  type="submit"
+                  className="ask-send"
+                  disabled={sending || !input.trim()}
+                  aria-label="Send message"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path
+                      d="M12 19V5M5 12l7-7 7 7"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </form>
             </div>
-          </form>
+          </div>
         </div>
       </div>
     </div>
