@@ -162,130 +162,113 @@ export function AskBrieflyView({
         </ul>
       </aside>
 
-      <div className="ask-main">
-        <header className={`ask-header${hasConversation ? " ask-header-compact" : ""}`}>
-          <div>
+      <div className={`ask-main${hasConversation ? "" : " ask-main-idle"}`}>
+        {hasConversation ? (
+          <header className="ask-header ask-header-compact">
             <p className="ask-eyebrow">Ask Briefly</p>
-            <h1 className="ask-heading">
-              {hasConversation ? "Conversation" : "Your second brain, on demand"}
-            </h1>
-            {!hasConversation ? (
-              <p className="ask-sub">
-                Grounded answers from your briefings, saves, and brain dumps.
-              </p>
-            ) : null}
-          </div>
-        </header>
+            <h1 className="ask-heading">Conversation</h1>
+          </header>
+        ) : null}
 
-        {scopeTitle ? (
+        {scopeTitle && hasConversation ? (
           <div className="ask-scope-banner" role="status">
             <span className="ask-scope-label">Focused on</span>
             <span className="ask-scope-title">{scopeTitle}</span>
           </div>
         ) : null}
 
-        <div className="ask-messages" aria-live="polite">
-          {messages.length === 0 && !sending ? (
-            <div className="ask-empty">
-              <div className="ask-empty-icon" aria-hidden>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+        <div className="ask-content">
+          {!hasConversation ? (
+            <header className="ask-idle-intro">
+              <h1 className="ask-idle-title">Your second brain, on demand</h1>
+              <p className="ask-idle-sub">
+                Grounded answers from your briefings, saves, and brain dumps.
+              </p>
+            </header>
+          ) : null}
+
+          <div className="ask-messages" aria-live="polite">
+            {messages.length === 0 && !sending ? (
+              <div className="ask-suggestions-wrap">
+                <p className="ask-suggestions-label">Try asking</p>
+                <div className="ask-suggestions">
+                  {SUGGESTED.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      className="ask-suggestion"
+                      onClick={() => void handleSend(s)}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="ask-thread">
+                {messages.map((m, i) => (
+                  <MessageBubble key={`${m.role}-${i}-${m.content.slice(0, 24)}`} message={m} />
+                ))}
+              </div>
+            )}
+            {sending ? (
+              <div className="ask-message ask-message-assistant ask-message-pending" role="status">
+                <div className="ask-message-body ask-typing-wrap">
+                  <span className="ask-typing-dots" aria-hidden>
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                  <span className="ask-typing">Briefly is thinking</span>
+                </div>
+              </div>
+            ) : null}
+            <div ref={bottomRef} />
+          </div>
+
+          {error ? <p className="ask-error">{error}</p> : null}
+
+          <form
+            className="ask-composer"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSend();
+            }}
+          >
+            <div className="ask-composer-inner">
+              <textarea
+                className="ask-input"
+                rows={1}
+                placeholder="Ask anything about your reading…"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void handleSend();
+                  }
+                }}
+                disabled={sending}
+              />
+              <button
+                type="submit"
+                className="ask-send"
+                disabled={sending || !input.trim()}
+                aria-label="Send message"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path
-                    d="M7 8.5h10M7 12h7M7 15.5h9"
+                    d="M5 12h14M13 6l6 6-6 6"
                     stroke="currentColor"
-                    strokeWidth="1.5"
+                    strokeWidth="1.75"
                     strokeLinecap="round"
-                  />
-                  <path
-                    d="M5 5.5h14a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H10l-4.5 3v-3H5a2 2 0 0 1-2-2V7.5a2 2 0 0 1 2-2Z"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
                     strokeLinejoin="round"
                   />
                 </svg>
-              </div>
-              <p className="ask-empty-title">What do you want to know?</p>
-              <p className="ask-empty-desc">
-                Ask about trends in your reading, connections between topics, or where you saw
-                something before.
-              </p>
-              <div className="ask-suggestions">
-                {SUGGESTED.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    className="ask-suggestion"
-                    onClick={() => void handleSend(s)}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
+              </button>
             </div>
-          ) : (
-            <div className="ask-thread">
-              {messages.map((m, i) => (
-                <MessageBubble key={`${m.role}-${i}-${m.content.slice(0, 24)}`} message={m} />
-              ))}
-            </div>
-          )}
-          {sending ? (
-            <div className="ask-message ask-message-assistant ask-message-pending" role="status">
-              <div className="ask-message-body ask-typing-wrap">
-                <span className="ask-typing-dots" aria-hidden>
-                  <span />
-                  <span />
-                  <span />
-                </span>
-                <span className="ask-typing">Briefly is thinking</span>
-              </div>
-            </div>
-          ) : null}
-          <div ref={bottomRef} />
+          </form>
         </div>
-
-        {error ? <p className="ask-error">{error}</p> : null}
-
-        <form
-          className="ask-composer"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void handleSend();
-          }}
-        >
-          <div className="ask-composer-inner">
-            <textarea
-              className="ask-input"
-              rows={1}
-              placeholder="Ask anything about your reading…"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void handleSend();
-                }
-              }}
-              disabled={sending}
-            />
-            <button
-              type="submit"
-              className="ask-send"
-              disabled={sending || !input.trim()}
-              aria-label="Send message"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path
-                  d="M5 12h14M13 6l6 6-6 6"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          </div>
-          <p className="ask-composer-hint">Enter to send · Shift+Enter for new line</p>
-        </form>
       </div>
     </div>
   );
