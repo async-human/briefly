@@ -124,26 +124,56 @@ function Block({
   );
 }
 
-function LayoutSkeleton({ variant }: { variant: Exclude<PageLoaderVariant, "graph"> }) {
-  if (variant === "dashboard") {
-    return (
-      <div className="dash-page app-loader-layout">
-        <header className="dash-page-header dash-page-header-skeleton">
-          <Block w={80} h={12} mb={12} delay={0.04} />
-          <Block w={280} h={32} mb={8} delay={0.1} />
-          <Block w={200} h={16} delay={0.16} />
-        </header>
-        <div className="dash-page-grid">
-          <div className="dash-surface dash-surface-briefing app-loader-surface" style={{ animationDelay: "0.22s" }}>
-            <div style={{ minHeight: 360 }} />
+function DashboardLoaderArt() {
+  return (
+    <div className="dash-page app-dashboard-loader" aria-hidden>
+      <div className="app-dashboard-loader-toolbar">
+        <span className="app-dashboard-loader-line app-dashboard-loader-line-sm" />
+        <span className="app-dashboard-loader-line app-dashboard-loader-line-lg" />
+      </div>
+
+      <div className="dash-page-grid">
+        <div className="dash-surface dash-surface-briefing app-dashboard-loader-panel">
+          <div className="app-dashboard-loader-panel-head">
+            <span className="app-dashboard-loader-line app-dashboard-loader-line-title" />
+            <span className="app-dashboard-loader-line app-dashboard-loader-line-sub" />
           </div>
-          <div className="dash-surface dash-surface-sources app-loader-surface" style={{ animationDelay: "0.3s" }}>
-            <div style={{ minHeight: 240 }} />
+          <div className="app-dashboard-loader-items">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="app-dashboard-loader-item"
+                style={{ animationDelay: `${i * 0.15}s` }}
+              />
+            ))}
+          </div>
+          <p className="app-dashboard-loader-caption">
+            <span className="app-dashboard-loader-dot" aria-hidden />
+            {CAPTIONS.dashboard}
+          </p>
+        </div>
+
+        <div className="dash-surface dash-surface-sources app-dashboard-loader-panel app-dashboard-loader-panel-side">
+          <div className="app-dashboard-loader-panel-head">
+            <span className="app-dashboard-loader-line app-dashboard-loader-line-title" />
+            <span className="app-dashboard-loader-line app-dashboard-loader-line-sub" />
+          </div>
+          <div className="app-dashboard-loader-sources">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="app-dashboard-loader-source"
+                style={{ animationDelay: `${0.08 + i * 0.1}s` }}
+              />
+            ))}
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
+
+function LayoutSkeleton({ variant }: { variant: Exclude<PageLoaderVariant, "graph" | "dashboard"> }) {
 
   if (variant === "saved") {
     return (
@@ -197,20 +227,29 @@ type AnimatedPageSkeletonProps = {
 
 export function AnimatedPageSkeleton({ variant }: AnimatedPageSkeletonProps) {
   const isGraph = variant === "graph";
+  const isDashboard = variant === "dashboard";
 
   return (
     <div
-      className={`app-page-loader${isGraph ? " app-page-loader-graph" : ""}`}
+      className={`app-page-loader${isGraph ? " app-page-loader-graph" : ""}${isDashboard ? " app-page-loader-dashboard" : ""}`}
       aria-busy="true"
       aria-label={CAPTIONS[variant]}
     >
       <div
-        className={`app-page-loader-inner app-page-loader-enter${isGraph ? " app-page-loader-enter-graph" : ""}`}
+        className={`app-page-loader-inner app-page-loader-enter${isGraph ? " app-page-loader-enter-graph" : ""}${isDashboard ? " app-page-loader-enter-dashboard" : ""}`}
       >
-        {isGraph ? <GraphLoaderArt /> : <LayoutSkeleton variant={variant} />}
-        <p className={`app-page-loader-caption${isGraph ? " app-page-loader-caption-graph" : ""}`}>
-          {CAPTIONS[variant]}
-        </p>
+        {isGraph ? (
+          <GraphLoaderArt />
+        ) : isDashboard ? (
+          <DashboardLoaderArt />
+        ) : (
+          <LayoutSkeleton variant={variant} />
+        )}
+        {!isDashboard && (
+          <p className={`app-page-loader-caption${isGraph ? " app-page-loader-caption-graph" : ""}`}>
+            {CAPTIONS[variant]}
+          </p>
+        )}
       </div>
     </div>
   );
