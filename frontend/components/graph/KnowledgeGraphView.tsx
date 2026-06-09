@@ -33,12 +33,32 @@ function truncateLabel(label: string, max: number): string {
   return `${label.slice(0, max - 1)}…`;
 }
 
+function linkEndpointId(endpoint: string | ForceNode): string {
+  return typeof endpoint === "object" ? endpoint.id! : endpoint;
+}
+
+function neighborIds(
+  nodeId: string,
+  links: { source: string | ForceNode; target: string | ForceNode }[],
+): Set<string> {
+  const ids = new Set<string>([nodeId]);
+  for (const link of links) {
+    const src = linkEndpointId(link.source);
+    const tgt = linkEndpointId(link.target);
+    if (src === nodeId) ids.add(tgt);
+    if (tgt === nodeId) ids.add(src);
+  }
+  return ids;
+}
+
 function shouldShowCanvasLabel(
   node: KnowledgeGraphNode,
   globalScale: number,
   hoveredId: string | null,
   selectedId: string | null,
+  focusIds: Set<string> | null,
 ): boolean {
+  if (focusIds && !focusIds.has(node.id)) return false;
   if (node.id === hoveredId || node.id === selectedId) return true;
   if (node.type === "item" || node.type === "thought") return false;
   if (!ANCHOR_TYPES.has(node.type)) return false;
@@ -315,6 +335,11 @@ export function KnowledgeGraphView({
   const hoveredId = hovered?.id ?? null;
   const selectedId = selected?.id ?? null;
 
+  const focusIds = useMemo(
+    () => (selectedId ? neighborIds(selectedId, filtered.links) : null),
+    [selectedId, filtered.links],
+  );
+
   useEffect(() => {
     setDidFit(false);
   }, [filtered.nodes.length, activeTypes]);
@@ -342,31 +367,72 @@ export function KnowledgeGraphView({
   const renderNode = useCallback(
     (node: object, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const n = node as ForceNode;
-      const size = Math.sqrt(Math.max(n.size, 4)) * (mobile ? 2.6 : 2.2);
-      const x = n.x ?? 0;
-      const y = n.y ?? 0;
+      const inFocus = !focusIds || focusIds.has(n.id);
       const isHovered = n.id === hoveredId;
       const isSelected = n.id === selectedId;
-      const emphasized = isHovered || isSelected;
+      const isNeighbor = Boolean(focusIds && inFocus && !isSelected);
+      const emphasized = isHovered || isSelected || (focusIds && isNeighbor);
+
+      const size =
+        Math.sqrt(Math.max(n.size, 4)) * (mobile ? 2.6 : 2.2) * (inFocus ? 1 : 0.82);
+
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+
+      ctx.save();
+      ctx.globalAlpha = inFocus ? (isSelected ? 1 : isNeighbor ? 0.92 : 0.78) : 0.1;
+
+      if (isSelected) {
+        ctx.shadowColor = NODE_COLORS[n.type];
+        ctx.shadowBlur = Math.max(8, 14 / globalScale);
+      }
 
       ctx.beginPath();
       ctx.arc(x, y, size, 0, 2 * Math.PI);
-      ctx.fillStyle = NODE_COLORS[n.type];
+      ctx.fillStyle = inFocus ? NODE_COLORS[n.type] : "rgba(148, 155, 175, 0.55)";
       ctx.fill();
+      ctx.shadowBlur = 0;
 
-      if (emphasized) {
+      if (emphasized && inFocus) {
         ctx.beginPath();
-        ctx.arc(x, y, size + 2.5, 0, 2 * Math.PI);
+        ctx.arc(x, y, size + (isSelected ? 3.5 : 2), 0, 2 * Math.PI);
         ctx.strokeStyle = isSelected ? NODE_COLORS[n.type] : "rgba(255, 255, 255, 0.95)";
-        ctx.lineWidth = isSelected ? 2.5 : 1.5;
+        ctx.lineWidth = (isSelected ? 2.5 : 1.5) / globalScale;
         ctx.stroke();
       }
 
-      if (shouldShowCanvasLabel(n, globalScale, hoveredId, selectedId) && n.label) {
-        drawNodeLabel(ctx, n.label, x, y + size + 4 / globalScale, globalScale, emphasized);
+      if (shouldShowCanvasLabel(n, globalScale, hoveredId, selectedId, focusIds) && n.label) {
+        drawNodeLabel(ctx, n.label, x, y + size + 4 / globalScale, globalScale, Boolean(emphasized));
       }
+
+      ctx.restore();
     },
-    [hoveredId, selectedId, mobile],
+    [hoveredId, selectedId, focusIds, mobile],
+  );
+
+  const linkColor = useCallback(
+    (link: object) => {
+      const l = link as { source?: string | ForceNode; target?: string | ForceNode };
+      if (!focusIds || !l.source || !l.target) return "rgba(94, 106, 210, 0.22)";
+      const src = linkEndpointId(l.source);
+      const tgt = linkEndpointId(l.target);
+      const active = focusIds.has(src) && focusIds.has(tgt);
+      return active ? "rgba(94, 106, 210, 0.72)" : "rgba(94, 106, 210, 0.04)";
+    },
+    [focusIds],
+  );
+
+  const linkWidth = useCallback(
+    (link: object) => {
+      const l = link as { weight?: number; source?: string | ForceNode; target?: string | ForceNode };
+      const base = 0.5 + (l.weight ?? 0.3) * 2.5;
+      if (!focusIds || !l.source || !l.target) return base;
+      const src = linkEndpointId(l.source);
+      const tgt = linkEndpointId(l.target);
+      const active = focusIds.has(src) && focusIds.has(tgt);
+      return active ? base * 1.65 : base * 0.35;
+    },
+    [focusIds],
   );
 
   const inspectorContent = focusNode ? (
@@ -447,8 +513,8 @@ export function KnowledgeGraphView({
   ) : null;
 
   return (
-    <div className={`kg-stage${mobile ? " kg-stage-mobile" : ""}`}>
-      <div className="kg-canvas-wrap">
+    <div className={`kg-stage${mobile ? " kg-stage-mobile" : ""}${focusIds ? " kg-stage-focused" : ""}`}>
+      <div className={`kg-canvas-wrap${focusIds ? " is-focused" : ""}`}>
         {filtered.nodes.length === 0 ? (
           <div className="kg-empty">
             <p className="kg-empty-title">No nodes to show</p>
@@ -479,8 +545,8 @@ export function KnowledgeGraphView({
               ctx.fillStyle = color;
               ctx.fill();
             }}
-            linkWidth={(link) => 0.5 + (link.weight ?? 0.3) * 2.5}
-            linkColor={() => "rgba(94, 106, 210, 0.22)"}
+            linkWidth={linkWidth}
+            linkColor={linkColor}
             linkDirectionalParticles={0}
             onNodeClick={(node) => handleNodeClick(node as ForceNode)}
             onNodeHover={canHover ? (node) => setHovered(node as KnowledgeGraphNode | null) : undefined}
@@ -504,9 +570,15 @@ export function KnowledgeGraphView({
           </div>
         ) : null}
 
-        {!focusNode && filtered.nodes.length > 0 ? (
+        {filtered.nodes.length > 0 ? (
           <p className="kg-float-hint">
-            {mobile ? "Tap a node to inspect" : "Click a node to inspect"}
+            {focusIds
+              ? mobile
+                ? "Tap empty space to show full graph"
+                : "Click empty space to show full graph"
+              : mobile
+                ? "Tap a node to inspect"
+                : "Click a node to inspect"}
           </p>
         ) : null}
       </div>

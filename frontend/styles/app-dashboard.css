@@ -1632,6 +1632,25 @@ a.saved-capture-title:hover {
   touch-action: none;
 }
 
+.kg-canvas-wrap.is-focused::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 70% 65% at 50% 48%,
+    transparent 0%,
+    rgba(245, 246, 250, 0.35) 55%,
+    rgba(235, 237, 244, 0.72) 100%
+  );
+  transition: opacity 0.35s var(--app-ease);
+}
+
+.kg-stage-focused .kg-float-hint {
+  opacity: 0.85;
+}
+
 .kg-skeleton-orbit {
   width: 12rem;
   height: 12rem;
