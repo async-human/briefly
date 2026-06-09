@@ -2216,23 +2216,29 @@ a.saved-capture-title:hover {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   min-height: 0;
+  padding: 0;
 }
 
 .app-main-scroll:has(.dash-page-ask) .app-page-enter {
   flex: 1;
   min-height: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
 }
 
-.dash-page-ask {
+.dash-page.dash-page-ask {
   flex: 1;
   min-height: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  max-width: none;
-  padding: 0;
 }
 
 .ask-layout {
@@ -2241,12 +2247,14 @@ a.saved-capture-title:hover {
   gap: 0;
   flex: 1;
   min-height: 0;
+  width: 100%;
   height: 100%;
 }
 
 .ask-sidebar {
   border-right: 1px solid var(--app-border);
-  background: var(--app-surface-muted);
+  border-left: none;
+  background: var(--app-sidebar-bg);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -2266,7 +2274,7 @@ a.saved-capture-title:hover {
   padding: 0.625rem 0.75rem;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-sm);
-  background: var(--app-surface);
+  background: var(--app-canvas);
   color: var(--app-ink);
   font-family: inherit;
   font-size: 0.8125rem;
@@ -2276,7 +2284,7 @@ a.saved-capture-title:hover {
 }
 
 .ask-new-chat-btn:hover {
-  background: var(--app-canvas);
+  background: var(--app-surface);
   border-color: color-mix(in srgb, var(--app-linear) 30%, var(--app-border));
 }
 
@@ -2304,7 +2312,8 @@ a.saved-capture-title:hover {
 }
 
 .ask-thread-item.is-active {
-  background: var(--app-surface);
+  background: var(--app-canvas);
+  box-shadow: 0 0 0 1px var(--app-border), 0 1px 2px rgba(31, 35, 40, 0.05);
 }
 
 .ask-thread-item-title {
