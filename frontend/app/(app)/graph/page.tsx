@@ -27,7 +27,7 @@ function GraphPageContent() {
   const [graph, setGraph] = useState<KnowledgeGraphResponse | null>(null);
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
   const [error, setError] = useState("");
-  const showLoading = useMinLoadTime(loading);
+  const showLoading = useMinLoadTime(loading, 720);
 
   const loadGraph = useCallback(() => {
     return api.getKnowledgeGraph(days ?? undefined).then(setGraph);
