@@ -95,6 +95,8 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             log.warning("RelevanceAgent: batch pre-embed failed, will embed per-item: %s", exc)
 
     threshold = s.relevance_threshold
+    if ctx.force_refresh:
+        threshold = max(0.48, threshold - 0.06)
     if len(items) < s.quality_gate_min_pool:
         threshold = max(0.45, threshold - 0.08)
 
@@ -138,6 +140,26 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             continue
 
         scored.append(item)
+
+    # Manual refresh or thin scoring: never return an empty pool when content exists.
+    if not scored and items:
+        never_show_ids = {i.id for i in dropped if i.drop_reason == "never_show"}
+        rescue_pool = [i for i in items if i.id not in never_show_ids]
+        rescue_pool.sort(key=lambda x: x.relevance_score, reverse=True)
+        floor = max(0.38, threshold - 0.17)
+        rescued = [i for i in rescue_pool if i.relevance_score >= floor]
+        if not rescued and rescue_pool:
+            rescued = rescue_pool[: max(s.digest_min_items, 5)]
+        if rescued:
+            log.warning(
+                "RelevanceAgent: rescue pass kept %d/%d items (floor=%.2f)",
+                len(rescued),
+                len(items),
+                floor,
+            )
+            scored = rescued[: max(s.digest_min_items, 8)]
+            rescued_ids = {i.id for i in scored}
+            dropped = [i for i in dropped if i.id not in rescued_ids]
 
     scored.sort(key=lambda x: x.relevance_score, reverse=True)
 
@@ -185,8 +207,8 @@ async def _semantic_score(
     if norm_a == 0 or norm_b == 0:
         return 0.5
     similarity = float(np.dot(a, b) / (norm_a * norm_b))
-    # Stretch the useful cosine range so strong matches separate from weak ones.
-    return max(0.0, min(1.0, (similarity - 0.18) / 0.62))
+    # Cosine similarity is -1 to 1; map to 0-1 for weighted scoring.
+    return max(0.0, min(1.0, (similarity + 1) / 2))
 
 
 def _story_thread_boost(item: RawItem, active_story_threads: list[dict]) -> float:

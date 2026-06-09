@@ -127,10 +127,10 @@ async def run(ctx: PipelineContext) -> PipelineContext:
 
     max_age = s.relevance_rescue_max_age_days
 
-    def _select(item: RawItem, section: str, pool: str) -> None:
+    def _select(item: RawItem, section: str, pool: str, *, ignore_age: bool = False) -> None:
         if item.id in selected_ids:
             return
-        if not _within_briefing_age(item, max_age):
+        if not ignore_age and not _within_briefing_age(item, max_age):
             item.drop_reason = "too_old"
             return
         item.meta["digest_section"] = section
@@ -229,7 +229,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         )
         fallback = sorted(items, key=lambda i: i.relevance_score, reverse=True)
         for item in fallback[: max(s.digest_min_items, 3)]:
-            _select(item, SECTION_HIGHLY_RELEVANT, "backfill")
+            _select(item, SECTION_HIGHLY_RELEVANT, "backfill", ignore_age=True)
 
     # Final order: highest personalization rank first (not freshness-first).
     # Pool selection above still guarantees source diversity and section mix.

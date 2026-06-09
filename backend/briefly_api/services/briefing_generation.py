@@ -66,6 +66,28 @@ async def report_briefing_progress(
         await session.commit()
 
 
+async def clear_force_refresh_flag(user_id: str) -> None:
+    from briefly_api.db.engine import SessionLocal
+    from briefly_api.db.models import UserProfile
+
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(UserProfile).where(UserProfile.user_id == user_id)
+        )
+        profile = result.scalar_one_or_none()
+        if not profile:
+            return
+        meta = dict(profile.ingestion_meta or {})
+        gen = dict(meta.get("briefing_generation") or {})
+        if not gen.get("force_refresh"):
+            return
+        gen.pop("force_refresh", None)
+        meta["briefing_generation"] = gen
+        profile.ingestion_meta = meta
+        flag_modified(profile, "ingestion_meta")
+        await session.commit()
+
+
 async def get_briefing_generation_meta(user_id: str) -> dict:
     from briefly_api.db.engine import SessionLocal
     from briefly_api.db.models import UserProfile

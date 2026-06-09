@@ -112,7 +112,14 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
             sources=fetchable_sources,
         )
 
-        ctx = PipelineContext(user=user_ctx, run_date=run_date)
+        from briefly_api.services.briefing_generation import get_briefing_generation_meta
+
+        gen_meta = await get_briefing_generation_meta(user_id)
+        ctx = PipelineContext(
+            user=user_ctx,
+            run_date=run_date,
+            force_refresh=bool(gen_meta.get("force_refresh")),
+        )
         ctx.db_session = session
 
         # ── Run agents in sequence ────────────────────────────────────────────

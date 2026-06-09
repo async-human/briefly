@@ -93,6 +93,7 @@ class PipelineContext:
     user: UserContext
     run_date: str          # YYYY-MM-DD
     run_started_at: datetime = field(default_factory=datetime.utcnow)
+    force_refresh: bool = False  # manual refresh — fetch sources live, relax filters
 
     # Stage 1: Raw ingested content (populated by SourceCollectorAgent)
     raw_items: list[RawItem] = field(default_factory=list)

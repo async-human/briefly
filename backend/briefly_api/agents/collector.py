@@ -127,8 +127,9 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         from_pool = sum(1 for i in raw_items if i.meta.get("from_pool"))
 
     min_needed = s.min_pool_items_before_live_fetch
-    if len(raw_items) < min_needed:
-        # Pool too thin — run incremental ingest then reload, or live fetch
+    needs_live_fetch = ctx.force_refresh or len(raw_items) < min_needed
+    if needs_live_fetch:
+        # Pool too thin or user hit refresh — ingest then live-fetch from connectors.
         if session:
             try:
                 await ingest_user_sources(session, ctx.user.user_id, settings=s)
@@ -138,7 +139,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             except Exception as exc:
                 log.warning("Inline ingestion failed: %s", exc)
 
-        if len(raw_items) < min_needed:
+        if ctx.force_refresh or len(raw_items) < min_needed:
             articles, warnings = await collect_from_sources(
                 sources,
                 s,

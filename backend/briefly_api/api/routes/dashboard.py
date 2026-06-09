@@ -477,6 +477,9 @@ async def _briefing_worker(user_id: str) -> None:
                 digest_id=digest.id,
                 warnings=warnings,
             )
+            # Clear one-shot refresh flag so the next scheduled run uses the normal pool path.
+            from briefly_api.services.briefing_generation import clear_force_refresh_flag
+            await clear_force_refresh_flag(user_id)
             log.info(
                 "Briefing worker completed for user %s (digest_id=%s items=%s)",
                 user_id,
@@ -493,6 +496,8 @@ async def _briefing_worker(user_id: str) -> None:
                 label="Briefing failed.",
                 error=msg,
             )
+            from briefly_api.services.briefing_generation import clear_force_refresh_flag
+            await clear_force_refresh_flag(user_id)
             await handle_scheduled_digest_failure(user_id, msg)
         except ValueError as exc:
             log.warning("Briefing worker failed for user %s: %s", user_id, exc)
@@ -503,6 +508,8 @@ async def _briefing_worker(user_id: str) -> None:
                 label="Briefing failed.",
                 error=str(exc),
             )
+            from briefly_api.services.briefing_generation import clear_force_refresh_flag
+            await clear_force_refresh_flag(user_id)
             await handle_scheduled_digest_failure(user_id, str(exc))
         except Exception as exc:
             log.exception("Briefing worker failed for user %s", user_id)
@@ -516,6 +523,8 @@ async def _briefing_worker(user_id: str) -> None:
                 label="Briefing failed.",
                 error=message,
             )
+            from briefly_api.services.briefing_generation import clear_force_refresh_flag
+            await clear_force_refresh_flag(user_id)
             await handle_scheduled_digest_failure(user_id, message)
 
 
@@ -686,13 +695,23 @@ async def generate_digest_now(
         failure.error_message = ""
         failure.updated_at = datetime.now(timezone.utc)
 
+    if force or restart:
+        from briefly_api.config import get_settings as _get_settings
+        from briefly_api.services.content_ingestion import ingest_user_sources
+
+        try:
+            await ingest_user_sources(db, user.id, settings=_get_settings())
+        except Exception:
+            log.warning("Pre-refresh source ingest failed for user %s", user.id, exc_info=True)
+
     now = datetime.now(timezone.utc).isoformat()
     meta["briefing_generation"] = {
         "status": "running",
         "step": "start",
-        "label": "Starting briefing generation…",
+        "label": "Fetching fresh content from your sources…" if (force or restart) else "Starting briefing generation…",
         "started_at": now,
         "updated_at": now,
+        "force_refresh": bool(force or restart),
     }
     profile.ingestion_meta = meta
     flag_modified(profile, "ingestion_meta")
