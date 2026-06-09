@@ -1,12 +1,5 @@
-import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { GraphPageSkeleton } from "@/components/graph/GraphPageSkeleton";
+import { PageLoadShell } from "@/components/loading/PageLoadShell";
 
 export default function GraphLoading() {
-  return (
-    <DashboardShell userName={null} avatarUrl={null}>
-      <div className="dash-page-graph">
-        <GraphPageSkeleton />
-      </div>
-    </DashboardShell>
-  );
+  return <PageLoadShell variant="graph" />;
 }

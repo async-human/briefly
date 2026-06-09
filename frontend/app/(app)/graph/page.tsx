@@ -6,6 +6,8 @@ import { api, type KnowledgeGraphResponse } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { GraphPageSkeleton } from "@/components/graph/GraphPageSkeleton";
 import { KnowledgeGraphView } from "@/components/graph/KnowledgeGraphView";
+import { PageContentTransition } from "@/components/loading/PageContentTransition";
+import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { getToken } from "@/lib/auth";
 import type { GraphTimeRange, GraphViewFilter } from "@/lib/graphLinks";
 
@@ -25,6 +27,7 @@ function GraphPageContent() {
   const [graph, setGraph] = useState<KnowledgeGraphResponse | null>(null);
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
   const [error, setError] = useState("");
+  const showLoading = useMinLoadTime(loading);
 
   const loadGraph = useCallback(() => {
     return api.getKnowledgeGraph(days ?? undefined).then(setGraph);
@@ -73,23 +76,27 @@ function GraphPageContent() {
 
   return (
     <DashboardShell userName={me?.name ?? null} avatarUrl={me?.avatar_url}>
-      {loading ? (
-        <GraphPageSkeleton />
+      {showLoading ? (
+        <div className="dash-page-graph">
+          <GraphPageSkeleton />
+        </div>
       ) : error ? (
         <div className="dash-page">
           <p className="form-error">{error}</p>
         </div>
       ) : graph ? (
-        <div className="dash-page-graph">
-          <KnowledgeGraphView
-            data={graph}
-            initialFocusNodeId={focusNodeId}
-            viewFilter={viewFilter}
-            timeRangeDays={days}
-            onViewChange={updateViewParams}
-            onGraphUpdated={() => void loadGraph()}
-          />
-        </div>
+        <PageContentTransition>
+          <div className="dash-page-graph">
+            <KnowledgeGraphView
+              data={graph}
+              initialFocusNodeId={focusNodeId}
+              viewFilter={viewFilter}
+              timeRangeDays={days}
+              onViewChange={updateViewParams}
+              onGraphUpdated={() => void loadGraph()}
+            />
+          </div>
+        </PageContentTransition>
       ) : null}
     </DashboardShell>
   );
@@ -100,7 +107,9 @@ export default function GraphPage() {
     <Suspense
       fallback={
         <DashboardShell userName={null} avatarUrl={null}>
-          <GraphPageSkeleton />
+          <div className="dash-page-graph">
+            <GraphPageSkeleton />
+          </div>
         </DashboardShell>
       }
     >

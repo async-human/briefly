@@ -7,20 +7,10 @@ import { api, type DigestSummary } from "@/lib/api";
 import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { HistoryArchive } from "@/components/history/HistoryArchive";
+import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton";
+import { PageContentTransition } from "@/components/loading/PageContentTransition";
+import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { getToken } from "@/lib/auth";
-
-function HistorySkeleton() {
-  return (
-    <div className="dash-page">
-      <header className="dash-page-header dash-page-header-skeleton">
-        <span className="skeleton-block" style={{ width: 72, height: 12, display: "block" }} />
-        <span className="skeleton-block" style={{ width: 220, height: 32, display: "block", marginTop: 12 }} />
-        <span className="skeleton-block" style={{ width: 160, height: 14, display: "block", marginTop: 10 }} />
-      </header>
-      <div className="dash-surface dash-surface-history" style={{ minHeight: 480 }} />
-    </div>
-  );
-}
 
 export default function HistoryPage() {
   const router = useRouter();
@@ -28,6 +18,7 @@ export default function HistoryPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
+  const showLoading = useMinLoadTime(loading);
 
   useEffect(() => {
     if (!getToken()) {
@@ -48,9 +39,10 @@ export default function HistoryPage() {
 
   return (
     <DashboardShell userName={me?.name ?? null} avatarUrl={me?.avatar_url}>
-      {loading ? (
-        <HistorySkeleton />
+      {showLoading ? (
+        <AnimatedPageSkeleton variant="history" />
       ) : (
+        <PageContentTransition>
         <div className="dash-page">
           <AppPageHeader
             eyebrow="History"
@@ -108,6 +100,7 @@ export default function HistoryPage() {
             </div>
           )}
         </div>
+        </PageContentTransition>
       )}
     </DashboardShell>
   );

@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { api, type ProfileIntelligence } from "@/lib/api";
 import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton";
+import { PageContentTransition } from "@/components/loading/PageContentTransition";
+import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { getToken } from "@/lib/auth";
 
 const ROLES = ["Founder", "Product manager", "Engineer", "Investor", "Researcher", "Other"];
@@ -416,23 +419,12 @@ function Section({
   );
 }
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
-
-function SettingsSkeleton() {
-  return (
-    <div className="dash-page-stack">
-      {[1, 2, 3, 4].map((i) => (
-        <div key={i} className="dash-surface" style={{ minHeight: 140 }} />
-      ))}
-    </div>
-  );
-}
-
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const showLoading = useMinLoadTime(loading);
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
   const [intel, setIntel] = useState<ProfileIntelligence | null>(null);
   const [streak, setStreak] = useState(0);
@@ -548,9 +540,10 @@ export default function SettingsPage() {
           }
         />
 
-        {loading ? (
-          <SettingsSkeleton />
+        {showLoading ? (
+          <AnimatedPageSkeleton variant="settings" />
         ) : (
+          <PageContentTransition>
           <div className="dash-page-stack">
             {intel && (
               <div className="dash-surface dash-surface-knows">
@@ -671,6 +664,7 @@ export default function SettingsPage() {
               </div>
             </Section>
           </div>
+          </PageContentTransition>
         )}
       </div>
     </DashboardShell>

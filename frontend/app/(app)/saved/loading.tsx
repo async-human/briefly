@@ -1,10 +1,5 @@
-import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { SavedPageSkeleton } from "@/components/saved/SavedPageSkeleton";
+import { PageLoadShell } from "@/components/loading/PageLoadShell";
 
 export default function SavedLoading() {
-  return (
-    <DashboardShell userName={null} avatarUrl={null}>
-      <SavedPageSkeleton />
-    </DashboardShell>
-  );
+  return <PageLoadShell variant="saved" />;
 }

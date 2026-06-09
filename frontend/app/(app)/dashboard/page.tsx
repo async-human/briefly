@@ -16,40 +16,14 @@ import {
   markBriefingGeneratedToday,
 } from "@/lib/briefingStorage";
 import { runSilentSourceDiscovery } from "@/lib/silentDiscovery";
+import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton";
+import { PageContentTransition } from "@/components/loading/PageContentTransition";
+import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 
 const FETCHABLE_SOURCE_TYPES = new Set([
   "rss", "youtube", "youtube_account", "reddit", "reddit_account",
   "url", "gmail", "email", "readwise",
 ]);
-
-function SkeletonBlock({ w, h, mb = 0 }: { w: number | string; h: number; mb?: number }) {
-  return (
-    <span
-      className="skeleton-block"
-      style={{ width: w, height: h, marginBottom: mb, display: "block" }}
-    />
-  );
-}
-
-function DashboardSkeleton() {
-  return (
-    <div className="dash-page">
-      <header className="dash-page-header dash-page-header-skeleton">
-        <SkeletonBlock w={80} h={12} mb={12} />
-        <SkeletonBlock w={280} h={32} mb={8} />
-        <SkeletonBlock w={200} h={16} />
-      </header>
-      <div className="dash-page-grid">
-        <div className="dash-surface dash-surface-briefing">
-          <div style={{ minHeight: 360 }} />
-        </div>
-        <div className="dash-surface dash-surface-sources">
-          <div style={{ minHeight: 240 }} />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function DashboardContent() {
   const router = useRouter();
@@ -68,6 +42,7 @@ function DashboardContent() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(true);
+  const showLoading = useMinLoadTime(loading);
   const [showDiscovery, setShowDiscovery] = useState(false);
   const [error, setError] = useState("");
   const [connectBanner, setConnectBanner] = useState<string | null>(null);
@@ -232,8 +207,8 @@ function DashboardContent() {
     weekday: "long", month: "long", day: "numeric",
   });
 
-  if (loading) {
-    return <DashboardSkeleton />;
+  if (showLoading) {
+    return <AnimatedPageSkeleton variant="dashboard" />;
   }
 
   if (error || !me) {
@@ -264,6 +239,7 @@ function DashboardContent() {
   }
 
   return (
+    <PageContentTransition>
     <div className="dash-page">
       <DashboardToolbar
         name={greeting}
@@ -339,6 +315,7 @@ function DashboardContent() {
         </aside>
       </div>
     </div>
+    </PageContentTransition>
   );
 }
 

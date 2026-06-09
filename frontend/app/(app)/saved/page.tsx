@@ -8,6 +8,8 @@ import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { SaveLinkPanel } from "@/components/saved/SaveLinkPanel";
 import { SavedCapturesList } from "@/components/saved/SavedCapturesList";
+import { PageContentTransition } from "@/components/loading/PageContentTransition";
+import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { SavedPageSkeleton } from "@/components/saved/SavedPageSkeleton";
 import { getToken } from "@/lib/auth";
 import { urlFromShareParams } from "@/lib/shareUrl";
@@ -21,6 +23,7 @@ function SavedPageContent() {
   const [loading, setLoading] = useState(true);
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
   const sharedUrl = urlFromShareParams(searchParams);
+  const showLoading = useMinLoadTime(loading);
 
   useEffect(() => {
     if (!getToken()) {
@@ -47,9 +50,10 @@ function SavedPageContent() {
 
   return (
     <DashboardShell userName={me?.name ?? null} avatarUrl={me?.avatar_url}>
-      {loading ? (
+      {showLoading ? (
         <SavedPageSkeleton />
       ) : (
+      <PageContentTransition>
       <div className="dash-page">
         <AppPageHeader
           eyebrow="Save"
@@ -141,6 +145,7 @@ function SavedPageContent() {
           )}
         </div>
       </div>
+      </PageContentTransition>
       )}
     </DashboardShell>
   );

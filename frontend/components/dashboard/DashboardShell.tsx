@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { AppSidebar } from "./AppSidebar";
 import { BrainDumpFab } from "./BrainDumpFab";
 
@@ -12,6 +14,7 @@ type DashboardShellProps = {
 };
 
 export function DashboardShell({ children, userName, avatarUrl }: DashboardShellProps) {
+  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -53,7 +56,9 @@ export function DashboardShell({ children, userName, avatarUrl }: DashboardShell
             Briefly
           </Link>
         </header>
-        <div className="app-main-scroll">{children}</div>
+        <div className="app-main-scroll">
+          <PageContentTransition key={pathname}>{children}</PageContentTransition>
+        </div>
       </div>
       <BrainDumpFab />
     </div>
