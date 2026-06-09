@@ -28,15 +28,20 @@ import numpy as np
 from briefly_api.agents.context import PipelineContext, RawItem
 from briefly_api.config import get_settings
 from briefly_api.embeddings.adapter import get_embedding_adapter
+from briefly_api.services.personalization_score import (
+    build_interest_model,
+    deprioritized_penalty,
+    topic_alignment_score,
+)
 
 log = logging.getLogger(__name__)
 
 # Dimension weights for final score
-W_SEMANTIC   = 0.40   # embedding cosine similarity to user profile
-W_TOPIC      = 0.30   # explicit topic keyword match
-W_QUALITY    = 0.15   # content quality signals
-W_RECENCY    = 0.10   # how fresh is this content
-W_SOURCE     = 0.05   # historical user engagement with this source
+W_SEMANTIC   = 0.45   # embedding cosine similarity to user profile
+W_TOPIC      = 0.28   # explicit interest / goal / cluster alignment
+W_QUALITY    = 0.10   # content quality signals
+W_RECENCY    = 0.08   # how fresh is this content
+W_SOURCE     = 0.09   # engagement + starred source priority
 
 
 async def run(ctx: PipelineContext) -> PipelineContext:
@@ -55,8 +60,11 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     interests: list[dict] = profile.get("interests", [])
     topic_clusters: list[dict] = ctx.user.topic_clusters
 
-    # Build interest keyword set for fast matching
-    interest_keywords = _build_keyword_set(interests, topic_clusters, profile)
+    interest_model = build_interest_model(
+        profile,
+        topic_clusters,
+        active_story_threads=ctx.user.active_story_threads,
+    )
 
     # Get profile embedding for semantic matching
     profile_embedding = profile.get("profile_embedding")
@@ -104,10 +112,11 @@ async def run(ctx: PipelineContext) -> PipelineContext:
 
         # Score each dimension
         semantic_score = await _semantic_score(item, profile_embedding, embedder)
-        topic_score    = _topic_score(item, interest_keywords)
+        topic_score    = topic_alignment_score(item, interest_model)
         quality_score  = _quality_score(item)
         recency_score  = _recency_score(item)
         source_score   = _source_score(item, ctx)
+        thread_boost   = _story_thread_boost(item, ctx.user.active_story_threads)
 
         # Weighted final score
         final = (
@@ -115,7 +124,9 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             W_TOPIC    * topic_score    +
             W_QUALITY  * quality_score  +
             W_RECENCY  * recency_score  +
-            W_SOURCE   * source_score
+            W_SOURCE   * source_score   +
+            thread_boost
+            - deprioritized_penalty(item, interest_model)
         )
         final = round(min(1.0, max(0.0, final)), 4)
         item.relevance_score = final
@@ -174,28 +185,24 @@ async def _semantic_score(
     if norm_a == 0 or norm_b == 0:
         return 0.5
     similarity = float(np.dot(a, b) / (norm_a * norm_b))
-    # Cosine similarity is -1 to 1, map to 0-1
-    return (similarity + 1) / 2
+    # Stretch the useful cosine range so strong matches separate from weak ones.
+    return max(0.0, min(1.0, (similarity - 0.18) / 0.62))
 
 
-def _topic_score(item: RawItem, interest_keywords: set[str]) -> float:
-    """
-    Check how many of the user's interest keywords appear in the item.
-    Medium digest fallbacks are title-heavy — weight the title extra.
-    """
-    if not interest_keywords:
-        return 0.5
-
-    title = item.title or ""
-    if item.meta.get("from_medium_digest"):
-        text = f"{title} {title} {title} {item.summary or ''}".lower()
-    else:
-        text = f"{title} {item.summary} {item.clean_text[:1000]}".lower()
-    matched = sum(1 for kw in interest_keywords if kw in text)
-    if matched == 0:
-        return 0.2
-    # Diminishing returns: 1 match = 0.6, 3 matches = 0.85, 5+ = 1.0
-    return min(1.0, 0.4 + (0.12 * matched))
+def _story_thread_boost(item: RawItem, active_story_threads: list[dict]) -> float:
+    if not active_story_threads:
+        return 0.0
+    text = f"{item.title} {item.summary or ''}".lower()
+    item_words = {w for w in text.split() if len(w) > 3}
+    best = 0.0
+    for thread in active_story_threads:
+        key = str(thread.get("key") or "").lower()
+        thread_words = {w for w in key.split() if len(w) > 3}
+        overlap = len(thread_words & item_words)
+        if overlap >= 2:
+            strength = float(thread.get("strength") or 1.0)
+            best = max(best, min(0.08, 0.03 + strength * 0.02))
+    return best
 
 
 def _quality_score(item: RawItem) -> float:
@@ -275,46 +282,6 @@ def _source_score(item: RawItem, ctx: PipelineContext) -> float:
 
 
 # ── Helper functions ──────────────────────────────────────────────────────────
-
-def _build_keyword_set(
-    interests: list[dict],
-    topic_clusters: list[dict],
-    profile: dict | None = None,
-) -> set[str]:
-    """Extract all interest keywords for fast text matching."""
-    keywords: set[str] = set()
-
-    for interest in interests:
-        topic = interest.get("topic", "").lower()
-        if topic:
-            keywords.add(topic)
-            for word in topic.split():
-                if len(word) > 3:
-                    keywords.add(word)
-
-    for cluster in topic_clusters:
-        if cluster.get("_type") in {"source_weight", "meta"}:
-            continue
-        cluster_name = (cluster.get("cluster") or cluster.get("topic") or cluster.get("section") or "").lower()
-        if cluster_name:
-            keywords.add(cluster_name)
-            for word in cluster_name.split():
-                if len(word) > 3:
-                    keywords.add(word)
-
-    # Extract meaningful terms from the user's stated goal so that articles
-    # aligned with their current focus get a keyword-match boost even when
-    # those terms don't appear as explicit interest tags yet.
-    if profile:
-        goal = profile.get("goal", "")
-        if goal:
-            for word in goal.lower().split():
-                word = word.strip(".,;:!?\"'()")
-                if len(word) > 4:  # skip short stop-words
-                    keywords.add(word)
-
-    return keywords
-
 
 def _profile_to_text(
     profile: dict,

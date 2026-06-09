@@ -20,6 +20,11 @@ from briefly_api.services.digest_sections import (
     SECTION_WHATS_NEW,
 )
 
+from briefly_api.services.personalization_score import (
+    build_interest_model,
+    personalization_rank_score,
+    rank_items_for_display,
+)
 from briefly_api.services.source_priority import (
     build_priority_map,
     max_items_for_source,
@@ -71,6 +76,12 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     s = get_settings()
     items = ctx.enriched_items
     priority_map = build_priority_map(ctx.user.sources or [])
+    interest_model = build_interest_model(
+        ctx.user.profile,
+        ctx.user.topic_clusters,
+        active_story_threads=ctx.user.active_story_threads,
+    )
+    memory_connections = getattr(ctx, "memory_connections", None) or {}
     thin_pool = len(items) < s.quality_gate_min_pool
 
     if not items:
@@ -86,11 +97,12 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         return cap
 
     def combined_score(item: RawItem) -> float:
-        base = 0.55 * item.relevance_score + 0.25 * item.novelty_score + 0.20 * _recency_component(item)
-        # Slight boost so starred sources win tie-breakers in backfill
-        if priority_sort_key(item.source_id, priority_map) == 0:
-            base += 0.04
-        return base
+        return personalization_rank_score(
+            item,
+            priority_map=priority_map,
+            interest_model=interest_model,
+            memory_connections=memory_connections,
+        )
 
     def _source_at_cap(source_id: str) -> bool:
         return source_counts[source_id] >= source_cap(source_id)
@@ -146,8 +158,10 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         min_rel = s.freshness_min_relevance
         if thin_pool:
             min_rel = max(0.32, min_rel - 0.08)
+        else:
+            min_rel = max(min_rel, 0.46)
         if priority_sort_key(source_id, priority_map) == 0:
-            min_rel = max(min_rel, 0.42)
+            min_rel = max(min_rel, 0.50)
         if candidate.relevance_score < min_rel:
             continue
         _select(candidate, SECTION_WHATS_NEW, "fresh")
@@ -164,8 +178,10 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             min_rel = s.freshness_min_relevance
             if thin_pool:
                 min_rel = max(0.32, min_rel - 0.08)
+            else:
+                min_rel = max(min_rel, 0.46)
             if priority_sort_key(source_id, priority_map) == 0:
-                min_rel = max(min_rel, 0.42)
+                min_rel = max(min_rel, 0.50)
             if candidate.relevance_score < min_rel:
                 continue
             _select(candidate, SECTION_WHATS_NEW, "fresh")
@@ -205,35 +221,14 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             )
             _select(item, section, "backfill")
 
-    # Order: What's new first, then Highly relevant
-    fresh_items = [i for i in selected if i.meta.get("digest_pool") == "fresh"]
-    relevant_items = [i for i in selected if i.meta.get("digest_pool") == "relevant"]
-    backfill_whats_new = [
-        i for i in selected
-        if i.meta.get("digest_pool") == "backfill" and i.meta.get("digest_section") == SECTION_WHATS_NEW
-    ]
-    backfill_relevant = [
-        i for i in selected
-        if i.meta.get("digest_pool") == "backfill" and i.meta.get("digest_section") == SECTION_HIGHLY_RELEVANT
-    ]
-
-    def _priority_freshness(item: RawItem) -> tuple:
-        fk = _freshness_key(item)
-        ts = fk[0].timestamp() if fk[0] != datetime.min.replace(tzinfo=timezone.utc) else 0.0
-        return (priority_sort_key(item.source_id, priority_map), -ts, fk[1])
-
-    fresh_items.sort(key=_priority_freshness)
-    relevant_items.sort(
-        key=lambda i: (priority_sort_key(i.source_id, priority_map), -i.relevance_score),
+    # Final order: highest personalization rank first (not freshness-first).
+    # Pool selection above still guarantees source diversity and section mix.
+    ordered = rank_items_for_display(
+        selected,
+        priority_map=priority_map,
+        interest_model=interest_model,
+        memory_connections=memory_connections,
     )
-    backfill_whats_new.sort(
-        key=lambda i: (priority_sort_key(i.source_id, priority_map), -combined_score(i)),
-    )
-    backfill_relevant.sort(
-        key=lambda i: (priority_sort_key(i.source_id, priority_map), -combined_score(i)),
-    )
-
-    ordered = fresh_items + backfill_whats_new + relevant_items + backfill_relevant
     ctx.selected_item_ids = [i.id for i in ordered]
 
     ctx.planned_sections = []
@@ -250,12 +245,15 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             item.drop_reason = "crowded_out"
     ctx.crowded_out_items = [i for i in items if i.id not in selected_id_set]
 
+    fresh_count = sum(1 for i in ordered if i.meta.get("digest_pool") == "fresh")
+    relevant_count = sum(1 for i in ordered if i.meta.get("digest_pool") == "relevant")
+    backfill_count = sum(1 for i in ordered if i.meta.get("digest_pool") == "backfill")
     log.info(
         "BriefingPlannerAgent: selected %d (fresh=%d relevant=%d backfill=%d, crowded_out=%d, thin_pool=%s)",
         len(ordered),
-        len(fresh_items),
-        len(relevant_items),
-        len(backfill_whats_new) + len(backfill_relevant),
+        fresh_count,
+        relevant_count,
+        backfill_count,
         len(ctx.crowded_out_items),
         thin_pool,
     )

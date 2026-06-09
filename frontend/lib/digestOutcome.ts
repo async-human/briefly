@@ -21,16 +21,23 @@ export function splitTopPriorityItems(
   digest: Digest,
   outcome: DigestOutcome | null,
 ): { topItems: DigestItem[]; restItems: DigestItem[] } {
-  const topIds = new Set(outcome?.top_priority_content_ids ?? []);
-  const topItems = digest.items.filter(
-    (item) => item.content_id && topIds.has(item.content_id),
-  );
-  if (topItems.length > 0) {
-    const topSet = new Set(topItems.map((i) => i.id));
-    return {
-      topItems,
-      restItems: digest.items.filter((i) => !topSet.has(i.id)),
-    };
+  const topIds = outcome?.top_priority_content_ids ?? [];
+  if (topIds.length > 0) {
+    const byContentId = new Map(
+      digest.items
+        .filter((item) => item.content_id)
+        .map((item) => [item.content_id as string, item]),
+    );
+    const topItems = topIds
+      .map((id) => byContentId.get(id))
+      .filter((item): item is DigestItem => Boolean(item));
+    if (topItems.length > 0) {
+      const topSet = new Set(topItems.map((i) => i.id));
+      return {
+        topItems,
+        restItems: digest.items.filter((i) => !topSet.has(i.id)),
+      };
+    }
   }
   return {
     topItems: digest.items.slice(0, 3),
