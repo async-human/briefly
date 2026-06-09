@@ -6,7 +6,6 @@ import type { ForceGraphMethods } from "react-force-graph-2d";
 import type { KnowledgeGraphNode, KnowledgeGraphNodeType, KnowledgeGraphResponse } from "@/lib/api";
 import { api } from "@/lib/api";
 import { applyThreadFocusFilter } from "@/lib/graphFilter";
-import { layoutKnowledgeGraph, NODE_DISPLAY_RADIUS, type LayoutNode } from "@/lib/graphLayout";
 import type { GraphTimeRange, GraphViewFilter } from "@/lib/graphLinks";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
@@ -116,7 +115,7 @@ function drawNodeLabel(
   }
 }
 
-type ForceNode = LayoutNode;
+type ForceNode = KnowledgeGraphNode & { x?: number; y?: number };
 
 const FILTER_SHORT: Record<KnowledgeGraphNodeType, string> = {
   topic: "Topics",
@@ -241,19 +240,6 @@ export function KnowledgeGraphView({
     return { nodes, links };
   }, [viewData, activeTypes]);
 
-  const selectedIdEarly = selected?.id ?? null;
-
-  const graphData = useMemo(() => {
-    const structural = filtered.links.filter((link) => link.type !== "related_to");
-    const nodes = layoutKnowledgeGraph(filtered.nodes, structural);
-    const links = filtered.links.filter((link) => {
-      if (link.type !== "related_to") return true;
-      if (!selectedIdEarly) return false;
-      return link.source === selectedIdEarly || link.target === selectedIdEarly;
-    });
-    return { nodes, links };
-  }, [filtered, selectedIdEarly]);
-
   const toggleType = useCallback((type: KnowledgeGraphNodeType) => {
     setActiveTypes((prev) => {
       const next = new Set(prev);
@@ -279,7 +265,7 @@ export function KnowledgeGraphView({
   }, []);
 
   const focusNode =
-    graphData.nodes.find((n) => n.id === selected?.id) ??
+    filtered.nodes.find((n) => n.id === selected?.id) ??
     viewData.nodes.find((n) => n.id === selected?.id) ??
     selected;
 
@@ -350,13 +336,13 @@ export function KnowledgeGraphView({
   const selectedId = selected?.id ?? null;
 
   const focusIds = useMemo(
-    () => (selectedId ? neighborIds(selectedId, graphData.links) : null),
-    [selectedId, graphData.links],
+    () => (selectedId ? neighborIds(selectedId, filtered.links) : null),
+    [selectedId, filtered.links],
   );
 
   useEffect(() => {
     setDidFit(false);
-  }, [graphData.nodes.length, activeTypes, viewFilter, timeRangeDays]);
+  }, [filtered.nodes.length, activeTypes]);
 
   useEffect(() => {
     const graph = graphRef.current;
@@ -378,18 +364,6 @@ export function KnowledgeGraphView({
 
   const fitPadding = mobile ? 80 : 48;
 
-  const linkCurvature = useCallback((link: object) => {
-    const l = link as { source?: string | ForceNode; target?: string | ForceNode };
-    if (!l.source || !l.target) return 0;
-    const src = linkEndpointId(l.source);
-    const tgt = linkEndpointId(l.target);
-    const key = src < tgt ? `${src}|${tgt}` : `${tgt}|${src}`;
-    let hash = 0;
-    for (let i = 0; i < key.length; i += 1) hash = (hash + key.charCodeAt(i) * (i + 1)) % 97;
-    const sign = hash % 2 === 0 ? 1 : -1;
-    return sign * (0.12 + (hash % 5) * 0.03);
-  }, []);
-
   const renderNode = useCallback(
     (node: object, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const n = node as ForceNode;
@@ -399,7 +373,8 @@ export function KnowledgeGraphView({
       const isNeighbor = Boolean(focusIds && inFocus && !isSelected);
       const emphasized = isHovered || isSelected || (focusIds && isNeighbor);
 
-      const size = NODE_DISPLAY_RADIUS[n.type] * (mobile ? 1.08 : 1) * (inFocus ? 1 : 0.82);
+      const size =
+        Math.sqrt(Math.max(n.size, 4)) * (mobile ? 2.6 : 2.2) * (inFocus ? 1 : 0.82);
 
       const x = n.x ?? 0;
       const y = n.y ?? 0;
@@ -540,7 +515,7 @@ export function KnowledgeGraphView({
   return (
     <div className={`kg-stage${mobile ? " kg-stage-mobile" : ""}${focusIds ? " kg-stage-focused" : ""}`}>
       <div className={`kg-canvas-wrap${focusIds ? " is-focused" : ""}`}>
-        {graphData.nodes.length === 0 ? (
+        {filtered.nodes.length === 0 ? (
           <div className="kg-empty">
             <p className="kg-empty-title">No nodes to show</p>
             <p className="kg-empty-desc">
@@ -554,18 +529,17 @@ export function KnowledgeGraphView({
         ) : (
           <ForceGraph2D
             ref={graphRef}
-            graphData={graphData}
+            graphData={filtered}
             backgroundColor="transparent"
-            enableNodeDrag={false}
             nodeRelSize={1}
-            nodeVal={() => 1}
+            nodeVal={(n) => (n as KnowledgeGraphNode).size}
             nodeLabel=""
             nodeColor={(n) => NODE_COLORS[(n as KnowledgeGraphNode).type]}
             nodeCanvasObject={renderNode}
             nodeCanvasObjectMode={() => "replace"}
             nodePointerAreaPaint={(node, color, ctx) => {
               const n = node as ForceNode;
-              const hit = NODE_DISPLAY_RADIUS[n.type] * (mobile ? 1.65 : 1.45);
+              const hit = Math.sqrt(Math.max(n.size, 4)) * (mobile ? 3.4 : 2.8);
               ctx.beginPath();
               ctx.arc(n.x ?? 0, n.y ?? 0, hit, 0, 2 * Math.PI);
               ctx.fillStyle = color;
@@ -573,7 +547,6 @@ export function KnowledgeGraphView({
             }}
             linkWidth={linkWidth}
             linkColor={linkColor}
-            linkCurvature={linkCurvature}
             linkDirectionalParticles={0}
             onNodeClick={(node) => handleNodeClick(node as ForceNode)}
             onNodeHover={canHover ? (node) => setHovered(node as KnowledgeGraphNode | null) : undefined}
@@ -584,8 +557,9 @@ export function KnowledgeGraphView({
                 setDidFit(true);
               }
             }}
-            warmupTicks={0}
-            cooldownTicks={0}
+            cooldownTicks={mobile ? 60 : 80}
+            d3AlphaDecay={0.03}
+            d3VelocityDecay={0.4}
           />
         )}
 
@@ -596,7 +570,7 @@ export function KnowledgeGraphView({
           </div>
         ) : null}
 
-        {graphData.nodes.length > 0 ? (
+        {filtered.nodes.length > 0 ? (
           <p className="kg-float-hint">
             {focusIds
               ? mobile
