@@ -23,11 +23,6 @@ function MessageBubble({ message }: { message: AskMessage }) {
 
   return (
     <div className={`ask-message${isUser ? " ask-message-user" : " ask-message-assistant"}`}>
-      {!isUser ? (
-        <div className="ask-avatar" aria-hidden>
-          B
-        </div>
-      ) : null}
       <div className="ask-message-body">
         {isUser ? (
           <p className="ask-message-text-user">{message.content}</p>
@@ -235,9 +230,6 @@ export function AskBrieflyView({
           )}
           {sending ? (
             <div className="ask-message ask-message-assistant ask-message-pending" role="status">
-              <div className="ask-avatar" aria-hidden>
-                B
-              </div>
               <div className="ask-message-body ask-typing-wrap">
                 <span className="ask-typing-dots" aria-hidden>
                   <span />

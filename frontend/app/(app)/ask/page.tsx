@@ -6,9 +6,6 @@ import { api } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AskBrieflyView } from "@/components/ask/AskBrieflyView";
-import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton";
-import { PageContentTransition } from "@/components/loading/PageContentTransition";
-import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 
 function AskPageContent() {
   const router = useRouter();
@@ -18,10 +15,8 @@ function AskPageContent() {
   const threadId = searchParams.get("thread");
   const titleParam = searchParams.get("title");
 
-  const [loading, setLoading] = useState(true);
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
   const anchorTitle = titleParam;
-  const showLoading = useMinLoadTime(loading);
 
   useEffect(() => {
     if (!getToken()) {
@@ -32,26 +27,19 @@ function AskPageContent() {
     void api
       .getMe()
       .then((m) => setMe({ name: m.user.name, avatar_url: m.user.avatar_url }))
-      .catch(() => router.replace("/login"))
-      .finally(() => setLoading(false));
+      .catch(() => router.replace("/login"));
   }, [router]);
 
   return (
     <DashboardShell userName={me?.name ?? null} avatarUrl={me?.avatar_url}>
-      {showLoading ? (
-        <AnimatedPageSkeleton variant="dashboard" />
-      ) : (
-        <PageContentTransition>
-          <div className="dash-page dash-page-ask">
-            <AskBrieflyView
-              initialContentId={contentId}
-              initialDigestItemId={digestItemId}
-              initialThreadId={threadId}
-              anchorTitle={anchorTitle}
-            />
-          </div>
-        </PageContentTransition>
-      )}
+      <div className="dash-page dash-page-ask">
+        <AskBrieflyView
+          initialContentId={contentId}
+          initialDigestItemId={digestItemId}
+          initialThreadId={threadId}
+          anchorTitle={anchorTitle}
+        />
+      </div>
     </DashboardShell>
   );
 }
@@ -61,7 +49,7 @@ export default function AskPage() {
     <Suspense
       fallback={
         <DashboardShell userName={null} avatarUrl={null}>
-          <AnimatedPageSkeleton variant="dashboard" />
+          <div className="dash-page dash-page-ask" aria-busy="true" />
         </DashboardShell>
       }
     >

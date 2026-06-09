@@ -1,5 +1,9 @@
-import { PageLoadShell } from "@/components/loading/PageLoadShell";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
 
 export default function AskLoading() {
-  return <PageLoadShell variant="dashboard" />;
+  return (
+    <DashboardShell userName={null} avatarUrl={null}>
+      <div className="dash-page dash-page-ask" aria-busy="true" />
+    </DashboardShell>
+  );
 }
