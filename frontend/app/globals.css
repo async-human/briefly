@@ -6644,6 +6644,7 @@ footer {
   align-items: center;
 }
 
+.read-ask-link,
 .read-graph-link {
   display: inline-flex;
   align-items: center;
@@ -6660,22 +6661,55 @@ footer {
   transition: background 0.2s, color 0.2s;
 }
 
+.read-ask-link:hover,
 .read-graph-link:hover {
   background: rgba(94, 106, 210, 0.2);
   color: #4a56b8;
 }
 
+.read-ask-link {
+  background: rgba(212, 170, 106, 0.14);
+  color: #9e7b3f;
+}
+
+.read-ask-link:hover {
+  background: rgba(212, 170, 106, 0.24);
+  color: #7a5f2c;
+}
+
+.read-meta-actions .read-ask-link,
 .read-meta-actions .read-graph-link {
   margin-right: 0.15rem;
 }
 
+.read-why-ask-graph {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.read-ask-link-why,
 .read-graph-link-why {
   text-transform: none;
   letter-spacing: 0.02em;
   font-size: 11px;
   padding: 8px 16px;
-  border: 1px solid rgba(94, 106, 210, 0.22);
   border-radius: 100px;
+}
+
+.read-ask-link-why {
+  border: 1px solid rgba(212, 170, 106, 0.28);
+  background: rgba(212, 170, 106, 0.1);
+}
+
+.read-ask-link-why:hover {
+  background: rgba(212, 170, 106, 0.18);
+  border-color: rgba(212, 170, 106, 0.4);
+}
+
+.read-graph-link-why {
+  border: 1px solid rgba(94, 106, 210, 0.22);
   background: rgba(94, 106, 210, 0.08);
 }
 

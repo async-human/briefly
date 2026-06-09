@@ -6,6 +6,8 @@ import type { ForceGraphMethods } from "react-force-graph-2d";
 import type { KnowledgeGraphNode, KnowledgeGraphNodeType, KnowledgeGraphResponse } from "@/lib/api";
 import { api } from "@/lib/api";
 import { applyThreadFocusFilter } from "@/lib/graphFilter";
+import Link from "next/link";
+import { askAboutContent } from "@/lib/askLinks";
 import type { GraphTimeRange, GraphViewFilter } from "@/lib/graphLinks";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
@@ -458,6 +460,18 @@ export function KnowledgeGraphView({
           </div>
         ))}
       </dl>
+      {focusNode.type === "item" || focusNode.type === "thought" ? (
+        <Link
+          href={askAboutContent(
+            focusNode.id.replace(/^(item|thought):/, ""),
+            undefined,
+            focusNode.label,
+          )}
+          className="dash-btn dash-btn-secondary kg-inspector-link"
+        >
+          Ask about this
+        </Link>
+      ) : null}
       {focusNode.type === "item" && focusNode.meta.url ? (
         <a
           href={String(focusNode.meta.url)}

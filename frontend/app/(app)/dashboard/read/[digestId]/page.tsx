@@ -12,6 +12,7 @@ import {
   SECTION_WHATS_NEW,
   sectionBadgeClass,
 } from "@/lib/digestSections";
+import { askAboutContent } from "@/lib/askLinks";
 import { graphItemUrl } from "@/lib/graphLinks";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -168,9 +169,17 @@ function ReadingCard({
         </div>
         <div className="read-meta-actions">
           {item.content_id ? (
-            <Link href={graphItemUrl(item.content_id)} className="read-graph-link">
-              Graph
-            </Link>
+            <>
+              <Link
+                href={askAboutContent(item.content_id, item.id, item.headline)}
+                className="read-ask-link"
+              >
+                Ask
+              </Link>
+              <Link href={graphItemUrl(item.content_id)} className="read-graph-link">
+                Graph
+              </Link>
+            </>
           ) : null}
           {/* Dislike — one tap, "less like this" */}
           <button
@@ -268,10 +277,17 @@ function ReadingCard({
           ) : null}
           {item.content_id ? (
             <motion.div
+              className="read-why-ask-graph"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.35, delay: 0.32, ease: EASE }}
             >
+              <Link
+                href={askAboutContent(item.content_id, item.id, item.headline)}
+                className="read-ask-link read-ask-link-why"
+              >
+                Ask about this
+              </Link>
               <Link href={graphItemUrl(item.content_id)} className="read-graph-link read-graph-link-why">
                 View in graph
               </Link>

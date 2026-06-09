@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { BrowserCapture } from "@/lib/api";
 import { formatCaptureTitle } from "@/lib/formatCaptureTitle";
+import { askAboutContent } from "@/lib/askLinks";
 import { graphItemUrl } from "@/lib/graphLinks";
 
 function formatCaptureDate(iso: string) {
@@ -95,6 +96,9 @@ export function SavedCapturesList({ captures }: SavedCapturesListProps) {
               <time className="saved-capture-date" dateTime={item.created_at}>
                 {formatCaptureDate(item.created_at)}
               </time>
+              <Link href={askAboutContent(item.id, undefined, item.title)} className="saved-capture-ask-link">
+                Ask
+              </Link>
               <Link href={graphItemUrl(item.id)} className="saved-capture-graph-link">
                 Graph
               </Link>

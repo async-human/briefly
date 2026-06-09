@@ -31,6 +31,26 @@ const NAV = [
     ),
   },
   {
+    href: "/ask",
+    label: "Ask",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M7 8.5h10M7 12h7M7 15.5h9"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <path
+          d="M5 5.5h14a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2H10l-4.5 3v-3H5a2 2 0 0 1-2-2V7.5a2 2 0 0 1 2-2Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/graph",
     label: "Graph",
     icon: (

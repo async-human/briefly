@@ -495,6 +495,44 @@ export type KnowledgeGraphEdge = {
   label: string | null;
 };
 
+export type AskCitation = {
+  ref: string;
+  content_id: string;
+  title: string;
+  url: string | null;
+  source_name: string | null;
+  snippet: string;
+  kind: string;
+};
+
+export type AskMessage = {
+  role: "user" | "assistant";
+  content: string;
+  citations?: AskCitation[];
+  timestamp?: string;
+};
+
+export type AskThreadSummary = {
+  id: string;
+  title: string;
+  preview: string;
+  digest_item_id: string | null;
+  content_id: string | null;
+  anchor_title: string | null;
+  updated_at: string | null;
+  message_count: number;
+};
+
+export type AskThread = {
+  id: string;
+  digest_item_id: string | null;
+  content_id: string | null;
+  anchor_title: string | null;
+  messages: AskMessage[];
+  created_at: string | null;
+  updated_at: string | null;
+};
+
 export type KnowledgeGraphResponse = {
   nodes: KnowledgeGraphNode[];
   edges: KnowledgeGraphEdge[];
@@ -689,6 +727,23 @@ export const api = {
       "/api/v1/graph/actions/source",
       { method: "POST", body: JSON.stringify(body) },
     ),
+
+  ask: (body: {
+    message: string;
+    thread_id?: string;
+    content_id?: string;
+    digest_item_id?: string;
+  }) =>
+    request<{
+      thread_id: string;
+      assistant: AskMessage & { created_at: string };
+    }>("/api/v1/ask", { method: "POST", body: JSON.stringify(body) }, 60000),
+
+  listAskThreads: () =>
+    request<{ threads: AskThreadSummary[] }>("/api/v1/ask/threads"),
+
+  getAskThread: (threadId: string) =>
+    request<{ thread: AskThread }>(`/api/v1/ask/threads/${threadId}`),
 
   // Brain Dump
   listBrainDumps: () => request<BrainDump[]>("/api/v1/brain-dumps"),
