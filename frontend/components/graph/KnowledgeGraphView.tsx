@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ForceGraphMethods } from "react-force-graph-2d";
 import type { KnowledgeGraphNode, KnowledgeGraphNodeType, KnowledgeGraphResponse } from "@/lib/api";
 import { api } from "@/lib/api";
+import { applyThreadFocusFilter } from "@/lib/graphFilter";
+import type { GraphTimeRange, GraphViewFilter } from "@/lib/graphLinks";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
@@ -44,6 +46,13 @@ function shouldShowCanvasLabel(
 }
 
 const ALL_TYPES: KnowledgeGraphNodeType[] = ["topic", "source", "item", "thought", "thread"];
+const THREAD_FOCUS_TYPES: KnowledgeGraphNodeType[] = ["thread", "item", "topic"];
+const TIME_RANGES: { label: string; value: GraphTimeRange | null }[] = [
+  { label: "All", value: null },
+  { label: "7d", value: 7 },
+  { label: "30d", value: 30 },
+  { label: "90d", value: 90 },
+];
 
 function drawNodeLabel(
   ctx: CanvasRenderingContext2D,
@@ -159,16 +168,37 @@ function nodeDetail(node: KnowledgeGraphNode): { label: string; value: string }[
 type KnowledgeGraphViewProps = {
   data: KnowledgeGraphResponse;
   initialFocusNodeId?: string | null;
+  viewFilter?: GraphViewFilter | null;
+  timeRangeDays?: GraphTimeRange | null;
+  onViewChange?: (next: { filter?: GraphViewFilter | null; days?: GraphTimeRange | null }) => void;
   onGraphUpdated?: () => void;
 };
 
-export function KnowledgeGraphView({ data, initialFocusNodeId, onGraphUpdated }: KnowledgeGraphViewProps) {
+export function KnowledgeGraphView({
+  data,
+  initialFocusNodeId,
+  viewFilter,
+  timeRangeDays,
+  onViewChange,
+  onGraphUpdated,
+}: KnowledgeGraphViewProps) {
   const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
   const [didFit, setDidFit] = useState(false);
   const mobile = useMobileLayout();
   const canHover = useCanHover();
+  const threadFocus = viewFilter === "thread";
   const [activeTypes, setActiveTypes] = useState<Set<KnowledgeGraphNodeType>>(
-    () => new Set(ALL_TYPES),
+    () => new Set(threadFocus ? THREAD_FOCUS_TYPES : ALL_TYPES),
+  );
+
+  useEffect(() => {
+    setActiveTypes(new Set(threadFocus ? THREAD_FOCUS_TYPES : ALL_TYPES));
+    setSelected(null);
+  }, [threadFocus]);
+
+  const viewData = useMemo(
+    () => (threadFocus ? applyThreadFocusFilter(data) : data),
+    [data, threadFocus],
   );
   const [selected, setSelected] = useState<KnowledgeGraphNode | null>(null);
   const [hovered, setHovered] = useState<KnowledgeGraphNode | null>(null);
@@ -176,9 +206,9 @@ export function KnowledgeGraphView({ data, initialFocusNodeId, onGraphUpdated }:
   const [actionMessage, setActionMessage] = useState("");
 
   const filtered = useMemo(() => {
-    const nodes = data.nodes.filter((n) => activeTypes.has(n.type));
+    const nodes = viewData.nodes.filter((n) => activeTypes.has(n.type));
     const nodeIds = new Set(nodes.map((n) => n.id));
-    const links = data.edges
+    const links = viewData.edges
       .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
       .map((e) => ({
         source: e.source,
@@ -188,7 +218,7 @@ export function KnowledgeGraphView({ data, initialFocusNodeId, onGraphUpdated }:
         type: e.type,
       }));
     return { nodes, links };
-  }, [data, activeTypes]);
+  }, [viewData, activeTypes]);
 
   const toggleType = useCallback((type: KnowledgeGraphNodeType) => {
     setActiveTypes((prev) => {
@@ -214,16 +244,19 @@ export function KnowledgeGraphView({ data, initialFocusNodeId, onGraphUpdated }:
     });
   }, []);
 
-  const focusNode = filtered.nodes.find((n) => n.id === selected?.id) ?? selected;
+  const focusNode =
+    filtered.nodes.find((n) => n.id === selected?.id) ??
+    viewData.nodes.find((n) => n.id === selected?.id) ??
+    selected;
 
   useEffect(() => {
     if (!initialFocusNodeId) return;
-    const node = data.nodes.find((n) => n.id === initialFocusNodeId);
+    const node = viewData.nodes.find((n) => n.id === initialFocusNodeId);
     if (node) {
       setSelected(node);
       setDidFit(false);
     }
-  }, [initialFocusNodeId, data]);
+  }, [initialFocusNodeId, viewData]);
 
   useEffect(() => {
     if (!initialFocusNodeId || !didFit) return;
@@ -419,7 +452,13 @@ export function KnowledgeGraphView({ data, initialFocusNodeId, onGraphUpdated }:
         {filtered.nodes.length === 0 ? (
           <div className="kg-empty">
             <p className="kg-empty-title">No nodes to show</p>
-            <p className="kg-empty-desc">Turn on a node type below, or keep reading to grow your graph.</p>
+            <p className="kg-empty-desc">
+              {threadFocus
+                ? "No story threads yet — keep reading and Briefly will map evolving narratives here."
+                : timeRangeDays
+                  ? `Nothing in the last ${timeRangeDays} days. Try a wider time range or keep reading.`
+                  : "Turn on a node type below, or keep reading to grow your graph."}
+            </p>
           </div>
         ) : (
           <ForceGraph2D
@@ -474,11 +513,45 @@ export function KnowledgeGraphView({ data, initialFocusNodeId, onGraphUpdated }:
 
       <div className="kg-float-bar">
         <div className="kg-float-controls">
+          <div className="kg-view-pills" role="group" aria-label="Graph view mode">
+            <button
+              type="button"
+              className={`kg-view-pill${!threadFocus ? " is-active" : ""}`}
+              aria-pressed={!threadFocus}
+              onClick={() => onViewChange?.({ filter: null })}
+            >
+              Full map
+            </button>
+            <button
+              type="button"
+              className={`kg-view-pill${threadFocus ? " is-active" : ""}`}
+              aria-pressed={threadFocus}
+              onClick={() => onViewChange?.({ filter: "thread" })}
+            >
+              Threads
+            </button>
+          </div>
+          <div className="kg-time-pills" role="group" aria-label="Time range">
+            {TIME_RANGES.map(({ label, value }) => {
+              const active = timeRangeDays === value || (!timeRangeDays && value === null);
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  className={`kg-time-pill${active ? " is-active" : ""}`}
+                  aria-pressed={active}
+                  onClick={() => onViewChange?.({ days: value })}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
           <div className="kg-filters-scroll">
             <div className="kg-filters" role="group" aria-label="Filter node types">
-              {ALL_TYPES.map((type) => {
+              {(threadFocus ? THREAD_FOCUS_TYPES : ALL_TYPES).map((type) => {
                 const on = activeTypes.has(type);
-                const count = data.nodes.filter((n) => n.type === type).length;
+                const count = viewData.nodes.filter((n) => n.type === type).length;
                 return (
                   <button
                     key={type}

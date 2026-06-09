@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 from sqlalchemy import select
@@ -50,6 +50,74 @@ def _topic_match_score(text: str, topic: str) -> float:
     hay = text.lower()
     hits = sum(1 for word in keywords if word in hay)
     return hits / len(keywords)
+
+
+def _parse_iso_dt(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _item_occurred_at(raw: RawContent | None, digest_date: str | None) -> str | None:
+    if raw and raw.ingested_at:
+        return raw.ingested_at.isoformat()
+    if digest_date:
+        return f"{digest_date}T12:00:00+00:00"
+    return None
+
+
+def filter_graph_by_days(graph: KnowledgeGraph, days: int) -> KnowledgeGraph:
+    """Keep nodes inside a time window; retain anchors connected to recent activity."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    kept: set[str] = set()
+
+    for node in graph.nodes:
+        if node.type in {"item", "thought"}:
+            ts = _parse_iso_dt(node.meta.get("occurred_at") or node.meta.get("created_at"))
+            if ts and ts >= cutoff:
+                kept.add(node.id)
+        elif node.type == "thread":
+            ts = _parse_iso_dt(node.meta.get("last_seen_at") or node.meta.get("first_seen"))
+            if ts and ts >= cutoff:
+                kept.add(node.id)
+
+    if not kept:
+        return KnowledgeGraph(nodes=[], edges=[], stats={**graph.stats, "time_window_days": days})
+
+    anchor_types = {"topic", "thread", "source"}
+    node_by_id = {n.id: n for n in graph.nodes}
+    changed = True
+    while changed:
+        changed = False
+        for edge in graph.edges:
+            if edge.source in kept and edge.target not in kept:
+                target = node_by_id.get(edge.target)
+                if target and target.type in anchor_types:
+                    kept.add(edge.target)
+                    changed = True
+            elif edge.target in kept and edge.source not in kept:
+                source = node_by_id.get(edge.source)
+                if source and source.type in anchor_types:
+                    kept.add(edge.source)
+                    changed = True
+
+    nodes = [n for n in graph.nodes if n.id in kept]
+    node_ids = {n.id for n in nodes}
+    edges = [e for e in graph.edges if e.source in node_ids and e.target in node_ids]
+    stats = {
+        **graph.stats,
+        "time_window_days": days,
+        "topic_count": sum(1 for n in nodes if n.type == "topic"),
+        "thread_count": sum(1 for n in nodes if n.type == "thread"),
+        "item_count": sum(1 for n in nodes if n.type == "item"),
+        "thought_count": sum(1 for n in nodes if n.type == "thought"),
+        "source_count": sum(1 for n in nodes if n.type == "source"),
+        "edge_count": len(edges),
+    }
+    return KnowledgeGraph(nodes=nodes, edges=edges, stats=stats)
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -143,6 +211,8 @@ async def build_knowledge_graph(
     db: AsyncSession,
     user_id: str,
     profile: UserProfile | None,
+    *,
+    days: int | None = None,
 ) -> KnowledgeGraph:
     builder = _GraphBuilder()
 
@@ -209,7 +279,8 @@ async def build_knowledge_graph(
                 meta={
                     "appearances": thread.occurrence_count,
                     "latest_headline": (val.get("latest_headline") or "")[:160],
-                    "first_seen": val.get("first_seen"),
+                    "first_seen": val.get("first_seen") or thread.first_seen_at.isoformat(),
+                    "last_seen_at": thread.last_seen_at.isoformat(),
                     "health": val.get("health", "active"),
                 },
             )
@@ -383,6 +454,7 @@ async def build_knowledge_graph(
                     "summary": (cand["summary"] or "")[:220],
                     "source_name": cand["source_name"],
                     "digest_date": cand["digest_date"],
+                    "occurred_at": _item_occurred_at(raw, cand["digest_date"]),
                     "engagement": round(engagement, 2),
                     "was_saved": bool(raw and (raw.meta or {}).get("saved")),
                     "connection_sentence": enrichment.connection_sentence if enrichment else None,
@@ -536,7 +608,10 @@ async def build_knowledge_graph(
         "edge_count": len(edges),
     }
 
-    return KnowledgeGraph(nodes=nodes, edges=edges, stats=stats)
+    graph = KnowledgeGraph(nodes=nodes, edges=edges, stats=stats)
+    if days is not None:
+        graph = filter_graph_by_days(graph, days)
+    return graph
 
 
 def graph_to_dict(graph: KnowledgeGraph) -> dict:

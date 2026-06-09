@@ -6636,10 +6636,57 @@ footer {
   margin: 0;
 }
 
+.read-why-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+  align-items: center;
+}
+
+.read-graph-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(94, 106, 210, 0.12);
+  color: #5e6ad2;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s;
+}
+
+.read-graph-link:hover {
+  background: rgba(94, 106, 210, 0.2);
+  color: #4a56b8;
+}
+
+.read-meta-actions .read-graph-link {
+  margin-right: 0.15rem;
+}
+
+.read-graph-link-why {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 11px;
+  padding: 8px 16px;
+  border: 1px solid rgba(94, 106, 210, 0.22);
+  border-radius: 100px;
+  background: rgba(94, 106, 210, 0.08);
+}
+
+.read-graph-link-why:hover {
+  background: rgba(94, 106, 210, 0.14);
+  border-color: rgba(94, 106, 210, 0.35);
+}
+
 /* Article link */
 .read-article-link {
   flex-shrink: 0;
-  margin-top: auto;
   align-self: flex-start;
   display: inline-flex;
   align-items: center;

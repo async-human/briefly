@@ -506,6 +506,8 @@ export type KnowledgeGraphResponse = {
     thought_count: number;
     source_count: number;
     edge_count: number;
+    time_window_days?: number;
+    thread_focus?: boolean;
   };
 };
 
@@ -673,7 +675,10 @@ export const api = {
       20_000,
     ),
 
-  getKnowledgeGraph: () => request<KnowledgeGraphResponse>("/api/v1/graph"),
+  getKnowledgeGraph: (days?: number) => {
+    const qs = days ? `?days=${days}` : "";
+    return request<KnowledgeGraphResponse>(`/api/v1/graph${qs}`);
+  },
   graphTopicAction: (body: { topic: string; action: "boost" | "mute" }) =>
     request<{ topic: string; action: string; strength: number }>(
       "/api/v1/graph/actions/topic",

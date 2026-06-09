@@ -7,29 +7,59 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { GraphPageSkeleton } from "@/components/graph/GraphPageSkeleton";
 import { KnowledgeGraphView } from "@/components/graph/KnowledgeGraphView";
 import { getToken } from "@/lib/auth";
+import type { GraphTimeRange, GraphViewFilter } from "@/lib/graphLinks";
+
+function parseDaysParam(value: string | null): GraphTimeRange | null {
+  if (value === "7" || value === "30" || value === "90") return Number(value) as GraphTimeRange;
+  return null;
+}
 
 function GraphPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const focusNodeId = searchParams.get("node");
+  const viewFilter = (searchParams.get("filter") === "thread" ? "thread" : null) as GraphViewFilter | null;
+  const days = parseDaysParam(searchParams.get("days"));
+
   const [loading, setLoading] = useState(true);
   const [graph, setGraph] = useState<KnowledgeGraphResponse | null>(null);
   const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
   const [error, setError] = useState("");
 
   const loadGraph = useCallback(() => {
-    return api.getKnowledgeGraph().then(setGraph);
-  }, []);
+    return api.getKnowledgeGraph(days ?? undefined).then(setGraph);
+  }, [days]);
+
+  const updateViewParams = useCallback(
+    (next: { filter?: GraphViewFilter | null; days?: GraphTimeRange | null }) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (next.filter === "thread") {
+        params.set("filter", "thread");
+      } else if (next.filter === null) {
+        params.delete("filter");
+      }
+      if (next.days) {
+        params.set("days", String(next.days));
+      } else if (next.days === null) {
+        params.delete("days");
+      }
+      const qs = params.toString();
+      router.replace(qs ? `/graph?${qs}` : "/graph");
+    },
+    [router, searchParams],
+  );
 
   useEffect(() => {
     if (!getToken()) {
       router.replace("/login");
       return;
     }
-    Promise.all([api.getMe(), api.getKnowledgeGraph()])
+    setLoading(true);
+    Promise.all([api.getMe(), api.getKnowledgeGraph(days ?? undefined)])
       .then(([meData, graphData]) => {
         setMe({ name: meData.user.name, avatar_url: meData.user.avatar_url });
         setGraph(graphData);
+        setError("");
       })
       .catch((err) => {
         if (err instanceof Error && err.message.includes("401")) {
@@ -39,7 +69,7 @@ function GraphPageContent() {
         setError(err instanceof Error ? err.message : "Could not load knowledge graph.");
       })
       .finally(() => setLoading(false));
-  }, [router]);
+  }, [router, days]);
 
   return (
     <DashboardShell userName={me?.name ?? null} avatarUrl={me?.avatar_url}>
@@ -54,6 +84,9 @@ function GraphPageContent() {
           <KnowledgeGraphView
             data={graph}
             initialFocusNodeId={focusNodeId}
+            viewFilter={viewFilter}
+            timeRangeDays={days}
+            onViewChange={updateViewParams}
             onGraphUpdated={() => void loadGraph()}
           />
         </div>

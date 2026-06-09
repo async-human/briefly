@@ -1658,16 +1658,59 @@ a.saved-capture-title:hover {
 .kg-float-controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.35rem;
   max-width: 100%;
-  padding: 0.3rem 0.35rem 0.3rem 0.45rem;
+  padding: 0.35rem 0.45rem;
   border: 1px solid var(--app-border);
-  border-radius: 999px;
+  border-radius: 1rem;
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   box-shadow: 0 4px 24px rgba(15, 15, 15, 0.07);
   pointer-events: auto;
+}
+
+.kg-view-pills,
+.kg-time-pills {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.kg-time-pills {
+  padding-right: 0.25rem;
+  border-right: 1px solid var(--app-border);
+  margin-right: 0.1rem;
+}
+
+.kg-view-pill,
+.kg-time-pill {
+  padding: 0.3rem 0.55rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--app-ink-muted);
+  font-family: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--app-dur) var(--app-ease), color var(--app-dur) var(--app-ease);
+}
+
+.kg-view-pill:hover,
+.kg-time-pill:hover {
+  color: var(--app-ink-secondary);
+  background: var(--app-surface-muted);
+}
+
+.kg-view-pill.is-active,
+.kg-time-pill.is-active {
+  background: var(--app-linear-soft);
+  color: var(--app-linear);
 }
 
 .kg-filters-scroll {

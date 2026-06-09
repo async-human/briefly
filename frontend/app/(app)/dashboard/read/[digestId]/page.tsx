@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type Digest, type DigestItem } from "@/lib/api";
@@ -11,6 +12,7 @@ import {
   SECTION_WHATS_NEW,
   sectionBadgeClass,
 } from "@/lib/digestSections";
+import { graphItemUrl } from "@/lib/graphLinks";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Mode = "quick" | "deep";
@@ -165,6 +167,11 @@ function ReadingCard({
           )}
         </div>
         <div className="read-meta-actions">
+          {item.content_id ? (
+            <Link href={graphItemUrl(item.content_id)} className="read-graph-link">
+              Graph
+            </Link>
+          ) : null}
           {/* Dislike — one tap, "less like this" */}
           <button
             className={`read-dislike-btn${isDisliked ? " disliked" : ""}`}
@@ -242,22 +249,35 @@ function ReadingCard({
           <p className="read-confidence-signal">◈ {item.confidence_signal}</p>
         )}
 
-        {articleUrl && (
-          <motion.a
-            href={articleUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="read-article-link"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.35, delay: 0.28, ease: EASE }}
-          >
-            Read full article
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </motion.a>
-        )}
+        <div className="read-why-links">
+          {articleUrl ? (
+            <motion.a
+              href={articleUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="read-article-link"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.35, delay: 0.28, ease: EASE }}
+            >
+              Read full article
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </motion.a>
+          ) : null}
+          {item.content_id ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.35, delay: 0.32, ease: EASE }}
+            >
+              <Link href={graphItemUrl(item.content_id)} className="read-graph-link read-graph-link-why">
+                View in graph
+              </Link>
+            </motion.div>
+          ) : null}
+        </div>
       </motion.div>
 
       {/* ── Evolution note (deep mode) — surfaces when behavior diverges from stated interests ── */}

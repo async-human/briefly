@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,11 +27,12 @@ class GraphSourceActionIn(BaseModel):
 
 @router.get("/graph")
 async def get_knowledge_graph(
+    days: int | None = Query(default=None, ge=1, le=365, description="Limit graph to recent N days"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     profile = user.profile
-    graph = await build_knowledge_graph(db, user.id, profile)
+    graph = await build_knowledge_graph(db, user.id, profile, days=days)
     return graph_to_dict(graph)
 
 
