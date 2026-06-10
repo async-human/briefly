@@ -116,25 +116,24 @@ function topicBreakdown(saves: number, engaged: number, skipped: number): string
 }
 
 function TopicTile({
-  topic, total, saves, engaged, skipped, ready, isDiscovered, isEmpty,
+  topic, storiesShown, saves, engaged, skipped, actions, isDiscovered, isEmpty,
 }: {
   topic: string;
-  total: number;
+  storiesShown: number;
   saves: number;
   engaged: number;
   skipped: number;
-  ready: boolean;
+  actions: number;
   isDiscovered?: boolean;
   isEmpty?: boolean;
 }) {
   const variant = isEmpty ? "declared"
-    : !ready ? "partial"
     : isDiscovered ? "discovered"
-    : saves >= skipped ? "above"
+    : actions > 0 && saves >= skipped ? "above"
     : "engaged";
-  const fill = ready && total > 0
-    ? `${Math.round((engaged / total) * 100)}%`
-    : "0%";
+  const fill = storiesShown > 0 && actions > 0
+    ? `${Math.round((engaged / actions) * 100)}%`
+    : storiesShown > 0 ? "18%" : "0%";
 
   return (
     <div
@@ -143,9 +142,9 @@ function TopicTile({
       title={
         isEmpty
           ? "No matching stories in your briefings yet"
-          : !ready
-            ? `${total} matching stor${total === 1 ? "y" : "ies"} — need ${2 - total} more to score this topic`
-            : `${total} matching stories · ${topicBreakdown(saves, engaged, skipped)}`
+          : actions > 0
+            ? `${storiesShown} stories in briefings · ${topicBreakdown(saves, engaged, skipped)}`
+            : `${storiesShown} stor${storiesShown === 1 ? "y" : "ies"} in your briefings`
       }
     >
       {isEmpty ? (
@@ -155,20 +154,20 @@ function TopicTile({
         </>
       ) : (
         <>
-          <span className="bk-topic-metric">{total}</span>
+          <span className="bk-topic-metric">{storiesShown}</span>
           <span className="bk-topic-detail">
-            {ready
+            {actions > 0
               ? topicBreakdown(saves, engaged, skipped)
-              : `1 more stor${total === 1 ? "y" : "ies"} to score`}
+              : storiesShown === 1 ? "story in briefings" : "stories in briefings"}
           </span>
         </>
       )}
       <span className="bk-topic-name">{topic}</span>
-      {isEmpty && <span className="bk-topic-sub">Read briefings on this topic</span>}
-      {!isEmpty && !ready && (
-        <span className="bk-topic-sub">Building your score</span>
+      {isEmpty && <span className="bk-topic-sub">Not in your briefings yet</span>}
+      {!isEmpty && actions === 0 && (
+        <span className="bk-topic-sub">Save or skip in read mode to track taste</span>
       )}
-      {ready && isDiscovered && (
+      {!isEmpty && isDiscovered && (
         <span className="bk-topic-sub">From your reading, not declared</span>
       )}
     </div>
@@ -202,40 +201,42 @@ function BrieflyKnowsCard({
   const srcEngage   = beh.source_engagement ?? {};
   const emerging    = (beh.emerging_topics ?? []).filter(isCleanLabel).slice(0, 6);
 
-  const topicsWithEngagement = Object.values(topicActual).filter((t) => t.ready !== false && (t.total ?? 0) >= 2).length;
-  const hasTopicEngagement = topicsWithEngagement > 0;
+  const topicsWithStories = Object.values(topicActual).filter(
+    (t) => (t.stories_shown ?? 0) >= 1,
+  ).length;
+  const hasTopicEngagement = topicsWithStories > 0;
   const windowDays = beh.window_days ?? 45;
   const lastActivity = formatSignalAge(beh.latest_signal_at);
 
   const declaredKeys = new Set(declared.interests.map((t) => t.toLowerCase()));
 
   const trackedRows = Object.entries(topicActual)
-    .filter(([, data]) => (data.total ?? 0) >= 1)
+    .filter(([, data]) => (data.stories_shown ?? 0) >= 1)
     .map(([key, data]) => ({
       topic: key,
-      total: data.total ?? 0,
+      storiesShown: data.stories_shown ?? 0,
       saves: data.saves ?? 0,
       engaged: data.engaged ?? 0,
       skipped: data.skipped ?? 0,
-      ready: data.ready !== false && (data.total ?? 0) >= 2,
+      actions: data.total ?? 0,
       isDiscovered: data.source === "discovered" || !declaredKeys.has(key),
       isEmpty: false as const,
     }))
-    .sort((a, b) => b.total - a.total || b.saves - a.saves);
+    .sort((a, b) => b.storiesShown - a.storiesShown || b.saves - a.saves);
 
   const declaredEmptyRows = declared.interests
     .filter(isCleanLabel)
     .filter((t) => {
       const data = topicActual[t.toLowerCase()];
-      return !data || (data.total ?? 0) === 0;
+      return !data || (data.stories_shown ?? 0) === 0;
     })
     .map((t) => ({
       topic: t,
-      total: 0,
+      storiesShown: 0,
       saves: 0,
       engaged: 0,
       skipped: 0,
-      ready: false,
+      actions: 0,
       isDiscovered: false,
       isEmpty: true,
     }));
@@ -332,12 +333,12 @@ function BrieflyKnowsCard({
               {hasTopicEngagement ? "Topic engagement" : "Your tracked topics"}
             </p>
             <span className="bk-section-hint">
-              Story counts from briefings that mention each topic (last {windowDays} days)
+              Stories Briefly included in your briefings (last {windowDays} days)
             </span>
           </div>
           {!hasTopicEngagement && (
             <p className="bk-declared-hint">
-              Save or skip stories in read mode — counts appear once Briefly sees 2+ matching stories.
+              Topics appear here once Briefly surfaces matching stories in a briefing.
             </p>
           )}
           <div className="bk-topics-grid">
@@ -345,13 +346,13 @@ function BrieflyKnowsCard({
               <TopicTile
                 key={row.topic}
                 topic={row.topic}
-                total={row.total}
-                saves={row.saves}
-                engaged={row.engaged}
-                skipped={row.skipped}
-                ready={row.ready}
-                isDiscovered={row.isDiscovered}
-                isEmpty={row.isEmpty ?? false}
+                  storiesShown={row.storiesShown}
+                  saves={row.saves}
+                  engaged={row.engaged}
+                  skipped={row.skipped}
+                  actions={row.actions}
+                  isDiscovered={row.isDiscovered}
+                  isEmpty={row.isEmpty ?? false}
               />
             ))}
           </div>

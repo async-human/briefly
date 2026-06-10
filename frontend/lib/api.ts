@@ -424,6 +424,7 @@ export type ProfileIntelligence = {
     latest_signal_at?: string | null;
     topic_actual?: Record<string, {
       rate: number;
+      stories_shown?: number;
       engaged: number;
       saves: number;
       skipped: number;

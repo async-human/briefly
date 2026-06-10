@@ -119,11 +119,17 @@ async def _detect_story_threads(ctx: PipelineContext) -> None:
     if not keywords:
         return
 
-    from briefly_api.services.topic_matching import topic_match_text, topic_matches
+    from briefly_api.services.topic_matching import item_matches_topic
 
     # Fetch recent digest items (headline + summary — not why_it_matters)
     result = await session.execute(
-        select(Digest.digest_date, DigestItem.headline, DigestItem.summary, DigestItem.source_name)
+        select(
+            Digest.digest_date,
+            DigestItem.headline,
+            DigestItem.summary,
+            DigestItem.source_name,
+            DigestItem.confidence_signal,
+        )
         .join(DigestItem, DigestItem.digest_id == Digest.id)
         .where(
             Digest.user_id == ctx.user.user_id,
@@ -141,10 +147,9 @@ async def _detect_story_threads(ctx: PipelineContext) -> None:
     topic_dates: dict[str, set[str]] = {kw: set() for kw in keywords}
     topic_latest_headline: dict[str, str] = {}
 
-    for digest_date, headline, summary, source_name in rows:
-        item_text = topic_match_text(headline, summary, source_name)
+    for digest_date, headline, summary, source_name, confidence_signal in rows:
         for kw in keywords:
-            if not topic_matches(item_text, kw):
+            if not item_matches_topic(headline, summary, source_name, confidence_signal, kw):
                 continue
             topic_dates[kw].add(digest_date)
             if kw not in topic_latest_headline and headline:

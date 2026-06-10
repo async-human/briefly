@@ -1,8 +1,8 @@
 """
 Shared topic ↔ article text matching.
 
-Uses headline/summary/source only — never why_it_matters, which is written by
-Briefly and name-drops the user's declared interests (circular false positives).
+Uses headline/summary/source plus optional confidence_signal (short attribution).
+Never uses why_it_matters — Briefly writes declared interests into that field.
 """
 from __future__ import annotations
 
@@ -14,6 +14,18 @@ TOPIC_STOP_WORDS = frozenset({
     "with", "from", "as", "is", "it", "be", "are", "was", "were", "its",
 })
 
+# Extra tokens to accept for common interest labels
+TOPIC_ALIASES: dict[str, list[str]] = {
+    "llms": ["llm", "llms", "large language models", "language model"],
+    "generative ai": ["generative ai", "gen ai", "genai", "generative"],
+    "ai tools": ["ai tools", "ai tool"],
+    "multi-agent systems": ["multi-agent", "multi agent", "agentic"],
+    "ai-ml engineer": ["machine learning", "ml engineer", "ai engineer"],
+    "startup funding": ["funding round", "raised", "series a", "venture"],
+    "product-market fit": ["product market fit", "pmf"],
+    "bill of materials": ["bill of materials", "bom"],
+}
+
 
 def topic_keywords(topic: str) -> set[str]:
     """Significant tokens from a topic label (stop words excluded)."""
@@ -21,7 +33,7 @@ def topic_keywords(topic: str) -> set[str]:
 
 
 def significant_words(topic: str) -> list[str]:
-    normalized = topic.strip().lower().replace("-", " ")
+    normalized = topic.strip().lower().replace("-", " ").replace("/", " ")
     words: list[str] = []
     for word in normalized.split():
         cleaned = word.strip(".,;:!?\"'()[]")
@@ -42,14 +54,7 @@ def _word_in_text(word: str, text: str) -> bool:
     return word.lower() in text.lower()
 
 
-def topic_matches(text: str, topic: str) -> bool:
-    """
-    True when article text is genuinely about a topic.
-
-    - Full phrase match wins
-    - Multi-word topics need most significant words (not any single token)
-    - Stop words like "of" never count alone
-    """
+def _topic_matches_core(text: str, topic: str) -> bool:
     if not text or not topic:
         return False
 
@@ -69,6 +74,50 @@ def topic_matches(text: str, topic: str) -> bool:
     hits = sum(1 for w in sig if _word_in_text(w, hay))
     required = len(sig) if len(sig) <= 2 else max(2, math.ceil(len(sig) * 0.6))
     return hits >= required
+
+
+def topic_matches(text: str, topic: str) -> bool:
+    """True when article text is genuinely about a topic."""
+    if _topic_matches_core(text, topic):
+        return True
+    topic_key = topic.strip().lower()
+    for alias in TOPIC_ALIASES.get(topic_key, []):
+        if _topic_matches_core(text, alias):
+            return True
+    return False
+
+
+def item_matches_topic(
+    headline: str | None,
+    summary: str | None,
+    source_name: str | None,
+    confidence_signal: str | None,
+    topic: str,
+) -> bool:
+    """
+    Whether a briefing item is about a topic.
+
+    Uses article text first; confidence_signal only when it names the topic
+    (short phrase, not the long why_it_matters paragraph).
+    """
+    body = topic_match_text(headline, summary, source_name)
+    if topic_matches(body, topic):
+        return True
+
+    cs = (confidence_signal or "").strip()
+    if not cs or len(cs) > 120:
+        return False
+
+    topic_l = topic.strip().lower()
+    cs_l = cs.lower()
+    if topic_l in cs_l:
+        return True
+
+    for alias in TOPIC_ALIASES.get(topic_l, []):
+        if alias in cs_l:
+            return True
+
+    return topic_matches(cs, topic)
 
 
 def topic_match_score(text: str, topic: str) -> float:

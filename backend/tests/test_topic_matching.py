@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from briefly_api.services.topic_matching import (
+    item_matches_topic,
     topic_keywords,
     topic_match_text,
     topic_matches,
@@ -44,3 +45,24 @@ def test_loose_of_does_not_match_everything():
 def test_ai_tools_needs_both_words():
     assert topic_matches(topic_match_text("Best AI tools for founders", None), "ai tools")
     assert not topic_matches(topic_match_text("Congress passes a new bill", None), "ai tools")
+
+
+def test_hyphenated_topic_splits_tokens():
+    words = topic_keywords("ai-ml engineer")
+    assert "ai" in words
+    assert "ml" in words
+    assert "engineer" in words
+
+
+def test_llms_alias_matches_llm_in_headline():
+    assert topic_matches(topic_match_text("How LLM routing changes inference", None), "llms")
+
+
+def test_confidence_signal_can_attribute_topic():
+    assert item_matches_topic(
+        "Weekly roundup",
+        "Various links",
+        "Hacker News",
+        "Matches your generative ai cluster",
+        "generative ai",
+    )

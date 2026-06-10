@@ -33,7 +33,7 @@ from briefly_api.db.models import (
     UserProfile,
 )
 from briefly_api.services.profile_utils import cluster_label
-from briefly_api.services.topic_matching import topic_match_text, topic_matches
+from briefly_api.services.topic_matching import item_matches_topic
 
 log = logging.getLogger(__name__)
 
@@ -80,6 +80,7 @@ async def preview_active_threads(
             DigestItem.headline,
             DigestItem.summary,
             DigestItem.source_name,
+            DigestItem.confidence_signal,
         )
         .join(DigestItem, DigestItem.digest_id == Digest.id)
         .where(Digest.user_id == user_id, Digest.created_at >= lookback)
@@ -91,10 +92,9 @@ async def preview_active_threads(
     topic_dates: dict[str, set[str]] = {kw: set() for kw in keywords}
     topic_latest_headline: dict[str, str] = {}
 
-    for digest_date, headline, summary, source_name in rows:
-        item_text = topic_match_text(headline, summary, source_name)
+    for digest_date, headline, summary, source_name, confidence_signal in rows:
         for kw in keywords:
-            if not topic_matches(item_text, kw):
+            if not item_matches_topic(headline, summary, source_name, confidence_signal, kw):
                 continue
             topic_dates[kw].add(digest_date)
             if kw not in topic_latest_headline and headline:
@@ -163,6 +163,7 @@ async def run_for_user(session, user_id: str) -> dict:
             DigestItem.headline,
             DigestItem.summary,
             DigestItem.source_name,
+            DigestItem.confidence_signal,
         )
         .join(DigestItem, DigestItem.digest_id == Digest.id)
         .where(
@@ -182,15 +183,14 @@ async def run_for_user(session, user_id: str) -> dict:
     topic_recent_dates: dict[str, set[str]] = {kw: set() for kw in keywords}
     topic_latest_headline: dict[str, str] = {}
 
-    for digest_date, created_at, headline, summary, source_name in rows:
-        item_text = topic_match_text(headline, summary, source_name)
+    for digest_date, created_at, headline, summary, source_name, confidence_signal in rows:
         is_recent = (
             created_at and (
                 created_at.replace(tzinfo=timezone.utc) if created_at.tzinfo is None else created_at
             ) >= cutoff_3d
         )
         for kw in keywords:
-            if not topic_matches(item_text, kw):
+            if not item_matches_topic(headline, summary, source_name, confidence_signal, kw):
                 continue
             topic_dates[kw].add(digest_date)
             if is_recent:

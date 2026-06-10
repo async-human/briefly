@@ -56,6 +56,7 @@ from briefly_api.services.connectors.registry import detect_source, get_connecto
 from briefly_api.services.connectors.types import ALL_SOURCE_TYPES
 from briefly_api.services.url_scraper import discover_rss_feed
 from briefly_api.services.topic_matching import (
+    item_matches_topic,
     topic_keywords as _topic_keywords,
     topic_match_text,
     topic_matches as _topic_matches,
@@ -912,15 +913,32 @@ async def _compute_behavioral_intelligence(
     and human-readable insight sentences — all derived from what the user
     actually clicked/saved/skipped, not what they declared.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=45)
+    window_days = 45
+    cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
+
+    items_result = await db.execute(
+        select(
+            DigestItem.id,
+            DigestItem.headline,
+            DigestItem.summary,
+            DigestItem.source_name,
+            DigestItem.confidence_signal,
+        )
+        .join(Digest, Digest.id == DigestItem.digest_id)
+        .where(
+            Digest.user_id == user_id,
+            Digest.created_at >= cutoff,
+        )
+    )
+    digest_items = items_result.all()
 
     result = await db.execute(
         select(
             BehavioralSignal.signal_type,
             BehavioralSignal.created_at,
+            BehavioralSignal.digest_item_id,
             DigestItem.headline,
             DigestItem.source_name,
-            DigestItem.why_it_matters,
             DigestItem.summary,
         )
         .join(DigestItem, BehavioralSignal.digest_item_id == DigestItem.id)
@@ -937,7 +955,7 @@ async def _compute_behavioral_intelligence(
     )
     signals = result.all()
 
-    if not signals:
+    if not signals and not digest_items:
         return {}
 
     pos_types  = {SignalType.saved, SignalType.clicked, SignalType.followed_up}
@@ -977,41 +995,60 @@ async def _compute_behavioral_intelligence(
     for t in declared_topics:
         declared_word_set.update(_topic_keywords(t))
 
-    def _item_text(s) -> str:
-        # Exclude why_it_matters — Briefly writes user interests into that field.
-        return topic_match_text(s.headline, s.summary, s.source_name)
+    signals_by_item: dict[str, list] = defaultdict(list)
+    for s in signals:
+        if s.digest_item_id:
+            signals_by_item[str(s.digest_item_id)].append(s)
 
-    def _topic_signal_counts(topic: str) -> tuple[int, int, int, int]:
+    def _topic_stats(topic: str) -> tuple[int, int, int, int, int]:
+        """stories_shown, pos, neg, saves, action_total."""
+        matching_ids = [
+            str(it.id)
+            for it in digest_items
+            if item_matches_topic(
+                it.headline, it.summary, it.source_name, it.confidence_signal, topic,
+            )
+        ]
+        stories_shown = len(matching_ids)
         pos = neg = saves = 0
-        for s in signals:
-            text = _item_text(s)
-            if not _topic_matches(topic, text):
-                continue
-            if s.signal_type == SignalType.saved:
-                saves += 1
-                pos += 1
-            elif s.signal_type in pos_types:
-                pos += 1
-            elif s.signal_type in neg_types:
-                neg += 1
-        return pos, neg, saves, pos + neg
+        for item_id in matching_ids:
+            for s in signals_by_item.get(item_id, []):
+                if s.signal_type == SignalType.saved:
+                    saves += 1
+                    pos += 1
+                elif s.signal_type in pos_types:
+                    pos += 1
+                elif s.signal_type in neg_types:
+                    neg += 1
+        return stories_shown, pos, neg, saves, pos + neg
 
-    def _topic_entry(topic: str, pos: int, neg: int, saves: int, tot: int, source: str) -> dict:
+    def _topic_entry(
+        topic: str,
+        stories_shown: int,
+        pos: int,
+        neg: int,
+        saves: int,
+        actions: int,
+        source: str,
+    ) -> dict:
         return {
-            "rate": round(pos / tot, 3) if tot else 0.0,
+            "rate": round(pos / actions, 3) if actions else 0.0,
+            "stories_shown": stories_shown,
             "engaged": pos,
             "saves": saves,
             "skipped": neg,
-            "total": tot,
-            "ready": tot >= 2,
+            "total": actions,
+            "ready": stories_shown >= 1,
             "source": source,
         }
 
     topic_actual: dict[str, dict] = {}
     for topic in declared_topics:
-        pos, neg, saves, tot = _topic_signal_counts(topic)
-        if tot >= 1:
-            topic_actual[topic] = _topic_entry(topic, pos, neg, saves, tot, "declared")
+        shown, pos, neg, saves, actions = _topic_stats(topic)
+        if shown >= 1:
+            topic_actual[topic] = _topic_entry(
+                topic, shown, pos, neg, saves, actions, "declared",
+            )
 
     # Discovered topics: learned from reading behaviour, not explicitly declared
     from briefly_api.services.profile_utils import cluster_label
@@ -1032,9 +1069,11 @@ async def _compute_behavioral_intelligence(
             discovered_candidates.append(key)
 
     for topic in dict.fromkeys(discovered_candidates):
-        pos, neg, saves, tot = _topic_signal_counts(topic)
-        if tot >= 1:
-            topic_actual[topic] = _topic_entry(topic, pos, neg, saves, tot, "discovered")
+        shown, pos, neg, saves, actions = _topic_stats(topic)
+        if shown >= 1:
+            topic_actual[topic] = _topic_entry(
+                topic, shown, pos, neg, saves, actions, "discovered",
+            )
 
     # Emerging topics: high-frequency words in saved/clicked headlines NOT
     # already covered by a declared interest
@@ -1140,7 +1179,7 @@ async def _compute_behavioral_intelligence(
         "source_engagement":   source_engagement,
         "emerging_topics":     emerging_topics,
         "insights":            insights,
-        "window_days":         45,
+        "window_days":         window_days,
         "computed_at":         datetime.now(timezone.utc).isoformat(),
         "latest_signal_at":    latest_signal_at.isoformat() if latest_signal_at else None,
     }
