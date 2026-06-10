@@ -104,19 +104,6 @@
   white-space: nowrap;
 }
 
-.app-sidebar-mark {
-  width: 1.375rem;
-  height: 1.375rem;
-  border-radius: 6px;
-  background: linear-gradient(
-    145deg,
-    oklch(72% 0.08 65) 0%,
-    oklch(58% 0.09 65) 100%
-  );
-  box-shadow: 0 1px 3px oklch(24% 0.02 265 / 0.12);
-  flex-shrink: 0;
-}
-
 .app-sidebar-nav {
   display: flex;
   flex-direction: column;
@@ -278,9 +265,6 @@
 }
 
 .app-mobile-brand {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  letter-spacing: -0.03em;
   color: var(--app-ink);
   text-decoration: none;
 }
@@ -3012,18 +2996,12 @@ a.saved-capture-title:hover {
   min-height: 0;
 }
 
-.ask-hero-mark {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.75rem;
-  background: linear-gradient(135deg, var(--app-linear), color-mix(in srgb, var(--app-linear) 70%, #6366f1));
-  color: #fff;
-  font-size: 1rem;
-  font-weight: 700;
-  display: grid;
-  place-items: center;
+.ask-hero-logo {
   margin-bottom: 1.25rem;
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--app-linear) 30%, transparent);
+}
+
+.ask-hero-logo svg {
+  box-shadow: 0 4px 14px oklch(58% 0.09 62 / 0.28);
 }
 
 .ask-hero-title {

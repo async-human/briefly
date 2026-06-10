@@ -1,0 +1,72 @@
+import { useId } from "react";
+
+type BrieflyLogoProps = {
+  /** Icon only, or icon + wordmark */
+  variant?: "mark" | "full";
+  size?: "xs" | "sm" | "md" | "lg";
+  className?: string;
+};
+
+const MARK_PX = { xs: 20, sm: 22, md: 32, lg: 40 } as const;
+
+function BrieflyMark({ sizePx }: { sizePx: number }) {
+  const uid = useId().replace(/:/g, "");
+
+  return (
+    <svg
+      width={sizePx}
+      height={sizePx}
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <defs>
+        <linearGradient
+          id={`${uid}-bg`}
+          x1="7"
+          y1="5"
+          x2="25"
+          y2="27"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop offset="0%" stopColor="#E4C07A" />
+          <stop offset="48%" stopColor="#C49A3C" />
+          <stop offset="100%" stopColor="#966F28" />
+        </linearGradient>
+        <linearGradient
+          id={`${uid}-shine`}
+          x1="8"
+          y1="6"
+          x2="20"
+          y2="14"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.28" />
+          <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="28" height="28" rx="8" fill={`url(#${uid}-bg)`} />
+      <rect x="2" y="2" width="28" height="14" rx="8" fill={`url(#${uid}-shine)`} />
+      {/* Margin stem */}
+      <rect x="9.75" y="9" width="2.5" height="14" rx="1.25" fill="white" fillOpacity="0.96" />
+      {/* Distilled lines — long → short */}
+      <rect x="14.25" y="10.25" width="12.5" height="2" rx="1" fill="white" fillOpacity="0.94" />
+      <rect x="14.25" y="15" width="9.25" height="2" rx="1" fill="white" fillOpacity="0.88" />
+      <rect x="14.25" y="19.75" width="5.75" height="2" rx="1" fill="white" fillOpacity="0.82" />
+    </svg>
+  );
+}
+
+export function BrieflyLogo({ variant = "full", size = "sm", className = "" }: BrieflyLogoProps) {
+  const markPx = MARK_PX[size];
+
+  return (
+    <span
+      className={`briefly-logo briefly-logo--${variant} briefly-logo--${size}${className ? ` ${className}` : ""}`}
+    >
+      <BrieflyMark sizePx={markPx} />
+      {variant === "full" ? <span className="briefly-logo-wordmark">Briefly</span> : null}
+    </span>
+  );
+}

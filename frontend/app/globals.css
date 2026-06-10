@@ -4666,9 +4666,6 @@ footer {
   background: var(--bg);
 }
 .nav-mobile-brand {
-  font-family: var(--serif);
-  font-size: 20px;
-  letter-spacing: -0.03em;
   color: var(--text);
 }
 .nav-mobile-close {
@@ -5187,12 +5184,6 @@ footer {
 }
 
 .login-brand {
-  font-family: var(--serif);
-  font-size: 20px;
-  letter-spacing: -0.03em;
-  color: var(--text);
-  text-decoration: none;
-  display: block;
   margin-bottom: 24px;
 }
 
@@ -10364,11 +10355,6 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   background: rgba(250,249,246,0.92);
 }
 .onboard-logo {
-  font-family: var(--serif);
-  font-size: 22px;
-  letter-spacing: -0.03em;
-  color: var(--text);
-  text-decoration: none;
   flex-shrink: 0;
 }
 .onboard-header-right {
@@ -13590,12 +13576,7 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   gap: 16px;
 }
 .legal-logo {
-  font-family: var(--serif);
-  font-size: 20px;
-  font-weight: 500;
   color: var(--text);
-  text-decoration: none;
-  letter-spacing: -0.03em;
 }
 .legal-header-nav {
   display: flex;
@@ -14001,4 +13982,50 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   .hero-metrics { gap: 20px; }
   .hero-metric-value { font-size: 24px; }
   .digest-window { max-width: 100%; }
+}
+
+/* ── Briefly logo ─────────────────────────────────────────────────────────── */
+
+.briefly-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5625rem;
+  line-height: 1;
+  color: inherit;
+  text-decoration: none;
+}
+
+.briefly-logo svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.briefly-logo-wordmark {
+  font-family: var(--font-serif, var(--serif)), Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.briefly-logo--xs .briefly-logo-wordmark { font-size: 0.9375rem; }
+.briefly-logo--sm .briefly-logo-wordmark { font-size: 1rem; }
+.briefly-logo--md .briefly-logo-wordmark { font-size: 1.125rem; }
+.briefly-logo--lg .briefly-logo-wordmark { font-size: 1.25rem; }
+
+.briefly-logo--mark { gap: 0; }
+
+.login-brand,
+.legal-logo,
+.onboard-logo,
+.nav-fp-logo {
+  display: inline-flex;
+  text-decoration: none;
+  color: inherit;
+}
+
+.mobile-capture-brand,
+.footer-linear-brand,
+.nav-mobile-brand {
+  color: inherit;
 }

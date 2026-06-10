@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { AppSidebar } from "./AppSidebar";
 import { BrainDumpFab } from "./BrainDumpFab";
@@ -55,7 +56,7 @@ export function DashboardShell({ children, userName, avatarUrl }: DashboardShell
             <span className="sr-only">Open menu</span>
           </button>
           <Link href="/dashboard" className="app-mobile-brand" onClick={() => setSidebarOpen(false)}>
-            Briefly
+            <BrieflyLogo variant="full" size="xs" />
           </Link>
         </header>
         <div className="app-main-scroll">

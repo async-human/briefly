@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { api, type OnboardingStatus, type MeResponse } from "@/lib/api";
 import { clearToken } from "@/lib/auth";
+import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { AddSourceForm } from "@/components/dashboard/AddSourceForm";
 
 const ROLES = ["Founder", "Product manager", "Engineer", "Investor", "Researcher", "Other"];
@@ -319,7 +320,9 @@ export default function OnboardingPage() {
       )}
 
       <header className="onboard-header">
-        <Link href="/" className="onboard-logo">Briefly</Link>
+        <Link href="/" className="onboard-logo">
+          <BrieflyLogo variant="full" size="md" />
+        </Link>
         <div className="onboard-header-right">
           <span className="onboard-step-counter">{progressStep} / {STEPS.length}</span>
           <div className="onboard-profile-wrap">

@@ -20,6 +20,7 @@ import { SourceIcon } from "@/components/SourceIcon";
 import { OutcomeBriefHeader, SafeToIgnorePanel } from "./OutcomeBriefHeader";
 import { getDigestOutcome, splitTopPriorityItems } from "@/lib/digestOutcome";
 import { graphItemUrl } from "@/lib/graphLinks";
+import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { askAboutContent } from "@/lib/askLinks";
 import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
 import { GeneratingProgressRing } from "@/components/loading/GeneratingProgressRing";
@@ -725,7 +726,8 @@ export function BriefingPanel({
     return (
       <div className="briefing-empty">
         <div className="briefing-empty-icon">
-          <span className="briefing-empty-ring" />
+          <BrieflyLogo variant="mark" size="lg" />
+          <span className="briefing-empty-ring" aria-hidden />
         </div>
         <h2 className="briefing-empty-title">Briefly is preparing your outcome</h2>
         <p className="briefing-empty-desc">

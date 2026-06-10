@@ -6,6 +6,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { getToken, googleLoginUrl, setAuthNext, consumeAuthNext } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { TimeGreetingBadge, TimeGreetingCardTitle } from "@/components/TimeGreeting";
 import { SourceIcon } from "@/components/SourceIcon";
 
@@ -261,7 +262,9 @@ function LoginPageContent() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.05, ease: EASE }}
           >
-            <Link href="/" className="login-brand">Briefly</Link>
+            <Link href="/" className="login-brand">
+              <BrieflyLogo variant="full" size="md" />
+            </Link>
           </motion.div>
 
           <motion.div

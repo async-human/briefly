@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { ThemeToggle } from "./ThemeToggle";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
@@ -29,7 +30,9 @@ export function Nav() {
       {/* N5 — Floating pill */}
       <nav className={`nav-fp${menuOpen ? " menu-open" : ""}`}>
         <div className="nav-fp-inner">
-          <a href="#" className="nav-fp-logo">Briefly</a>
+          <a href="#" className="nav-fp-logo">
+            <BrieflyLogo variant="full" size="sm" />
+          </a>
 
           <ul className="nav-fp-links">
             {NAV_LINKS.map((l) => (
@@ -82,7 +85,7 @@ export function Nav() {
               transition={{ duration: 0.32, ease: EASE }}
             >
               <div className="nav-mobile-topbar">
-                <span className="nav-mobile-brand">Briefly</span>
+                <BrieflyLogo variant="full" size="sm" className="nav-mobile-brand" />
                 <button className="nav-mobile-close" onClick={close} aria-label="Close menu" type="button">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
                     <path d="M2 2l12 12M14 2L2 14" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />

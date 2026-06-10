@@ -1,8 +1,10 @@
+import { BrieflyLogo } from "@/components/BrieflyLogo";
+
 export function Footer() {
   return (
     <footer className="footer-linear">
       <div className="footer-linear-inner">
-        <span className="footer-linear-brand">Briefly</span>
+        <BrieflyLogo variant="full" size="sm" className="footer-linear-brand" />
         <nav className="footer-linear-nav" aria-label="Footer">
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>

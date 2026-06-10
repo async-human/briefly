@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BrieflyLogo } from "@/components/BrieflyLogo";
 
 export type LegalSection = {
   id: string;
@@ -29,7 +30,9 @@ export function LegalPageShell({
     <div className="legal-page">
       <header className="legal-header">
         <div className="legal-header-inner">
-          <Link href="/" className="legal-logo">Briefly</Link>
+          <Link href="/" className="legal-logo">
+            <BrieflyLogo variant="full" size="sm" />
+          </Link>
           <nav className="legal-header-nav" aria-label="Legal">
             <Link href="/terms">Terms</Link>
             <Link href="/privacy">Privacy</Link>

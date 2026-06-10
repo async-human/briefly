@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type AskMessage, type AskThreadSummary } from "@/lib/api";
+import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { buildContextualAskQuestion } from "@/lib/askLinks";
 import { AskMessageContent, CitationSources } from "./AskMessageContent";
 
@@ -281,9 +282,7 @@ export function AskBrieflyView({
             {!hasConversation ? (
               isScopedEntry ? (
                 <div className="ask-hero ask-hero-scoped">
-                  <div className="ask-hero-mark" aria-hidden>
-                    B
-                  </div>
+                  <BrieflyLogo variant="mark" size="lg" className="ask-hero-logo" />
                   <h1 className="ask-hero-title">Going deeper on this story</h1>
                   {scopeTitle ? (
                     <p className="ask-hero-anchor-title">{scopeTitle}</p>
@@ -296,9 +295,7 @@ export function AskBrieflyView({
                 </div>
               ) : (
                 <div className="ask-hero">
-                  <div className="ask-hero-mark" aria-hidden>
-                    B
-                  </div>
+                  <BrieflyLogo variant="mark" size="lg" className="ask-hero-logo" />
                   <h1 className="ask-hero-title">What would you like to know?</h1>
                   <p className="ask-hero-sub">
                     Answers grounded in your briefings, saves, and brain dumps.

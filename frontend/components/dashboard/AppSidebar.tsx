@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { clearToken } from "@/lib/auth";
 import { useBriefingGeneration } from "./BriefingGenerationProvider";
 
@@ -132,8 +133,7 @@ export function AppSidebar({ userName, avatarUrl, open, onClose }: AppSidebarPro
       <aside className={`app-sidebar${open ? " is-open" : ""}`} aria-label="App navigation">
         <div className="app-sidebar-brand">
           <Link href="/dashboard" className="app-sidebar-logo" onClick={onClose}>
-            <span className="app-sidebar-mark" aria-hidden />
-            Briefly
+            <BrieflyLogo variant="full" size="sm" />
           </Link>
         </div>
 

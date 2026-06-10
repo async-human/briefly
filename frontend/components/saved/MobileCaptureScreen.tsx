@@ -8,6 +8,7 @@ import { getToken, setAuthNext } from "@/lib/auth";
 import { enrichmentConnectionText } from "@/lib/captureUtils";
 import { formatCaptureTitle } from "@/lib/formatCaptureTitle";
 import { graphItemUrl } from "@/lib/graphLinks";
+import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { titleFromShareParams, urlFromShareParams } from "@/lib/shareUrl";
 
 type Phase = "auth" | "capturing" | "success" | "error" | "no-url";
@@ -70,7 +71,7 @@ export function MobileCaptureScreen() {
   return (
     <div className="mobile-capture">
       <header className="mobile-capture-header">
-        <span className="mobile-capture-brand">Briefly</span>
+        <BrieflyLogo variant="full" size="sm" className="mobile-capture-brand" />
       </header>
 
       <main className="mobile-capture-main">
