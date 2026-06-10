@@ -593,16 +593,17 @@ export type AskStreamEvent =
   | { type: "done"; citations: AskCitation[]; created_at: string }
   | { type: "error"; message: string };
 
-function* parseAskSseBuffer(buffer: string): Generator<AskStreamEvent> {
+function parseAskSseBuffer(buffer: string): AskStreamEvent[] {
+  const events: AskStreamEvent[] = [];
   for (const part of buffer.split("\n\n")) {
     const trimmed = part.trim();
     if (!trimmed) continue;
     for (const line of trimmed.split("\n")) {
       if (!line.startsWith("data: ")) continue;
-      const data = JSON.parse(line.slice(6)) as AskStreamEvent;
-      yield data;
+      events.push(JSON.parse(line.slice(6)) as AskStreamEvent);
     }
   }
+  return events;
 }
 
 async function* readAskStream(
