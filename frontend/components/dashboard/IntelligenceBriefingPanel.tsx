@@ -38,6 +38,33 @@ type Props = {
   blindSpots?: BlindSpot[];
 };
 
+function CalendarIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M8 3v4M16 3v4M3 10h18" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SparkIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+      <path d="M12 3l1.8 5.5L19 10l-5.2 1.5L12 17l-1.8-5.5L5 10l5.2-1.5L12 3z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function LensIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+      <circle cx="11" cy="11" r="6" />
+      <path d="M16 16l5 5" strokeLinecap="round" />
+      <path d="M8 11h6M11 8v6" strokeLinecap="round" opacity="0.5" />
+    </svg>
+  );
+}
+
 export function IntelligenceBriefingPanel({ calendar, wrapped, blindSpots = [] }: Props) {
   const meetings = calendar?.meetings ?? [];
   const hasCalendar = meetings.length > 0;
@@ -54,15 +81,20 @@ export function IntelligenceBriefingPanel({ calendar, wrapped, blindSpots = [] }
   return (
     <section className="intelligence-briefing-panel" aria-label="Intelligence layer">
       {hasCalendar && (
-        <div className="intel-block intel-block-calendar">
-          <header className="intel-block-head">
-            <p className="intel-eyebrow">Today&apos;s meetings</p>
-            <p className="intel-sub">Stories in your brief matched to your calendar</p>
+        <article className="intel-card intel-card-calendar">
+          <header className="intel-card-head">
+            <span className="intel-card-icon" aria-hidden>
+              <CalendarIcon />
+            </span>
+            <div className="intel-card-head-text">
+              <h3 className="intel-card-title">Today&apos;s meetings</h3>
+              <p className="intel-card-desc">Stories in your brief matched to your calendar</p>
+            </div>
           </header>
           <ul className="intel-meeting-list">
             {meetings.map((m) => (
-              <li key={`${m.time}-${m.title}`} className="intel-meeting-item">
-                <div className="intel-meeting-time">{m.time}</div>
+              <li key={`${m.time}-${m.title}`} className="intel-meeting-card">
+                <div className="intel-meeting-time-pill">{m.time}</div>
                 <div className="intel-meeting-body">
                   <p className="intel-meeting-title">{m.title}</p>
                   {m.attendees && m.attendees.length > 0 && (
@@ -71,44 +103,58 @@ export function IntelligenceBriefingPanel({ calendar, wrapped, blindSpots = [] }
                   {m.relevant_stories && m.relevant_stories.length > 0 && (
                     <ul className="intel-meeting-stories">
                       {m.relevant_stories.map((s) => (
-                        <li key={s.headline}>{s.headline}</li>
+                        <li key={s.headline}>
+                          <span className="intel-meeting-story-dot" aria-hidden />
+                          {s.headline}
+                        </li>
                       ))}
                     </ul>
                   )}
                   {m.active_threads && m.active_threads.length > 0 && (
                     <p className="intel-meeting-threads">
-                      Threads: {m.active_threads.join(" · ")}
+                      <span className="intel-meeting-threads-label">Threads</span>
+                      {m.active_threads.join(" · ")}
                     </p>
                   )}
                 </div>
               </li>
             ))}
           </ul>
-        </div>
+        </article>
       )}
 
       {hasWrapped && wrapped && (
-        <div className="intel-block intel-block-wrapped">
-          <header className="intel-block-head">
-            <p className="intel-eyebrow">Your week in focus</p>
-            <p className="intel-sub">How your attention shifted — the memory loop at work</p>
+        <article className="intel-card intel-card-wrapped">
+          <header className="intel-card-head">
+            <span className="intel-card-icon" aria-hidden>
+              <SparkIcon />
+            </span>
+            <div className="intel-card-head-text">
+              <h3 className="intel-card-title">Your week in focus</h3>
+              <p className="intel-card-desc">How your attention shifted — the memory loop at work</p>
+            </div>
           </header>
+
           {wrapped.current_focus && (
-            <p className="intel-wrapped-focus">{wrapped.current_focus}</p>
+            <blockquote className="intel-wrapped-focus">{wrapped.current_focus}</blockquote>
           )}
+
           {wrapped.mind_shifts && wrapped.mind_shifts.length > 0 && (
             <ul className="intel-shift-list">
               {wrapped.mind_shifts.map((s) => (
-                <li key={`${s.topic}-${s.direction}`}>
-                  <strong>{s.topic}</strong>
-                  <span className={`intel-shift-dir intel-shift-dir--${s.direction}`}>
-                    {s.direction}
-                  </span>
-                  {s.evidence && <span className="intel-shift-evidence">{s.evidence}</span>}
+                <li key={`${s.topic}-${s.direction}`} className="intel-shift-card">
+                  <div className="intel-shift-top">
+                    <span className="intel-shift-topic">{s.topic}</span>
+                    <span className={`intel-shift-badge intel-shift-badge--${s.direction || "stable"}`}>
+                      {s.direction}
+                    </span>
+                  </div>
+                  {s.evidence && <p className="intel-shift-evidence">{s.evidence}</p>}
                 </li>
               ))}
             </ul>
           )}
+
           {wrapped.high_engagement && wrapped.high_engagement.length > 0 && (
             <div className="intel-wrapped-chips">
               {wrapped.high_engagement.map((h) => (
@@ -119,17 +165,23 @@ export function IntelligenceBriefingPanel({ calendar, wrapped, blindSpots = [] }
               ))}
             </div>
           )}
+
           {wrapped.weekly_synthesis && (
             <p className="intel-wrapped-synthesis">{wrapped.weekly_synthesis}</p>
           )}
-        </div>
+        </article>
       )}
 
       {hasBlindSpots && (
-        <div className="intel-block intel-block-blind">
-          <header className="intel-block-head">
-            <p className="intel-eyebrow">Blind spots</p>
-            <p className="intel-sub">Where your sources agree — and what you might be missing</p>
+        <article className="intel-card intel-card-blind">
+          <header className="intel-card-head">
+            <span className="intel-card-icon" aria-hidden>
+              <LensIcon />
+            </span>
+            <div className="intel-card-head-text">
+              <h3 className="intel-card-title">Blind spots</h3>
+              <p className="intel-card-desc">Where your sources agree — and what you might be missing</p>
+            </div>
           </header>
           <ul className="intel-blind-list">
             {blindSpots.map((spot) => (
@@ -137,20 +189,20 @@ export function IntelligenceBriefingPanel({ calendar, wrapped, blindSpots = [] }
                 <p className="intel-blind-topic">{spot.topic}</p>
                 <p className="intel-blind-consensus">{spot.consensus}</p>
                 {spot.counter_argument && (
-                  <p className="intel-blind-counter">
+                  <div className="intel-blind-counter">
                     {spot.counter_headline && (
-                      <span className="intel-blind-counter-src">
+                      <p className="intel-blind-counter-src">
                         {spot.counter_headline}
                         {spot.counter_source ? ` · ${spot.counter_source}` : ""}
-                      </span>
+                      </p>
                     )}
-                    {spot.counter_argument}
-                  </p>
+                    <p className="intel-blind-counter-text">{spot.counter_argument}</p>
+                  </div>
                 )}
               </li>
             ))}
           </ul>
-        </div>
+        </article>
       )}
     </section>
   );
