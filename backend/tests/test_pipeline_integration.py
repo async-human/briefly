@@ -109,3 +109,6 @@ def test_serendipity_agent_runs_without_db():
 
     ctx = asyncio.run(_run())
     assert len(ctx.serendipity_connections) >= 1
+    conn = ctx.serendipity_connections[0]
+    assert conn.get("kind") == "in_brief"
+    assert conn.get("body")

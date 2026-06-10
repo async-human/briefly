@@ -212,7 +212,11 @@ export type SerendipityConnection = {
   title: string;
   body: string;
   content_id?: string | null;
-  headline?: string;
+  headline?: string | null;
+  kind?: "in_brief" | "history" | "saved" | string;
+  thread_update?: string | null;
+  thread_key?: string | null;
+  strength?: number;
 };
 
 export type ProactiveEvent = {

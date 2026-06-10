@@ -287,7 +287,17 @@ function DashboardContent() {
       <WeeklyReportCard />
 
       {digest?.meta?.serendipity && digest.meta.serendipity.length > 0 && (
-        <SerendipityPanel connections={digest.meta.serendipity} />
+        <SerendipityPanel
+          connections={digest.meta.serendipity}
+          digestId={digest.id}
+          inBriefContentIds={
+            new Set(
+              digest.items
+                .map((item) => item.content_id)
+                .filter((id): id is string => Boolean(id)),
+            )
+          }
+        />
       )}
 
       {digest?.meta && (

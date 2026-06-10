@@ -4340,12 +4340,15 @@ a.saved-capture-title:hover {
 }
 
 .app-shell .story-threads-rail,
-.app-shell .serendipity-panel,
 .app-shell .weekly-report-card {
   padding: 1.125rem 1.25rem;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius);
   background: var(--app-surface);
+  margin-bottom: 1rem;
+}
+
+.app-shell .serendipity-panel {
   margin-bottom: 1rem;
 }
 
@@ -4728,28 +4731,147 @@ a.saved-capture-title:hover {
   line-height: 1.4;
 }
 
-.app-shell .serendipity-item {
-  padding: 0.75rem;
-  border-left: 3px solid oklch(72% 0.08 75);
-  background: oklch(98% 0.01 85);
-  border-radius: 0 var(--app-radius-sm) var(--app-radius-sm) 0;
+.app-shell .serendipity-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
 }
 
-.app-shell .serendipity-item-label {
-  display: block;
-  font-size: 0.6875rem;
+.app-shell .serendipity-head-icon {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: oklch(42% 0.12 278);
+  background: oklch(96% 0.04 278 / 0.55);
+  border: 1px solid oklch(72% 0.08 278 / 0.35);
+}
+
+.app-shell .serendipity-title {
+  margin: 0 0 0.15rem;
+  font-size: 0.9375rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: oklch(48% 0.08 75);
-  margin-bottom: 0.25rem;
+  letter-spacing: -0.02em;
+  color: var(--app-ink);
 }
 
-.app-shell .serendipity-item-body {
+.app-shell .serendipity-sub {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--app-muted);
+}
+
+.app-shell .serendipity-card {
+  padding: 0.9rem 1rem;
+  border-radius: var(--app-radius);
+  border: 1px solid oklch(72% 0.06 278 / 0.3);
+  background: linear-gradient(
+    135deg,
+    oklch(97.5% 0.02 278) 0%,
+    oklch(99% 0.008 278) 55%,
+    var(--app-surface) 100%
+  );
+  box-shadow: 0 1px 0 rgba(28, 24, 18, 0.04);
+}
+
+.app-shell .serendipity-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.55rem;
+}
+
+.app-shell .serendipity-kind {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  border-radius: 100px;
+  border: 1px solid var(--app-border);
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--app-ink-secondary);
+}
+
+.app-shell .serendipity-kind--in_brief {
+  color: oklch(40% 0.12 278);
+  background: oklch(95% 0.04 278);
+  border-color: oklch(72% 0.08 278 / 0.4);
+}
+
+.app-shell .serendipity-thread-key {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--app-muted);
+  text-transform: capitalize;
+}
+
+.app-shell .serendipity-story-headline {
+  margin: 0 0 0.55rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--app-ink);
+}
+
+.app-shell .serendipity-link-block {
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--app-radius-sm);
+  background: rgba(255, 255, 255, 0.62);
+  border-left: 3px solid oklch(62% 0.1 278);
+}
+
+.app-shell .serendipity-link-label {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+.app-shell .serendipity-link-text {
   margin: 0;
   font-size: 0.8125rem;
   line-height: 1.55;
   color: var(--app-ink-2);
+}
+
+.app-shell .serendipity-thread-update {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--app-muted);
+  font-style: italic;
+}
+
+.app-shell .serendipity-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+}
+
+.app-shell .serendipity-action {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: oklch(42% 0.12 278);
+  text-decoration: none;
+}
+
+.app-shell .serendipity-action:hover {
+  text-decoration: underline;
+}
+
+.app-shell .serendipity-action-muted {
+  color: var(--app-muted);
+  font-weight: 500;
 }
 
 .app-shell .proactive-alert-banner {
