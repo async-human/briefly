@@ -11,7 +11,7 @@ const freeFeatures = [
   { text: "Email delivery", included: true },
   { text: "Manual capture", included: false },
   { text: "Interest learning", included: false },
-  { text: "Ask Briefly (V3)", included: false },
+  { text: "Ask Briefly", included: false },
 ];
 
 const proFeatures = [
@@ -20,8 +20,9 @@ const proFeatures = [
   { text: "All source types + Readwise", included: true },
   { text: "Unlimited history", included: true },
   { text: "Interest learning — gets smarter daily", included: true },
-  { text: "Manual capture: links, notes, docs", included: true, soon: true },
-  { text: "Ask Briefly — search your knowledge base", included: true, soon: true },
+  { text: "Manual capture: links, notes, docs", included: true },
+  { text: "Ask Briefly — search your knowledge base", included: true },
+  { text: "Audio brief for your commute", included: true },
   { text: "Priority support", included: true },
 ];
 

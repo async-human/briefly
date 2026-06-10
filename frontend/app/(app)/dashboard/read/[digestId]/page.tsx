@@ -14,6 +14,7 @@ import {
 } from "@/lib/digestSections";
 import { askAboutContent } from "@/lib/askLinks";
 import { graphItemUrl } from "@/lib/graphLinks";
+import { useLearnedToast } from "@/components/dashboard/LearnedToast";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Mode = "quick" | "deep";
@@ -172,9 +173,9 @@ function ReadingCard({
             <>
               <Link
                 href={askAboutContent(item.content_id, item.id, item.headline)}
-                className="read-ask-link"
+                className="read-ask-link read-ask-link-primary"
               >
-                Ask
+                Ask about this
               </Link>
               <Link href={graphItemUrl(item.content_id)} className="read-graph-link">
                 Graph
@@ -256,6 +257,12 @@ function ReadingCard({
         {/* Confidence signal — how Briefly knows this is relevant */}
         {item.confidence_signal && (
           <p className="read-confidence-signal">◈ {item.confidence_signal}</p>
+        )}
+
+        {item.contradiction_flag && item.contradiction_explanation && (
+          <p className="read-contradiction-callout">
+            <span aria-hidden>⚠</span> Contradicts what you read recently: {item.contradiction_explanation}
+          </p>
         )}
 
         <div className="read-why-links">
@@ -580,6 +587,7 @@ function ReadingSkeleton() {
 export default function ReadingPage() {
   const params = useParams();
   const router = useRouter();
+  const { showLearned } = useLearnedToast();
   const digestId = params.digestId as string;
 
   const [digest, setDigest]       = useState<Digest | null>(null);
@@ -658,10 +666,12 @@ export default function ReadingPage() {
     const item = items[currentIndex];
     if (withSave && item && !saved.has(item.id)) {
       addToSaved(item.id);
-      api.recordFeedback({ signal_type: "saved", digest_item_id: item.id, digest_id: digest.id });
+      api.recordFeedback({ signal_type: "saved", digest_item_id: item.id, digest_id: digest.id })
+        .then((r) => showLearned(r.learned_message))
+        .catch(() => {});
     } else if (!withSave && item && !saved.has(item.id) && !disliked.has(item.id)) {
-      // User skipped without saving or disliking — record skip signal
       api.recordFeedback({ signal_type: "skipped", digest_item_id: item.id, digest_id: digest.id })
+        .then((r) => showLearned(r.learned_message))
         .catch(() => {});
     }
     setDirection(1);
@@ -670,7 +680,7 @@ export default function ReadingPage() {
     } else {
       setCurrentIndex((i) => i + 1);
     }
-  }, [currentIndex, items, digest, saved, disliked, complete, addToSaved]);
+  }, [currentIndex, items, digest, saved, disliked, complete, addToSaved, showLearned]);
 
   const goBack = useCallback(() => {
     if (currentIndex > 0) {
@@ -684,8 +694,10 @@ export default function ReadingPage() {
     const item = items[currentIndex];
     if (!item || saved.has(item.id)) return;
     addToSaved(item.id);
-    api.recordFeedback({ signal_type: "saved", digest_item_id: item.id, digest_id: digest.id });
-  }, [currentIndex, items, digest, saved, addToSaved]);
+    api.recordFeedback({ signal_type: "saved", digest_item_id: item.id, digest_id: digest.id })
+      .then((r) => showLearned(r.learned_message))
+      .catch(() => {});
+  }, [currentIndex, items, digest, saved, addToSaved, showLearned]);
 
   const toggleDislike = useCallback(() => {
     if (!digest) return;
@@ -693,8 +705,9 @@ export default function ReadingPage() {
     if (!item || disliked.has(item.id)) return;
     setDisliked((prev) => new Set(Array.from(prev).concat(item.id)));
     api.recordFeedback({ signal_type: "disliked", digest_item_id: item.id, digest_id: digest.id })
+      .then((r) => showLearned(r.learned_message))
       .catch(() => {});
-  }, [currentIndex, items, digest, disliked]);
+  }, [currentIndex, items, digest, disliked, showLearned]);
 
   // Keyboard shortcuts
   useEffect(() => {

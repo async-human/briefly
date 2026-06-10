@@ -85,7 +85,19 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             ctx=ctx,
         )
 
-        result = await skill.run(cached_prefix=cached_prefix, items_section=items_section)
+        from briefly_api.config import get_settings
+        writer_model = None
+        if getattr(ctx.user, "is_pro", False):
+            writer_model = get_settings().pro_writer_model
+
+        proactive_section = _build_proactive_section(ctx.proactive_events or [])
+        items_with_proactive = items_section + proactive_section
+
+        result = await skill.run(
+            cached_prefix=cached_prefix,
+            items_section=items_with_proactive,
+            model=writer_model,
+        )
 
         if result and result.get("items"):
             ctx.subject_line = result.get("subject_line", f"Your Briefly for {ctx.run_date}")
@@ -159,6 +171,10 @@ def _fallback_drafts(items: list[RawItem], ctx: PipelineContext) -> list[DigestI
                 confidence_signal=_fallback_confidence_signal(item, ctx.user.profile),
             )
         )
+        cached = ctx.enrichment_cache.get(item.id, {})
+        if cached.get("contradiction_flag"):
+            drafts[-1].contradiction_flag = True
+            drafts[-1].contradiction_explanation = cached.get("contradiction_explanation") or ""
     return drafts
 
 
@@ -325,6 +341,12 @@ def _drafts_from_llm(
             confidence_signal=written.get("confidence_signal", ""),
             evolution_note=written.get("evolution_note", ""),
         )
+        cached = ctx.enrichment_cache.get(item.id, {})
+        if cached.get("contradiction_flag"):
+            draft.contradiction_flag = True
+            draft.contradiction_explanation = (
+                cached.get("contradiction_explanation") or written.get("contradiction_explanation") or ""
+            )
         if draft.section not in (SECTION_WHATS_NEW, SECTION_HIGHLY_RELEVANT):
             draft.section = assigned
         drafts.append(draft)
@@ -336,6 +358,21 @@ def _drafts_from_llm(
 
 
 # ── Context builders ──────────────────────────────────────────────────────────
+
+def _build_proactive_section(events: list[dict]) -> str:
+    if not events:
+        return ""
+    lines = ["\n## Proactive alerts to weave into the brief (elevate these threads)\n"]
+    for ev in events:
+        lines.append(
+            f"- [{ev.get('event_type')}] {ev.get('title')}: {ev.get('body')}"
+        )
+    lines.append(
+        "\nIf a digest item matches a proactive alert, mention the thread update "
+        "in memory_reference or why_it_matters_to_you.\n"
+    )
+    return "\n".join(lines)
+
 
 def _build_profile_summary(profile: dict, topic_clusters: list[dict]) -> str:
     parts = []

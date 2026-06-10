@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { AppSidebar } from "./AppSidebar";
 import { BrainDumpFab } from "./BrainDumpFab";
+import { LearnedToastProvider } from "./LearnedToast";
 
 type DashboardShellProps = {
   children: React.ReactNode;
@@ -27,6 +28,7 @@ export function DashboardShell({ children, userName, avatarUrl }: DashboardShell
   }, [sidebarOpen]);
 
   return (
+    <LearnedToastProvider>
     <div className="app-shell">
       <AppSidebar
         userName={userName}
@@ -62,5 +64,6 @@ export function DashboardShell({ children, userName, avatarUrl }: DashboardShell
       </div>
       <BrainDumpFab />
     </div>
+    </LearnedToastProvider>
   );
 }

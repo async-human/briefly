@@ -146,6 +146,7 @@ class NarrativeSkill:
         self,
         cached_prefix: str,
         items_section: str,
+        model: str | None = None,
     ) -> dict | None:
         """
         Run the full narrative LLM call.  Returns parsed JSON dict or None.
@@ -160,7 +161,7 @@ class NarrativeSkill:
                 llm.complete_json(
                     messages=[Message(role="user", content=prompt)],
                     system=_SYSTEM,
-                    model=_SKILL.model or None,
+                    model=model or _SKILL.model or None,
                     max_tokens=_SKILL.max_tokens or 2200,
                     cached_prefix=cached_prefix,
                 ),

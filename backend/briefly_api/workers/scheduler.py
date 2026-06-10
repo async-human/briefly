@@ -441,6 +441,16 @@ async def digest_scheduler_loop() -> None:
                 asyncio.create_task(_run_story_thread_agent())
                 log.info("Scheduler: StoryThreadAgent task scheduled for %s", today)
 
+            # ── Proactive breaking alerts (every poll, capped server-side) ────
+            if s.proactive_surfacing_enabled and now_utc.minute % 15 == 0:
+                from briefly_api.services.proactive_notifier import send_pending_proactive_alerts
+                asyncio.create_task(send_pending_proactive_alerts())
+
+            # ── Weekly report emails (Sunday local 08:00 per user) ─────────────
+            if s.weekly_report_email_enabled and now_utc.minute == 0:
+                from briefly_api.services.weekly_email import send_weekly_reports_for_due_users
+                asyncio.create_task(send_weekly_reports_for_due_users(now_utc))
+
         except Exception:
             log.exception("Scheduler: error in poll loop — will retry next cycle")
 

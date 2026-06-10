@@ -51,15 +51,22 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         html_body = html_body.replace("</body>", f"{listen_button}</body>", 1)
 
     try:
+        outcome = ctx.__dict__.get("outcome") or {}
+        skipped_note = (outcome.get("skipped_note") or "").strip()
+        preheader = (ctx.preview_text or skipped_note or "").strip()
+        if preheader:
+            pre = (
+                f'<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">'
+                f'{preheader}</div>'
+            )
+            html_body = pre + html_body
+
         params: resend.Emails.SendParams = {
             "from": f"{s.digest_from_name} <{s.digest_from_email}>",
             "to": [ctx.user.email],
             "subject": ctx.subject_line or f"Your Briefly — {ctx.run_date}",
             "html": html_body,
         }
-        if ctx.preview_text:
-            # Embed preview text as hidden preheader in HTML (already in template)
-            pass
 
         response = await asyncio.wait_for(
             asyncio.to_thread(resend.Emails.send, params),

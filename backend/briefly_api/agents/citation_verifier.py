@@ -81,15 +81,35 @@ def _render_html(ctx: PipelineContext) -> str:
 
     saved = outcome.get("saved_minutes")
     filtered = outcome.get("filtered_count", 0)
+    words = outcome.get("words_scanned", 0)
+    skipped_note = (outcome.get("skipped_note") or "").strip()
     outcome_banner = ""
-    if saved:
+    if saved or words:
+        detail = skipped_note or (
+            f"Briefly read {outcome.get('items_scanned', ctx.total_ingested)} stories "
+            f"({words:,} words) and filtered {filtered} you can safely skip."
+        )
         outcome_banner = f"""
           <div style="margin:0 0 28px 0;padding:16px 18px;background:#f4f1ff;border-radius:10px;border-left:4px solid #5b47e0;">
             <p style="margin:0;font-size:14px;color:#444;line-height:1.55;">
-              <strong style="color:#5b47e0;">~{saved} min saved</strong> — Briefly scanned
-              {outcome.get("items_scanned", ctx.total_ingested)} stories and filtered
-              {filtered} you can safely skip today.
+              <strong style="color:#5b47e0;">~{saved} min saved</strong> — {detail}
             </p>
+          </div>"""
+
+    serendipity = list(getattr(ctx, "serendipity_connections", []) or [])
+    serendipity_html = ""
+    if serendipity:
+        blocks = ""
+        for conn in serendipity[:3]:
+            blocks += (
+                f'<p style="margin:0 0 12px;font-size:14px;color:#444;line-height:1.55;">'
+                f'<strong>{_esc(conn.get("title", "Connection"))}:</strong> '
+                f'{_esc(conn.get("body", ""))}</p>'
+            )
+        serendipity_html = f"""
+          <div style="margin:0 0 28px 0;padding:16px 18px;background:#faf8f5;border-radius:10px;border-left:4px solid #c9b896;">
+            <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#999;letter-spacing:1.5px;text-transform:uppercase;">Connections Briefly noticed</p>
+            {blocks}
           </div>"""
 
     top_html = ""
@@ -156,6 +176,7 @@ def _render_html(ctx: PipelineContext) -> str:
         <tr><td style="padding:32px;">
           <p style="margin:0 0 24px 0;font-size:15px;color:#555;">Hey {_esc(user_name)},</p>
           {outcome_banner}
+          {serendipity_html}
           {sections_html}
           {skipped_html}
         </td></tr>
@@ -185,13 +206,31 @@ def _render_items_block(items: list[DigestItemDraft], section_name: str) -> str:
                 f"Also covered by {item.duplicate_count - 1} other source(s).</p>"
             )
         memory_note = ""
-        if item.memory_connections:
+        if item.memory_reference:
+            memory_note = (
+                f'<p style="font-size:12px;color:#7c6ff7;margin:4px 0 0 0;">'
+                f"&#128279; {_esc(item.memory_reference)}</p>"
+            )
+        elif item.memory_connections:
             desc = item.memory_connections[0].get("description", "")
             if desc:
                 memory_note = (
                     f'<p style="font-size:12px;color:#7c6ff7;margin:4px 0 0 0;">'
-                    f"&#128279; {desc}</p>"
+                    f"&#128279; {_esc(desc)}</p>"
                 )
+        contradiction_note = ""
+        if getattr(item, "contradiction_flag", False) and getattr(item, "contradiction_explanation", ""):
+            contradiction_note = (
+                f'<p style="font-size:12px;color:#b45309;margin:8px 0 0 0;padding:8px 10px;'
+                f'background:#fffbeb;border-radius:6px;">'
+                f"&#9888; Contradicts what you read recently: {_esc(item.contradiction_explanation)}</p>"
+            )
+        confidence_note = ""
+        if item.confidence_signal:
+            confidence_note = (
+                f'<p style="font-size:12px;color:#888;margin:6px 0 0 0;">'
+                f"&#9670; {_esc(item.confidence_signal)}</p>"
+            )
         items_html += f"""
             <div style="margin-bottom:28px;padding-bottom:24px;border-bottom:1px solid #f0f0f0;">
               <h3 style="margin:0 0 8px 0;font-size:17px;line-height:1.4;font-weight:600;color:#1a1a1a;">
@@ -204,7 +243,7 @@ def _render_items_block(items: list[DigestItemDraft], section_name: str) -> str:
               <p style="margin:0;font-size:12px;color:#888;">
                 <a href="{item.source_url or '#'}" style="color:#888;">{_esc(item.source_name or '')}</a>
               </p>
-              {dupe_note}{memory_note}
+              {confidence_note}{contradiction_note}{dupe_note}{memory_note}
             </div>"""
 
     return f"""

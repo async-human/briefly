@@ -4,10 +4,19 @@ from __future__ import annotations
 from briefly_api.agents.context import PipelineContext
 from briefly_api.services.personalization_score import pick_top_priority_content_ids
 
+_WORDS_PER_MINUTE = 220
+
+
+def _word_count(text: str) -> int:
+    return len((text or "").split())
+
 
 def build_outcome_meta(ctx: PipelineContext) -> dict:
     """
     Build proof-of-value metrics shown in UI and email.
+
+    saved_minutes is based on word counts from ingested source material —
+    honest framing: time it would take to read everything Briefly scanned.
     """
     dropped = list(getattr(ctx, "dropped_items", []) or [])
     crowded = list(getattr(ctx, "crowded_out_items", []) or [])
@@ -23,8 +32,20 @@ def build_outcome_meta(ctx: PipelineContext) -> dict:
         memory_connections=getattr(ctx, "memory_connections", None),
     )
 
-    # Estimate reading time saved vs reading full sources (~4 min/item filtered, ~2 min/item summarized)
-    saved_minutes = max(5, filtered_count * 4 + len(drafts) * 2)
+    shown_ids = {d.content_id for d in drafts if d.content_id}
+    words_scanned = 0
+    for item in ctx.raw_items or []:
+        words_scanned += _word_count(item.clean_text or item.title or "")
+
+    brief_words = sum(
+        _word_count(f"{d.headline} {d.summary} {d.why_it_matters}")
+        for d in drafts
+    )
+
+    # Time to read full sources vs. the distilled brief
+    full_read_minutes = words_scanned / _WORDS_PER_MINUTE
+    brief_read_minutes = brief_words / _WORDS_PER_MINUTE
+    saved_minutes = max(1, round(full_read_minutes - brief_read_minutes))
 
     profile = ctx.user.profile or {}
     raw_interests = profile.get("interests") or []
@@ -42,8 +63,8 @@ def build_outcome_meta(ctx: PipelineContext) -> dict:
     skipped_note = str(ctx.__dict__.get("skipped_note") or "").strip()
     if not skipped_note and filtered_count > 0:
         skipped_note = (
-            f"Briefly filtered {filtered_count} items — mostly duplicates, low relevance, "
-            f"or topics you've deprioritized. You're not missing anything in your priority areas."
+            f"Briefly read {ctx.total_ingested} stories and showed {len(drafts)} — "
+            f"filtered {filtered_count} you can safely skip today."
         )
 
     return {
@@ -55,4 +76,5 @@ def build_outcome_meta(ctx: PipelineContext) -> dict:
         "skipped_note": skipped_note,
         "items_shown": len(drafts),
         "items_scanned": ctx.total_ingested,
+        "words_scanned": words_scanned,
     }

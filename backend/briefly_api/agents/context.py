@@ -67,6 +67,8 @@ class DigestItemDraft:
     memory_reference: str = ""    # explicit past-reading connection ("You've been following this for 6 weeks...")
     confidence_signal: str = ""   # how strongly Briefly knows this matches the user ("94% match to top cluster")
     evolution_note: str = ""      # surfaces when behavior diverges from stated interests
+    contradiction_flag: bool = False
+    contradiction_explanation: str = ""
 
 
 @dataclass
@@ -81,6 +83,8 @@ class UserContext:
     active_story_threads: list[dict] # ongoing stories being tracked
     topic_clusters: list[dict]       # inferred topic interests with weights
     sources: list[Any] = field(default_factory=list)  # active Source ORM objects
+    plan: str = "free"
+    is_pro: bool = False
 
 
 @dataclass
@@ -154,6 +158,9 @@ class PipelineContext:
     # Pending proactive surfacing events (from ProactiveSurfacingEvent table).
     # The writer uses these to know which threads/topics to elevate.
     proactive_events: list[dict] = field(default_factory=list)
+
+    # Cross-domain connections surfaced weekly / in digest meta
+    serendipity_connections: list[dict] = field(default_factory=list)
 
     # Shared DB session — set by pipeline orchestrator, used by agents that need DB
     db_session: Any | None = field(default=None, repr=False)

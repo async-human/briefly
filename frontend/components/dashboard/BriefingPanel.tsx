@@ -20,6 +20,7 @@ import { SourceIcon } from "@/components/SourceIcon";
 import { OutcomeBriefHeader, SafeToIgnorePanel } from "./OutcomeBriefHeader";
 import { getDigestOutcome, splitTopPriorityItems } from "@/lib/digestOutcome";
 import { graphItemUrl } from "@/lib/graphLinks";
+import { askAboutContent } from "@/lib/askLinks";
 import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
 import { GeneratingProgressRing } from "@/components/loading/GeneratingProgressRing";
 
@@ -440,6 +441,64 @@ function ReadwiseCard({
   );
 }
 
+// ── Hero item — full personalization surfaced on dashboard ───────────────────
+
+function BriefingHeroItem({
+  item,
+  digestId,
+}: {
+  item: DigestItem;
+  digestId: string;
+}) {
+  const router = useRouter();
+
+  return (
+    <article className="briefing-hero-item">
+      <div className="briefing-hero-meta">
+        <span className="briefing-hero-badge">Top story</span>
+        {item.source_name && <span className="briefing-hero-source">{item.source_name}</span>}
+      </div>
+      <h3 className="briefing-hero-headline">{item.headline}</h3>
+      {item.why_it_matters && (
+        <p className="briefing-hero-why">{item.why_it_matters}</p>
+      )}
+      {item.confidence_signal && (
+        <p className="briefing-hero-confidence">◈ {item.confidence_signal}</p>
+      )}
+      {item.contradiction_flag && item.contradiction_explanation && (
+        <p className="briefing-hero-contradiction">
+          <span aria-hidden>⚠</span> {item.contradiction_explanation}
+        </p>
+      )}
+      {item.memory_reference && (
+        <p className="briefing-hero-memory">⟳ {item.memory_reference}</p>
+      )}
+      <div className="briefing-hero-actions">
+        {item.content_id && (
+          <Link
+            href={askAboutContent(item.content_id, item.id, item.headline)}
+            className="briefing-hero-ask btn-primary"
+          >
+            Ask about this
+          </Link>
+        )}
+        <Link href={`/dashboard/read/${digestId}`} className="briefing-hero-read">
+          Read full brief →
+        </Link>
+        {item.content_id && (
+          <button
+            type="button"
+            className="briefing-graph-link"
+            onClick={() => router.push(graphItemUrl(item.content_id!))}
+          >
+            Graph
+          </button>
+        )}
+      </div>
+    </article>
+  );
+}
+
 // ── Briefing preview item (dashboard — compact, no inline reading) ───────────
 
 function BriefingPreviewItem({
@@ -486,6 +545,12 @@ function BriefingPreviewItem({
         </div>
         <h3 className="briefing-preview-headline">{item.headline}</h3>
         {why && <p className="briefing-preview-why">{why}</p>}
+        {item.contradiction_flag && item.contradiction_explanation && (
+          <p className="briefing-preview-contradiction">⚠ {item.contradiction_explanation}</p>
+        )}
+        {item.confidence_signal && (
+          <p className="briefing-preview-confidence">◈ {item.confidence_signal}</p>
+        )}
       </div>
       {digestId ? <span className="briefing-preview-chevron" aria-hidden>→</span> : null}
     </>
@@ -698,7 +763,13 @@ export function BriefingPanel({
         generating={false}
         itemCount={digest.total_items_shown}
         digestDate={digest.digest_date}
+        subjectLine={digest.subject_line}
+        previewText={digest.preview_text}
       />
+
+      {topItems[0] && (
+        <BriefingHeroItem item={topItems[0]} digestId={digest.id} />
+      )}
 
       {generateWarnings.length > 0 && (
         <ul className="briefing-warnings briefing-warnings-panel">
@@ -710,18 +781,17 @@ export function BriefingPanel({
 
       <div className="briefing-preview-list">
         <div>
-          {topItems.length > 0 && (
+          {topItems.length > 1 && (
             <section className="briefing-section-group briefing-section-top3">
               <header className="briefing-section-head">
-                <span className="briefing-section-badge briefing-section-badge-top">Top 3 for today</span>
-                <p className="briefing-section-sub">What deserves your attention first</p>
+                <span className="briefing-section-badge briefing-section-badge-top">Also priority today</span>
               </header>
               <div className="briefing-section-items">
-                {topItems.map((item, index) => (
+                {topItems.slice(1).map((item, index) => (
                   <BriefingPreviewItem
                     key={item.id}
                     item={item}
-                    index={index}
+                    index={index + 1}
                     digestId={digest.id}
                   />
                 ))}

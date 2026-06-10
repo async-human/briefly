@@ -434,6 +434,8 @@ class DigestItem(Base):
     memory_reference: Mapped[str | None] = mapped_column(Text)    # "You've been tracking this for 6 weeks..."
     confidence_signal: Mapped[str | None] = mapped_column(Text)   # "94% match to your top interest cluster"
     evolution_note: Mapped[str | None] = mapped_column(Text)      # surfaces behavior diverging from stated interests
+    contradiction_flag: Mapped[bool] = mapped_column(Boolean, default=False)
+    contradiction_explanation: Mapped[str | None] = mapped_column(Text)
 
     # User interaction (updated by LearningAgent)
     was_clicked: Mapped[bool] = mapped_column(Boolean, default=False)

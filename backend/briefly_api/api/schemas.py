@@ -123,8 +123,31 @@ class DigestItemOut(BaseModel):
     memory_reference: str | None = None
     confidence_signal: str | None = None
     evolution_note: str | None = None
+    contradiction_flag: bool = False
+    contradiction_explanation: str | None = None
+    was_disliked: bool = False
 
     model_config = {"from_attributes": True}
+
+
+class FeedbackOut(BaseModel):
+    learned_message: str | None = None
+
+
+class SerendipityConnectionOut(BaseModel):
+    title: str
+    body: str
+    content_id: str | None = None
+
+
+class ProactiveEventOut(BaseModel):
+    id: str
+    event_type: str
+    title: str
+    body: str
+    thread_key: str | None = None
+    priority: int = 0
+    created_at: str | None = None
 
 
 class DigestOut(BaseModel):

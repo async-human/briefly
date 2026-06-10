@@ -21,6 +21,12 @@ import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton"
 import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
+import { BrieflyKnowsSummary } from "@/components/dashboard/BrieflyKnowsSummary";
+import { StoryThreadsRail } from "@/components/dashboard/StoryThreadsRail";
+import { SerendipityPanel } from "@/components/dashboard/SerendipityPanel";
+import { WeeklyReportCard } from "@/components/dashboard/WeeklyReportCard";
+import { ProactiveAlertsBanner } from "@/components/dashboard/ProactiveAlertsBanner";
+import type { ProfileIntelligence } from "@/lib/api";
 
 const FETCHABLE_SOURCE_TYPES = new Set([
   "rss", "youtube", "youtube_account", "reddit", "reddit_account",
@@ -49,6 +55,7 @@ function DashboardContent() {
   const [error, setError] = useState("");
   const [connectBanner, setConnectBanner] = useState<string | null>(null);
   const [discoveryRunning, setDiscoveryRunning] = useState(false);
+  const [intel, setIntel] = useState<ProfileIntelligence | null>(null);
   const autoGenerateChecked = useRef(false);
 
   useEffect(() => {
@@ -81,11 +88,12 @@ function DashboardContent() {
   useEffect(() => {
     async function init() {
       try {
-        const [meData, todayDigest, sourcesData, genStatus] = await Promise.all([
+        const [meData, todayDigest, sourcesData, genStatus, intelData] = await Promise.all([
           api.getMe(),
           api.getTodayDigest(),
           api.getSources(),
           api.getBriefingGenerationStatus().catch(() => null),
+          api.getProfileIntelligence().catch(() => null),
         ]);
 
         if (!meData.onboarding_completed) {
@@ -98,6 +106,7 @@ function DashboardContent() {
           setDigest(todayDigest);
         }
         setSources(sourcesData);
+        if (intelData) setIntel(intelData);
         setLoading(false);
 
         if (!meData.sources_discovery_confirmed) {
@@ -260,6 +269,25 @@ function DashboardContent() {
         generating={generating}
         onRefresh={runGenerate}
       />
+
+      <ProactiveAlertsBanner />
+
+      {intel && (
+        <div className="dash-intelligence-row">
+          <BrieflyKnowsSummary
+            intel={intel}
+            streak={me.reading_streak ?? 0}
+            declaredInterests={me.profile?.interests?.map((i) => i.topic).filter(Boolean) ?? []}
+          />
+          <StoryThreadsRail threads={intel.active_threads ?? []} />
+        </div>
+      )}
+
+      <WeeklyReportCard />
+
+      {digest?.meta?.serendipity && digest.meta.serendipity.length > 0 && (
+        <SerendipityPanel connections={digest.meta.serendipity} />
+      )}
 
       <div className="dash-page-grid">
         <section className="dash-surface dash-surface-briefing" aria-labelledby="briefing-surface-title">

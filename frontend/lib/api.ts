@@ -200,6 +200,30 @@ export type DigestItem = {
   memory_reference?: string | null;
   confidence_signal?: string | null;
   evolution_note?: string | null;
+  contradiction_flag?: boolean;
+  contradiction_explanation?: string | null;
+  was_disliked?: boolean;
+};
+
+export type SerendipityConnection = {
+  title: string;
+  body: string;
+  content_id?: string | null;
+  headline?: string;
+};
+
+export type ProactiveEvent = {
+  id: string;
+  event_type: string;
+  title: string;
+  body: string;
+  thread_key?: string | null;
+  priority?: number;
+  created_at?: string | null;
+};
+
+export type FeedbackResponse = {
+  learned_message: string | null;
 };
 
 export type Digest = {
@@ -217,6 +241,8 @@ export type Digest = {
     blocked?: SkippedItem[];      // explicitly rejected: never_show, low_relevance
     more_today?: BonusItem[];     // good fit but cut for daily length cap
     outcome?: DigestOutcome;
+    serendipity?: SerendipityConnection[];
+    proactive_events?: ProactiveEvent[];
   };
 };
 
@@ -736,7 +762,10 @@ export const api = {
     digest_id?: string;
     meta?: Record<string, unknown>;
   }) =>
-    request<void>("/api/v1/feedback", { method: "POST", body: JSON.stringify(body) }),
+    request<FeedbackResponse>("/api/v1/feedback", { method: "POST", body: JSON.stringify(body) }),
+
+  getProactiveEvents: () =>
+    request<ProactiveEvent[]>("/api/v1/proactive-events"),
 
   // Reading session completion — records a "opened" signal with elapsed time
   completeReading: (digestId: string, readTimeSec: number) =>

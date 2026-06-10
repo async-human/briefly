@@ -198,6 +198,13 @@ class Settings(BaseSettings):
     # UTC hour to run the weekly analysis
     weekly_intelligence_hour: int = 2
 
+    # ── Weekly report email ───────────────────────────────────────────────────
+    weekly_report_email_enabled: bool = True
+    weekly_report_email_time: str = "08:00"  # local Sunday
+
+    # ── Writer model tiering ──────────────────────────────────────────────────
+    pro_writer_model: str = "gpt-4o"
+
     # ── Lemon Squeezy ─────────────────────────────────────────────────────────
     lemon_squeezy_webhook_secret: str = ""
     # Variant IDs — set these after creating products in Lemon Squeezy dashboard

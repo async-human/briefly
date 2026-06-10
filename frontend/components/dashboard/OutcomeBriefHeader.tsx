@@ -8,6 +8,8 @@ type OutcomeBriefHeaderProps = {
   generating: boolean;
   itemCount: number;
   digestDate: string;
+  subjectLine?: string | null;
+  previewText?: string | null;
 };
 
 export function OutcomeBriefHeader({
@@ -15,6 +17,8 @@ export function OutcomeBriefHeader({
   generating,
   itemCount,
   digestDate,
+  subjectLine,
+  previewText,
 }: OutcomeBriefHeaderProps) {
   const saved = outcome?.saved_minutes;
   const filtered = outcome?.filtered_count ?? 0;
@@ -45,8 +49,13 @@ export function OutcomeBriefHeader({
       <div className="outcome-brief-header-main">
         <p className="outcome-brief-eyebrow">Today</p>
         <h2 className="outcome-brief-title">
-          {generating ? "Updating your brief" : "Your briefing"}
+          {generating
+            ? "Updating your brief"
+            : subjectLine || "Your briefing"}
         </h2>
+        {previewText && !generating && (
+          <p className="outcome-brief-hook">{previewText}</p>
+        )}
         <p className="outcome-brief-sub">
           {itemCount} {itemCount === 1 ? "story" : "stories"} · {digestDate}
           {savedHint}

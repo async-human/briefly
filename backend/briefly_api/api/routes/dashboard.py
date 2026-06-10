@@ -21,6 +21,8 @@ from briefly_api.api.schemas import (
     DigestOut,
     DigestSummaryOut,
     FeedbackIn,
+    FeedbackOut,
+    ProactiveEventOut,
     BriefingGenerationStatusOut,
     GenerateDigestOut,
     IngestionSummaryOut,
@@ -1181,6 +1183,19 @@ async def get_profile_intelligence(
     }
 
 
+# ── Proactive surfacing (dashboard) ───────────────────────────────────────────
+
+@router.get("/proactive-events", response_model=list[ProactiveEventOut])
+async def list_proactive_events(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[ProactiveEventOut]:
+    from briefly_api.agents.proactive.proactive_surfacing import get_for_api
+
+    events = await get_for_api(db, user.id)
+    return [ProactiveEventOut(**e) for e in events]
+
+
 # ── Weekly intelligence report ────────────────────────────────────────────────
 
 @router.get("/weekly-report")
@@ -1216,12 +1231,12 @@ _SIGNAL_MAP: dict[str, SignalType] = {
 }
 
 
-@router.post("/feedback", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+@router.post("/feedback", response_model=FeedbackOut)
 async def record_feedback(
     body: FeedbackIn,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> Response:
+) -> FeedbackOut:
     signal_type = _SIGNAL_MAP.get(body.signal_type)
     if not signal_type:
         raise HTTPException(
@@ -1238,7 +1253,7 @@ async def record_feedback(
             meta=body.meta or {},
         ))
         await db.commit()
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
+        return FeedbackOut(learned_message=None)
 
     item_result = await db.execute(
         select(DigestItem).where(
@@ -1311,7 +1326,14 @@ async def record_feedback(
             _queue_click_discovery(user.id, item.source_url)
         )
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    from briefly_api.services.feedback_learned import build_learned_message
+
+    learned = build_learned_message(
+        body.signal_type,
+        source_name=item.source_name,
+        headline=item.headline,
+    )
+    return FeedbackOut(learned_message=learned)
 
 
 async def _bump_source_weight(

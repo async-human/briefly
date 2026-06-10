@@ -31,11 +31,15 @@ async def get_user_with_profile(session: AsyncSession, user_id: str) -> dict | N
     if not user:
         return None
 
+    from briefly_api.api.plan_limits import has_pro_access
+
     data: dict = {
         "id": user.id,
         "email": user.email,
         "name": user.name,
         "avatar_url": user.avatar_url,
+        "plan": user.plan or "free",
+        "is_pro": has_pro_access(user),
         "profile": {},
     }
 

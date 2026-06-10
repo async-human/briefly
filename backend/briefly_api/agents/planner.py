@@ -14,6 +14,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from briefly_api.agents.context import PipelineContext, RawItem
+from briefly_api.api.plan_limits import FREE_DIGEST_ITEMS
 from briefly_api.config import get_settings
 from briefly_api.services.digest_sections import (
     SECTION_HIGHLY_RELEVANT,
@@ -74,6 +75,9 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     Populates ctx.selected_item_ids and ctx.planned_sections.
     """
     s = get_settings()
+    max_items = s.digest_max_items
+    if not getattr(ctx.user, "is_pro", False):
+        max_items = min(max_items, FREE_DIGEST_ITEMS)
     items = ctx.enriched_items
     priority_map = build_priority_map(ctx.user.sources or [])
     interest_model = build_interest_model(
@@ -152,7 +156,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         key=lambda pair: priority_sort_key(pair[0], priority_map),
     )
     for source_id, group in pool_a_sources:
-        if len(selected) >= s.digest_max_items:
+        if len(selected) >= max_items:
             break
         candidate = group[0]
         min_rel = s.freshness_min_relevance
@@ -171,7 +175,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         if priority_sort_key(source_id, priority_map) != 0:
             continue
         for candidate in group[1:3]:
-            if len(selected) >= s.digest_max_items:
+            if len(selected) >= max_items:
                 break
             if _source_at_cap(source_id):
                 break
@@ -196,21 +200,21 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     rescue_candidates.sort(key=lambda i: i.relevance_score, reverse=True)
 
     for item in rescue_candidates:
-        if len(selected) >= s.digest_max_items:
+        if len(selected) >= max_items:
             break
         if source_counts[item.source_id] >= max_items_for_source(item.source_id, priority_map):
             continue
         _select(item, SECTION_HIGHLY_RELEVANT, "relevant")
 
     # Backfill — best combined score among what's left
-    if len(selected) < s.digest_min_items or len(selected) < s.digest_max_items:
+    if len(selected) < s.digest_min_items or len(selected) < max_items:
         remaining = sorted(
             [i for i in items if i.id not in selected_ids],
             key=combined_score,
             reverse=True,
         )
         for item in remaining:
-            if len(selected) >= s.digest_max_items:
+            if len(selected) >= max_items:
                 break
             if _source_at_cap(item.source_id):
                 continue

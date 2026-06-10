@@ -105,6 +105,8 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
             user_id=user_id,
             email=user_data["email"],
             name=user_data.get("name"),
+            plan=user_data.get("plan", "free"),
+            is_pro=bool(user_data.get("is_pro")),
             profile=user_data.get("profile", {}),
             recent_digest_items=recent_items,
             seen_content_hashes=seen_hashes,
@@ -147,6 +149,9 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
         # Populates ctx.enrichment_cache, ctx.behavioral_fingerprint_text, and
         # ctx.proactive_events so BriefingWriterAgent can use pre-computed context.
         ctx = await _load_proactive_context(session, ctx)
+
+        from briefly_api.agents import serendipity as serendipity_agent
+        ctx = await _run_agent("SerendipityAgent", serendipity_agent.run, ctx)
 
         ctx = await _run_agent("BriefingWriterAgent",    briefing_writer.run,  ctx)
         ctx = await _run_agent("ContentDiscoveryInjectorAgent", content_discovery_injector.run, ctx)
@@ -485,6 +490,8 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
             "more_today": more_today_preview,
             "stage_timings": ctx.__dict__.get("stage_timings", {}),
             "outcome": outcome,
+            "serendipity": list(getattr(ctx, "serendipity_connections", []) or []),
+            "proactive_events": list(getattr(ctx, "proactive_events", []) or []),
         },
     )
     session.add(digest)
@@ -528,6 +535,8 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
             memory_reference=draft.memory_reference or None,
             confidence_signal=draft.confidence_signal or None,
             evolution_note=draft.evolution_note or None,
+            contradiction_flag=bool(draft.contradiction_flag),
+            contradiction_explanation=draft.contradiction_explanation or None,
         )
         session.add(item)
 

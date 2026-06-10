@@ -6712,6 +6712,30 @@ footer {
   color: #7a5f2c;
 }
 
+.read-ask-link-primary {
+  background: #5b47e0;
+  color: #fff !important;
+  font-weight: 500;
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+}
+
+.read-ask-link-primary:hover {
+  background: #4a38c4;
+  color: #fff !important;
+}
+
+.read-contradiction-callout {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #92400e;
+  background: #fffbeb;
+  border-radius: 6px;
+  border-left: 3px solid #f59e0b;
+}
+
 .read-meta-actions .read-ask-link,
 .read-meta-actions .read-graph-link {
   margin-right: 0.15rem;

@@ -93,7 +93,8 @@ def _synthesize(script: str, output_path: str, voice_name: str) -> bool:
 async def run(ctx: PipelineContext) -> PipelineContext:
     s = get_settings()
 
-    if not s.audio_enabled:
+    is_pro = getattr(ctx.user, "is_pro", False)
+    if not s.audio_enabled and not is_pro:
         return ctx
 
     if not ctx.digest_items:
