@@ -6,8 +6,10 @@ from types import SimpleNamespace
 from briefly_api.db.models import SignalType
 from briefly_api.services.topic_briefing_analytics import (
     aggregate_topic_stats,
+    build_emerging_topics,
     build_topic_actual,
     build_tracked_topics,
+    is_emerging_label,
 )
 
 
@@ -104,6 +106,37 @@ def test_build_topic_actual_includes_declared_with_zero_counts():
     assert actual["startup funding"]["stories_shown"] == 1
     assert actual["langchain"]["stories_shown"] == 0
     assert actual["langchain"]["ready"] is False
+
+
+def test_is_emerging_label_rejects_common_words():
+    assert not is_emerging_label("against")
+    assert not is_emerging_label("through")
+    assert is_emerging_label("agentic workflows")
+    assert is_emerging_label("semiconductors")
+
+
+def test_build_emerging_topics_uses_clusters_not_headline_tokens():
+    profile = SimpleNamespace(
+        interests=[{"topic": "generative ai"}],
+        topic_clusters=[
+            {
+                "cluster": "agentic workflows",
+                "strength": 0.15,
+                "item_count": 4,
+                "source": "learned",
+            },
+        ],
+    )
+    tracked = build_tracked_topics(profile)
+    analytics = SimpleNamespace(
+        tracked_topics=tracked,
+        topic_stats=aggregate_topic_stats(tracked, [], []),
+    )
+
+    emerging = build_emerging_topics(analytics, profile)
+
+    assert "agentic workflows" in emerging
+    assert "against" not in emerging
 
 
 def test_bill_of_materials_does_not_false_match():

@@ -56,11 +56,11 @@ from briefly_api.services.connectors.registry import detect_source, get_connecto
 from briefly_api.services.connectors.types import ALL_SOURCE_TYPES
 from briefly_api.services.url_scraper import discover_rss_feed
 from briefly_api.services.topic_matching import (
-    topic_keywords as _topic_keywords,
     topic_match_text,
     topic_matches as _topic_matches,
 )
 from briefly_api.services.topic_briefing_analytics import (
+    build_emerging_topics,
     build_topic_actual,
     compute_topic_briefing_analytics,
     format_active_threads,
@@ -950,33 +950,8 @@ def _build_behavioral_intelligence(profile, analytics) -> dict:
         for interest in (profile.interests or [])
         if (label := interest_topic_label(interest))
     ]
-    declared_word_set: set[str] = set()
-    for t in declared_topics:
-        declared_word_set.update(_topic_keywords(t))
-
     topic_actual = build_topic_actual(analytics)
-
-    # Emerging topics: high-frequency words in saved/clicked headlines NOT
-    # already covered by a declared interest
-    emerging_counts: dict[str, int] = {}
-    stop = {"that", "with", "this", "from", "have", "will", "been", "into",
-            "they", "their", "about", "more", "after", "what", "when",
-            "could", "would", "says", "your", "over", "here", "than",
-            "announces", "announced", "equity", "capital", "expand",
-            "compute", "alphabet", "million", "billion", "company",
-            "market", "invest", "investors", "raises", "launch"}
-    for s in signals:
-        if s.signal_type not in pos_types or not s.headline:
-            continue
-        for word in s.headline.lower().split():
-            word = word.strip(".,;:!?\"'()[]")
-            if len(word) > 5 and word.isalpha() and word not in declared_word_set and word not in stop:
-                emerging_counts[word] = emerging_counts.get(word, 0) + 1
-
-    emerging_topics = [
-        w for w, c in sorted(emerging_counts.items(), key=lambda x: x[1], reverse=True)
-        if c >= 3
-    ][:6]
+    emerging_topics = build_emerging_topics(analytics, profile)
 
     # Generate insight sentences
     insights: list[dict] = []

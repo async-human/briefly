@@ -15,9 +15,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.db.models import BehavioralSignal, Digest, DigestItem, SignalType
 from briefly_api.services.profile_utils import cluster_label
-from briefly_api.services.topic_matching import item_matches_topic
+from briefly_api.services.topic_matching import TOPIC_STOP_WORDS, item_matches_topic
 
 DEFAULT_WINDOW_DAYS = 45
+
+# Common English words that must never surface as "emerging topics"
+_EMERGING_LABEL_STOP_WORDS = TOPIC_STOP_WORDS | frozenset({
+    "about", "above", "across", "after", "again", "against", "along", "among",
+    "around", "because", "before", "being", "below", "between", "beyond",
+    "during", "every", "first", "found", "getting", "going", "great",
+    "having", "inside", "into", "just", "large", "later", "little", "local",
+    "major", "makes", "making", "might", "money", "month", "never", "newer",
+    "often", "other", "ought", "outside", "people", "place", "power",
+    "really", "right", "since", "small", "still", "story", "stories",
+    "takes", "taking", "their", "there", "these", "thing", "things", "think",
+    "those", "three", "through", "today", "under", "until", "using", "very",
+    "watch", "where", "which", "while", "world", "would", "years", "young",
+    "announces", "announced", "report", "reports", "update", "updates",
+    "analysis", "inside", "latest", "weekly", "daily",
+})
 THREAD_MIN_BRIEFING_DAYS = 3
 
 _POS_TYPES = frozenset({
@@ -238,6 +254,84 @@ async def compute_topic_briefing_analytics(
         signals=signals,
         briefing_item_count=len(briefing_rows),
     )
+
+
+def is_emerging_label(label: str) -> bool:
+    """Reject headline fragments and common words — only human topic phrases."""
+    clean = label.strip()
+    if len(clean) < 4:
+        return False
+
+    words = [
+        w.strip(".,;:!?\"'()[]").lower()
+        for w in clean.replace("-", " ").split()
+        if w.strip(".,;:!?\"'()[]")
+    ]
+    if not words:
+        return False
+
+    significant = [w for w in words if w not in _EMERGING_LABEL_STOP_WORDS and len(w) >= 2]
+    if not significant:
+        return False
+
+    if len(words) == 1:
+        word = words[0]
+        return len(word) >= 6 and word not in _EMERGING_LABEL_STOP_WORDS
+
+    return len(significant) >= 2 or (len(significant) == 1 and len(significant[0]) >= 5)
+
+
+def build_emerging_topics(
+    analytics: TopicBriefingAnalytics,
+    profile=None,
+    *,
+    min_stories: int = 2,
+    limit: int = 6,
+) -> list[str]:
+    """
+    Topics Briefly inferred from reading that the user did not declare.
+
+    Uses learned clusters plus briefing attribution — never raw headline tokens.
+    """
+    declared_keys = {
+        key for key, meta in analytics.tracked_topics.items()
+        if meta["source"] == "declared"
+    }
+
+    ranked: dict[str, int] = {}
+
+    for key, stat in analytics.topic_stats.items():
+        if stat.source != "discovered" or key in declared_keys:
+            continue
+        if stat.stories_shown < min_stories:
+            continue
+        if not is_emerging_label(stat.display):
+            continue
+        ranked[stat.display] = max(ranked.get(stat.display, 0), stat.stories_shown)
+
+    if profile:
+        for entry in profile.topic_clusters or []:
+            label = cluster_label(entry)
+            if not label or not is_emerging_label(label):
+                continue
+            key = label.lower()
+            if key in declared_keys:
+                continue
+            source = entry.get("source") or "inferred"
+            strength = float(entry.get("strength", 0))
+            item_count = int(entry.get("item_count", 0))
+            if source not in {"inferred", "learned"}:
+                continue
+            if strength < 0.08 or item_count < 2:
+                continue
+            stat = analytics.topic_stats.get(key)
+            briefing_count = stat.stories_shown if stat else 0
+            ranked[label] = max(ranked.get(label, 0), briefing_count, item_count)
+
+    return [
+        label
+        for label, _ in sorted(ranked.items(), key=lambda x: x[1], reverse=True)
+    ][:limit]
 
 
 def build_topic_actual(analytics: TopicBriefingAnalytics) -> dict[str, dict]:
