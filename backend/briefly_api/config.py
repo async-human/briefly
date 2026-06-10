@@ -163,7 +163,8 @@ class Settings(BaseSettings):
 
     @property
     def calendar_redirect_uri(self) -> str:
-        return f"{self.backend_url.rstrip('/')}/api/v1/auth/calendar/callback"
+        """Calendar OAuth completes via the Gmail callback (already in GCP)."""
+        return self.gmail_redirect_uri
 
     gmail_scopes: str = "https://www.googleapis.com/auth/gmail.readonly openid email"
     calendar_scopes: str = (

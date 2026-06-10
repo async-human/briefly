@@ -22,6 +22,7 @@ async def oauth_config(settings: Settings = Depends(get_settings)) -> dict:
         "google_sign_in_redirect_uri": settings.google_redirect_uri,
         "gmail_connect_redirect_uri": settings.gmail_redirect_uri,
         "calendar_connect_redirect_uri": settings.calendar_redirect_uri,
+        "calendar_uses_gmail_callback": True,
     }
 
 

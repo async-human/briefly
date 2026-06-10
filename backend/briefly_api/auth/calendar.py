@@ -26,9 +26,12 @@ CALENDAR_API = "https://www.googleapis.com/calendar/v3"
 
 
 def build_calendar_auth_url(settings: Settings, state: str) -> str:
+    # Reuse the Gmail redirect URI — it is already registered in Google Cloud Console
+    # for most Briefly deployments. A separate /calendar/callback URI causes
+    # redirect_uri_mismatch unless manually added to GCP.
     params = {
         "client_id": settings.google_client_id,
-        "redirect_uri": settings.calendar_redirect_uri,
+        "redirect_uri": settings.gmail_redirect_uri,
         "response_type": "code",
         "scope": settings.calendar_scopes,
         "access_type": "offline",
@@ -69,7 +72,7 @@ async def exchange_calendar_code(code: str, settings: Settings) -> dict:
                 "code": code,
                 "client_id": settings.google_client_id,
                 "client_secret": settings.google_client_secret,
-                "redirect_uri": settings.calendar_redirect_uri,
+                "redirect_uri": settings.gmail_redirect_uri,
                 "grant_type": "authorization_code",
             },
             headers={"Content-Type": "application/x-www-form-urlencoded"},

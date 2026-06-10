@@ -223,21 +223,42 @@ async def gmail_callback(
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
     base = settings.frontend_url.rstrip("/")
+
+    # Calendar OAuth reuses this callback URI (see auth/calendar.py).
+    flow = "gmail"
+    payload: dict | None = None
+    if state:
+        try:
+            payload = decode_calendar_state(state, settings)
+            flow = "calendar"
+        except Exception:
+            try:
+                payload = decode_gmail_state(state, settings)
+                flow = "gmail"
+            except Exception:
+                payload = None
+
+    default_path = "/settings" if flow == "calendar" else "/onboarding"
+    param = "calendar" if flow == "calendar" else "gmail"
+
     if error:
-        return RedirectResponse(f"{base}/onboarding?gmail=denied")
-    if not code or not state:
-        return RedirectResponse(f"{base}/onboarding?gmail=error")
-    try:
-        payload = decode_gmail_state(state, settings)
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state") from exc
+        path = (payload or {}).get("redirect", default_path)
+        return RedirectResponse(f"{base}{path}?{param}=denied")
+    if not code or not state or not payload:
+        return RedirectResponse(f"{base}{default_path}?{param}=error")
 
     user_id = payload["user_id"]
-    redirect_path = payload.get("redirect", "/onboarding")
+    redirect_path = payload.get("redirect", default_path)
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    if flow == "calendar":
+        tokens = await exchange_calendar_code(code, settings)
+        await upsert_calendar_connection(db, user, tokens, user.email, settings=settings)
+        await db.commit()
+        return RedirectResponse(f"{base}{redirect_path}?calendar=connected")
 
     tokens = await exchange_gmail_code(code, settings)
     connection = await upsert_gmail_connection(db, user, tokens, user.email, settings=settings)
@@ -314,27 +335,10 @@ async def calendar_callback(
     error: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
-    base = settings.frontend_url.rstrip("/")
-    if error:
-        return RedirectResponse(f"{base}/settings?calendar=denied")
-    if not code or not state:
-        return RedirectResponse(f"{base}/settings?calendar=error")
-    try:
-        payload = decode_calendar_state(state, settings)
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state") from exc
-
-    user_id = payload["user_id"]
-    redirect_path = payload.get("redirect", "/settings")
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
-
-    tokens = await exchange_calendar_code(code, settings)
-    await upsert_calendar_connection(db, user, tokens, user.email, settings=settings)
-    await db.commit()
-    return RedirectResponse(f"{base}{redirect_path}?calendar=connected")
+    """Legacy path — calendar OAuth now completes via /auth/gmail/callback."""
+    return await gmail_callback(
+        settings=settings, code=code, state=state, error=error, db=db,
+    )
 
 
 @router.get("/auth/calendar/status", response_model=CalendarStatusOut)
