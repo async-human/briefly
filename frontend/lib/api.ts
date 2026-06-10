@@ -875,6 +875,9 @@ export const api = {
   getAskThread: (threadId: string) =>
     request<{ thread: AskThread }>(`/api/v1/ask/threads/${threadId}`),
 
+  deleteAskThread: (threadId: string) =>
+    request<{ ok: boolean }>(`/api/v1/ask/threads/${threadId}`, { method: "DELETE" }),
+
   // Brain Dump
   listBrainDumps: () => request<BrainDump[]>("/api/v1/brain-dumps"),
   createBrainDump: (body: { text: string }) =>

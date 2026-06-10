@@ -2855,10 +2855,29 @@ a.saved-capture-title:hover {
   padding: 0 0.5rem 0.5rem;
   overflow-y: auto;
   flex: 1;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ask-thread-list::-webkit-scrollbar {
+  display: none;
+}
+
+.ask-thread-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.125rem;
+  border-radius: var(--app-radius-sm);
+}
+
+.ask-thread-row:hover .ask-thread-delete,
+.ask-thread-row:focus-within .ask-thread-delete {
+  opacity: 1;
 }
 
 .ask-thread-item {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   text-align: left;
   border: none;
   background: transparent;
@@ -2886,6 +2905,34 @@ a.saved-capture-title:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ask-thread-delete {
+  flex-shrink: 0;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-right: 0.125rem;
+  border: none;
+  border-radius: var(--app-radius-sm);
+  background: transparent;
+  color: var(--app-ink-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--app-dur) var(--app-ease), background var(--app-dur) var(--app-ease), color var(--app-dur) var(--app-ease);
+}
+
+.ask-thread-delete:hover {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  color: #dc2626;
+}
+
+@media (hover: none) {
+  .ask-thread-delete {
+    opacity: 0.55;
+  }
 }
 
 .ask-thread-empty {
@@ -3039,6 +3086,12 @@ a.saved-capture-title:hover {
   overscroll-behavior: contain;
   padding-bottom: 0.75rem;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ask-messages::-webkit-scrollbar {
+  display: none;
 }
 
 .ask-main-chat .ask-messages {

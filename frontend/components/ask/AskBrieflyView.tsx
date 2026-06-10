@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api, type AskMessage, type AskThreadSummary } from "@/lib/api";
 import { buildContextualAskQuestion } from "@/lib/askLinks";
 import { AskMessageContent, CitationSources } from "./AskMessageContent";
@@ -62,6 +63,7 @@ export function AskBrieflyView({
   initialThreadId,
   anchorTitle,
 }: AskBrieflyViewProps) {
+  const router = useRouter();
   const [threads, setThreads] = useState<AskThreadSummary[]>([]);
   const [threadId, setThreadId] = useState<string | null>(initialThreadId ?? null);
   const [messages, setMessages] = useState<AskMessage[]>([]);
@@ -193,6 +195,19 @@ export function AskBrieflyView({
     setError("");
   }
 
+  async function handleDeleteThread(id: string) {
+    try {
+      await api.deleteAskThread(id);
+      setThreads((prev) => prev.filter((t) => t.id !== id));
+      if (threadId === id) {
+        startNewThread();
+        router.replace("/ask");
+      }
+    } catch {
+      setError("Could not delete this chat.");
+    }
+  }
+
   function openThread(id: string) {
     void api
       .getAskThread(id)
@@ -221,13 +236,32 @@ export function AskBrieflyView({
             <li className="ask-thread-empty">No chats yet</li>
           ) : (
             threads.map((t) => (
-              <li key={t.id}>
+              <li key={t.id} className="ask-thread-row">
                 <button
                   type="button"
                   className={`ask-thread-item${threadId === t.id ? " is-active" : ""}`}
                   onClick={() => openThread(t.id)}
                 >
                   <span className="ask-thread-item-title">{t.title}</span>
+                </button>
+                <button
+                  type="button"
+                  className="ask-thread-delete"
+                  aria-label={`Delete chat: ${t.title}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleDeleteThread(t.id);
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path
+                      d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 </button>
               </li>
             ))

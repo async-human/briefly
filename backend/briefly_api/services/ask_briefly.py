@@ -702,6 +702,21 @@ async def list_threads(db: AsyncSession, user_id: str, *, limit: int = 30) -> li
     return out
 
 
+async def delete_thread(db: AsyncSession, user_id: str, thread_id: str) -> bool:
+    result = await db.execute(
+        select(FollowUpThread).where(
+            FollowUpThread.id == thread_id,
+            FollowUpThread.user_id == user_id,
+        )
+    )
+    thread = result.scalar_one_or_none()
+    if not thread:
+        return False
+    await db.delete(thread)
+    await db.commit()
+    return True
+
+
 async def get_thread(db: AsyncSession, user_id: str, thread_id: str) -> dict | None:
     result = await db.execute(
         select(FollowUpThread).where(

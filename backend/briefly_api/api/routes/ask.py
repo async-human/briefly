@@ -12,6 +12,7 @@ from briefly_api.db.engine import get_db
 from briefly_api.db.models import User
 from briefly_api.services.ask_briefly import (
     ask_briefly,
+    delete_thread,
     get_thread,
     list_threads,
     stream_ask_briefly,
@@ -96,3 +97,15 @@ async def get_ask_thread(
     if not thread:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found.")
     return {"thread": thread}
+
+
+@router.delete("/ask/threads/{thread_id}")
+async def delete_ask_thread(
+    thread_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    deleted = await delete_thread(db, user.id, thread_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found.")
+    return {"ok": True}
