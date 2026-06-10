@@ -2995,6 +2995,15 @@ a.saved-capture-title:hover {
   max-width: 24rem;
 }
 
+.ask-hero-anchor-title {
+  margin: 0.75rem 0 0;
+  font-size: 0.9375rem;
+  font-weight: 550;
+  color: var(--app-ink);
+  line-height: 1.4;
+  max-width: 28rem;
+}
+
 .ask-chips {
   display: flex;
   flex-wrap: wrap;
