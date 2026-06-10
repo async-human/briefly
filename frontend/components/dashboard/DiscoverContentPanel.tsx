@@ -17,8 +17,8 @@ const REASON_LABELS: Record<string, string> = {
   declared: "Your interests",
 };
 
-const POLL_MS = 2500;
-const MAX_POLLS = 40;
+const POLL_MS = 3000;
+const MAX_POLLS = 60; // ~3 min of polling; job runs in background if this elapses
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -70,7 +70,10 @@ export function DiscoverContentPanel({ onSourceAdded }: DiscoverContentPanelProp
           return;
         }
       }
-      setError("Discovery is taking longer than expected. Try Refresh.");
+      // Job may still be running server-side — don't treat as hard failure
+      setScanning(true);
+      setScanLabel("Still scanning in the background — check back in a minute or tap Refresh.");
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load discoveries");
     } finally {

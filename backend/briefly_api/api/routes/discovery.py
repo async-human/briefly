@@ -215,7 +215,10 @@ def _articles_out(profile: UserProfile) -> DiscoveredArticlesOut:
 
 async def _start_content_discovery(user_id: str, *, force: bool = False) -> None:
     """Mark job running in DB, then run harvest/score in a background task."""
-    from briefly_api.services.intelligent_content_discovery import run_content_discovery_job
+    from briefly_api.services.intelligent_content_discovery import (
+        _progress_is_stale,
+        run_content_discovery_job,
+    )
 
     async with SessionLocal() as session:
         prof = await session.execute(
@@ -226,7 +229,7 @@ async def _start_content_discovery(user_id: str, *, force: bool = False) -> None
             return
 
         progress = (profile.discovery_meta or {}).get("content_discovery") or {}
-        if progress.get("status") == "running":
+        if progress.get("status") == "running" and not _progress_is_stale(progress):
             return
 
         meta = dict(profile.discovery_meta or {})
@@ -255,10 +258,18 @@ async def get_discovered_articles(
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
+    from briefly_api.services.intelligent_content_discovery import (
+        _progress_is_stale,
+        content_discovery_is_running,
+    )
+
     articles = get_cached_discoveries(profile)
     progress = (profile.discovery_meta or {}).get("content_discovery") or {}
 
-    if not articles and progress.get("status") != "running":
+    if _progress_is_stale(progress):
+        progress = {**progress, "status": "idle"}
+
+    if not articles and not content_discovery_is_running(profile):
         await _start_content_discovery(user.id, force=False)
         await db.refresh(profile)
 
@@ -276,8 +287,13 @@ async def refresh_discovered_articles(
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
+    from briefly_api.services.intelligent_content_discovery import (
+        _progress_is_stale,
+        content_discovery_is_running,
+    )
+
     progress = (profile.discovery_meta or {}).get("content_discovery") or {}
-    if progress.get("status") != "running":
+    if _progress_is_stale(progress) or not content_discovery_is_running(profile):
         await _start_content_discovery(user.id, force=True)
         await db.refresh(profile)
 

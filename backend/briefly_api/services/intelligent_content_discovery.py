@@ -58,7 +58,8 @@ _SCORE_THRESHOLD = 0.58
 _DASHBOARD_LIMIT = 8
 _DIGEST_INJECT_LIMIT = 2
 _HARVEST_TIMEOUT_SEC = 40.0
-_DISCOVERY_JOB_TIMEOUT_SEC = 75.0
+_DISCOVERY_JOB_TIMEOUT_SEC = 90.0
+_STALE_RUNNING_MINUTES = 3
 
 _POS_SIGNALS = {SignalType.saved, SignalType.clicked, SignalType.followed_up}
 
@@ -625,6 +626,29 @@ def _content_discovery_progress(profile: UserProfile | None) -> dict:
     return dict((profile.discovery_meta or {}).get("content_discovery") or {})
 
 
+def _progress_is_stale(progress: dict) -> bool:
+    """A 'running' job with no heartbeat for N minutes is treated as crashed."""
+    if progress.get("status") != "running":
+        return False
+    updated = progress.get("updated_at")
+    if not updated:
+        return True
+    try:
+        at = datetime.fromisoformat(str(updated).replace("Z", "+00:00"))
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=timezone.utc)
+    except Exception:
+        return True
+    return datetime.now(timezone.utc) - at > timedelta(minutes=_STALE_RUNNING_MINUTES)
+
+
+def content_discovery_is_running(profile: UserProfile | None) -> bool:
+    progress = _content_discovery_progress(profile)
+    if progress.get("status") != "running":
+        return False
+    return not _progress_is_stale(progress)
+
+
 async def report_content_discovery_progress(
     user_id: str,
     *,
@@ -740,31 +764,38 @@ async def discover_relevant_content(
 async def run_content_discovery_job(user_id: str, *, force_refresh: bool = False) -> None:
     """Background worker — never call from a synchronous HTTP handler."""
     from briefly_api.db.engine import SessionLocal
+    from briefly_api.workers.job_queue import job_lock
 
-    try:
-        async with SessionLocal() as session:
-            await asyncio.wait_for(
-                discover_relevant_content(
-                    session, user_id, force_refresh=force_refresh,
-                ),
-                timeout=_DISCOVERY_JOB_TIMEOUT_SEC,
+    lock_key = f"briefly:content_discovery:{user_id}"
+    async with job_lock(lock_key, ttl_seconds=120) as acquired:
+        if not acquired:
+            log.debug("Content discovery lock held for user %s — skipping", user_id)
+            return
+
+        try:
+            async with SessionLocal() as session:
+                await asyncio.wait_for(
+                    discover_relevant_content(
+                        session, user_id, force_refresh=force_refresh,
+                    ),
+                    timeout=_DISCOVERY_JOB_TIMEOUT_SEC,
+                )
+        except asyncio.TimeoutError:
+            log.error("Content discovery job timed out for user %s", user_id)
+            await report_content_discovery_progress(
+                user_id,
+                status="error",
+                label="Discovery timed out",
+                error="Scan took too long. Try Refresh in a moment.",
             )
-    except asyncio.TimeoutError:
-        log.error("Content discovery job timed out for user %s", user_id)
-        await report_content_discovery_progress(
-            user_id,
-            status="error",
-            label="Discovery timed out",
-            error="Scan took too long. Try Refresh in a moment.",
-        )
-    except Exception as exc:
-        log.exception("Content discovery job failed for user %s", user_id)
-        await report_content_discovery_progress(
-            user_id,
-            status="error",
-            label="Discovery failed",
-            error=str(exc)[:240],
-        )
+        except Exception as exc:
+            log.exception("Content discovery job failed for user %s", user_id)
+            await report_content_discovery_progress(
+                user_id,
+                status="error",
+                label="Discovery failed",
+                error=str(exc)[:240],
+            )
 
 
 async def discover_and_cache_for_user(session: AsyncSession, user_id: str) -> int:
