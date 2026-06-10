@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, type ProfileIntelligence } from "@/lib/api";
 import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { AccountConnections } from "@/components/settings/AccountConnections";
 import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton";
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
@@ -475,7 +476,11 @@ export default function SettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const showLoading = useMinLoadTime(loading);
-  const [me, setMe] = useState<{ name: string | null; avatar_url?: string | null } | null>(null);
+  const [me, setMe] = useState<{
+    name: string | null;
+    avatar_url?: string | null;
+    ingestion_email?: string;
+  } | null>(null);
   const [intel, setIntel] = useState<ProfileIntelligence | null>(null);
   const [streak, setStreak] = useState(0);
   const [declaredProfile, setDeclaredProfile] = useState<{
@@ -532,7 +537,11 @@ export default function SettingsPage() {
     Promise.all([api.getMe(), api.getProfileIntelligence().catch(() => null)])
       .then(([meData, intelData]) => {
         if (!meData.onboarding_completed) { router.replace("/onboarding"); return; }
-        setMe({ name: meData.user.name, avatar_url: meData.user.avatar_url });
+        setMe({
+          name: meData.user.name,
+          avatar_url: meData.user.avatar_url,
+          ingestion_email: meData.ingestion_email,
+        });
         setStreak(meData.reading_streak ?? 0);
         const p = meData.profile;
         if (p) {
@@ -643,6 +652,19 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+
+            {/* ── Connections ── */}
+            <div className="dash-surface dash-surface-settings dash-surface-connections">
+              <div className="dash-surface-head">
+                <h2 className="dash-surface-title">Connected accounts</h2>
+                <p className="dash-surface-desc">
+                  Link the services Briefly reads from. Connect or disconnect anytime.
+                </p>
+              </div>
+              <div className="dash-surface-body dash-surface-body-form">
+                <AccountConnections ingestionEmail={me?.ingestion_email} />
+              </div>
+            </div>
 
             {/* ── Profile ── */}
             <Section

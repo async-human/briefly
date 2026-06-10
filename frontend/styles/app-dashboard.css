@@ -1226,6 +1226,308 @@
   font-size: 0.75rem;
 }
 
+/* Settings — account connections */
+.dash-surface-connections .dash-surface-body-form {
+  padding-top: 0.25rem;
+}
+
+.settings-connections-loading {
+  font-size: 0.875rem;
+  color: var(--app-muted);
+  margin: 0;
+}
+
+.settings-connections-banner,
+.settings-connections-error {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--app-radius-sm);
+  margin-bottom: 1rem;
+}
+
+.settings-connections-banner {
+  background: color-mix(in srgb, #6aab8a 12%, var(--app-canvas));
+  border: 1px solid color-mix(in srgb, #6aab8a 28%, var(--app-border));
+  color: #3d7a5c;
+}
+
+.settings-connections-error {
+  background: color-mix(in srgb, #c47070 10%, var(--app-canvas));
+  border: 1px solid color-mix(in srgb, #c47070 25%, var(--app-border));
+  color: #9a4040;
+}
+
+.settings-connections-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.settings-connections-count {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--app-muted);
+  text-transform: uppercase;
+}
+
+.settings-connector-list {
+  list-style: none;
+  margin: 0 0 1.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.settings-connector-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md, 12px);
+  background: var(--app-canvas);
+  transition: border-color var(--app-dur) var(--app-ease),
+    box-shadow var(--app-dur) var(--app-ease);
+}
+
+.settings-connector-card:hover {
+  border-color: var(--app-border-strong);
+}
+
+.settings-connector-card.is-connected {
+  border-color: color-mix(in srgb, #6aab8a 35%, var(--app-border));
+  background: color-mix(in srgb, #6aab8a 5%, var(--app-canvas));
+}
+
+.settings-connector-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
+}
+
+.settings-connector-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-connector-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.15rem;
+}
+
+.settings-connector-name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.settings-connector-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #3d7a5c;
+  background: color-mix(in srgb, #6aab8a 14%, transparent);
+  border: 1px solid color-mix(in srgb, #6aab8a 30%, var(--app-border));
+  border-radius: 100px;
+  padding: 0.15rem 0.45rem;
+}
+
+.settings-connector-desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-connector-action {
+  flex-shrink: 0;
+}
+
+.settings-connector-btn {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--app-radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity var(--app-dur) var(--app-ease),
+    background var(--app-dur) var(--app-ease),
+    border-color var(--app-dur) var(--app-ease);
+}
+
+.settings-connector-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.settings-connector-btn-primary {
+  border: 1px solid var(--app-ink);
+  background: var(--app-ink);
+  color: var(--app-canvas, #faf9f6);
+}
+
+.settings-connector-btn-primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.settings-connector-btn-ghost {
+  border: 1px solid var(--app-border-strong);
+  background: transparent;
+  color: var(--app-ink-secondary);
+}
+
+.settings-connector-btn-ghost:hover:not(:disabled) {
+  background: var(--app-surface-muted);
+  color: var(--app-ink);
+}
+
+.settings-feeds-section {
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.settings-feeds-head {
+  margin-bottom: 0.85rem;
+}
+
+.settings-feeds-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.settings-feeds-desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+  line-height: 1.45;
+}
+
+.settings-feeds-empty {
+  margin: 0 0 0.85rem;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+}
+
+.settings-feed-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.settings-feed-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-muted);
+}
+
+.settings-feed-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+
+.settings-feed-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.settings-feed-name {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--app-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-feed-url {
+  font-size: 0.6875rem;
+  color: var(--app-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-feed-remove {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--app-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.35rem;
+  border-radius: 6px;
+}
+
+.settings-feed-remove:hover:not(:disabled) {
+  color: #9a4040;
+  background: color-mix(in srgb, #c47070 10%, transparent);
+}
+
+.settings-feed-add {
+  margin-top: 0.25rem;
+}
+
+.settings-connections-footnote {
+  margin: 1.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+  line-height: 1.55;
+}
+
+.settings-ingestion-email {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
+  color: var(--app-ink-secondary);
+}
+
+@media (max-width: 560px) {
+  .settings-connector-card {
+    flex-wrap: wrap;
+  }
+
+  .settings-connector-action {
+    width: 100%;
+    padding-left: calc(44px + 0.85rem);
+  }
+
+  .settings-connector-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
 /* Briefly Knows inside surface */
 .dash-surface-knows {
   overflow: visible;
