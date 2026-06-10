@@ -174,6 +174,11 @@ class UserProfile(Base):
     discovery_last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     discovery_meta: Mapped[dict] = mapped_column(JSONB, default=dict)
 
+    # Article-level discovery — relevant content from outside user subscriptions
+    # Structure: [{id, title, url, source_name, summary, relevance_score, why_relevant, ...}]
+    discovered_articles: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+    discovered_articles_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

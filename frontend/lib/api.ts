@@ -307,6 +307,28 @@ export type DiscoveryConfirmResponse = {
   confirmed: boolean;
 };
 
+export type DiscoveredArticle = {
+  id: string;
+  title: string;
+  url: string;
+  source_name: string;
+  summary?: string;
+  published_at?: string | null;
+  feed_url?: string;
+  source_type?: string;
+  relevance_score?: number;
+  discovery_reason?: string;
+  why_relevant?: string;
+  intent_topic?: string;
+  publisher_domain?: string;
+};
+
+export type DiscoveredArticlesResponse = {
+  articles: DiscoveredArticle[];
+  refreshed_at?: string | null;
+  meta?: Record<string, unknown>;
+};
+
 export type DigestSummary = {
   id: string;
   digest_date: string;
@@ -629,6 +651,10 @@ export const api = {
     request<DiscoveryStatusResponse>("/api/v1/sources/discover/status"),
   resetSourceDiscovery: () =>
     request<{ reset: boolean }>("/api/v1/sources/discover/reset", { method: "POST" }),
+  getDiscoveredArticles: () =>
+    request<DiscoveredArticlesResponse>("/api/v1/discover/articles"),
+  refreshDiscoveredArticles: () =>
+    request<DiscoveredArticlesResponse>("/api/v1/discover/articles/refresh", { method: "POST" }),
   getOnboardingStatus: () => request<OnboardingStatus>("/api/v1/onboarding/status"),
   updateOnboardingProfile: (body: {
     role?: string;

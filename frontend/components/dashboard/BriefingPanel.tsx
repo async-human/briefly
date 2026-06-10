@@ -8,6 +8,7 @@ import {
   groupDigestItemsBySection,
   SECTION_HIGHLY_RELEVANT,
   SECTION_WHATS_NEW,
+  SECTION_WORTH_DISCOVERING,
   sectionBadgeClass,
 } from "@/lib/digestSections";
 import { AddSourceForm, CopyEmailButton } from "./AddSourceForm";
@@ -503,12 +504,14 @@ function BriefingPreviewItem({
 function sectionSubtitle(section: string): string {
   if (section === SECTION_WHATS_NEW) return "Latest from your sources";
   if (section === SECTION_HIGHLY_RELEVANT) return "Picked for your interests";
+  if (section === SECTION_WORTH_DISCOVERING) return "Relevant content from outside your subscriptions";
   return "";
 }
 
 function sectionBadgeLabel(section: string): string {
   if (section === SECTION_WHATS_NEW) return "From your sources";
   if (section === SECTION_HIGHLY_RELEVANT) return "Picked for you";
+  if (section === SECTION_WORTH_DISCOVERING) return "Worth discovering";
   return section;
 }
 

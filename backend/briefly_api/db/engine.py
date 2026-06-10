@@ -95,6 +95,8 @@ async def init_db() -> None:
             "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sources_discovery_confirmed_at TIMESTAMPTZ",
             "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS discovery_last_run_at TIMESTAMPTZ",
             "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS discovery_meta JSONB DEFAULT '{}'::jsonb",
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS discovered_articles JSONB DEFAULT '[]'::jsonb",
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS discovered_articles_at TIMESTAMPTZ",
         ):
             try:
                 await conn.execute(text(stmt))

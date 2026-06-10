@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from briefly_api.api.schemas import (
+    DiscoveredArticleOut,
+    DiscoveredArticlesOut,
     DiscoveryCandidateOut,
     DiscoveryConfirmIn,
     DiscoveryConfirmOut,
@@ -184,4 +186,65 @@ async def confirm_discovery(
         added=[SourceOut.model_validate(s) for s in added_sources],
         total_sources=len(sources),
         confirmed=True,
+    )
+
+
+@router.get("/discover/articles", response_model=DiscoveredArticlesOut)
+async def get_discovered_articles(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> DiscoveredArticlesOut:
+    """Return cached relevant articles from outside user subscriptions."""
+    from briefly_api.services.intelligent_content_discovery import (
+        discover_relevant_content,
+        get_cached_discoveries,
+    )
+
+    prof = await db.execute(select(UserProfile).where(UserProfile.user_id == user.id))
+    profile = prof.scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    articles = get_cached_discoveries(profile)
+    if not articles:
+        articles = await discover_relevant_content(db, user.id, settings=settings)
+
+    meta = (profile.discovery_meta or {}).get("last_content_discovery") or {}
+    return DiscoveredArticlesOut(
+        articles=[DiscoveredArticleOut.model_validate(a) for a in articles],
+        refreshed_at=(
+            profile.discovered_articles_at.isoformat()
+            if profile.discovered_articles_at else None
+        ),
+        meta=meta,
+    )
+
+
+@router.post("/discover/articles/refresh", response_model=DiscoveredArticlesOut)
+async def refresh_discovered_articles(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> DiscoveredArticlesOut:
+    """Force-refresh the intelligent content discovery pipeline."""
+    from briefly_api.services.intelligent_content_discovery import discover_relevant_content
+
+    prof = await db.execute(select(UserProfile).where(UserProfile.user_id == user.id))
+    profile = prof.scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    articles = await discover_relevant_content(
+        db, user.id, settings=settings, force_refresh=True,
+    )
+    meta = (profile.discovery_meta or {}).get("last_content_discovery") or {}
+    await db.refresh(profile)
+    return DiscoveredArticlesOut(
+        articles=[DiscoveredArticleOut.model_validate(a) for a in articles],
+        refreshed_at=(
+            profile.discovered_articles_at.isoformat()
+            if profile.discovered_articles_at else None
+        ),
+        meta=meta,
     )

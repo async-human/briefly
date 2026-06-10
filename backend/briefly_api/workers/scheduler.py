@@ -324,6 +324,13 @@ async def _run_ingestion_for_user(user_id: str, local_date: str) -> None:
                 "Scheduler: ingested for user %s (new=%d updated=%d)",
                 user_id, summary.items_new, summary.items_updated,
             )
+            try:
+                from briefly_api.services.intelligent_content_discovery import discover_and_cache_for_user
+                async with SessionLocal() as disc_session:
+                    count = await discover_and_cache_for_user(disc_session, user_id)
+                log.info("Scheduler: content discovery for user %s surfaced %d articles", user_id, count)
+            except Exception:
+                log.exception("Scheduler: content discovery failed for user %s", user_id)
         except Exception:
             log.exception("Scheduler: ingestion failed for user %s", user_id)
 

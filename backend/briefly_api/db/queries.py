@@ -65,6 +65,10 @@ async def get_user_with_profile(session: AsyncSession, user_id: str) -> dict | N
             "activity_feed": await list_activity(session, user.id, limit=10),
             "auto_expand_sources": bool(p.auto_expand_sources),
             "ingest_time": p.ingest_time or "03:00",
+            "discovered_articles": list(p.discovered_articles or []),
+            "discovered_articles_at": (
+                p.discovered_articles_at.isoformat() if p.discovered_articles_at else None
+            ),
         }
 
     return data

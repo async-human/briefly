@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, type MeResponse, type Source } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { BriefingPanel, SourcesSidebar } from "@/components/dashboard/BriefingPanel";
+import { DiscoverContentPanel } from "@/components/dashboard/DiscoverContentPanel";
 import { DashboardToolbar } from "@/components/dashboard/DashboardToolbar";
 import { SourceDiscoveryWizard } from "@/components/dashboard/SourceDiscoveryWizard";
 import { useBriefingGeneration } from "@/components/dashboard/BriefingGenerationProvider";
@@ -283,6 +284,7 @@ function DashboardContent() {
                 runGenerate();
               }}
             />
+            <DiscoverContentPanel onSourceAdded={handleSourceAdded} />
           </div>
         </section>
 

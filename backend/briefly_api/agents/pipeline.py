@@ -31,6 +31,7 @@ from briefly_api.agents import (
     relevance,
     brain_dump_injector,
     browser_capture_injector,
+    content_discovery_injector,
 )
 from briefly_api.agents.context import PipelineContext, UserContext
 from briefly_api.config import get_settings
@@ -148,6 +149,7 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
         ctx = await _load_proactive_context(session, ctx)
 
         ctx = await _run_agent("BriefingWriterAgent",    briefing_writer.run,  ctx)
+        ctx = await _run_agent("ContentDiscoveryInjectorAgent", content_discovery_injector.run, ctx)
 
         # Persist guard: planner selected items but writer produced none → fallback drafts
         if ctx.selected_item_ids and not ctx.digest_items:

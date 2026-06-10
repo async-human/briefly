@@ -304,6 +304,28 @@ class DiscoveryConfirmOut(BaseModel):
     confirmed: bool
 
 
+class DiscoveredArticleOut(BaseModel):
+    id: str
+    title: str
+    url: str
+    source_name: str
+    summary: str = ""
+    published_at: str | None = None
+    feed_url: str = ""
+    source_type: str = "rss"
+    relevance_score: float = 0.0
+    discovery_reason: str = ""
+    why_relevant: str = ""
+    intent_topic: str = ""
+    publisher_domain: str = ""
+
+
+class DiscoveredArticlesOut(BaseModel):
+    articles: list[DiscoveredArticleOut]
+    refreshed_at: str | None = None
+    meta: dict = Field(default_factory=dict)
+
+
 class ReadwiseConnectIn(BaseModel):
     api_key: str
 
