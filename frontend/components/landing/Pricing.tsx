@@ -112,12 +112,7 @@ export function Pricing() {
                 {proFeatures.map((f) => (
                   <li key={f.text} className="pricing-v2-feature">
                     <Check />
-                    <span>
-                      {f.text}
-                      {f.soon && (
-                        <span className="pricing-soon-badge">Soon</span>
-                      )}
-                    </span>
+                    <span>{f.text}</span>
                   </li>
                 ))}
               </ul>
