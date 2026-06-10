@@ -1,0 +1,477 @@
+/* Vellum-inspired onboarding — centered, calm, step-by-step */
+
+.onboard-shell {
+  --ob-max: 480px;
+  --ob-radius: 14px;
+  --ob-radius-lg: 18px;
+}
+
+.onboard-shell .onboard-header {
+  padding: 20px 24px;
+  border-bottom: none;
+  background: transparent;
+  max-width: calc(var(--ob-max) + 48px);
+  margin: 0 auto;
+}
+
+.onboard-shell .onboard-main {
+  max-width: calc(var(--ob-max) + 48px);
+  padding: 8px 24px 80px;
+}
+
+.onboard-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+  min-height: 36px;
+}
+
+.onboard-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.onboard-back:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--bg-elevated);
+}
+
+.onboard-back svg {
+  width: 18px;
+  height: 18px;
+}
+
+.onboard-nav-spacer {
+  flex: 1;
+}
+
+.onboard-editable-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.onboard-editable-note a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.onboard-editable-note a:hover {
+  color: var(--text);
+}
+
+.onboard-shell .onboard-title {
+  font-size: clamp(28px, 4.5vw, 34px);
+  letter-spacing: -0.03em;
+  margin-bottom: 8px;
+}
+
+.onboard-shell .onboard-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: none;
+}
+
+.onboard-shell .onboard-panel-head {
+  margin-bottom: 28px;
+}
+
+.onboard-shell .onboard-eyebrow {
+  display: none;
+}
+
+.onboard-shell .onboard-progress-bar {
+  max-width: var(--ob-max);
+  padding-top: 0;
+  margin-bottom: 4px;
+}
+
+/* Role selection — vertical cards */
+.onboard-role-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.onboard-role-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--ob-radius);
+  background: rgba(255, 255, 255, 0.55);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+}
+
+.onboard-role-card:hover {
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.onboard-role-card.selected {
+  border-color: var(--accent-line);
+  background: var(--accent-dim);
+  box-shadow: 0 0 0 1px var(--accent-line);
+}
+
+.onboard-role-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.onboard-role-card.selected .onboard-role-card-icon {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.onboard-role-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.onboard-role-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 2px;
+}
+
+.onboard-role-card-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.onboard-role-radio {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.onboard-role-card.selected .onboard-role-radio {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.onboard-role-radio-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.onboard-role-card.selected .onboard-role-radio-dot {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Topic suggestion pills — "A few to try" */
+.onboard-suggest-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 14px 0 8px;
+}
+
+.onboard-shell .tag-suggestions {
+  gap: 8px;
+}
+
+.onboard-shell .tag-suggestion {
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.onboard-shell .tag-input-wrap {
+  border-radius: var(--ob-radius);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.onboard-shell .tag-chip {
+  background: var(--accent-dim);
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+/* Source tile grid */
+.onboard-source-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 520px) {
+  .onboard-source-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.onboard-source-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 108px;
+  padding: 16px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--ob-radius-lg);
+  background: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, box-shadow 0.18s, transform 0.15s;
+  text-align: center;
+}
+
+.onboard-source-tile:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(28, 24, 18, 0.06);
+}
+
+.onboard-source-tile:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.onboard-source-tile.connected {
+  border-color: rgba(106, 171, 138, 0.45);
+  background: rgba(106, 171, 138, 0.06);
+}
+
+.onboard-source-tile-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+}
+
+.onboard-source-tile-icon--text {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.onboard-source-tile-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.onboard-source-tile-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #6aab8a;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.onboard-source-detail {
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--ob-radius);
+  background: rgba(255, 255, 255, 0.55);
+  margin-bottom: 20px;
+  animation: onboardFade 0.25s ease-out;
+}
+
+.onboard-source-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.onboard-source-detail-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.onboard-source-detail-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.onboard-source-detail-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.onboard-source-url-panel .onboard-add-form {
+  margin-top: 12px;
+}
+
+.onboard-source-count-pill {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 6px 12px;
+  margin-bottom: 16px;
+}
+
+/* CTA — Vellum dark pill */
+.onboard-shell .onboard-actions {
+  margin-top: 8px;
+  align-items: stretch;
+}
+
+.onboard-shell .onboard-cta {
+  max-width: none;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.onboard-shell .onboard-cta:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.onboard-shell .onboard-ghost {
+  font-size: 14px;
+  padding: 8px;
+  color: var(--text-secondary);
+}
+
+.onboard-shell .onboard-ghost:hover {
+  color: var(--text);
+}
+
+.onboard-shell .onboard-input {
+  border-radius: var(--ob-radius);
+  background: rgba(255, 255, 255, 0.55);
+  padding: 13px 16px;
+}
+
+/* Schedule step */
+.onboard-schedule-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--ob-radius-lg);
+  background: rgba(255, 255, 255, 0.55);
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.onboard-shell .onboard-time-input {
+  font-size: 18px;
+  padding: 14px 16px;
+  width: 100%;
+  max-width: 200px;
+}
+
+.onboard-time-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 10px;
+}
+
+.onboard-ready-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.onboard-ready-stat {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 6px 12px;
+}
+
+.onboard-ready-stat strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.onboard-shell .onboard-confirm {
+  padding-top: 12px;
+}
+
+.onboard-shell .onboard-confirm-icon {
+  width: 56px;
+  height: 56px;
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+
+.onboard-shell .onboard-confirm-title {
+  font-size: clamp(28px, 4.5vw, 34px);
+}
+
+.onboard-shell .onboard-banner {
+  border-radius: var(--ob-radius);
+  margin-bottom: 16px;
+}
+
+@media (max-width: 600px) {
+  .onboard-shell .onboard-header {
+    padding: 16px 20px;
+  }
+
+  .onboard-shell .onboard-main {
+    padding: 4px 20px 64px;
+  }
+}
