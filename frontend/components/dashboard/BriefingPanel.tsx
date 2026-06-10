@@ -21,6 +21,7 @@ import { OutcomeBriefHeader, SafeToIgnorePanel } from "./OutcomeBriefHeader";
 import { getDigestOutcome, splitTopPriorityItems } from "@/lib/digestOutcome";
 import { graphItemUrl } from "@/lib/graphLinks";
 import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
+import { GeneratingProgressRing } from "@/components/loading/GeneratingProgressRing";
 
 const PREVIEW_LIMIT = 5;
 
@@ -531,11 +532,19 @@ function buildGroupedPreview(items: DigestItem[], limit: number) {
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 const GENERATING_PHASES = [
+  "Fetching from your sources…",
   "Reading your sources…",
   "Scoring items for relevance…",
-  "Finding what&apos;s new for you…",
   "Writing your briefing…",
 ];
+
+function phaseIndexFromLabel(label: string): number {
+  const lower = label.toLowerCase();
+  if (lower.includes("writing") || lower.includes("ready")) return 3;
+  if (lower.includes("scoring") || lower.includes("relevance") || lower.includes("planning")) return 2;
+  if (lower.includes("reading") || lower.includes("clean") || lower.includes("dedup")) return 1;
+  return 0;
+}
 
 type BriefingPanelProps = {
   digest: Digest | null;
@@ -567,18 +576,55 @@ function GeneratingPanel({
   elapsedSec: number;
   isUpdate: boolean;
 }) {
+  const activePhase = phaseIndexFromLabel(statusLabel);
+  const progress = Math.min(0.92, (activePhase + 0.35) / GENERATING_PHASES.length);
+
   return (
-    <div className="bgl-panel bgl-panel-minimal" aria-busy="true" aria-live="polite">
-      <BriefLoaderArt />
-      <p className="bgl-panel-minimal-title">
+    <div className="hm-generating-panel" aria-busy="true" aria-live="polite">
+      <div className="hm-generating-panel-visual">
+        <GeneratingProgressRing progress={progress} />
+        <BriefLoaderArt size="md" />
+      </div>
+
+      <h3 className="hm-generating-panel-title">
         {isUpdate ? "Preparing your briefing" : "Building your first briefing"}
-      </p>
-      <p className="bgl-panel-minimal-status">
+      </h3>
+
+      <p className="hm-generating-panel-status">
         <span className="dash-page-status-dot" aria-hidden />
         {statusLabel}
       </p>
+
+      <ol className="hm-generating-steps">
+        {GENERATING_PHASES.map((phase, i) => {
+          const state =
+            i < activePhase ? "done" : i === activePhase ? "active" : "pending";
+          return (
+            <li key={phase} className={`hm-generating-step hm-generating-step--${state}`}>
+              <span className="hm-generating-step-marker" aria-hidden>
+                {state === "done" ? (
+                  <svg viewBox="0 0 12 12" width="10" height="10">
+                    <path
+                      d="M2.5 6.2 4.8 8.5 9.5 3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ) : state === "active" ? (
+                  <span className="hm-generating-step-pulse" />
+                ) : null}
+              </span>
+              <span className="hm-generating-step-label">{phase}</span>
+            </li>
+          );
+        })}
+      </ol>
+
       {elapsedSec > 0 && (
-        <p className="bgl-panel-minimal-elapsed">{fmtElapsed(elapsedSec)}</p>
+        <p className="hm-generating-panel-elapsed">{fmtElapsed(elapsedSec)}</p>
       )}
     </div>
   );

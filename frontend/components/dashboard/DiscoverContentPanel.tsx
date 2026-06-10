@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type DiscoveredArticle, type Source } from "@/lib/api";
 import { SourceIcon } from "@/components/SourceIcon";
+import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
 
 type DiscoverContentPanelProps = {
   onSourceAdded?: (source: Source) => void;
@@ -71,7 +72,7 @@ export function DiscoverContentPanel({ onSourceAdded }: DiscoverContentPanelProp
   if (loading) {
     return (
       <div className="discover-content-panel discover-content-loading">
-        <div className="discover-content-spinner" aria-hidden />
+        <BriefLoaderArt size="sm" />
         <p>Finding relevant content outside your subscriptions…</p>
       </div>
     );

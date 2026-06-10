@@ -1,46 +1,52 @@
-# Design — Briefly App
+# Design — Briefly
 
-Locked design system for authenticated app surfaces (dashboard, history, settings).
-Landing/marketing uses editorial Hallmark separately; app pages read this file.
+Locked design system for the Briefly app shell. Dashboard and in-app surfaces read this before visual changes.
 
 ## Genre
 
-modern-minimal — quiet editorial app: sans-led type, hairline dividers, no card chrome.
+modern-minimal with editorial warmth — knowledge-work utility, not marketing flash.
 
-## Macrostructure family
+## App macrostructure
 
-- **App pages:** Workbench — functional header, primary content column, optional secondary rail (sources / meta).
-- **Marketing pages:** Long Document (hallmark-landing) — do not mix tokens without intent.
+**Workbench** — sidebar navigation + primary canvas + secondary sources rail. Function carries the page; no hero enrichment.
 
-## Theme (app)
+## Theme (Lumen-adjacent)
 
-Cool light paper, cool ink, single signal accent (briefly gold-cobalt hybrid).
+- `--color-paper` canvas: warm near-white
+- `--color-paper-2` sidebar: cool grey-violet wash
+- `--color-ink` primary text: deep blue-grey
+- `--color-accent` action: refined indigo (~278°)
+- `--color-brand` mark: warm gold (~65°)
 
-- Display: Playfair Display (existing `--font-serif`)
-- Body: DM Sans (`--font-sans`)
-- Labels: DM Mono (`--font-mono`)
+Mapped in `frontend/styles/app-dashboard.css` as `--app-*` tokens.
 
-Tokens live in `frontend/styles/hallmark-dashboard.css` and map to app `--bg`, `--text`, `--accent` variables.
+## Typography
 
-## Spacing
-
-4pt scale via `--hm-space-*`; components use existing `--space` aliases where wired.
+- Display / page titles: `var(--font-serif)` (Playfair Display), weight 600, roman only
+- Body / UI: `var(--font-sans)` (DM Sans)
+- Mono / metrics: `var(--font-mono)` (DM Mono)
 
 ## Motion
 
-- Reveal: opacity only, ≤220ms, `--hm-ease-out`
-- `prefers-reduced-motion`: no transforms on hover lifts
+- Easing: `cubic-bezier(0.22, 1, 0.36, 1)` as `--app-ease`
+- Durations: 160ms UI, 480ms reveals, 2.4–3.2s ambient loaders
+- Animate `transform` and `opacity` only
+- `prefers-reduced-motion`: collapse to opacity ≤150ms
+
+## Loaders
+
+- **Brief loader**: stacked page sheets with staggered line reveal + soft orbital glow
+- **Generating panel**: ring progress + phased step list (active / done / pending)
+- **Page skeleton**: fade-rise surfaces, no bounce
 
 ## CTA voice
 
-- Primary: filled ink pill, single line, 6px radius
-- Secondary: hairline outline on `--border`
+- Primary: filled indigo, 6px radius, medium weight label
+- Secondary: hairline border, canvas fill, hover muted wash
 
-## Per-page rules
+## What app pages share
 
-- App pages: no hero enrichment, no marketing gradients
-- Sources rail collapses to sheet/toggle below 60rem
-
-## What pages MUST share
-
-Wordmark, accent placement, card hairlines, nav destinations (Today · History · Preferences).
+- Sidebar + canvas grid
+- Accent ≤5% per viewport
+- Surface shadow: single hairline + 1px lift
+- Status dot: breathing pulse on indigo

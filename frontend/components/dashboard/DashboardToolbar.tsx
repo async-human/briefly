@@ -76,10 +76,11 @@ export function DashboardToolbar({
           {onRefresh && sourceCount > 0 && (
             <button
               type="button"
-              className="dash-btn dash-btn-secondary"
+              className={`dash-btn dash-btn-secondary${generating ? " dash-btn-loading" : ""}`}
               onClick={onRefresh}
               disabled={generating}
             >
+              {generating && <span className="dash-btn-spinner" aria-hidden />}
               {generating ? "Refreshing…" : "Refresh"}
             </button>
           )}

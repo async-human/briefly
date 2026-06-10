@@ -193,7 +193,7 @@ export function AnimatedPageSkeleton({ variant }: AnimatedPageSkeletonProps) {
         {isGraph ? (
           <GraphLoaderArt />
         ) : isDashboard ? (
-          <BriefLoaderArt />
+          <BriefLoaderArt size="lg" />
         ) : (
           <LayoutSkeleton variant={variant} />
         )}

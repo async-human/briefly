@@ -1,38 +1,42 @@
 import type { CSSProperties } from "react";
 
-const LINES = [
-  { y: 7, x1: 7, x2: 41 },
-  { y: 16, x1: 7, x2: 34 },
-  { y: 25, x1: 7, x2: 27 },
-] as const;
+type BriefLoaderArtProps = {
+  /** sm = inline status · md = panel · lg = full-page */
+  size?: "sm" | "md" | "lg";
+};
 
-export function BriefLoaderArt() {
+const SIZE_CLASS = {
+  sm: "hm-brief-loader--sm",
+  md: "hm-brief-loader--md",
+  lg: "hm-brief-loader--lg",
+} as const;
+
+export function BriefLoaderArt({ size = "md" }: BriefLoaderArtProps) {
   return (
-    <div className="app-brief-loader" aria-hidden>
-      <div className="app-brief-loader-visual">
-        <span className="app-brief-loader-glow" />
-        <svg className="app-brief-loader-svg" viewBox="0 0 48 32" fill="none">
-          {LINES.map((line, i) => {
-            const len = line.x2 - line.x1;
-            return (
-              <line
-                key={line.y}
-                x1={line.x1}
-                y1={line.y}
-                x2={line.x2}
-                y2={line.y}
-                className="app-brief-loader-stroke"
-                strokeDasharray={len}
-                style={
-                  {
-                    "--line-len": `${len}`,
-                    animationDelay: `${i * 0.26}s`,
-                  } as CSSProperties
-                }
-              />
-            );
-          })}
-        </svg>
+    <div className={`hm-brief-loader ${SIZE_CLASS[size]}`} aria-hidden>
+      <span className="hm-brief-loader-orbit" />
+      <span className="hm-brief-loader-orbit hm-brief-loader-orbit-2" />
+      <div className="hm-brief-loader-stack">
+        <span className="hm-brief-loader-sheet hm-brief-loader-sheet-back" />
+        <span className="hm-brief-loader-sheet hm-brief-loader-sheet-mid" />
+        <span className="hm-brief-loader-sheet hm-brief-loader-sheet-front">
+          <span
+            className="hm-brief-loader-line"
+            style={{ "--line-i": 0 } as CSSProperties}
+          />
+          <span
+            className="hm-brief-loader-line hm-brief-loader-line-2"
+            style={{ "--line-i": 1 } as CSSProperties}
+          />
+          <span
+            className="hm-brief-loader-line hm-brief-loader-line-3"
+            style={{ "--line-i": 2 } as CSSProperties}
+          />
+          <span
+            className="hm-brief-loader-line hm-brief-loader-line-4"
+            style={{ "--line-i": 3 } as CSSProperties}
+          />
+        </span>
       </div>
     </div>
   );

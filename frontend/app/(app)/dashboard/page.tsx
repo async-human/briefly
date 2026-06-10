@@ -18,6 +18,7 @@ import {
 } from "@/lib/briefingStorage";
 import { runSilentSourceDiscovery } from "@/lib/silentDiscovery";
 import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton";
+import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 
@@ -222,9 +223,12 @@ function DashboardContent() {
   if (discoveryRunning) {
     return (
       <div className="dash-page dash-page-centered">
-        <div className="dash-empty-state">
-          <span className="btn-spinner" aria-hidden />
-          <p>Briefly is learning your sources — your first brief is on the way…</p>
+        <div className="hm-discovery-boot" aria-busy="true" aria-live="polite">
+          <BriefLoaderArt size="lg" />
+          <h2 className="hm-discovery-boot-title">Learning your sources</h2>
+          <p className="hm-discovery-boot-desc">
+            Briefly is scanning what you follow — your first brief is on the way.
+          </p>
         </div>
       </div>
     );
