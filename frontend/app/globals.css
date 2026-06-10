@@ -13998,6 +13998,7 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
 .briefly-logo svg {
   display: block;
   flex-shrink: 0;
+  overflow: visible;
 }
 
 .briefly-logo-wordmark {

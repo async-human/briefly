@@ -23,37 +23,47 @@ function BrieflyMark({ sizePx }: { sizePx: number }) {
     >
       <defs>
         <linearGradient
-          id={`${uid}-bg`}
-          x1="7"
-          y1="5"
-          x2="25"
-          y2="27"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop offset="0%" stopColor="#E4C07A" />
-          <stop offset="48%" stopColor="#C49A3C" />
-          <stop offset="100%" stopColor="#966F28" />
-        </linearGradient>
-        <linearGradient
-          id={`${uid}-shine`}
+          id={`${uid}-gold`}
           x1="8"
-          y1="6"
-          x2="20"
-          y2="14"
+          y1="7"
+          x2="26"
+          y2="25"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.28" />
-          <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+          <stop offset="0%" stopColor="#DDB96A" />
+          <stop offset="45%" stopColor="#C49A3C" />
+          <stop offset="100%" stopColor="#8F6624" />
         </linearGradient>
       </defs>
-      <rect x="2" y="2" width="28" height="28" rx="8" fill={`url(#${uid}-bg)`} />
-      <rect x="2" y="2" width="28" height="14" rx="8" fill={`url(#${uid}-shine)`} />
-      {/* Margin stem */}
-      <rect x="9.75" y="9" width="2.5" height="14" rx="1.25" fill="white" fillOpacity="0.96" />
+      {/* Editorial margin */}
+      <path
+        d="M10.25 7.5v17"
+        stroke={`url(#${uid}-gold)`}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
       {/* Distilled lines — long → short */}
-      <rect x="14.25" y="10.25" width="12.5" height="2" rx="1" fill="white" fillOpacity="0.94" />
-      <rect x="14.25" y="15" width="9.25" height="2" rx="1" fill="white" fillOpacity="0.88" />
-      <rect x="14.25" y="19.75" width="5.75" height="2" rx="1" fill="white" fillOpacity="0.82" />
+      <path
+        d="M14 10.75h10.25"
+        stroke={`url(#${uid}-gold)`}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeOpacity="0.95"
+      />
+      <path
+        d="M14 15.5h7.75"
+        stroke={`url(#${uid}-gold)`}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeOpacity="0.78"
+      />
+      <path
+        d="M14 20.25h4.75"
+        stroke={`url(#${uid}-gold)`}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeOpacity="0.58"
+      />
     </svg>
   );
 }
