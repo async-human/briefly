@@ -4,7 +4,12 @@ Locked design system for the Briefly app shell. Dashboard and in-app surfaces re
 
 ## Genre
 
-modern-minimal with editorial warmth — knowledge-work utility, not marketing flash.
+editorial-minimal — warm paper, serif display, restrained indigo accent. A morning journal, not a SaaS control panel.
+
+## Hallmark passes
+
+- **v1** — Workbench tokens, OKLCH palette, stacked-page loaders
+- **v2** — Airier rhythm, border-only surfaces, sidebar accent rail, redundant chrome removed
 
 ## App macrostructure
 

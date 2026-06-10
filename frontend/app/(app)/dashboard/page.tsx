@@ -263,17 +263,10 @@ function DashboardContent() {
 
       <div className="dash-page-grid">
         <section className="dash-surface dash-surface-briefing" aria-labelledby="briefing-surface-title">
-          <div className="dash-surface-head">
-            <div>
-              <h2 id="briefing-surface-title" className="dash-surface-title">
-                Today&apos;s briefing
-              </h2>
-              <p className="dash-surface-desc">
-                Curated stories ranked by relevance — open any item for the full read.
-              </p>
-            </div>
-          </div>
-          <div className="dash-surface-body">
+          <h2 id="briefing-surface-title" className="sr-only">
+            Today&apos;s briefing
+          </h2>
+          <div className="dash-surface-body dash-surface-body-flush">
             <BriefingPanel
               digest={digest}
               sources={fetchableSources}
@@ -293,17 +286,15 @@ function DashboardContent() {
         </section>
 
         <aside className="dash-surface dash-surface-sources" aria-labelledby="sources-surface-title">
-          <div className="dash-surface-head">
-            <div>
-              <h2 id="sources-surface-title" className="dash-surface-title">
-                Sources
-              </h2>
-              <p className="dash-surface-desc">
-                {fetchableSources.length > 0
-                  ? `${fetchableSources.length} connected — Briefly reads these in the background`
-                  : "Connect where Briefly finds your newsletters and feeds"}
-              </p>
-            </div>
+          <div className="dash-surface-head dash-surface-head-rail">
+            <h2 id="sources-surface-title" className="dash-surface-title">
+              Sources
+            </h2>
+            <p className="dash-surface-desc">
+              {fetchableSources.length > 0
+                ? `${fetchableSources.length} connected`
+                : "Connect your feeds"}
+            </p>
           </div>
           <div className="dash-surface-body dash-surface-body-sources">
             <SourcesSidebar
