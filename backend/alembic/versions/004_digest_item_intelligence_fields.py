@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from typing import Sequence, Union
 
-import sqlalchemy as sa
 from alembic import op
 
 revision: str = "004"
@@ -18,16 +17,21 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "digest_items",
-        sa.Column("contradiction_flag", sa.Boolean(), nullable=False, server_default="false"),
+    # Idempotent — init_db() may have already added these columns on legacy deploys.
+    op.execute(
+        """
+        ALTER TABLE digest_items
+        ADD COLUMN IF NOT EXISTS contradiction_flag BOOLEAN NOT NULL DEFAULT FALSE
+        """
     )
-    op.add_column(
-        "digest_items",
-        sa.Column("contradiction_explanation", sa.Text(), nullable=True),
+    op.execute(
+        """
+        ALTER TABLE digest_items
+        ADD COLUMN IF NOT EXISTS contradiction_explanation TEXT
+        """
     )
 
 
 def downgrade() -> None:
-    op.drop_column("digest_items", "contradiction_explanation")
-    op.drop_column("digest_items", "contradiction_flag")
+    op.execute("ALTER TABLE digest_items DROP COLUMN IF EXISTS contradiction_explanation")
+    op.execute("ALTER TABLE digest_items DROP COLUMN IF EXISTS contradiction_flag")
