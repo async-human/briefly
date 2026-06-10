@@ -94,49 +94,82 @@ function isCleanLabel(s: string) {
 
 // ── Topic tile: animated fill from bottom ────────────────────────────────────
 
-function lookupTopicStrength(strengths: Record<string, number>, topic: string): number {
-  if (strengths[topic] !== undefined) return strengths[topic];
-  const lower = topic.toLowerCase();
-  const match = Object.entries(strengths).find(([k]) => k.toLowerCase() === lower);
-  return match ? match[1] : 0.5;
+function formatSignalAge(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  const days = Math.floor((Date.now() - then) / 86_400_000);
+  if (days <= 0) return "Last activity today";
+  if (days === 1) return "Last activity yesterday";
+  if (days < 14) return `Last activity ${days} days ago`;
+  const weeks = Math.round(days / 7);
+  return `Last activity ${weeks} weeks ago`;
+}
+
+function topicBreakdown(saves: number, engaged: number, skipped: number): string {
+  if (saves > 0 && skipped > 0) return `${saves} saved · ${skipped} skipped`;
+  if (saves > 0) return `${saves} saved`;
+  if (engaged > 0 && skipped > 0) return `${engaged} kept · ${skipped} skipped`;
+  if (engaged > 0) return `${engaged} kept`;
+  if (skipped > 0) return `${skipped} skipped`;
+  return "No actions yet";
 }
 
 function TopicTile({
-  topic, pct, isActual, aboveExpectation, sampleTotal, isDiscovered,
+  topic, total, saves, engaged, skipped, ready, isDiscovered, isEmpty,
 }: {
   topic: string;
-  pct: number | null;
-  isActual: boolean;
-  aboveExpectation: boolean | null;
-  sampleTotal?: number;
+  total: number;
+  saves: number;
+  engaged: number;
+  skipped: number;
+  ready: boolean;
   isDiscovered?: boolean;
+  isEmpty?: boolean;
 }) {
-  const variant = !isActual ? "declared"
+  const variant = isEmpty ? "declared"
+    : !ready ? "partial"
     : isDiscovered ? "discovered"
-    : aboveExpectation === true ? "above"
+    : saves >= skipped ? "above"
     : "engaged";
-  const fill = pct !== null ? `${pct}%` : "0%";
+  const fill = ready && total > 0
+    ? `${Math.round((engaged / total) * 100)}%`
+    : "0%";
+
   return (
     <div
       className={`bk-topic-tile bk-topic-tile--${variant}`}
       style={{ "--bk-fill": fill } as React.CSSProperties}
       title={
-        isActual && sampleTotal
-          ? `${pct}% engaged across ${sampleTotal} signals on this topic`
-          : "Open or save stories on this topic to measure engagement"
+        isEmpty
+          ? "No matching stories in your briefings yet"
+          : !ready
+            ? `${total} matching stor${total === 1 ? "y" : "ies"} — need ${2 - total} more to score this topic`
+            : `${total} matching stories · ${topicBreakdown(saves, engaged, skipped)}`
       }
     >
-      {isActual && pct !== null ? (
-        <span className="bk-topic-pct">{pct}%</span>
+      {isEmpty ? (
+        <>
+          <span className="bk-topic-metric bk-topic-metric--muted">0</span>
+          <span className="bk-topic-detail">stories so far</span>
+        </>
       ) : (
-        <span className="bk-topic-pct bk-topic-pct--muted">—</span>
+        <>
+          <span className="bk-topic-metric">{total}</span>
+          <span className="bk-topic-detail">
+            {ready
+              ? topicBreakdown(saves, engaged, skipped)
+              : `1 more stor${total === 1 ? "y" : "ies"} to score`}
+          </span>
+        </>
       )}
       <span className="bk-topic-name">{topic}</span>
-      {!isActual && (
-        <span className="bk-topic-sub">Need more signals</span>
+      {isEmpty && <span className="bk-topic-sub">Read briefings on this topic</span>}
+      {!isEmpty && !ready && (
+        <span className="bk-topic-sub">Building your score</span>
       )}
-      {isActual && isDiscovered && (
-        <span className="bk-topic-sub">Discovered from your reads</span>
+      {ready && isDiscovered && (
+        <span className="bk-topic-sub">From your reading, not declared</span>
       )}
     </div>
   );
@@ -169,37 +202,45 @@ function BrieflyKnowsCard({
   const srcEngage   = beh.source_engagement ?? {};
   const emerging    = (beh.emerging_topics ?? []).filter(isCleanLabel).slice(0, 6);
 
-  const topicsWithEngagement = Object.values(topicActual).filter((t) => (t.total ?? 0) >= 2).length;
+  const topicsWithEngagement = Object.values(topicActual).filter((t) => t.ready !== false && (t.total ?? 0) >= 2).length;
   const hasTopicEngagement = topicsWithEngagement > 0;
+  const windowDays = beh.window_days ?? 45;
+  const lastActivity = formatSignalAge(beh.latest_signal_at);
 
   const declaredKeys = new Set(declared.interests.map((t) => t.toLowerCase()));
 
-  const engagedRows = Object.entries(topicActual)
-    .filter(([, data]) => (data.total ?? 0) >= 2)
+  const trackedRows = Object.entries(topicActual)
+    .filter(([, data]) => (data.total ?? 0) >= 1)
     .map(([key, data]) => ({
       topic: key,
-      declared: lookupTopicStrength(intel.topic_strengths ?? {}, key),
-      actual: data.rate,
-      sampleTotal: data.total,
+      total: data.total ?? 0,
+      saves: data.saves ?? 0,
+      engaged: data.engaged ?? 0,
+      skipped: data.skipped ?? 0,
+      ready: data.ready !== false && (data.total ?? 0) >= 2,
       isDiscovered: data.source === "discovered" || !declaredKeys.has(key),
+      isEmpty: false as const,
     }))
-    .sort((a, b) => b.actual - a.actual);
+    .sort((a, b) => b.total - a.total || b.saves - a.saves);
 
-  const declaredPendingRows = declared.interests
+  const declaredEmptyRows = declared.interests
     .filter(isCleanLabel)
     .filter((t) => {
       const data = topicActual[t.toLowerCase()];
-      return !data || (data.total ?? 0) < 2;
+      return !data || (data.total ?? 0) === 0;
     })
     .map((t) => ({
       topic: t,
-      declared: lookupTopicStrength(intel.topic_strengths ?? {}, t),
-      actual: null as number | null,
-      sampleTotal: 0,
+      total: 0,
+      saves: 0,
+      engaged: 0,
+      skipped: 0,
+      ready: false,
       isDiscovered: false,
+      isEmpty: true,
     }));
 
-  const comparisonRows = [...engagedRows, ...declaredPendingRows].slice(0, 12);
+  const comparisonRows = [...trackedRows, ...declaredEmptyRows].slice(0, 12);
 
   const cleanSources       = (intel.top_sources           ?? []).filter(isCleanLabel);
   const cleanDeprioritized = (intel.deprioritized_sources ?? []).filter(isCleanLabel);
@@ -233,7 +274,8 @@ function BrieflyKnowsCard({
           <span className="bk-eyebrow">intelligence profile</span>
           <h2 className="bk-title">What Briefly knows about you</h2>
           <p className="bk-freshness">
-            {freshness ?? "Based on your last 45 days of reading"}
+            {freshness ?? `Based on your last ${windowDays} days`}
+            {lastActivity ? ` · ${lastActivity}` : ""}
             <button
               type="button"
               className="bk-refresh-btn"
@@ -289,34 +331,29 @@ function BrieflyKnowsCard({
             <p className="bk-section-label">
               {hasTopicEngagement ? "Topic engagement" : "Your tracked topics"}
             </p>
-            {hasTopicEngagement && (
-              <span className="bk-section-hint">
-                % = save/skip rate on stories matching each topic (needs 2+ signals)
-              </span>
-            )}
+            <span className="bk-section-hint">
+              Story counts from briefings that mention each topic (last {windowDays} days)
+            </span>
           </div>
           {!hasTopicEngagement && (
             <p className="bk-declared-hint">
-              Open and save stories to see your actual engagement per topic.
+              Save or skip stories in read mode — counts appear once Briefly sees 2+ matching stories.
             </p>
           )}
           <div className="bk-topics-grid">
-            {comparisonRows.map(({ topic, declared: d, actual: a, sampleTotal, isDiscovered }) => {
-              const hasActual = a !== null;
-              const pct = hasActual ? Math.round(a * 100) : null;
-              const diff = hasActual ? Math.round(a * 100) - Math.round(d * 100) : null;
-              return (
-                <TopicTile
-                  key={topic}
-                  topic={topic}
-                  pct={pct}
-                  isActual={hasActual}
-                  aboveExpectation={diff !== null && !isDiscovered ? diff > 10 : null}
-                  sampleTotal={sampleTotal}
-                  isDiscovered={isDiscovered}
-                />
-              );
-            })}
+            {comparisonRows.map((row) => (
+              <TopicTile
+                key={row.topic}
+                topic={row.topic}
+                total={row.total}
+                saves={row.saves}
+                engaged={row.engaged}
+                skipped={row.skipped}
+                ready={row.ready}
+                isDiscovered={row.isDiscovered}
+                isEmpty={row.isEmpty ?? false}
+              />
+            ))}
           </div>
           {emerging.length > 0 && (
             <div className="bk-emerging">

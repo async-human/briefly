@@ -923,6 +923,7 @@ async def _compute_behavioral_intelligence(
     result = await db.execute(
         select(
             BehavioralSignal.signal_type,
+            BehavioralSignal.created_at,
             DigestItem.headline,
             DigestItem.source_name,
             DigestItem.why_it_matters,
@@ -998,26 +999,37 @@ async def _compute_behavioral_intelligence(
             return False
         return any(kw in text for kw in keywords)
 
-    topic_actual: dict[str, dict] = {}
-    for topic in declared_topics:
-        pos = neg = 0
+    def _topic_signal_counts(topic: str) -> tuple[int, int, int, int]:
+        pos = neg = saves = 0
         for s in signals:
             text = _item_text(s)
             if not _topic_matches(topic, text):
                 continue
-            if s.signal_type in pos_types:
+            if s.signal_type == SignalType.saved:
+                saves += 1
+                pos += 1
+            elif s.signal_type in pos_types:
                 pos += 1
             elif s.signal_type in neg_types:
                 neg += 1
-        tot = pos + neg
-        if tot >= 2:
-            topic_actual[topic] = {
-                "rate":    round(pos / tot, 3),
-                "engaged": pos,
-                "skipped": neg,
-                "total":   tot,
-                "source":  "declared",
-            }
+        return pos, neg, saves, pos + neg
+
+    def _topic_entry(topic: str, pos: int, neg: int, saves: int, tot: int, source: str) -> dict:
+        return {
+            "rate": round(pos / tot, 3) if tot else 0.0,
+            "engaged": pos,
+            "saves": saves,
+            "skipped": neg,
+            "total": tot,
+            "ready": tot >= 2,
+            "source": source,
+        }
+
+    topic_actual: dict[str, dict] = {}
+    for topic in declared_topics:
+        pos, neg, saves, tot = _topic_signal_counts(topic)
+        if tot >= 1:
+            topic_actual[topic] = _topic_entry(topic, pos, neg, saves, tot, "declared")
 
     # Discovered topics: learned from reading behaviour, not explicitly declared
     from briefly_api.services.profile_utils import cluster_label
@@ -1038,31 +1050,19 @@ async def _compute_behavioral_intelligence(
             discovered_candidates.append(key)
 
     for topic in dict.fromkeys(discovered_candidates):
-        pos = neg = 0
-        for s in signals:
-            text = _item_text(s)
-            if not _topic_matches(topic, text):
-                continue
-            if s.signal_type in pos_types:
-                pos += 1
-            elif s.signal_type in neg_types:
-                neg += 1
-        tot = pos + neg
-        if tot >= 2:
-            topic_actual[topic] = {
-                "rate":    round(pos / tot, 3),
-                "engaged": pos,
-                "skipped": neg,
-                "total":   tot,
-                "source":  "discovered",
-            }
+        pos, neg, saves, tot = _topic_signal_counts(topic)
+        if tot >= 1:
+            topic_actual[topic] = _topic_entry(topic, pos, neg, saves, tot, "discovered")
 
     # Emerging topics: high-frequency words in saved/clicked headlines NOT
     # already covered by a declared interest
     emerging_counts: dict[str, int] = {}
     stop = {"that", "with", "this", "from", "have", "will", "been", "into",
             "they", "their", "about", "more", "after", "what", "when",
-            "could", "would", "says", "your", "over", "here", "than"}
+            "could", "would", "says", "your", "over", "here", "than",
+            "announces", "announced", "equity", "capital", "expand",
+            "compute", "alphabet", "million", "billion", "company",
+            "market", "invest", "investors", "raises", "launch"}
     for s in signals:
         if s.signal_type not in pos_types or not s.headline:
             continue
@@ -1073,7 +1073,7 @@ async def _compute_behavioral_intelligence(
 
     emerging_topics = [
         w for w, c in sorted(emerging_counts.items(), key=lambda x: x[1], reverse=True)
-        if c >= 2
+        if c >= 3
     ][:6]
 
     # Generate insight sentences
@@ -1145,14 +1145,22 @@ async def _compute_behavioral_intelligence(
                 ),
             })
 
+    latest_signal_at = max(
+        (s.created_at for s in signals if s.created_at),
+        default=None,
+    )
+
     return {
         "total_signals":       total,
         "overall_engagement":  overall_engagement,
         "save_rate":           save_rate,
-        "topic_actual":        topic_actual,        # engagement per topic (declared + discovered)
-        "source_engagement":   source_engagement,   # engagement rate per source
-        "emerging_topics":     emerging_topics,     # keywords from clicked items, not declared
-        "insights":            insights,            # human-readable observation cards
+        "topic_actual":        topic_actual,
+        "source_engagement":   source_engagement,
+        "emerging_topics":     emerging_topics,
+        "insights":            insights,
+        "window_days":         45,
+        "computed_at":         datetime.now(timezone.utc).isoformat(),
+        "latest_signal_at":    latest_signal_at.isoformat() if latest_signal_at else None,
     }
 
 

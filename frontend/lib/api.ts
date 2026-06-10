@@ -419,11 +419,16 @@ export type ProfileIntelligence = {
     total_signals?: number;
     overall_engagement?: number;
     save_rate?: number;
+    window_days?: number;
+    computed_at?: string | null;
+    latest_signal_at?: string | null;
     topic_actual?: Record<string, {
       rate: number;
       engaged: number;
+      saves: number;
       skipped: number;
       total: number;
+      ready?: boolean;
       source?: "declared" | "discovered";
     }>;
     source_engagement?: Record<string, number>;

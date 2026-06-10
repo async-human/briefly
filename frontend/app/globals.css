@@ -12935,6 +12935,34 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
 .bk-topic-tile--declared::before {
   display: none;
 }
+.bk-topic-tile--partial {
+  border-color: rgba(158,123,63,0.14);
+  background: rgba(158,123,63,0.03);
+}
+.bk-topic-tile--partial::before {
+  display: none;
+}
+.bk-topic-metric {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+}
+.bk-topic-metric--muted {
+  color: var(--text-secondary);
+  font-size: 18px;
+}
+.bk-topic-detail {
+  font-size: 11px;
+  color: var(--text-secondary);
+  position: relative;
+  z-index: 1;
+  line-height: 1.25;
+}
 .bk-topic-pct--muted {
   color: var(--text-secondary);
   font-size: 16px;
