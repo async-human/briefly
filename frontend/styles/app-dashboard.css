@@ -2216,97 +2216,107 @@ a.saved-capture-title:hover {
   animation: app-graph-caption-shimmer 3.2s ease-in-out infinite;
 }
 
-.app-graph-loader {
+/* ── Hallmark graph loader ─────────────────────────────────────────────────── */
+
+.hm-graph-loader {
+  --kg-hub: var(--app-accent);
+  --kg-topic: oklch(58% 0.18 295);
+  --kg-source: oklch(62% 0.17 145);
+  --kg-item: oklch(58% 0.14 250);
+  --kg-thought: oklch(72% 0.14 75);
+  --kg-thread: oklch(62% 0.18 350);
+
   position: relative;
-  width: min(15rem, 58vw);
+  width: min(16rem, 62vw);
   aspect-ratio: 1;
   display: grid;
   place-items: center;
 }
 
-.app-graph-loader-ring {
+.hm-graph-loader-ambient {
   position: absolute;
-  border-radius: 50%;
-  border: 1px solid rgba(94, 106, 210, 0.12);
-  pointer-events: none;
-}
-
-.app-graph-loader-ring-outer {
-  inset: 2%;
-  animation: app-graph-ring-spin 48s linear infinite;
-}
-
-.app-graph-loader-ring-inner {
-  inset: 18%;
-  border-color: rgba(94, 106, 210, 0.08);
-  animation: app-graph-ring-spin 36s linear infinite reverse;
-}
-
-.app-graph-loader-svg {
-  position: relative;
-  z-index: 1;
-  width: 88%;
-  height: 88%;
-  overflow: visible;
-}
-
-.app-graph-loader-constellation {
-  transform-origin: 100px 100px;
-  animation: app-graph-constellation-drift 20s ease-in-out infinite;
-}
-
-.app-graph-loader-glow {
-  position: absolute;
-  inset: 8%;
+  inset: 4%;
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    rgba(94, 106, 210, 0.18) 0%,
-    rgba(94, 106, 210, 0.06) 42%,
-    transparent 72%
+    oklch(48% 0.12 278 / 0.1) 0%,
+    oklch(48% 0.12 278 / 0.03) 45%,
+    transparent 70%
   );
-  animation: app-graph-glow-breathe 5s ease-in-out infinite;
+  animation: hm-graph-ambient-breathe 5.5s var(--app-ease-out) infinite;
   pointer-events: none;
 }
 
-.app-graph-loader-edge {
-  stroke: url(#graph-loader-edge-grad);
-  stroke-width: 1.25;
+.hm-graph-loader-svg {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.hm-graph-loader-network {
+  transform-origin: 120px 120px;
+  animation: hm-graph-network-settle 14s var(--app-ease-out) infinite;
+}
+
+.hm-graph-loader-edge {
+  fill: none;
+  stroke: var(--app-accent);
+  stroke-width: 1.35;
   stroke-linecap: round;
-  stroke-dasharray: 100;
-  stroke-dashoffset: 100;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
   opacity: 0;
   animation:
-    app-graph-edge-draw 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards,
-    app-graph-edge-ambient 4.5s ease-in-out 1.1s infinite;
+    hm-graph-edge-draw 0.95s var(--app-ease-out) forwards,
+    hm-graph-edge-glow 4.2s ease-in-out 0.95s infinite;
 }
 
-.app-graph-loader-node-wrap {
+.hm-graph-loader-pulse {
+  fill: var(--app-accent);
+  opacity: 0;
+  animation: hm-graph-pulse-fade 2.8s ease-in-out infinite;
+}
+
+.hm-graph-loader-node {
   opacity: 0;
   animation:
-    app-graph-node-enter 0.75s cubic-bezier(0.22, 1, 0.36, 1) var(--node-delay, 0s) forwards,
-    app-graph-node-float var(--float-duration, 4.5s) ease-in-out calc(0.75s + var(--node-delay, 0s)) infinite;
+    hm-graph-node-appear 0.7s var(--app-ease-out) var(--node-delay, 0s) forwards,
+    hm-graph-node-drift 5.5s ease-in-out calc(0.7s + var(--float-phase, 0s)) infinite;
 }
 
-.app-graph-loader-node-halo {
-  fill: rgba(94, 106, 210, 0.12);
-  stroke: none;
+.hm-graph-loader-node-ring {
+  fill: currentColor;
+  opacity: 0.14;
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
-.app-graph-loader-node-wrap.is-hub .app-graph-loader-node-halo {
-  fill: rgba(94, 106, 210, 0.2);
-  animation: app-graph-hub-halo 4s ease-in-out infinite;
-}
-
-.app-graph-loader-node {
-  fill: url(#graph-loader-node-grad);
-  stroke: rgba(255, 255, 255, 0.85);
+.hm-graph-loader-node-core {
+  fill: currentColor;
+  stroke: oklch(100% 0 0 / 0.88);
   stroke-width: 1.25;
 }
 
-.app-graph-loader-node-wrap.is-hub .app-graph-loader-node {
+.hm-graph-loader-node--hub {
+  color: var(--kg-hub);
+}
+
+.hm-graph-loader-node--hub .hm-graph-loader-node-ring {
+  opacity: 0.22;
+  animation: hm-graph-hub-ring 3.8s ease-in-out infinite;
+}
+
+.hm-graph-loader-node--hub .hm-graph-loader-node-core {
   stroke-width: 1.5;
 }
+
+.hm-graph-loader-node--topic { color: var(--kg-topic); }
+.hm-graph-loader-node--source { color: var(--kg-source); }
+.hm-graph-loader-node--item { color: var(--kg-item); }
+.hm-graph-loader-node--thought { color: var(--kg-thought); }
+.hm-graph-loader-node--thread { color: var(--kg-thread); }
 
 @keyframes app-loader-fade-in {
   from { opacity: 0; transform: translateY(10px) scale(0.98); }
@@ -2341,36 +2351,43 @@ a.saved-capture-title:hover {
   50% { opacity: 1; }
 }
 
-@keyframes app-graph-ring-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@keyframes hm-graph-ambient-breathe {
+  0%, 100% { opacity: 0.7; transform: scale(0.97); }
+  50% { opacity: 1; transform: scale(1.02); }
 }
 
-@keyframes app-graph-constellation-drift {
-  0%, 100% { transform: rotate(-1.5deg) scale(1); }
-  50% { transform: rotate(1.5deg) scale(1.02); }
+@keyframes hm-graph-network-settle {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  35% { transform: translate(1px, -1.5px) scale(1.005); }
+  70% { transform: translate(-1px, 1px) scale(0.998); }
 }
 
-@keyframes app-graph-edge-draw {
+@keyframes hm-graph-edge-draw {
   from {
-    stroke-dashoffset: 100;
+    stroke-dashoffset: 1;
     opacity: 0;
   }
   to {
     stroke-dashoffset: 0;
-    opacity: 0.7;
+    opacity: 0.55;
   }
 }
 
-@keyframes app-graph-edge-ambient {
-  0%, 100% { opacity: 0.42; }
-  50% { opacity: 0.72; }
+@keyframes hm-graph-edge-glow {
+  0%, 100% { opacity: 0.38; }
+  50% { opacity: 0.62; }
 }
 
-@keyframes app-graph-node-enter {
+@keyframes hm-graph-pulse-fade {
+  0%, 8% { opacity: 0; }
+  18%, 42% { opacity: 0.85; }
+  55%, 100% { opacity: 0; }
+}
+
+@keyframes hm-graph-node-appear {
   from {
     opacity: 0;
-    transform: scale(0.55);
+    transform: scale(0.4);
   }
   to {
     opacity: 1;
@@ -2378,40 +2395,39 @@ a.saved-capture-title:hover {
   }
 }
 
-@keyframes app-graph-node-float {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-2.5px) scale(1.03); }
+@keyframes hm-graph-node-drift {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(0, -2px); }
 }
 
-@keyframes app-graph-hub-halo {
-  0%, 100% { opacity: 0.65; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.08); }
-}
-
-@keyframes app-graph-glow-breathe {
-  0%, 100% { opacity: 0.55; transform: scale(0.98); }
-  50% { opacity: 1; transform: scale(1.03); }
+@keyframes hm-graph-hub-ring {
+  0%, 100% { transform: scale(1); opacity: 0.2; }
+  50% { transform: scale(1.12); opacity: 0.34; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .app-page-loader-enter-graph,
-  .app-graph-loader-ring,
-  .app-graph-loader-constellation,
-  .app-graph-loader-glow,
-  .app-graph-loader-edge,
-  .app-graph-loader-node-wrap,
-  .app-graph-loader-node-wrap.is-hub .app-graph-loader-node-halo,
+  .hm-graph-loader-ambient,
+  .hm-graph-loader-network,
+  .hm-graph-loader-edge,
+  .hm-graph-loader-pulse,
+  .hm-graph-loader-node,
+  .hm-graph-loader-node--hub .hm-graph-loader-node-ring,
   .app-page-loader-caption-graph {
     animation: none !important;
   }
 
-  .app-graph-loader-edge {
+  .hm-graph-loader-edge {
     stroke-dashoffset: 0;
-    opacity: 0.55;
+    opacity: 0.5;
   }
 
-  .app-graph-loader-node-wrap {
+  .hm-graph-loader-node {
     opacity: 1;
+  }
+
+  .hm-graph-loader-pulse {
+    display: none;
   }
 }
 

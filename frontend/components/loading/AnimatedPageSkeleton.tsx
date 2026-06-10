@@ -1,5 +1,5 @@
-import type { CSSProperties } from "react";
 import { BriefLoaderArt } from "./BriefLoaderArt";
+import { GraphLoaderArt } from "./GraphLoaderArt";
 
 export type PageLoaderVariant = "dashboard" | "saved" | "history" | "settings" | "graph";
 
@@ -10,95 +10,6 @@ const CAPTIONS: Record<PageLoaderVariant, string> = {
   settings: "Loading preferences…",
   graph: "Mapping your knowledge graph…",
 };
-
-const GRAPH_NODES = [
-  { id: "hub", cx: 100, cy: 100, r: 10, delay: "0s" },
-  { id: "n1", cx: 100, cy: 38, r: 6, delay: "0.08s" },
-  { id: "n2", cx: 154, cy: 72, r: 5.5, delay: "0.14s" },
-  { id: "n3", cx: 140, cy: 138, r: 6, delay: "0.2s" },
-  { id: "n4", cx: 60, cy: 138, r: 5.5, delay: "0.26s" },
-  { id: "n5", cx: 46, cy: 72, r: 5, delay: "0.32s" },
-  { id: "n6", cx: 168, cy: 118, r: 4, delay: "0.38s" },
-] as const;
-
-const GRAPH_EDGES: Array<[number, number, string]> = [
-  [0, 1, "0.05s"],
-  [0, 2, "0.12s"],
-  [0, 3, "0.18s"],
-  [0, 4, "0.24s"],
-  [0, 5, "0.3s"],
-  [2, 6, "0.36s"],
-  [3, 6, "0.42s"],
-  [1, 2, "0.48s"],
-  [4, 5, "0.54s"],
-];
-
-function GraphLoaderArt() {
-  return (
-    <div className="app-graph-loader" aria-hidden>
-      <span className="app-graph-loader-ring app-graph-loader-ring-outer" />
-      <span className="app-graph-loader-ring app-graph-loader-ring-inner" />
-      <svg className="app-graph-loader-svg" viewBox="0 0 200 200" fill="none">
-        <defs>
-          <linearGradient id="graph-loader-edge-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#5e6ad2" stopOpacity="0.15" />
-            <stop offset="50%" stopColor="#5e6ad2" stopOpacity="0.55" />
-            <stop offset="100%" stopColor="#5e6ad2" stopOpacity="0.15" />
-          </linearGradient>
-          <radialGradient id="graph-loader-node-grad" cx="30%" cy="30%" r="70%">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#5e6ad2" stopOpacity="0.9" />
-          </radialGradient>
-          <filter id="graph-loader-soft-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="2.5" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-        <g className="app-graph-loader-constellation">
-          <g className="app-graph-loader-edges">
-            {GRAPH_EDGES.map(([from, to, delay], i) => {
-              const a = GRAPH_NODES[from];
-              const b = GRAPH_NODES[to];
-              return (
-                <line
-                  key={`${from}-${to}-${i}`}
-                  x1={a.cx}
-                  y1={a.cy}
-                  x2={b.cx}
-                  y2={b.cy}
-                  className="app-graph-loader-edge"
-                  style={{ animationDelay: delay }}
-                />
-              );
-            })}
-          </g>
-          <g className="app-graph-loader-nodes" filter="url(#graph-loader-soft-glow)">
-            {GRAPH_NODES.map((node) => (
-              <g
-                key={node.id}
-                className={`app-graph-loader-node-wrap${node.id === "hub" ? " is-hub" : ""}`}
-                transform={`translate(${node.cx} ${node.cy})`}
-                style={
-                  {
-                    "--node-delay": node.delay,
-                    "--float-duration": node.id === "hub" ? "6s" : `${4.2 + (node.r % 3) * 0.4}s`,
-                  } as CSSProperties
-                }
-              >
-                <circle cx={0} cy={0} r={node.r + 3} className="app-graph-loader-node-halo" />
-                <circle cx={0} cy={0} r={node.r} className="app-graph-loader-node" />
-              </g>
-            ))}
-          </g>
-        </g>
-      </svg>
-      <span className="app-graph-loader-glow" />
-    </div>
-  );
-}
 
 function Block({
   w,
