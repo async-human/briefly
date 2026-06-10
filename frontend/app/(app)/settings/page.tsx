@@ -142,13 +142,26 @@ function TopicTile({
   );
 }
 
+function formatIntelFreshness(updatedAt: Date | null): string | null {
+  if (!updatedAt) return null;
+  const mins = Math.round((Date.now() - updatedAt.getTime()) / 60_000);
+  if (mins < 1) return "Updated just now";
+  if (mins < 60) return `Updated ${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  return `Updated ${hrs}h ago`;
+}
+
 function BrieflyKnowsCard({
-  intel, streak, declared,
+  intel, streak, declared, updatedAt, onRefresh, refreshing,
 }: {
   intel: ProfileIntelligence;
   streak: number;
   declared: { role: string; goal: string; interests: string[] };
+  updatedAt: Date | null;
+  onRefresh: () => void;
+  refreshing: boolean;
 }) {
+  const freshness = formatIntelFreshness(updatedAt);
   const stats       = intel.reading_stats ?? { total_digests: 0, avg_open_rate: 0, avg_click_rate: 0 };
   const beh         = intel.behavioral    ?? {};
   const insights    = beh.insights        ?? [];
@@ -219,6 +232,18 @@ function BrieflyKnowsCard({
         <div className="bk-masthead-left">
           <span className="bk-eyebrow">intelligence profile</span>
           <h2 className="bk-title">What Briefly knows about you</h2>
+          <p className="bk-freshness">
+            {freshness ?? "Based on your last 45 days of reading"}
+            <button
+              type="button"
+              className="bk-refresh-btn"
+              onClick={onRefresh}
+              disabled={refreshing}
+              aria-label="Refresh intelligence profile"
+            >
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </button>
+          </p>
         </div>
         <div className="bk-masthead-stats">
           {stats.total_digests > 0 && (
@@ -265,7 +290,9 @@ function BrieflyKnowsCard({
               {hasTopicEngagement ? "Topic engagement" : "Your tracked topics"}
             </p>
             {hasTopicEngagement && (
-              <span className="bk-section-hint">% = open/save rate on matching stories</span>
+              <span className="bk-section-hint">
+                % = save/skip rate on stories matching each topic (needs 2+ signals)
+              </span>
             )}
           </div>
           {!hasTopicEngagement && (
@@ -449,6 +476,8 @@ export default function SettingsPage() {
   const [filtersSaved, setFiltersSaved] = useState(false);
   const [deliverySaving, setDeliverySaving] = useState(false);
   const [deliverySaved, setDeliverySaved] = useState(false);
+  const [intelUpdatedAt, setIntelUpdatedAt] = useState<Date | null>(null);
+  const [intelRefreshing, setIntelRefreshing] = useState(false);
 
   // Auto-clear "Saved" badge after 2s
   const savedTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -456,6 +485,23 @@ export default function SettingsPage() {
     setter(true);
     const t = setTimeout(() => setter(false), 2000);
     savedTimers.current.push(t);
+  }
+
+  async function refreshIntelligence() {
+    setIntelRefreshing(true);
+    try {
+      const [meData, intelData] = await Promise.all([
+        api.getMe(),
+        api.getProfileIntelligence(),
+      ]);
+      setStreak(meData.reading_streak ?? 0);
+      setIntel(intelData);
+      setIntelUpdatedAt(new Date());
+    } catch {
+      /* non-blocking — card keeps last known data */
+    } finally {
+      setIntelRefreshing(false);
+    }
   }
 
   useEffect(() => {
@@ -479,13 +525,26 @@ export default function SettingsPage() {
             interests: p.interests?.map((i) => i.topic).filter(Boolean) ?? [],
           });
         }
-        if (intelData) setIntel(intelData);
+        if (intelData) {
+          setIntel(intelData);
+          setIntelUpdatedAt(new Date());
+        }
       })
       .catch(() => router.replace("/login"))
       .finally(() => setLoading(false));
     const timers = savedTimers.current;
     return () => timers.forEach(clearTimeout);
   }, [router]);
+
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible" && !loading) {
+        void refreshIntelligence();
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loading]);
 
   async function saveProfile() {
     setProfileSaving(true);
@@ -503,7 +562,9 @@ export default function SettingsPage() {
     setInterestsSaving(true);
     try {
       await api.updateOnboardingProfile({ interests: topics.length ? topics : [] });
+      setDeclaredProfile((prev) => ({ ...prev, interests: topics }));
       flashSaved(setInterestsSaved);
+      void refreshIntelligence();
     } finally { setInterestsSaving(false); }
   }
 
@@ -548,7 +609,14 @@ export default function SettingsPage() {
             {intel && (
               <div className="dash-surface dash-surface-knows">
                 <div className="dash-surface-body dash-surface-body-knows">
-                  <BrieflyKnowsCard intel={intel} streak={streak} declared={declaredProfile} />
+                  <BrieflyKnowsCard
+                    intel={intel}
+                    streak={streak}
+                    declared={declaredProfile}
+                    updatedAt={intelUpdatedAt}
+                    onRefresh={() => void refreshIntelligence()}
+                    refreshing={intelRefreshing}
+                  />
                 </div>
               </div>
             )}

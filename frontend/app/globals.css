@@ -12791,6 +12791,34 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   margin: 0;
   line-height: 1.2;
 }
+.bk-freshness {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.bk-refresh-btn {
+  border: none;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.bk-refresh-btn:hover:not(:disabled) {
+  opacity: 0.8;
+}
+.bk-refresh-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  text-decoration: none;
+}
 .bk-masthead-stats {
   display: flex;
   gap: 24px;
