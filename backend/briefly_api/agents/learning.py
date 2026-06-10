@@ -177,20 +177,16 @@ async def _update_topic_clusters(ctx: PipelineContext, session) -> None:
         if delta == 0.0:
             continue
 
-        item_text = " ".join(filter(None, [
+        from briefly_api.services.topic_matching import topic_match_text, topic_matches
+
+        item_text = topic_match_text(
             sig_row.headline,
-            sig_row.why_it_matters,
-            # section is an internal routing label ("What's new"), not a topic —
-            # including it would reinforce those labels as fake interest clusters.
+            None,
             sig_row.source_name,
-        ])).lower()
+        )
 
         for label_key, cluster in clusters.items():
-            # Match: any word from the label appears in the item text (words > 3 chars)
-            label_words = {w for w in label_key.split() if len(w) > 3}
-            if not label_words:
-                continue
-            if any(w in item_text for w in label_words):
+            if not topic_matches(item_text, label_key):
                 old_strength = float(cluster.get("strength", 0.3))
                 cluster["strength"] = round(min(1.0, max(0.0, old_strength + delta)), 4)
                 cluster["last_reinforced_at"] = _now_iso()
@@ -202,8 +198,7 @@ async def _update_topic_clusters(ctx: PipelineContext, session) -> None:
                 topic = (interest.get("topic") or "").strip()
                 topic_lower = topic.lower()
                 if topic_lower and topic_lower not in clusters:
-                    topic_words = {w for w in topic_lower.split() if len(w) > 3}
-                    if topic_words and any(w in item_text for w in topic_words):
+                    if topic_matches(item_text, topic_lower):
                         clusters[topic_lower] = {
                             "cluster": topic,
                             "strength": round(0.4 + delta, 4),

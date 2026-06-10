@@ -1,7 +1,7 @@
 """Tests for profile intelligence topic matching."""
 from __future__ import annotations
 
-from briefly_api.api.routes.dashboard import _topic_keywords
+from briefly_api.services.topic_matching import topic_keywords as _topic_keywords
 
 
 def test_topic_keywords_includes_short_terms():

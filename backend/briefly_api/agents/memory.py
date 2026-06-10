@@ -119,9 +119,11 @@ async def _detect_story_threads(ctx: PipelineContext) -> None:
     if not keywords:
         return
 
-    # Fetch recent digest items (headline + why_it_matters)
+    from briefly_api.services.topic_matching import topic_match_text, topic_matches
+
+    # Fetch recent digest items (headline + summary — not why_it_matters)
     result = await session.execute(
-        select(Digest.digest_date, DigestItem.headline, DigestItem.why_it_matters, DigestItem.source_name)
+        select(Digest.digest_date, DigestItem.headline, DigestItem.summary, DigestItem.source_name)
         .join(DigestItem, DigestItem.digest_id == Digest.id)
         .where(
             Digest.user_id == ctx.user.user_id,
@@ -139,14 +141,14 @@ async def _detect_story_threads(ctx: PipelineContext) -> None:
     topic_dates: dict[str, set[str]] = {kw: set() for kw in keywords}
     topic_latest_headline: dict[str, str] = {}
 
-    for digest_date, headline, why, source_name in rows:
-        item_text = " ".join(filter(None, [headline, why, source_name])).lower()
+    for digest_date, headline, summary, source_name in rows:
+        item_text = topic_match_text(headline, summary, source_name)
         for kw in keywords:
-            kw_words = {w for w in kw.split() if len(w) > 3}
-            if kw_words and any(w in item_text for w in kw_words):
-                topic_dates[kw].add(digest_date)
-                if kw not in topic_latest_headline and headline:
-                    topic_latest_headline[kw] = headline
+            if not topic_matches(item_text, kw):
+                continue
+            topic_dates[kw].add(digest_date)
+            if kw not in topic_latest_headline and headline:
+                topic_latest_headline[kw] = headline
 
     # Batch-load all existing story-thread memories in one query instead of
     # issuing a SELECT per keyword (N+1 pattern that adds 50-100ms per topic).

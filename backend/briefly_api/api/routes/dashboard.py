@@ -55,6 +55,11 @@ from briefly_api.db.engine import SessionLocal
 from briefly_api.services.connectors.registry import detect_source, get_connector
 from briefly_api.services.connectors.types import ALL_SOURCE_TYPES
 from briefly_api.services.url_scraper import discover_rss_feed
+from briefly_api.services.topic_matching import (
+    topic_keywords as _topic_keywords,
+    topic_match_text,
+    topic_matches as _topic_matches,
+)
 
 log = logging.getLogger(__name__)
 
@@ -896,17 +901,6 @@ async def bulk_create_sources(
 
 # ── Behavioral intelligence helper ───────────────────────────────────────────
 
-def _topic_keywords(topic: str) -> set[str]:
-    """Extract match tokens from a declared topic (supports short terms like 'ai')."""
-    normalized = topic.strip().lower().replace("-", " ")
-    keywords: set[str] = set()
-    for word in normalized.split():
-        cleaned = word.strip(".,;:!?\"'()[]")
-        if len(cleaned) >= 2:
-            keywords.add(cleaned)
-    return keywords
-
-
 async def _compute_behavioral_intelligence(
     user_id: str,
     profile,
@@ -984,20 +978,8 @@ async def _compute_behavioral_intelligence(
         declared_word_set.update(_topic_keywords(t))
 
     def _item_text(s) -> str:
-        return " ".join(
-            filter(None, [s.headline, s.summary, s.why_it_matters, s.source_name])
-        ).lower()
-
-    def _topic_matches(topic: str, text: str) -> bool:
-        topic = topic.strip().lower()
-        if not topic or not text:
-            return False
-        if topic in text:
-            return True
-        keywords = _topic_keywords(topic)
-        if not keywords:
-            return False
-        return any(kw in text for kw in keywords)
+        # Exclude why_it_matters — Briefly writes user interests into that field.
+        return topic_match_text(s.headline, s.summary, s.source_name)
 
     def _topic_signal_counts(topic: str) -> tuple[int, int, int, int]:
         pos = neg = saves = 0
@@ -1177,7 +1159,7 @@ async def get_profile_intelligence(
     prioritised and deprioritised sources.
     This is the data behind the 'Your Briefly Knows' card in settings.
     """
-    from briefly_api.db.models import UserMemory, Source
+    from briefly_api.db.models import Source
     from briefly_api.services.profile_utils import cluster_label, _UUID_RE
 
     profile = user.profile
@@ -1240,32 +1222,10 @@ async def get_profile_intelligence(
     )
     moved_away_from = [cluster_label(c) for c in faded[:3] if cluster_label(c)]
 
-    # Active story threads
-    thread_result = await db.execute(
-        select(UserMemory)
-        .where(
-            UserMemory.user_id == user.id,
-            UserMemory.memory_type == "story_thread",
-        )
-        .order_by(UserMemory.occurrence_count.desc())
-        .limit(8)
-    )
-    threads = thread_result.scalars().all()
-    active_threads = []
-    for t in threads:
-        val = t.value or {}
-        from briefly_api.agents.learning import _days_since
-        from datetime import datetime, timezone
-        first_seen = val.get("first_seen", "")
-        # Estimate weeks
-        days = _days_since(first_seen) if first_seen else 0
-        weeks = max(1, round(days / 7))
-        active_threads.append({
-            "topic": val.get("topic") or t.key,
-            "weeks": weeks,
-            "appearances": t.occurrence_count,
-            "latest": val.get("latest_headline", "")[:100],
-        })
+    # Active story threads — live preview with strict matching (not stale UserMemory)
+    from briefly_api.agents.proactive.story_thread_agent import preview_active_threads
+
+    active_threads = await preview_active_threads(db, user.id, profile, limit=8)
 
     # Source weights — resolve UUID keys to human-readable names, then rank
     source_weights = dict(profile.source_weights or {})

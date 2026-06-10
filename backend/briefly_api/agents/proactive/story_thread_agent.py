@@ -33,6 +33,7 @@ from briefly_api.db.models import (
     UserProfile,
 )
 from briefly_api.services.profile_utils import cluster_label
+from briefly_api.services.topic_matching import topic_match_text, topic_matches
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +43,84 @@ _THREAD_MIN_APPEARANCES = 3
 _STRENGTH_INC = 0.05
 # Thread is "breaking" if it appeared N+ times in the last 3 days
 _BREAKING_RECENT_APPEARANCES = 3
+
+
+async def preview_active_threads(
+    session,
+    user_id: str,
+    profile: UserProfile,
+    *,
+    limit: int = 8,
+) -> list[dict]:
+    """
+    Read-only thread snapshot for settings UI — uses strict topic matching on
+    headline/summary only (same rules as run_for_user).
+    """
+    from briefly_api.agents.learning import _days_since
+
+    keywords: dict[str, str] = {}
+    for interest in (profile.interests or []):
+        topic = (interest.get("topic") or "").strip()
+        if topic and len(topic) > 3:
+            keywords[topic.lower()] = topic
+    for cluster in (profile.topic_clusters or []):
+        label = cluster_label(cluster)
+        if label and len(label) > 3:
+            keywords[label.lower()] = label
+
+    if not keywords:
+        return []
+
+    s = get_settings()
+    lookback = datetime.now(timezone.utc) - timedelta(days=s.story_thread_agent_lookback_days)
+
+    result = await session.execute(
+        select(
+            Digest.digest_date,
+            DigestItem.headline,
+            DigestItem.summary,
+            DigestItem.source_name,
+        )
+        .join(DigestItem, DigestItem.digest_id == Digest.id)
+        .where(Digest.user_id == user_id, Digest.created_at >= lookback)
+        .order_by(Digest.created_at.desc())
+        .limit(500)
+    )
+    rows = result.all()
+
+    topic_dates: dict[str, set[str]] = {kw: set() for kw in keywords}
+    topic_latest_headline: dict[str, str] = {}
+
+    for digest_date, headline, summary, source_name in rows:
+        item_text = topic_match_text(headline, summary, source_name)
+        for kw in keywords:
+            if not topic_matches(item_text, kw):
+                continue
+            topic_dates[kw].add(digest_date)
+            if kw not in topic_latest_headline and headline:
+                topic_latest_headline[kw] = headline
+
+    threads: list[dict] = []
+    for kw, dates in sorted(
+        topic_dates.items(),
+        key=lambda x: len(x[1]),
+        reverse=True,
+    ):
+        if len(dates) < _THREAD_MIN_APPEARANCES:
+            continue
+        first_date = min(dates) if dates else ""
+        days = _days_since(f"{first_date}T12:00:00+00:00") if first_date else 0
+        weeks = max(1, round(days / 7))
+        threads.append({
+            "topic": keywords[kw],
+            "weeks": weeks,
+            "appearances": len(dates),
+            "latest": topic_latest_headline.get(kw, "")[:100],
+        })
+        if len(threads) >= limit:
+            break
+
+    return threads
 
 
 async def run_for_user(session, user_id: str) -> dict:
@@ -82,7 +161,7 @@ async def run_for_user(session, user_id: str) -> dict:
             Digest.digest_date,
             Digest.created_at,
             DigestItem.headline,
-            DigestItem.why_it_matters,
+            DigestItem.summary,
             DigestItem.source_name,
         )
         .join(DigestItem, DigestItem.digest_id == Digest.id)
@@ -103,21 +182,21 @@ async def run_for_user(session, user_id: str) -> dict:
     topic_recent_dates: dict[str, set[str]] = {kw: set() for kw in keywords}
     topic_latest_headline: dict[str, str] = {}
 
-    for digest_date, created_at, headline, why, source_name in rows:
-        item_text = " ".join(filter(None, [headline, why, source_name])).lower()
+    for digest_date, created_at, headline, summary, source_name in rows:
+        item_text = topic_match_text(headline, summary, source_name)
         is_recent = (
             created_at and (
                 created_at.replace(tzinfo=timezone.utc) if created_at.tzinfo is None else created_at
             ) >= cutoff_3d
         )
         for kw in keywords:
-            kw_words = {w for w in kw.split() if len(w) > 3}
-            if kw_words and any(w in item_text for w in kw_words):
-                topic_dates[kw].add(digest_date)
-                if is_recent:
-                    topic_recent_dates[kw].add(digest_date)
-                if kw not in topic_latest_headline and headline:
-                    topic_latest_headline[kw] = headline
+            if not topic_matches(item_text, kw):
+                continue
+            topic_dates[kw].add(digest_date)
+            if is_recent:
+                topic_recent_dates[kw].add(digest_date)
+            if kw not in topic_latest_headline and headline:
+                topic_latest_headline[kw] = headline
 
     # ── Batch-load existing threads ───────────────────────────────────────────
     active_kws = {kw for kw, dates in topic_dates.items() if len(dates) >= _THREAD_MIN_APPEARANCES}

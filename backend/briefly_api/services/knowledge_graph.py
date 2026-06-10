@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from briefly_api.api.routes.dashboard import _topic_keywords
+from briefly_api.services.topic_matching import topic_match_score
 from briefly_api.db.models import (
     ContentEmbedding,
     ContentEnrichmentCache,
@@ -44,12 +44,7 @@ def _slug(value: str) -> str:
 
 
 def _topic_match_score(text: str, topic: str) -> float:
-    keywords = _topic_keywords(topic)
-    if not keywords or not text:
-        return 0.0
-    hay = text.lower()
-    hits = sum(1 for word in keywords if word in hay)
-    return hits / len(keywords)
+    return topic_match_score(text, topic)
 
 
 def _parse_iso_dt(value: str | None) -> datetime | None:
