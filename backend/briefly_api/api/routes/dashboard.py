@@ -59,7 +59,11 @@ from briefly_api.services.topic_matching import (
     topic_keywords as _topic_keywords,
     topic_match_text,
     topic_matches as _topic_matches,
-    topics_for_digest_item,
+)
+from briefly_api.services.topic_briefing_analytics import (
+    build_topic_actual,
+    compute_topic_briefing_analytics,
+    format_active_threads,
 )
 
 log = logging.getLogger(__name__)
@@ -902,73 +906,29 @@ async def bulk_create_sources(
 
 # ── Behavioral intelligence helper ───────────────────────────────────────────
 
-async def _compute_behavioral_intelligence(
-    user_id: str,
-    profile,
-    db: AsyncSession,
-) -> dict:
+def _build_behavioral_intelligence(profile, analytics) -> dict:
     """
-    Mine BehavioralSignal + DigestItem for real behavioral patterns.
-    Returns per-topic actual engagement, emerging topics, source patterns,
-    and human-readable insight sentences — all derived from what the user
-    actually clicked/saved/skipped, not what they declared.
+    Build behavioral API payload from precomputed briefing analytics.
+
+    Topic counts come from digest-item attribution; save/skip rates come from
+    BehavioralSignal rows on those same items.
     """
-    window_days = 45
-    cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
+    from briefly_api.services.topic_briefing_analytics import interest_topic_label
 
-    items_result = await db.execute(
-        select(
-            DigestItem.id,
-            DigestItem.headline,
-            DigestItem.summary,
-            DigestItem.source_name,
-            DigestItem.confidence_signal,
-        )
-        .join(Digest, Digest.id == DigestItem.digest_id)
-        .where(
-            Digest.user_id == user_id,
-            Digest.created_at >= cutoff,
-        )
-    )
-    digest_items = items_result.all()
-
-    result = await db.execute(
-        select(
-            BehavioralSignal.signal_type,
-            BehavioralSignal.created_at,
-            BehavioralSignal.digest_item_id,
-            DigestItem.headline,
-            DigestItem.source_name,
-            DigestItem.summary,
-        )
-        .join(DigestItem, BehavioralSignal.digest_item_id == DigestItem.id)
-        .where(
-            BehavioralSignal.user_id == user_id,
-            BehavioralSignal.created_at >= cutoff,
-            BehavioralSignal.signal_type.in_([
-                SignalType.saved, SignalType.clicked, SignalType.followed_up,
-                SignalType.skipped, SignalType.disliked,
-            ]),
-            BehavioralSignal.digest_item_id.isnot(None),
-        )
-        .limit(600)
-    )
-    signals = result.all()
-
-    if not signals and not digest_items:
+    if not analytics.tracked_topics:
         return {}
 
-    pos_types  = {SignalType.saved, SignalType.clicked, SignalType.followed_up}
-    neg_types  = {SignalType.skipped, SignalType.disliked}
+    signals = analytics.signals
+    pos_types = {SignalType.saved, SignalType.clicked, SignalType.followed_up}
+    neg_types = {SignalType.skipped, SignalType.disliked}
 
-    total      = len(signals)
+    total = len(signals)
     save_count = sum(1 for s in signals if s.signal_type == SignalType.saved)
-    pos_count  = sum(1 for s in signals if s.signal_type in pos_types)
+    pos_count = sum(1 for s in signals if s.signal_type in pos_types)
 
     overall_engagement = round(pos_count / max(total, 1), 3)
-    save_rate          = round(save_count / max(total, 1), 3)
+    save_rate = round(save_count / max(total, 1), 3)
 
-    # Per-source engagement (min 3 signals to count)
     src_pos: dict[str, int] = {}
     src_tot: dict[str, int] = {}
     for s in signals:
@@ -985,104 +945,16 @@ async def _compute_behavioral_intelligence(
         if v >= 3
     }
 
-    # Per-declared-topic actual engagement via keyword / phrase matching
     declared_topics = [
-        (i.get("topic") or "").strip().lower()
-        for i in (profile.interests or [])
-        if i.get("topic")
+        label.lower()
+        for interest in (profile.interests or [])
+        if (label := interest_topic_label(interest))
     ]
     declared_word_set: set[str] = set()
     for t in declared_topics:
         declared_word_set.update(_topic_keywords(t))
 
-    signals_by_item: dict[str, list] = defaultdict(list)
-    for s in signals:
-        if s.digest_item_id:
-            signals_by_item[str(s.digest_item_id)].append(s)
-
-    item_topics: dict[str, list[str]] = {}
-    all_topics = list(dict.fromkeys(declared_topics))
-    for it in digest_items:
-        item_topics[str(it.id)] = topics_for_digest_item(
-            it.headline,
-            it.summary,
-            it.source_name,
-            it.confidence_signal,
-            all_topics,
-        )
-
-    def _topic_stats(topic: str) -> tuple[int, int, int, int, int]:
-        """stories_shown, pos, neg, saves, action_total."""
-        matching_ids = [
-            item_id
-            for item_id, topics in item_topics.items()
-            if topic in topics
-        ]
-        stories_shown = len(matching_ids)
-        pos = neg = saves = 0
-        for item_id in matching_ids:
-            for s in signals_by_item.get(item_id, []):
-                if s.signal_type == SignalType.saved:
-                    saves += 1
-                    pos += 1
-                elif s.signal_type in pos_types:
-                    pos += 1
-                elif s.signal_type in neg_types:
-                    neg += 1
-        return stories_shown, pos, neg, saves, pos + neg
-
-    def _topic_entry(
-        topic: str,
-        stories_shown: int,
-        pos: int,
-        neg: int,
-        saves: int,
-        actions: int,
-        source: str,
-    ) -> dict:
-        return {
-            "rate": round(pos / actions, 3) if actions else 0.0,
-            "stories_shown": stories_shown,
-            "engaged": pos,
-            "saves": saves,
-            "skipped": neg,
-            "total": actions,
-            "ready": stories_shown >= 1,
-            "source": source,
-        }
-
-    topic_actual: dict[str, dict] = {}
-    for topic in declared_topics:
-        shown, pos, neg, saves, actions = _topic_stats(topic)
-        if shown >= 1:
-            topic_actual[topic] = _topic_entry(
-                topic, shown, pos, neg, saves, actions, "declared",
-            )
-
-    # Discovered topics: learned from reading behaviour, not explicitly declared
-    from briefly_api.services.profile_utils import cluster_label
-
-    declared_set = set(declared_topics)
-    discovered_candidates: list[str] = []
-    for entry in (profile.topic_clusters or []):
-        label = cluster_label(entry)
-        if not label:
-            continue
-        key = label.lower()
-        if key in declared_set:
-            continue
-        source = entry.get("source") or "inferred"
-        strength = float(entry.get("strength", 0))
-        item_count = int(entry.get("item_count", 0))
-        if source in {"inferred", "learned"} or (strength >= 0.2 and item_count >= 1):
-            discovered_candidates.append(key)
-
-    for topic in dict.fromkeys(discovered_candidates):
-        shown, pos, neg, saves, actions = _topic_stats(topic)
-        if shown >= 1:
-            topic_actual[topic] = _topic_entry(
-                topic, shown, pos, neg, saves, actions, "discovered",
-            )
+    topic_actual = build_topic_actual(analytics)
 
     # Emerging topics: high-frequency words in saved/clicked headlines NOT
     # already covered by a declared interest
@@ -1148,7 +1020,7 @@ async def _compute_behavioral_intelligence(
         top_topic = max(topic_actual.items(), key=lambda x: x[1]["rate"])
         top_name, top_data = top_topic
         # Only surface if it's notably above 50% and not the #1 declared topic
-        if top_data["rate"] >= 0.6 and top_name != declared_topics[0]:
+        if top_data["rate"] >= 0.6 and declared_topics and top_name != declared_topics[0]:
             insights.append({
                 "type": "divergence",
                 "label": "Behaviour ≠ declaration",
@@ -1175,10 +1047,7 @@ async def _compute_behavioral_intelligence(
                 ),
             })
 
-    latest_signal_at = max(
-        (s.created_at for s in signals if s.created_at),
-        default=None,
-    )
+    latest_signal_at = analytics.latest_signal_at
 
     return {
         "total_signals":       total,
@@ -1188,8 +1057,8 @@ async def _compute_behavioral_intelligence(
         "source_engagement":   source_engagement,
         "emerging_topics":     emerging_topics,
         "insights":            insights,
-        "window_days":         window_days,
-        "computed_at":         datetime.now(timezone.utc).isoformat(),
+        "window_days":         analytics.window_days,
+        "computed_at":         analytics.computed_at.isoformat(),
         "latest_signal_at":    latest_signal_at.isoformat() if latest_signal_at else None,
     }
 
@@ -1270,11 +1139,6 @@ async def get_profile_intelligence(
     )
     moved_away_from = [cluster_label(c) for c in faded[:3] if cluster_label(c)]
 
-    # Active story threads — live preview with strict matching (not stale UserMemory)
-    from briefly_api.agents.proactive.story_thread_agent import preview_active_threads
-
-    active_threads = await preview_active_threads(db, user.id, profile, limit=8)
-
     # Source weights — resolve UUID keys to human-readable names, then rank
     source_weights = dict(profile.source_weights or {})
 
@@ -1317,12 +1181,15 @@ async def get_profile_intelligence(
         and all(c.get("source") == "declared" for c in clusters if cluster_label(c))
     )
 
-    # Compute real behavioral intelligence from signal history
-    behavioral = {}
+    # Briefing analytics: one scan powers topic cards and story threads
+    behavioral: dict = {}
+    active_threads: list[dict] = []
     try:
-        behavioral = await _compute_behavioral_intelligence(user.id, profile, db)
+        analytics = await compute_topic_briefing_analytics(db, user.id, profile)
+        behavioral = _build_behavioral_intelligence(profile, analytics)
+        active_threads = format_active_threads(analytics, limit=8)
     except Exception as exc:
-        log.warning("Behavioral intelligence computation failed: %s", exc)
+        log.exception("Behavioral intelligence computation failed: %s", exc)
 
     return {
         "digest_day": digest_day,

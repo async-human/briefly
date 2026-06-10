@@ -154,32 +154,9 @@ def topics_for_digest_item(
     confidence_signal: str | None,
     declared_topics: list[str],
 ) -> list[str]:
-    """
-    Topics a briefing item belongs to.
-
-    Strict phrase/word rules first; otherwise the single best partial match
-  (≥50% of significant words) so each story counts toward one topic at most.
-    """
-    strict = [
-        t
-        for t in declared_topics
-        if item_matches_topic(headline, summary, source_name, confidence_signal, t)
+    """All declared topics that match this briefing item (same rules as story threads)."""
+    return [
+        topic
+        for topic in declared_topics
+        if item_matches_topic(headline, summary, source_name, confidence_signal, topic)
     ]
-    if strict:
-        return strict
-
-    body = topic_match_text(headline, summary, source_name)
-    cs = (confidence_signal or "").strip()
-    best_topic: str | None = None
-    best_score = 0.0
-    for topic in declared_topics:
-        score = topic_match_score_partial(body, topic)
-        if cs and len(cs) <= 120:
-            score = max(score, topic_match_score_partial(cs, topic))
-        if score > best_score:
-            best_score = score
-            best_topic = topic
-
-    if best_topic and best_score >= 0.5:
-        return [best_topic]
-    return []

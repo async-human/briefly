@@ -52,75 +52,14 @@ async def preview_active_threads(
     *,
     limit: int = 8,
 ) -> list[dict]:
-    """
-    Read-only thread snapshot for settings UI — uses strict topic matching on
-    headline/summary only (same rules as run_for_user).
-    """
-    from briefly_api.agents.learning import _days_since
-
-    keywords: dict[str, str] = {}
-    for interest in (profile.interests or []):
-        topic = (interest.get("topic") or "").strip()
-        if topic and len(topic) > 3:
-            keywords[topic.lower()] = topic
-    for cluster in (profile.topic_clusters or []):
-        label = cluster_label(cluster)
-        if label and len(label) > 3:
-            keywords[label.lower()] = label
-
-    if not keywords:
-        return []
-
-    s = get_settings()
-    lookback = datetime.now(timezone.utc) - timedelta(days=s.story_thread_agent_lookback_days)
-
-    result = await session.execute(
-        select(
-            Digest.digest_date,
-            DigestItem.headline,
-            DigestItem.summary,
-            DigestItem.source_name,
-            DigestItem.confidence_signal,
-        )
-        .join(DigestItem, DigestItem.digest_id == Digest.id)
-        .where(Digest.user_id == user_id, Digest.created_at >= lookback)
-        .order_by(Digest.created_at.desc())
-        .limit(500)
+    """Read-only thread snapshot — same briefing analytics as settings topic cards."""
+    from briefly_api.services.topic_briefing_analytics import (
+        compute_topic_briefing_analytics,
+        format_active_threads,
     )
-    rows = result.all()
 
-    topic_dates: dict[str, set[str]] = {kw: set() for kw in keywords}
-    topic_latest_headline: dict[str, str] = {}
-
-    for digest_date, headline, summary, source_name, confidence_signal in rows:
-        for kw in keywords:
-            if not item_matches_topic(headline, summary, source_name, confidence_signal, kw):
-                continue
-            topic_dates[kw].add(digest_date)
-            if kw not in topic_latest_headline and headline:
-                topic_latest_headline[kw] = headline
-
-    threads: list[dict] = []
-    for kw, dates in sorted(
-        topic_dates.items(),
-        key=lambda x: len(x[1]),
-        reverse=True,
-    ):
-        if len(dates) < _THREAD_MIN_APPEARANCES:
-            continue
-        first_date = min(dates) if dates else ""
-        days = _days_since(f"{first_date}T12:00:00+00:00") if first_date else 0
-        weeks = max(1, round(days / 7))
-        threads.append({
-            "topic": keywords[kw],
-            "weeks": weeks,
-            "appearances": len(dates),
-            "latest": topic_latest_headline.get(kw, "")[:100],
-        })
-        if len(threads) >= limit:
-            break
-
-    return threads
+    analytics = await compute_topic_briefing_analytics(session, user_id, profile)
+    return format_active_threads(analytics, limit=limit)
 
 
 async def run_for_user(session, user_id: str) -> dict:

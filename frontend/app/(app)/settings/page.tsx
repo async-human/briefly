@@ -201,47 +201,32 @@ function BrieflyKnowsCard({
   const srcEngage   = beh.source_engagement ?? {};
   const emerging    = (beh.emerging_topics ?? []).filter(isCleanLabel).slice(0, 6);
 
-  const topicsWithStories = Object.values(topicActual).filter(
-    (t) => (t.stories_shown ?? 0) >= 1,
-  ).length;
-  const hasTopicEngagement = topicsWithStories > 0;
   const windowDays = beh.window_days ?? 45;
   const lastActivity = formatSignalAge(beh.latest_signal_at);
 
   const declaredKeys = new Set(declared.interests.map((t) => t.toLowerCase()));
 
-  const trackedRows = Object.entries(topicActual)
-    .filter(([, data]) => (data.stories_shown ?? 0) >= 1)
-    .map(([key, data]) => ({
-      topic: key,
-      storiesShown: data.stories_shown ?? 0,
-      saves: data.saves ?? 0,
-      engaged: data.engaged ?? 0,
-      skipped: data.skipped ?? 0,
-      actions: data.total ?? 0,
-      isDiscovered: data.source === "discovered" || !declaredKeys.has(key),
-      isEmpty: false as const,
-    }))
-    .sort((a, b) => b.storiesShown - a.storiesShown || b.saves - a.saves);
-
-  const declaredEmptyRows = declared.interests
+  const comparisonRows = declared.interests
     .filter(isCleanLabel)
-    .filter((t) => {
-      const data = topicActual[t.toLowerCase()];
-      return !data || (data.stories_shown ?? 0) === 0;
+    .map((topic) => {
+      const key = topic.toLowerCase();
+      const data = topicActual[key];
+      const storiesShown = data?.stories_shown ?? 0;
+      return {
+        topic,
+        storiesShown,
+        saves: data?.saves ?? 0,
+        engaged: data?.engaged ?? 0,
+        skipped: data?.skipped ?? 0,
+        actions: data?.total ?? 0,
+        isDiscovered: data?.source === "discovered" || !declaredKeys.has(key),
+        isEmpty: storiesShown === 0,
+      };
     })
-    .map((t) => ({
-      topic: t,
-      storiesShown: 0,
-      saves: 0,
-      engaged: 0,
-      skipped: 0,
-      actions: 0,
-      isDiscovered: false,
-      isEmpty: true,
-    }));
+    .sort((a, b) => b.storiesShown - a.storiesShown || b.saves - a.saves)
+    .slice(0, 12);
 
-  const comparisonRows = [...trackedRows, ...declaredEmptyRows].slice(0, 12);
+  const hasTopicEngagement = comparisonRows.some((r) => r.storiesShown > 0);
 
   const cleanSources       = (intel.top_sources           ?? []).filter(isCleanLabel);
   const cleanDeprioritized = (intel.deprioritized_sources ?? []).filter(isCleanLabel);
@@ -399,7 +384,7 @@ function BrieflyKnowsCard({
                 <div className="bk-thread-body">
                   <div className="bk-thread-header">
                     <span className="bk-thread-topic">{t.topic}</span>
-                    <span className="bk-thread-meta">{t.weeks}w · {t.appearances} items</span>
+                    <span className="bk-thread-meta">{t.weeks}w · {t.appearances} briefings</span>
                   </div>
                   {t.latest && <p className="bk-thread-latest">&ldquo;{t.latest}&rdquo;</p>}
                 </div>
