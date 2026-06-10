@@ -130,6 +130,7 @@ export type MeResponse = {
   gmail_connected: boolean;
   youtube_connected: boolean;
   reddit_connected: boolean;
+  calendar_connected: boolean;
   reading_streak: number;
   auto_suggestions: AutoSuggestion[];
   sources_discovery_confirmed: boolean;
@@ -146,6 +147,8 @@ export type OnboardingStatus = {
   youtube_channel_count: number | null;
   reddit_connected: boolean;
   reddit_subreddit_count: number | null;
+  calendar_connected: boolean;
+  calendar_email: string | null;
   sources_count: number;
 };
 
@@ -243,6 +246,33 @@ export type Digest = {
     outcome?: DigestOutcome;
     serendipity?: SerendipityConnection[];
     proactive_events?: ProactiveEvent[];
+    calendar?: {
+      meetings: {
+        title: string;
+        time: string;
+        attendees?: string[];
+        relevant_stories?: { headline: string; source?: string }[];
+        active_threads?: string[];
+      }[];
+      meeting_count?: number;
+    };
+    wrapped?: {
+      current_focus?: string;
+      depth_trend?: string;
+      weekly_synthesis?: string;
+      mind_shifts?: { topic: string; direction: string; evidence: string }[];
+      high_engagement?: { topic: string; detail: string }[];
+      emerging_threads?: string[] | { topic?: string }[];
+      coverage_gaps?: string[];
+    };
+    blind_spots?: {
+      type: string;
+      topic: string;
+      consensus: string;
+      counter_headline?: string | null;
+      counter_source?: string | null;
+      counter_argument?: string | null;
+    }[];
   };
 };
 
@@ -760,6 +790,15 @@ export const api = {
       "/api/v1/auth/reddit/status",
     ),
   disconnectReddit: () => request<void>("/api/v1/auth/reddit", { method: "DELETE" }),
+
+  startCalendarConnect: (redirectPath = "/settings") =>
+    request<{ url: string }>(
+      `/api/v1/auth/calendar/start?redirect_path=${encodeURIComponent(redirectPath)}`,
+      { method: "POST" },
+    ),
+  getCalendarStatus: () =>
+    request<{ connected: boolean; email: string | null }>("/api/v1/auth/calendar/status"),
+  disconnectCalendar: () => request<void>("/api/v1/auth/calendar", { method: "DELETE" }),
 
   // Gmail discovery
   discoverGmailNewsletters: () =>

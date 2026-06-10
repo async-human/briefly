@@ -338,6 +338,76 @@ async def _load_proactive_context(session, ctx: PipelineContext) -> PipelineCont
     except Exception:
         log.debug("Pipeline: proactive events load failed — continuing without", exc_info=True)
 
+    return await _load_intelligence_layer(session, ctx)
+
+
+async def _load_intelligence_layer(session, ctx: PipelineContext) -> PipelineContext:
+    """Calendar context, blind spots, and weekly wrapped — injected before writer."""
+    user_id = ctx.user.user_id
+    profile = ctx.user.profile or {}
+    tz = profile.get("digest_timezone") or "UTC"
+
+    # Expand enrichment cache for blind-spot detection (contrarian items may be unselected)
+    try:
+        from sqlalchemy import select as sa_select
+        extra_ids = [i.id for i in ctx.enriched_items[:80] if i.id not in ctx.enrichment_cache]
+        if extra_ids:
+            cache_result = await session.execute(
+                sa_select(ContentEnrichmentCache).where(
+                    ContentEnrichmentCache.user_id == user_id,
+                    ContentEnrichmentCache.content_id.in_(extra_ids),
+                )
+            )
+            for row in cache_result.scalars().all():
+                ctx.enrichment_cache[row.content_id] = {
+                    "why_relevant": row.why_relevant,
+                    "connection_sentence": row.connection_sentence,
+                    "thread_update": row.thread_update,
+                    "thread_key": row.thread_key,
+                    "contradiction_flag": row.contradiction_flag,
+                    "contradiction_explanation": row.contradiction_explanation,
+                    "user_angle": row.user_angle,
+                    "connection_strength": row.connection_strength,
+                }
+    except Exception:
+        log.debug("Pipeline: extended enrichment cache load failed", exc_info=True)
+
+    try:
+        from briefly_api.services.calendar_briefing import load_calendar_briefing
+
+        ctx.calendar_briefing = await load_calendar_briefing(
+            session,
+            user_id,
+            tz,
+            ctx.run_date,
+            ctx.enriched_items,
+            ctx.selected_item_ids,
+            ctx.user.active_story_threads,
+        )
+    except Exception:
+        log.debug("Pipeline: calendar briefing failed", exc_info=True)
+
+    try:
+        from sqlalchemy import select as sa_select
+        from briefly_api.db.models import BehavioralFingerprint
+        from briefly_api.services.blind_spots import detect_blind_spots
+        from briefly_api.services.wrapped_snapshot import build_wrapped_snapshot
+
+        fp_result = await session.execute(
+            sa_select(BehavioralFingerprint).where(BehavioralFingerprint.user_id == user_id)
+        )
+        fp = fp_result.scalar_one_or_none()
+
+        ctx.blind_spots = detect_blind_spots(
+            ctx.enriched_items,
+            ctx.selected_item_ids,
+            ctx.enrichment_cache,
+            coverage_gaps=(fp.coverage_gaps if fp else None),
+        )
+        ctx.wrapped_snapshot = build_wrapped_snapshot(fp, run_date=ctx.run_date)
+    except Exception:
+        log.debug("Pipeline: blind spots / wrapped load failed", exc_info=True)
+
     return ctx
 
 
@@ -498,6 +568,9 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
             "outcome": outcome,
             "serendipity": list(getattr(ctx, "serendipity_connections", []) or []),
             "proactive_events": list(getattr(ctx, "proactive_events", []) or []),
+            "calendar": getattr(ctx, "calendar_briefing", None),
+            "blind_spots": list(getattr(ctx, "blind_spots", []) or []),
+            "wrapped": getattr(ctx, "wrapped_snapshot", None),
         },
     )
     session.add(digest)

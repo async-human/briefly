@@ -170,9 +170,12 @@ async def get_me(
     ingestion_email = f"{user.email_token}@{settings.email_ingestion_domain}"
     profile_orm = user.profile
     profile_out = ProfileOut.model_validate(profile_orm) if profile_orm else None
+    from briefly_api.auth.calendar import get_calendar_connection
+
     gmail = await get_gmail_connection(db, user.id)
     youtube = await get_youtube_connection(db, user.id)
     reddit = await get_reddit_connection(db, user.id)
+    calendar = await get_calendar_connection(db, user.id)
     streak = await _compute_streak(user.id, db)
     auto_suggestions = await _auto_suggestions_for_user(user, db)
     return MeOut(
@@ -183,6 +186,7 @@ async def get_me(
         gmail_connected=gmail is not None,
         youtube_connected=youtube is not None,
         reddit_connected=reddit is not None,
+        calendar_connected=calendar is not None,
         reading_streak=streak,
         auto_suggestions=auto_suggestions,
         sources_discovery_confirmed=bool(

@@ -161,7 +161,14 @@ class Settings(BaseSettings):
     def reddit_redirect_uri(self) -> str:
         return f"{self.backend_url.rstrip('/')}/api/v1/auth/reddit/callback"
 
+    @property
+    def calendar_redirect_uri(self) -> str:
+        return f"{self.backend_url.rstrip('/')}/api/v1/auth/calendar/callback"
+
     gmail_scopes: str = "https://www.googleapis.com/auth/gmail.readonly openid email"
+    calendar_scopes: str = (
+        "https://www.googleapis.com/auth/calendar.readonly openid email"
+    )
 
     # ── Continuous enrichment worker ──────────────────────────────────────────
     # Runs every N hours; pre-computes memory connections + contradiction flags

@@ -24,6 +24,7 @@ import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { BrieflyKnowsSummary } from "@/components/dashboard/BrieflyKnowsSummary";
 import { StoryThreadsRail } from "@/components/dashboard/StoryThreadsRail";
 import { SerendipityPanel } from "@/components/dashboard/SerendipityPanel";
+import { IntelligenceBriefingPanel } from "@/components/dashboard/IntelligenceBriefingPanel";
 import { WeeklyReportCard } from "@/components/dashboard/WeeklyReportCard";
 import { ProactiveAlertsBanner } from "@/components/dashboard/ProactiveAlertsBanner";
 import type { ProfileIntelligence } from "@/lib/api";
@@ -287,6 +288,14 @@ function DashboardContent() {
 
       {digest?.meta?.serendipity && digest.meta.serendipity.length > 0 && (
         <SerendipityPanel connections={digest.meta.serendipity} />
+      )}
+
+      {digest?.meta && (
+        <IntelligenceBriefingPanel
+          calendar={digest.meta.calendar}
+          wrapped={digest.meta.wrapped}
+          blindSpots={digest.meta.blind_spots ?? []}
+        />
       )}
 
       <div className="dash-page-grid">

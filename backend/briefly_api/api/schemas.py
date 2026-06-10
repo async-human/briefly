@@ -51,6 +51,8 @@ class OnboardingStatusOut(BaseModel):
     youtube_channel_count: int | None = None
     reddit_connected: bool = False
     reddit_subreddit_count: int | None = None
+    calendar_connected: bool = False
+    calendar_email: str | None = None
     sources_count: int
 
 
@@ -90,6 +92,15 @@ class RedditStatusOut(BaseModel):
     subreddit_count: int | None = None
 
 
+class CalendarConnectOut(BaseModel):
+    url: str
+
+
+class CalendarStatusOut(BaseModel):
+    connected: bool
+    email: str | None = None
+
+
 class MeOut(BaseModel):
     user: UserOut
     profile: ProfileOut | None
@@ -98,6 +109,7 @@ class MeOut(BaseModel):
     gmail_connected: bool = False
     youtube_connected: bool = False
     reddit_connected: bool = False
+    calendar_connected: bool = False
     reading_streak: int = 0  # consecutive days with a digest
     auto_suggestions: list["AutoSuggestionOut"] = Field(default_factory=list)
     sources_discovery_confirmed: bool = False

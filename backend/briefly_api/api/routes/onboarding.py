@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from briefly_api.api.schemas import (
     GmailConnectOut,
     GmailStatusOut,
+    CalendarConnectOut,
+    CalendarStatusOut,
     OnboardingCompleteOut,
     OnboardingStatusOut,
     ProfileUpdate,
@@ -39,6 +41,14 @@ from briefly_api.auth.youtube import (
     get_youtube_connection,
     refresh_youtube_access_token,
     upsert_youtube_connection,
+)
+from briefly_api.auth.calendar import (
+    build_calendar_auth_url,
+    decode_calendar_state,
+    encode_calendar_state,
+    exchange_calendar_code,
+    get_calendar_connection,
+    upsert_calendar_connection,
 )
 from briefly_api.auth.reddit import (
     build_reddit_auth_url,
@@ -72,6 +82,7 @@ async def _build_onboarding_status(
     gmail = await get_gmail_connection(db, user.id)
     youtube = await get_youtube_connection(db, user.id)
     reddit = await get_reddit_connection(db, user.id)
+    calendar = await get_calendar_connection(db, user.id)
     sources_count = await db.scalar(
         select(func.count()).select_from(Source).where(Source.user_id == user.id)
     )
@@ -86,6 +97,8 @@ async def _build_onboarding_status(
         youtube_channel_count=(youtube.meta or {}).get("channel_count") if youtube else None,
         reddit_connected=reddit is not None,
         reddit_subreddit_count=(reddit.meta or {}).get("subreddit_count") if reddit else None,
+        calendar_connected=calendar is not None,
+        calendar_email=calendar.account_email if calendar else None,
         sources_count=sources_count or 0,
     )
 
@@ -275,6 +288,74 @@ async def disconnect_gmail(
     )
     for source in gmail_sources.scalars().all():
         await db.delete(source)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── Google Calendar OAuth ─────────────────────────────────────────────────────
+
+@router.post("/auth/calendar/start", response_model=CalendarConnectOut)
+async def start_calendar_connect(
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+    redirect_path: str = Query("/settings"),
+) -> CalendarConnectOut:
+    if not settings.google_client_id or not settings.google_client_secret:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Google OAuth is not configured.")
+    state = encode_calendar_state(user.id, settings, redirect_path=redirect_path)
+    return CalendarConnectOut(url=build_calendar_auth_url(settings, state))
+
+
+@router.get("/auth/calendar/callback")
+async def calendar_callback(
+    settings: Settings = Depends(get_settings),
+    code: str | None = Query(None),
+    state: str | None = Query(None),
+    error: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    base = settings.frontend_url.rstrip("/")
+    if error:
+        return RedirectResponse(f"{base}/settings?calendar=denied")
+    if not code or not state:
+        return RedirectResponse(f"{base}/settings?calendar=error")
+    try:
+        payload = decode_calendar_state(state, settings)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state") from exc
+
+    user_id = payload["user_id"]
+    redirect_path = payload.get("redirect", "/settings")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    tokens = await exchange_calendar_code(code, settings)
+    await upsert_calendar_connection(db, user, tokens, user.email, settings=settings)
+    await db.commit()
+    return RedirectResponse(f"{base}{redirect_path}?calendar=connected")
+
+
+@router.get("/auth/calendar/status", response_model=CalendarStatusOut)
+async def calendar_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> CalendarStatusOut:
+    connection = await get_calendar_connection(db, user.id)
+    if not connection:
+        return CalendarStatusOut(connected=False)
+    return CalendarStatusOut(connected=True, email=connection.account_email)
+
+
+@router.delete("/auth/calendar", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def disconnect_calendar(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    connection = await get_calendar_connection(db, user.id)
+    if connection:
+        await db.delete(connection)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

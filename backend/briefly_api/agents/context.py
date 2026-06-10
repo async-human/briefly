@@ -162,6 +162,13 @@ class PipelineContext:
     # Cross-domain connections surfaced weekly / in digest meta
     serendipity_connections: list[dict] = field(default_factory=list)
 
+    # Meeting-aware briefing (Google Calendar)
+    calendar_briefing: dict | None = None
+
+    # Cross-source blind spots + weekly wrapped snapshot (digest meta)
+    blind_spots: list[dict] = field(default_factory=list)
+    wrapped_snapshot: dict | None = None
+
     # Shared DB session — set by pipeline orchestrator, used by agents that need DB
     db_session: Any | None = field(default=None, repr=False)
 

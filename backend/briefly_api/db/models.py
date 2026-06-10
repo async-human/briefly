@@ -633,6 +633,9 @@ class BehavioralFingerprint(Base):
     current_focus: Mapped[str | None] = mapped_column(Text)
     # e.g. "LLM infrastructure and AI reliability"
 
+    # Full WeeklyIntelligenceSkill output (mind_shifts also copied to dedicated column)
+    weekly_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict)
+
     total_signals_analyzed: Mapped[int] = mapped_column(Integer, default=0)
 
     computed_at: Mapped[datetime] = mapped_column(

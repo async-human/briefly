@@ -4341,12 +4341,195 @@ a.saved-capture-title:hover {
 
 .app-shell .story-threads-rail,
 .app-shell .serendipity-panel,
-.app-shell .weekly-report-card {
+.app-shell .weekly-report-card,
+.app-shell .intelligence-briefing-panel {
   padding: 1.125rem 1.25rem;
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius);
   background: var(--app-surface);
   margin-bottom: 1rem;
+}
+
+.app-shell .intelligence-briefing-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.app-shell .intel-block {
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--app-border);
+}
+
+.app-shell .intel-block:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.app-shell .intel-eyebrow {
+  margin: 0 0 0.2rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: oklch(48% 0.08 75);
+}
+
+.app-shell .intel-sub {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--app-muted);
+}
+
+.app-shell .intel-meeting-list,
+.app-shell .intel-shift-list,
+.app-shell .intel-blind-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.app-shell .intel-meeting-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.app-shell .intel-meeting-time {
+  flex-shrink: 0;
+  min-width: 4.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.app-shell .intel-meeting-title {
+  margin: 0 0 0.15rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.app-shell .intel-meeting-attendees,
+.app-shell .intel-meeting-threads {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  color: var(--app-muted);
+}
+
+.app-shell .intel-meeting-stories {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.75rem;
+  color: var(--app-ink-2);
+  line-height: 1.45;
+}
+
+.app-shell .intel-wrapped-focus {
+  margin: 0.75rem 0 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--app-ink);
+}
+
+.app-shell .intel-shift-list li {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--app-ink-2);
+}
+
+.app-shell .intel-shift-dir {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: oklch(48% 0.08 75);
+}
+
+.app-shell .intel-shift-evidence {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--app-muted);
+}
+
+.app-shell .intel-wrapped-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
+.app-shell .intel-wrapped-chip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 100px;
+  border: 1px solid var(--app-border);
+  background: var(--app-paper-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.app-shell .intel-wrapped-chip-sub {
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--app-muted);
+}
+
+.app-shell .intel-wrapped-synthesis {
+  margin: 0.65rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--app-ink-2);
+}
+
+.app-shell .intel-blind-item {
+  padding: 0.75rem;
+  border-radius: var(--app-radius-sm);
+  background: oklch(98% 0.02 25);
+  border: 1px solid oklch(75% 0.06 25 / 0.35);
+}
+
+.app-shell .intel-blind-topic {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.app-shell .intel-blind-consensus {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--app-ink-2);
+  line-height: 1.45;
+}
+
+.app-shell .intel-blind-counter {
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: oklch(42% 0.1 25);
+}
+
+.app-shell .intel-blind-counter-src {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.15rem;
+}
+
+.settings-connector-cal-icon {
+  display: grid;
+  place-items: center;
+  color: var(--app-ink-secondary);
 }
 
 .app-shell .story-threads-list,

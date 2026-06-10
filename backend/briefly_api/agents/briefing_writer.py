@@ -77,6 +77,8 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             story_threads_text=story_threads_text,
             memory_json=memory_json,
         )
+        cached_prefix += _build_calendar_section(getattr(ctx, "calendar_briefing", None))
+        cached_prefix += _build_wrapped_section(getattr(ctx, "wrapped_snapshot", None))
 
         # Variable section — items + pre-computed enrichment
         items_section = skill.build_items_section(
@@ -91,7 +93,8 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             writer_model = get_settings().pro_writer_model
 
         proactive_section = _build_proactive_section(ctx.proactive_events or [])
-        items_with_proactive = items_section + proactive_section
+        blind_spot_section = _build_blind_spot_section(getattr(ctx, "blind_spots", None) or [])
+        items_with_proactive = items_section + proactive_section + blind_spot_section
 
         result = await skill.run(
             cached_prefix=cached_prefix,
@@ -358,6 +361,52 @@ def _drafts_from_llm(
 
 
 # ── Context builders ──────────────────────────────────────────────────────────
+
+def _build_calendar_section(calendar_briefing: dict | None) -> str:
+    if not calendar_briefing or not calendar_briefing.get("meetings"):
+        return ""
+    lines = [
+        "\n## Today's meetings (elevate stories relevant to these)\n",
+        calendar_briefing.get("summary_text", ""),
+        "\nWhen a digest item clearly prepares the user for a listed meeting, "
+        "say so in why_it_matters_to_you (e.g. 'Relevant before your 2pm with …').\n",
+    ]
+    return "\n".join(lines)
+
+
+def _build_wrapped_section(wrapped: dict | None) -> str:
+    if not wrapped:
+        return ""
+    parts = ["\n## Weekly intelligence (surface lightly in subject or preview if Monday)\n"]
+    if wrapped.get("current_focus"):
+        parts.append(f"Current focus: {wrapped['current_focus']}")
+    for shift in (wrapped.get("mind_shifts") or [])[:2]:
+        parts.append(
+            f"Mind shift — {shift.get('topic', '')}: {shift.get('direction', '')} ({shift.get('evidence', '')})"
+        )
+    if wrapped.get("weekly_synthesis"):
+        parts.append(f"Weekly synthesis: {wrapped['weekly_synthesis'][:400]}")
+    parts.append(
+        "Do not add a separate Wrapped section to the digest — weave one insight into preview_text if natural.\n"
+    )
+    return "\n".join(parts) + "\n"
+
+
+def _build_blind_spot_section(blind_spots: list[dict]) -> str:
+    if not blind_spots:
+        return ""
+    lines = ["\n## Blind spots — contrarian angles the user may be missing\n"]
+    for spot in blind_spots:
+        lines.append(f"- Topic: {spot.get('topic', '')}")
+        lines.append(f"  Consensus: {spot.get('consensus', '')}")
+        if spot.get("counter_argument"):
+            lines.append(f"  Counter: {spot.get('counter_argument', '')}")
+    lines.append(
+        "\nIf a blind spot matches a digest item, mention the tension in why_it_matters_to_you. "
+        "Do not invent counter-arguments not listed above.\n"
+    )
+    return "\n".join(lines)
+
 
 def _build_proactive_section(events: list[dict]) -> str:
     if not events:

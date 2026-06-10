@@ -9,7 +9,7 @@ import { sourceDisplayName } from "@/components/dashboard/sourceLabels";
 const OAUTH_TYPES = new Set(["gmail", "youtube", "youtube_account", "reddit", "reddit_account"]);
 const MANUAL_TYPES = new Set(["rss", "url", "email", "readwise"]);
 
-type ConnectorId = "gmail" | "youtube" | "reddit";
+type ConnectorId = "gmail" | "youtube" | "reddit" | "calendar";
 
 type ConnectorDef = {
   id: ConnectorId;
@@ -37,12 +37,19 @@ const CONNECTORS: ConnectorDef[] = [
     description: "Posts from subreddits you follow",
     iconType: "reddit",
   },
+  {
+    id: "calendar",
+    name: "Google Calendar",
+    description: "Meeting-aware briefings — relevant stories before your meetings",
+    iconType: "url",
+  },
 ];
 
 function isConnected(id: ConnectorId, status: OnboardingStatus | null): boolean {
   if (!status) return false;
   if (id === "gmail") return status.gmail_connected;
   if (id === "youtube") return status.youtube_connected;
+  if (id === "calendar") return status.calendar_connected;
   return status.reddit_connected;
 }
 
@@ -61,6 +68,10 @@ function connectorMeta(id: ConnectorId, status: OnboardingStatus | null): string
       return `${status.youtube_channel_count} channel${status.youtube_channel_count === 1 ? "" : "s"}`;
     }
     return "Connected — subscriptions may be private";
+  }
+  if (id === "calendar") {
+    if (!status.calendar_connected) return null;
+    return status.calendar_email ? `${status.calendar_email} · read-only` : "Connected — read-only";
   }
   if (!status.reddit_connected) return null;
   if (status.reddit_subreddit_count != null) {
@@ -102,7 +113,8 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
     const gmail = params.get("gmail");
     const youtube = params.get("youtube");
     const reddit = params.get("reddit");
-    if (!gmail && !youtube && !reddit) return;
+    const calendar = params.get("calendar");
+    if (!gmail && !youtube && !reddit && !calendar) return;
 
     window.history.replaceState({}, "", "/settings");
 
@@ -138,6 +150,15 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
     } else if (reddit === "error") {
       setError("Reddit connection failed.");
     }
+
+    if (calendar === "connected") {
+      setBanner("Google Calendar connected — meeting-aware briefings enabled.");
+      void refresh();
+    } else if (calendar === "denied") {
+      setError("Calendar access was denied.");
+    } else if (calendar === "error") {
+      setError("Calendar connection failed.");
+    }
   }, [refresh]);
 
   useEffect(() => {
@@ -161,7 +182,9 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
           ? api.startGmailConnect
           : id === "youtube"
             ? api.startYouTubeConnect
-            : api.startRedditConnect;
+            : id === "calendar"
+              ? api.startCalendarConnect
+              : api.startRedditConnect;
       const { url } = await start("/settings");
       window.location.href = url;
     } catch (err) {
@@ -176,6 +199,7 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
     try {
       if (id === "gmail") await api.disconnectGmail();
       else if (id === "youtube") await api.disconnectYouTube();
+      else if (id === "calendar") await api.disconnectCalendar();
       else await api.disconnectReddit();
       setBanner(`${CONNECTORS.find((c) => c.id === id)?.name ?? "Account"} disconnected.`);
       await refresh();
@@ -234,7 +258,16 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
                   className={`settings-connector-card${connected ? " is-connected" : ""}`}
                 >
                   <div className="settings-connector-icon">
-                    <SourceIcon type={connector.iconType} size={26} />
+                    {connector.id === "calendar" ? (
+                      <span className="settings-connector-cal-icon" aria-hidden>
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                          <rect x="3" y="5" width="18" height="16" rx="2" />
+                          <path d="M8 3v4M16 3v4M3 10h18" strokeLinecap="round" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <SourceIcon type={connector.iconType} size={26} />
+                    )}
                   </div>
                   <div className="settings-connector-body">
                     <div className="settings-connector-head">

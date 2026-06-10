@@ -314,10 +314,20 @@ async def _run_weekly_intelligence() -> None:
                     )
                 )
                 fp = fp_result.scalar_one_or_none()
+                weekly_snapshot = {
+                    "mind_shifts": wi_result.mind_shifts,
+                    "emerging_threads": wi_result.emerging_threads,
+                    "coverage_gaps": wi_result.coverage_gaps,
+                    "depth_trend": wi_result.depth_trend,
+                    "current_focus": wi_result.current_focus,
+                    "weekly_synthesis": wi_result.weekly_synthesis,
+                    "computed_at": datetime.now(timezone.utc).isoformat(),
+                }
                 if fp:
-                    fp.mind_shifts      = wi_result.mind_shifts
-                    fp.coverage_gaps    = wi_result.coverage_gaps
-                    fp.current_focus    = wi_result.current_focus
+                    fp.mind_shifts = wi_result.mind_shifts
+                    fp.coverage_gaps = wi_result.coverage_gaps
+                    fp.current_focus = wi_result.current_focus
+                    fp.weekly_snapshot = weekly_snapshot
                     await session.flush()
                 else:
                     fp = BehavioralFingerprint(
@@ -325,6 +335,7 @@ async def _run_weekly_intelligence() -> None:
                         mind_shifts=wi_result.mind_shifts,
                         coverage_gaps=wi_result.coverage_gaps,
                         current_focus=wi_result.current_focus,
+                        weekly_snapshot=weekly_snapshot,
                     )
                     session.add(fp)
 
