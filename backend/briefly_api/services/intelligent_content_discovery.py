@@ -51,12 +51,14 @@ from briefly_api.services.rss import fetch_rss_articles
 log = logging.getLogger(__name__)
 
 _CACHE_TTL_HOURS = 6
-_MAX_INTENTS = 8
-_MAX_CANDIDATES = 72
+_MAX_INTENTS = 6
+_MAX_CANDIDATES = 48
 _MAX_AGE_DAYS = 5
 _SCORE_THRESHOLD = 0.58
 _DASHBOARD_LIMIT = 8
 _DIGEST_INJECT_LIMIT = 2
+_HARVEST_TIMEOUT_SEC = 40.0
+_DISCOVERY_JOB_TIMEOUT_SEC = 75.0
 
 _POS_SIGNALS = {SignalType.saved, SignalType.clicked, SignalType.followed_up}
 
@@ -369,10 +371,10 @@ async def _harvest_candidates(
         return []
 
     harvest_tasks = []
-    for intent in intents[:6]:
-        harvest_tasks.append(_harvest_google_news(intent))
-        harvest_tasks.append(_harvest_medium(intent))
-        harvest_tasks.append(_harvest_hn(intent))
+    for intent in intents[:4]:
+        harvest_tasks.append(_harvest_google_news(intent, limit=3))
+        harvest_tasks.append(_harvest_medium(intent, limit=2))
+        harvest_tasks.append(_harvest_hn(intent, limit=2))
 
     sub_results = await discover_reddit_subreddits_for_interests(
         [i.phrase for i in intents[:4]],
@@ -391,7 +393,14 @@ async def _harvest_candidates(
         if sub:
             harvest_tasks.append(_harvest_reddit_hot(sub, settings, intent))
 
-    batches = await asyncio.gather(*harvest_tasks, return_exceptions=True)
+    try:
+        batches = await asyncio.wait_for(
+            asyncio.gather(*harvest_tasks, return_exceptions=True),
+            timeout=_HARVEST_TIMEOUT_SEC,
+        )
+    except asyncio.TimeoutError:
+        log.warning("Content discovery harvest timed out after %ss", _HARVEST_TIMEOUT_SEC)
+        batches = []
 
     candidates: list[DiscoveredCandidate] = []
     seen_urls: set[str] = set()
@@ -610,6 +619,41 @@ def _cache_fresh(profile: UserProfile) -> bool:
     return datetime.now(timezone.utc) - at < timedelta(hours=_CACHE_TTL_HOURS)
 
 
+def _content_discovery_progress(profile: UserProfile | None) -> dict:
+    if not profile:
+        return {}
+    return dict((profile.discovery_meta or {}).get("content_discovery") or {})
+
+
+async def report_content_discovery_progress(
+    user_id: str,
+    *,
+    status: str,
+    label: str = "",
+    error: str | None = None,
+) -> None:
+    """Persist job status so the dashboard can poll without blocking HTTP."""
+    from briefly_api.db.engine import SessionLocal
+
+    now = datetime.now(timezone.utc).isoformat()
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(UserProfile).where(UserProfile.user_id == user_id)
+        )
+        profile = result.scalar_one_or_none()
+        if not profile:
+            return
+        meta = dict(profile.discovery_meta or {})
+        meta["content_discovery"] = {
+            "status": status,
+            "label": label or meta.get("content_discovery", {}).get("label", ""),
+            "error": error,
+            "updated_at": now,
+        }
+        profile.discovery_meta = meta
+        await session.commit()
+
+
 async def discover_relevant_content(
     session: AsyncSession,
     user_id: str,
@@ -631,6 +675,10 @@ async def discover_relevant_content(
     if not force_refresh and _cache_fresh(profile) and profile.discovered_articles:
         return list(profile.discovered_articles or [])[:limit]
 
+    await report_content_discovery_progress(
+        user_id, status="running", label="Building search intents…",
+    )
+
     fp_result = await session.execute(
         select(BehavioralFingerprint).where(BehavioralFingerprint.user_id == user_id)
     )
@@ -640,11 +688,20 @@ async def discover_relevant_content(
     if not intents:
         intents = [DiscoveryIntent(phrase="technology innovation", weight=0.7, reason="declared")]
 
+    await report_content_discovery_progress(
+        user_id, status="running", label="Scanning external feeds…",
+    )
+
     subscribed = await _subscribed_domains(session, user_id)
     seen_hashes = await get_seen_content_hashes(session, user_id, days=30)
     never_show = profile.never_show or []
 
     candidates = await _harvest_candidates(intents, s, subscribed)
+
+    await report_content_discovery_progress(
+        user_id, status="running", label="Scoring relevance…",
+    )
+
     profile_embedding = list(profile.profile_embedding) if profile.profile_embedding else None
     scored = await _score_candidates(candidates, profile, profile_embedding, seen_hashes, never_show)
     top = _select_diverse(scored, limit)
@@ -660,6 +717,16 @@ async def discover_relevant_content(
         "candidates_scored": len(scored),
         "articles_surfaced": len(articles),
     }
+    meta["content_discovery"] = {
+        "status": "complete",
+        "label": (
+            f"Found {len(articles)} relevant article{'s' if len(articles) != 1 else ''}"
+            if articles
+            else "No new matches right now — try again later"
+        ),
+        "error": None,
+        "updated_at": profile.discovered_articles_at.isoformat(),
+    }
     profile.discovery_meta = meta
 
     await session.commit()
@@ -668,6 +735,36 @@ async def discover_relevant_content(
         user_id, len(candidates), len(scored), len(articles),
     )
     return articles
+
+
+async def run_content_discovery_job(user_id: str, *, force_refresh: bool = False) -> None:
+    """Background worker — never call from a synchronous HTTP handler."""
+    from briefly_api.db.engine import SessionLocal
+
+    try:
+        async with SessionLocal() as session:
+            await asyncio.wait_for(
+                discover_relevant_content(
+                    session, user_id, force_refresh=force_refresh,
+                ),
+                timeout=_DISCOVERY_JOB_TIMEOUT_SEC,
+            )
+    except asyncio.TimeoutError:
+        log.error("Content discovery job timed out for user %s", user_id)
+        await report_content_discovery_progress(
+            user_id,
+            status="error",
+            label="Discovery timed out",
+            error="Scan took too long. Try Refresh in a moment.",
+        )
+    except Exception as exc:
+        log.exception("Content discovery job failed for user %s", user_id)
+        await report_content_discovery_progress(
+            user_id,
+            status="error",
+            label="Discovery failed",
+            error=str(exc)[:240],
+        )
 
 
 async def discover_and_cache_for_user(session: AsyncSession, user_id: str) -> int:

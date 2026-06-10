@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type DiscoveredArticle, type Source } from "@/lib/api";
 import { SourceIcon } from "@/components/SourceIcon";
 import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
@@ -17,13 +17,68 @@ const REASON_LABELS: Record<string, string> = {
   declared: "Your interests",
 };
 
+const POLL_MS = 2500;
+const MAX_POLLS = 40;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+function discoveryStatus(meta?: Record<string, unknown>): string {
+  const status = meta?.status;
+  return typeof status === "string" ? status : "idle";
+}
+
+function discoveryLabel(meta?: Record<string, unknown>): string {
+  const label = meta?.label;
+  return typeof label === "string" && label.trim() ? label : "Scanning for relevant articles…";
+}
+
 export function DiscoverContentPanel({ onSourceAdded }: DiscoverContentPanelProps) {
   const [articles, setArticles] = useState<DiscoveredArticle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [scanLabel, setScanLabel] = useState("Scanning for relevant articles…");
   const [refreshing, setRefreshing] = useState(false);
   const [addingFeed, setAddingFeed] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef(false);
+
+  const applyResponse = useCallback((res: Awaited<ReturnType<typeof api.getDiscoveredArticles>>) => {
+    setArticles(res.articles);
+    const status = discoveryStatus(res.meta);
+    const label = discoveryLabel(res.meta);
+    setScanLabel(label);
+    setScanning(status === "running");
+    if (status === "error" && typeof res.meta?.error === "string") {
+      setError(res.meta.error);
+    }
+  }, []);
+
+  const pollUntilDone = useCallback(async () => {
+    if (pollRef.current) return;
+    pollRef.current = true;
+    try {
+      for (let i = 0; i < MAX_POLLS; i++) {
+        await sleep(POLL_MS);
+        const res = await api.getDiscoveredArticles();
+        applyResponse(res);
+        const status = discoveryStatus(res.meta);
+        if (status !== "running") {
+          if (status === "complete" && res.articles.length === 0) {
+            setError(null);
+          }
+          return;
+        }
+      }
+      setError("Discovery is taking longer than expected. Try Refresh.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load discoveries");
+    } finally {
+      pollRef.current = false;
+      setScanning(false);
+      setRefreshing(false);
+    }
+  }, [applyResponse]);
 
   const load = useCallback(async (force = false) => {
     setError(null);
@@ -31,14 +86,21 @@ export function DiscoverContentPanel({ onSourceAdded }: DiscoverContentPanelProp
       const res = force
         ? await api.refreshDiscoveredArticles()
         : await api.getDiscoveredArticles();
-      setArticles(res.articles);
+      applyResponse(res);
+      const status = discoveryStatus(res.meta);
+      if (status === "running" || (force && res.articles.length === 0)) {
+        setScanning(true);
+        void pollUntilDone();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load discoveries");
     } finally {
       setLoading(false);
-      setRefreshing(false);
+      if (!pollRef.current) {
+        setRefreshing(false);
+      }
     }
-  }, []);
+  }, [applyResponse, pollUntilDone]);
 
   useEffect(() => {
     void load();
@@ -46,6 +108,7 @@ export function DiscoverContentPanel({ onSourceAdded }: DiscoverContentPanelProp
 
   async function handleRefresh() {
     setRefreshing(true);
+    setScanning(true);
     await load(true);
   }
 
@@ -78,7 +141,9 @@ export function DiscoverContentPanel({ onSourceAdded }: DiscoverContentPanelProp
     );
   }
 
-  if (!visible.length && !error) {
+  const showPanel = visible.length > 0 || error || scanning;
+
+  if (!showPanel) {
     return null;
   }
 
@@ -98,63 +163,73 @@ export function DiscoverContentPanel({ onSourceAdded }: DiscoverContentPanelProp
           type="button"
           className="discover-content-refresh"
           onClick={() => void handleRefresh()}
-          disabled={refreshing}
+          disabled={refreshing || scanning}
         >
-          {refreshing ? "Scanning…" : "Refresh"}
+          {refreshing || scanning ? "Scanning…" : "Refresh"}
         </button>
       </header>
 
+      {scanning && (
+        <div className="discover-content-scanning" aria-live="polite">
+          <BriefLoaderArt size="sm" />
+          <p>{scanLabel}</p>
+        </div>
+      )}
+
       {error && <p className="form-error discover-content-error">{error}</p>}
 
-      <ul className="discover-content-list">
-        {visible.map((article) => {
-          const scorePct = Math.round((article.relevance_score || 0) * 100);
-          const reasonLabel = (article.discovery_reason && REASON_LABELS[article.discovery_reason]) || "Relevant";
-          return (
-            <li key={article.id} className="discover-content-card">
-              <div className="discover-content-card-top">
-                <span className="discover-content-score">{scorePct}% match</span>
-                <span className="discover-content-reason">{reasonLabel}</span>
-              </div>
-              <a
-                href={article.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="discover-content-link"
-              >
-                {article.title}
-              </a>
-              <p className="discover-content-why">{article.why_relevant}</p>
-              <div className="discover-content-meta">
-                <SourceIcon type={article.source_type} size={14} />
-                <span>{article.source_name}</span>
-                {article.intent_topic && (
-                  <span className="discover-content-topic">· {article.intent_topic}</span>
-                )}
-              </div>
-              <div className="discover-content-actions">
-                {article.feed_url && (
+      {visible.length > 0 && (
+        <ul className="discover-content-list">
+          {visible.map((article) => {
+            const scorePct = Math.round((article.relevance_score || 0) * 100);
+            const reasonLabel =
+              (article.discovery_reason && REASON_LABELS[article.discovery_reason]) || "Relevant";
+            return (
+              <li key={article.id} className="discover-content-card">
+                <div className="discover-content-card-top">
+                  <span className="discover-content-score">{scorePct}% match</span>
+                  <span className="discover-content-reason">{reasonLabel}</span>
+                </div>
+                <a
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="discover-content-link"
+                >
+                  {article.title}
+                </a>
+                <p className="discover-content-why">{article.why_relevant}</p>
+                <div className="discover-content-meta">
+                  <SourceIcon type={article.source_type ?? "rss"} size={14} />
+                  <span>{article.source_name}</span>
+                  {article.intent_topic && (
+                    <span className="discover-content-topic">· {article.intent_topic}</span>
+                  )}
+                </div>
+                <div className="discover-content-actions">
+                  {article.feed_url && (
+                    <button
+                      type="button"
+                      className="discover-content-subscribe"
+                      onClick={() => void handleSubscribe(article)}
+                      disabled={addingFeed === article.id}
+                    >
+                      {addingFeed === article.id ? "Adding…" : "Subscribe to source"}
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="discover-content-subscribe"
-                    onClick={() => void handleSubscribe(article)}
-                    disabled={addingFeed === article.id}
+                    className="discover-content-dismiss"
+                    onClick={() => setDismissed((prev) => new Set(prev).add(article.id))}
                   >
-                    {addingFeed === article.id ? "Adding…" : "Subscribe to source"}
+                    Not for me
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="discover-content-dismiss"
-                  onClick={() => setDismissed((prev) => new Set(prev).add(article.id))}
-                >
-                  Not for me
-                </button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

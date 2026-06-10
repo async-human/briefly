@@ -1,6 +1,7 @@
 """Source discovery API — run, review, confirm before first briefing."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -189,17 +190,65 @@ async def confirm_discovery(
     )
 
 
+def _articles_out(profile: UserProfile) -> DiscoveredArticlesOut:
+    from briefly_api.services.intelligent_content_discovery import get_cached_discoveries
+
+    articles = get_cached_discoveries(profile)
+    discovery_meta = profile.discovery_meta or {}
+    progress = discovery_meta.get("content_discovery") or {}
+    last_run = discovery_meta.get("last_content_discovery") or {}
+    meta = {
+        **last_run,
+        "status": progress.get("status", "idle"),
+        "label": progress.get("label", ""),
+        "error": progress.get("error"),
+    }
+    return DiscoveredArticlesOut(
+        articles=[DiscoveredArticleOut.model_validate(a) for a in articles],
+        refreshed_at=(
+            profile.discovered_articles_at.isoformat()
+            if profile.discovered_articles_at else None
+        ),
+        meta=meta,
+    )
+
+
+async def _start_content_discovery(user_id: str, *, force: bool = False) -> None:
+    """Mark job running in DB, then run harvest/score in a background task."""
+    from briefly_api.services.intelligent_content_discovery import run_content_discovery_job
+
+    async with SessionLocal() as session:
+        prof = await session.execute(
+            select(UserProfile).where(UserProfile.user_id == user_id)
+        )
+        profile = prof.scalar_one_or_none()
+        if not profile:
+            return
+
+        progress = (profile.discovery_meta or {}).get("content_discovery") or {}
+        if progress.get("status") == "running":
+            return
+
+        meta = dict(profile.discovery_meta or {})
+        meta["content_discovery"] = {
+            "status": "running",
+            "label": "Refreshing discoveries…" if force else "Starting discovery…",
+            "error": None,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        profile.discovery_meta = meta
+        await session.commit()
+
+    asyncio.create_task(run_content_discovery_job(user_id, force_refresh=force))
+
+
 @router.get("/discover/articles", response_model=DiscoveredArticlesOut)
 async def get_discovered_articles(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    settings: Settings = Depends(get_settings),
 ) -> DiscoveredArticlesOut:
-    """Return cached relevant articles from outside user subscriptions."""
-    from briefly_api.services.intelligent_content_discovery import (
-        discover_relevant_content,
-        get_cached_discoveries,
-    )
+    """Return cached discoveries. Starts a background scan if cache is empty."""
+    from briefly_api.services.intelligent_content_discovery import get_cached_discoveries
 
     prof = await db.execute(select(UserProfile).where(UserProfile.user_id == user.id))
     profile = prof.scalar_one_or_none()
@@ -207,44 +256,29 @@ async def get_discovered_articles(
         raise HTTPException(status_code=404, detail="Profile not found")
 
     articles = get_cached_discoveries(profile)
-    if not articles:
-        articles = await discover_relevant_content(db, user.id, settings=settings)
+    progress = (profile.discovery_meta or {}).get("content_discovery") or {}
 
-    meta = (profile.discovery_meta or {}).get("last_content_discovery") or {}
-    return DiscoveredArticlesOut(
-        articles=[DiscoveredArticleOut.model_validate(a) for a in articles],
-        refreshed_at=(
-            profile.discovered_articles_at.isoformat()
-            if profile.discovered_articles_at else None
-        ),
-        meta=meta,
-    )
+    if not articles and progress.get("status") != "running":
+        await _start_content_discovery(user.id, force=False)
+        await db.refresh(profile)
+
+    return _articles_out(profile)
 
 
 @router.post("/discover/articles/refresh", response_model=DiscoveredArticlesOut)
 async def refresh_discovered_articles(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    settings: Settings = Depends(get_settings),
 ) -> DiscoveredArticlesOut:
-    """Force-refresh the intelligent content discovery pipeline."""
-    from briefly_api.services.intelligent_content_discovery import discover_relevant_content
-
+    """Queue a background refresh — returns immediately with status=running."""
     prof = await db.execute(select(UserProfile).where(UserProfile.user_id == user.id))
     profile = prof.scalar_one_or_none()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    articles = await discover_relevant_content(
-        db, user.id, settings=settings, force_refresh=True,
-    )
-    meta = (profile.discovery_meta or {}).get("last_content_discovery") or {}
-    await db.refresh(profile)
-    return DiscoveredArticlesOut(
-        articles=[DiscoveredArticleOut.model_validate(a) for a in articles],
-        refreshed_at=(
-            profile.discovered_articles_at.isoformat()
-            if profile.discovered_articles_at else None
-        ),
-        meta=meta,
-    )
+    progress = (profile.discovery_meta or {}).get("content_discovery") or {}
+    if progress.get("status") != "running":
+        await _start_content_discovery(user.id, force=True)
+        await db.refresh(profile)
+
+    return _articles_out(profile)
