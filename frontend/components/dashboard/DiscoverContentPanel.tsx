@@ -108,7 +108,7 @@ export function DiscoverContentPanel({ onSourceAdded }: DiscoverContentPanelProp
       <ul className="discover-content-list">
         {visible.map((article) => {
           const scorePct = Math.round((article.relevance_score || 0) * 100);
-          const reasonLabel = REASON_LABELS[article.discovery_reason] || "Relevant";
+          const reasonLabel = (article.discovery_reason && REASON_LABELS[article.discovery_reason]) || "Relevant";
           return (
             <li key={article.id} className="discover-content-card">
               <div className="discover-content-card-top">
