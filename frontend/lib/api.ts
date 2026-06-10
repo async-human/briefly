@@ -593,6 +593,18 @@ export type AskStreamEvent =
   | { type: "done"; citations: AskCitation[]; created_at: string }
   | { type: "error"; message: string };
 
+function* parseAskSseBuffer(buffer: string): Generator<AskStreamEvent> {
+  for (const part of buffer.split("\n\n")) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    for (const line of trimmed.split("\n")) {
+      if (!line.startsWith("data: ")) continue;
+      const data = JSON.parse(line.slice(6)) as AskStreamEvent;
+      yield data;
+    }
+  }
+}
+
 async function* readAskStream(
   stream: ReadableStream<Uint8Array>,
 ): AsyncGenerator<AskStreamEvent> {
@@ -602,18 +614,24 @@ async function* readAskStream(
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const parts = buffer.split("\n\n");
-    buffer = parts.pop() ?? "";
-    for (const part of parts) {
-      for (const line of part.split("\n")) {
-        if (!line.startsWith("data: ")) continue;
-        const data = JSON.parse(line.slice(6)) as AskStreamEvent;
-        yield data;
-        if (data.type === "error") return;
+    if (value) {
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() ?? "";
+      for (const part of parts) {
+        for (const event of parseAskSseBuffer(part)) {
+          yield event;
+          if (event.type === "error") return;
+        }
       }
     }
+    if (done) break;
+  }
+
+  buffer += decoder.decode();
+  for (const event of parseAskSseBuffer(buffer)) {
+    yield event;
+    if (event.type === "error") return;
   }
 }
 

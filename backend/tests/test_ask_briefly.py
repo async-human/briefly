@@ -41,6 +41,17 @@ def test_extract_citations_from_answer():
     assert cites[1]["content_id"] == "c2"
 
 
+def test_extract_citations_falls_back_to_context_chunks():
+    chunks = [
+        ContextChunk("S1", "c1", "Title A", None, None, "snippet", "article"),
+    ]
+    answer = "Here is a summary without inline citation markers."
+    cites = _extract_citations(answer, chunks)
+    assert len(cites) == 1
+    assert cites[0]["ref"] == "S1"
+    assert cites[0]["title"] == "Title A"
+
+
 def test_is_saved_unread_query_detects_backlog_questions():
     assert is_saved_unread_query("What did I save recently that I haven't read yet?")
     assert is_saved_unread_query("show my unread saves")

@@ -138,7 +138,7 @@ export function CitationSources({ citations }: { citations: AskCitation[] }) {
                     Open
                   </a>
                 ) : null}
-                {!cite.content_id.startsWith("digest-item") ? (
+                {cite.content_id && !cite.content_id.startsWith("digest-item") ? (
                   <Link href={graphHref} className="ask-source-action">
                     Graph
                   </Link>

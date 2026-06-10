@@ -402,25 +402,30 @@ def _format_context_pack(chunks: list[ContextChunk]) -> str:
     return "\n---\n".join(parts)
 
 
+def _chunk_to_citation(chunk: ContextChunk) -> dict:
+    return {
+        "ref": chunk.ref,
+        "content_id": chunk.content_id or "",
+        "title": chunk.title,
+        "url": chunk.url,
+        "source_name": chunk.source_name,
+        "snippet": chunk.snippet[:280],
+        "kind": chunk.kind,
+    }
+
+
 def _extract_citations(answer: str, chunks: list[ContextChunk]) -> list[dict]:
     refs_used = {f"S{m.group(1)}" for m in _CITATION_RE.finditer(answer)}
-    by_ref = {c.ref: c for c in chunks}
+    by_ref = {c.ref: c for c in chunks if c.ref}
+    # If the model omits inline [S1] markers, still surface the context pack as sources.
+    if not refs_used:
+        refs_used = set(by_ref.keys())
     citations: list[dict] = []
     for ref in sorted(refs_used, key=lambda r: int(r[1:])):
         chunk = by_ref.get(ref)
         if not chunk:
             continue
-        citations.append(
-            {
-                "ref": ref,
-                "content_id": chunk.content_id,
-                "title": chunk.title,
-                "url": chunk.url,
-                "source_name": chunk.source_name,
-                "snippet": chunk.snippet[:280],
-                "kind": chunk.kind,
-            }
-        )
+        citations.append(_chunk_to_citation(chunk))
     return citations
 
 

@@ -140,7 +140,7 @@ export function AskBrieflyView({
               if (last?.role !== "assistant") return next;
               next[next.length - 1] = {
                 ...last,
-                citations: event.citations,
+                citations: event.citations ?? [],
                 timestamp: event.created_at,
               };
               return next;
