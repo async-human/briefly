@@ -2219,15 +2219,8 @@ a.saved-capture-title:hover {
 /* ── Hallmark graph loader ─────────────────────────────────────────────────── */
 
 .hm-graph-loader {
-  --kg-hub: var(--app-accent);
-  --kg-topic: oklch(58% 0.18 295);
-  --kg-source: oklch(62% 0.17 145);
-  --kg-item: oklch(58% 0.14 250);
-  --kg-thought: oklch(72% 0.14 75);
-  --kg-thread: oklch(62% 0.18 350);
-
   position: relative;
-  width: min(16rem, 62vw);
+  width: min(17.5rem, 68vw);
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -2247,76 +2240,13 @@ a.saved-capture-title:hover {
   pointer-events: none;
 }
 
-.hm-graph-loader-svg {
+.hm-graph-loader-canvas {
   position: relative;
   z-index: 1;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
-
-.hm-graph-loader-network {
-  transform-origin: 120px 120px;
-  animation: hm-graph-network-settle 14s var(--app-ease-out) infinite;
-}
-
-.hm-graph-loader-edge {
-  fill: none;
-  stroke: var(--app-accent);
-  stroke-width: 1.35;
-  stroke-linecap: round;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  opacity: 0;
-  animation:
-    hm-graph-edge-draw 0.95s var(--app-ease-out) forwards,
-    hm-graph-edge-glow 4.2s ease-in-out 0.95s infinite;
-}
-
-.hm-graph-loader-pulse {
-  fill: var(--app-accent);
-  opacity: 0;
-  animation: hm-graph-pulse-fade 2.8s ease-in-out infinite;
-}
-
-.hm-graph-loader-node {
-  opacity: 0;
-  animation:
-    hm-graph-node-appear 0.7s var(--app-ease-out) var(--node-delay, 0s) forwards,
-    hm-graph-node-drift 5.5s ease-in-out calc(0.7s + var(--float-phase, 0s)) infinite;
-}
-
-.hm-graph-loader-node-ring {
-  fill: currentColor;
-  opacity: 0.14;
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.hm-graph-loader-node-core {
-  fill: currentColor;
-  stroke: oklch(100% 0 0 / 0.88);
-  stroke-width: 1.25;
-}
-
-.hm-graph-loader-node--hub {
-  color: var(--kg-hub);
-}
-
-.hm-graph-loader-node--hub .hm-graph-loader-node-ring {
-  opacity: 0.22;
-  animation: hm-graph-hub-ring 3.8s ease-in-out infinite;
-}
-
-.hm-graph-loader-node--hub .hm-graph-loader-node-core {
-  stroke-width: 1.5;
-}
-
-.hm-graph-loader-node--topic { color: var(--kg-topic); }
-.hm-graph-loader-node--source { color: var(--kg-source); }
-.hm-graph-loader-node--item { color: var(--kg-item); }
-.hm-graph-loader-node--thought { color: var(--kg-thought); }
-.hm-graph-loader-node--thread { color: var(--kg-thread); }
 
 @keyframes app-loader-fade-in {
   from { opacity: 0; transform: translateY(10px) scale(0.98); }
@@ -2356,78 +2286,11 @@ a.saved-capture-title:hover {
   50% { opacity: 1; transform: scale(1.02); }
 }
 
-@keyframes hm-graph-network-settle {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  35% { transform: translate(1px, -1.5px) scale(1.005); }
-  70% { transform: translate(-1px, 1px) scale(0.998); }
-}
-
-@keyframes hm-graph-edge-draw {
-  from {
-    stroke-dashoffset: 1;
-    opacity: 0;
-  }
-  to {
-    stroke-dashoffset: 0;
-    opacity: 0.55;
-  }
-}
-
-@keyframes hm-graph-edge-glow {
-  0%, 100% { opacity: 0.38; }
-  50% { opacity: 0.62; }
-}
-
-@keyframes hm-graph-pulse-fade {
-  0%, 8% { opacity: 0; }
-  18%, 42% { opacity: 0.85; }
-  55%, 100% { opacity: 0; }
-}
-
-@keyframes hm-graph-node-appear {
-  from {
-    opacity: 0;
-    transform: scale(0.4);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes hm-graph-node-drift {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(0, -2px); }
-}
-
-@keyframes hm-graph-hub-ring {
-  0%, 100% { transform: scale(1); opacity: 0.2; }
-  50% { transform: scale(1.12); opacity: 0.34; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .app-page-loader-enter-graph,
   .hm-graph-loader-ambient,
-  .hm-graph-loader-network,
-  .hm-graph-loader-edge,
-  .hm-graph-loader-pulse,
-  .hm-graph-loader-node,
-  .hm-graph-loader-node--hub .hm-graph-loader-node-ring,
   .app-page-loader-caption-graph {
     animation: none !important;
-  }
-
-  .hm-graph-loader-edge {
-    stroke-dashoffset: 0;
-    opacity: 0.5;
-  }
-
-  .hm-graph-loader-node {
-    opacity: 1;
-  }
-
-  .hm-graph-loader-pulse {
-    display: none;
   }
 }
 
