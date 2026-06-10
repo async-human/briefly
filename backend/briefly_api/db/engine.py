@@ -75,6 +75,14 @@ async def init_db() -> None:
             )
         except Exception as exc:
             logger.warning("digest.meta migration: %s", exc)
+        for stmt in (
+            "ALTER TABLE digest_items ADD COLUMN IF NOT EXISTS contradiction_flag BOOLEAN NOT NULL DEFAULT FALSE",
+            "ALTER TABLE digest_items ADD COLUMN IF NOT EXISTS contradiction_explanation TEXT",
+        ):
+            try:
+                await conn.execute(text(stmt))
+            except Exception as exc:
+                logger.warning("digest_items intelligence migration: %s", exc)
         try:
             await conn.execute(
                 text("""
