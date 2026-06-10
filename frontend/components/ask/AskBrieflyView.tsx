@@ -14,12 +14,31 @@ const SUGGESTED = [
   "Where did I see something about AI agents?",
 ];
 
+type StoryScope = {
+  contentId?: string;
+  digestItemId?: string;
+  title?: string;
+};
+
 type AskBrieflyViewProps = {
   initialContentId?: string | null;
   initialDigestItemId?: string | null;
   initialThreadId?: string | null;
   anchorTitle?: string | null;
 };
+
+function scopeFromEntry(
+  contentId?: string | null,
+  digestItemId?: string | null,
+  title?: string | null,
+): StoryScope | null {
+  if (!contentId && !digestItemId) return null;
+  return {
+    contentId: contentId ?? undefined,
+    digestItemId: digestItemId ?? undefined,
+    title: title ?? undefined,
+  };
+}
 
 function MessageBubble({
   message,
@@ -71,14 +90,20 @@ export function AskBrieflyView({
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const [scopeTitle, setScopeTitle] = useState(anchorTitle ?? null);
+  const [storyScope, setStoryScope] = useState<StoryScope | null>(() =>
+    scopeFromEntry(initialContentId, initialDigestItemId, anchorTitle),
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const contentId = initialContentId ?? null;
-  const digestItemId = initialDigestItemId ?? null;
-  const isScopedEntry = Boolean((contentId || digestItemId) && !initialThreadId);
   const hasConversation = messages.length > 0 || sending;
+  const isStoryFocused = Boolean(storyScope?.contentId || storyScope?.digestItemId);
+  const isScopedIdle = isStoryFocused && !hasConversation && !initialThreadId;
   const autoAskStarted = useRef(false);
+
+  const clearStoryFocus = useCallback(() => {
+    setStoryScope(null);
+    router.replace("/ask");
+  }, [router]);
 
   const loadThreads = useCallback(() => {
     void api.listAskThreads().then((res) => setThreads(res.threads)).catch(() => {});
@@ -95,7 +120,15 @@ export function AskBrieflyView({
       .then((res) => {
         setThreadId(res.thread.id);
         setMessages(res.thread.messages);
-        if (res.thread.anchor_title) setScopeTitle(res.thread.anchor_title);
+        setStoryScope(
+          res.thread.digest_item_id || res.thread.content_id
+            ? {
+                contentId: res.thread.content_id ?? undefined,
+                digestItemId: res.thread.digest_item_id ?? undefined,
+                title: res.thread.anchor_title ?? undefined,
+              }
+            : null,
+        );
       })
       .catch(() => setError("Could not load this conversation."));
   }, [initialThreadId]);
@@ -121,8 +154,8 @@ export function AskBrieflyView({
         for await (const event of api.askStream({
           message: trimmed,
           thread_id: threadId ?? undefined,
-          content_id: contentId ?? undefined,
-          digest_item_id: digestItemId ?? undefined,
+          content_id: storyScope?.contentId,
+          digest_item_id: storyScope?.digestItemId,
         })) {
           if (event.type === "thread_id") {
             setThreadId(event.thread_id);
@@ -169,31 +202,25 @@ export function AskBrieflyView({
         setSending(false);
       }
     },
-    [threadId, contentId, digestItemId, input, sending, loadThreads],
+    [threadId, storyScope, input, sending, loadThreads],
   );
 
   // Contextual entry from reader / dashboard / graph — auto-ask with anchor scope.
   useEffect(() => {
     if (autoAskStarted.current || initialThreadId) return;
-    if (!contentId && !digestItemId) return;
+    if (!isStoryFocused) return;
 
     autoAskStarted.current = true;
-    const question = buildContextualAskQuestion(anchorTitle ?? scopeTitle);
+    const question = buildContextualAskQuestion(storyScope?.title);
     void handleSend(question);
-  }, [
-    initialThreadId,
-    contentId,
-    digestItemId,
-    anchorTitle,
-    scopeTitle,
-    handleSend,
-  ]);
+  }, [initialThreadId, isStoryFocused, storyScope?.title, handleSend]);
 
   function startNewThread() {
     setThreadId(null);
     setMessages([]);
-    setScopeTitle(anchorTitle ?? null);
+    setStoryScope(null);
     setError("");
+    router.replace("/ask");
   }
 
   async function handleDeleteThread(id: string) {
@@ -202,7 +229,6 @@ export function AskBrieflyView({
       setThreads((prev) => prev.filter((t) => t.id !== id));
       if (threadId === id) {
         startNewThread();
-        router.replace("/ask");
       }
     } catch {
       setError("Could not delete this chat.");
@@ -215,7 +241,15 @@ export function AskBrieflyView({
       .then((res) => {
         setThreadId(res.thread.id);
         setMessages(res.thread.messages);
-        setScopeTitle(res.thread.anchor_title);
+        setStoryScope(
+          res.thread.digest_item_id || res.thread.content_id
+            ? {
+                contentId: res.thread.content_id ?? undefined,
+                digestItemId: res.thread.digest_item_id ?? undefined,
+                title: res.thread.anchor_title ?? undefined,
+              }
+            : null,
+        );
         setError("");
       })
       .catch(() => setError("Could not load this conversation."));
@@ -271,27 +305,41 @@ export function AskBrieflyView({
       </aside>
 
       <div className={`ask-main${hasConversation ? " ask-main-chat" : " ask-main-idle"}`}>
-        {scopeTitle && (isScopedEntry || hasConversation) ? (
+        {storyScope?.title && (isScopedIdle || hasConversation) ? (
           <div className="ask-scope-pill" role="status">
-            Focused on <strong>{scopeTitle}</strong>
+            <span className="ask-scope-pill-text">
+              Focused on <strong>{storyScope.title}</strong>
+            </span>
+            <button
+              type="button"
+              className="ask-scope-pill-action"
+              onClick={hasConversation ? () => setStoryScope(null) : clearStoryFocus}
+            >
+              {hasConversation ? "Ask broadly" : "Ask broadly instead"}
+            </button>
           </div>
         ) : null}
 
         <div className="ask-stage">
           <div className="ask-stage-inner">
             {!hasConversation ? (
-              isScopedEntry ? (
+              isScopedIdle ? (
                 <div className="ask-hero ask-hero-scoped">
                   <BrieflyLogo variant="mark" size="lg" className="ask-hero-logo" />
                   <h1 className="ask-hero-title">Going deeper on this story</h1>
-                  {scopeTitle ? (
-                    <p className="ask-hero-anchor-title">{scopeTitle}</p>
+                  {storyScope?.title ? (
+                    <p className="ask-hero-anchor-title">{storyScope.title}</p>
                   ) : null}
                   <p className="ask-hero-sub">
                     {sending
                       ? "Briefly is reading this item and your related context…"
                       : "Starting a focused briefing with your saved context."}
                   </p>
+                  {!sending ? (
+                    <button type="button" className="ask-scope-exit" onClick={clearStoryFocus}>
+                      Ask about your whole library instead
+                    </button>
+                  ) : null}
                 </div>
               ) : (
                 <div className="ask-hero">

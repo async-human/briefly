@@ -2938,8 +2938,11 @@ a.saved-capture-title:hover {
 .ask-scope-pill {
   flex-shrink: 0;
   align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
   margin: 0.625rem 1rem 0;
-  padding: 0.35rem 0.75rem;
+  padding: 0.35rem 0.5rem 0.35rem 0.75rem;
   border-radius: 999px;
   background: var(--app-linear-soft);
   border: 1px solid color-mix(in srgb, var(--app-linear) 20%, var(--app-border));
@@ -2947,9 +2950,54 @@ a.saved-capture-title:hover {
   color: var(--app-ink-secondary);
 }
 
+.ask-scope-pill-text {
+  min-width: 0;
+}
+
 .ask-scope-pill strong {
   color: var(--app-ink);
   font-weight: 600;
+}
+
+.ask-scope-pill-action {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  background: var(--app-surface);
+  color: var(--app-linear);
+  font-family: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    background var(--app-dur) var(--app-ease),
+    color var(--app-dur) var(--app-ease);
+}
+
+.ask-scope-pill-action:hover {
+  background: var(--app-canvas);
+  color: color-mix(in srgb, var(--app-linear) 85%, var(--app-ink));
+}
+
+.ask-scope-exit {
+  margin-top: 1rem;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--app-ink-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color var(--app-dur) var(--app-ease);
+}
+
+.ask-scope-exit:hover {
+  color: var(--app-linear);
 }
 
 .ask-stage {
