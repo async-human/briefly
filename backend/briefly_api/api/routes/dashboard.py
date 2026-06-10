@@ -56,10 +56,10 @@ from briefly_api.services.connectors.registry import detect_source, get_connecto
 from briefly_api.services.connectors.types import ALL_SOURCE_TYPES
 from briefly_api.services.url_scraper import discover_rss_feed
 from briefly_api.services.topic_matching import (
-    item_matches_topic,
     topic_keywords as _topic_keywords,
     topic_match_text,
     topic_matches as _topic_matches,
+    topics_for_digest_item,
 )
 
 log = logging.getLogger(__name__)
@@ -1000,14 +1000,23 @@ async def _compute_behavioral_intelligence(
         if s.digest_item_id:
             signals_by_item[str(s.digest_item_id)].append(s)
 
+    item_topics: dict[str, list[str]] = {}
+    all_topics = list(dict.fromkeys(declared_topics))
+    for it in digest_items:
+        item_topics[str(it.id)] = topics_for_digest_item(
+            it.headline,
+            it.summary,
+            it.source_name,
+            it.confidence_signal,
+            all_topics,
+        )
+
     def _topic_stats(topic: str) -> tuple[int, int, int, int, int]:
         """stories_shown, pos, neg, saves, action_total."""
         matching_ids = [
-            str(it.id)
-            for it in digest_items
-            if item_matches_topic(
-                it.headline, it.summary, it.source_name, it.confidence_signal, topic,
-            )
+            item_id
+            for item_id, topics in item_topics.items()
+            if topic in topics
         ]
         stories_shown = len(matching_ids)
         pos = neg = saves = 0

@@ -726,7 +726,9 @@ async def discover_relevant_content(
         user_id, status="running", label="Scoring relevance…",
     )
 
-    profile_embedding = list(profile.profile_embedding) if profile.profile_embedding else None
+    from briefly_api.services.embedding_utils import embedding_as_list
+
+    profile_embedding = embedding_as_list(profile.profile_embedding)
     scored = await _score_candidates(candidates, profile, profile_embedding, seen_hashes, never_show)
     top = _select_diverse(scored, limit)
 

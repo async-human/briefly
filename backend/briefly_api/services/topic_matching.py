@@ -16,8 +16,8 @@ TOPIC_STOP_WORDS = frozenset({
 
 # Extra tokens to accept for common interest labels
 TOPIC_ALIASES: dict[str, list[str]] = {
-    "llms": ["llm", "llms", "large language models", "language model"],
-    "generative ai": ["generative ai", "gen ai", "genai", "generative"],
+    "llms": ["llm", "llms", "large language models", "language model", "gpt", "chatgpt"],
+    "generative ai": ["generative ai", "gen ai", "genai", "generative", "gpt", "llm", "openai"],
     "ai tools": ["ai tools", "ai tool"],
     "multi-agent systems": ["multi-agent", "multi agent", "agentic"],
     "ai-ml engineer": ["machine learning", "ml engineer", "ai engineer"],
@@ -120,14 +120,66 @@ def item_matches_topic(
     return topic_matches(cs, topic)
 
 
-def topic_match_score(text: str, topic: str) -> float:
-    """0–1 overlap score for ranking (e.g. knowledge graph)."""
+def topic_match_score_partial(text: str, topic: str) -> float:
+    """Share of significant topic words found in text (0–1), no threshold."""
     if not text or not topic:
         return 0.0
+    hay = text.lower()
+    topic_clean = topic.strip().lower()
+    if topic_clean in hay:
+        return 1.0
+    sig = significant_words(topic)
+    if not sig:
+        return 0.0
+    hits = sum(1 for w in sig if _word_in_text(w, hay))
+    score = hits / len(sig)
+    topic_key = topic.strip().lower()
+    for alias in TOPIC_ALIASES.get(topic_key, []):
+        if _word_in_text(alias, hay) or alias in hay:
+            score = max(score, 0.5 if len(sig) >= 2 else 1.0)
+    return score
+
+
+def topic_match_score(text: str, topic: str) -> float:
+    """0–1 overlap score for ranking (e.g. knowledge graph)."""
     if topic_matches(text, topic):
-        sig = significant_words(topic)
-        if not sig:
-            return 1.0 if topic.strip().lower() in text.lower() else 0.0
-        hits = sum(1 for w in sig if _word_in_text(w, text.lower()))
-        return hits / len(sig)
+        return topic_match_score_partial(text, topic)
     return 0.0
+
+
+def topics_for_digest_item(
+    headline: str | None,
+    summary: str | None,
+    source_name: str | None,
+    confidence_signal: str | None,
+    declared_topics: list[str],
+) -> list[str]:
+    """
+    Topics a briefing item belongs to.
+
+    Strict phrase/word rules first; otherwise the single best partial match
+  (≥50% of significant words) so each story counts toward one topic at most.
+    """
+    strict = [
+        t
+        for t in declared_topics
+        if item_matches_topic(headline, summary, source_name, confidence_signal, t)
+    ]
+    if strict:
+        return strict
+
+    body = topic_match_text(headline, summary, source_name)
+    cs = (confidence_signal or "").strip()
+    best_topic: str | None = None
+    best_score = 0.0
+    for topic in declared_topics:
+        score = topic_match_score_partial(body, topic)
+        if cs and len(cs) <= 120:
+            score = max(score, topic_match_score_partial(cs, topic))
+        if score > best_score:
+            best_score = score
+            best_topic = topic
+
+    if best_topic and best_score >= 0.5:
+        return [best_topic]
+    return []

@@ -6,7 +6,10 @@ from briefly_api.services.topic_matching import (
     topic_keywords,
     topic_match_text,
     topic_matches,
+    topics_for_digest_item,
 )
+from briefly_api.services.embedding_utils import embedding_as_list
+import numpy as np
 
 
 def test_topic_keywords_excludes_stop_words():
@@ -66,3 +69,19 @@ def test_confidence_signal_can_attribute_topic():
         "Matches your generative ai cluster",
         "generative ai",
     )
+
+
+def test_topics_for_digest_item_soft_match_single_topic():
+    topics = topics_for_digest_item(
+        "OpenAI ships a new GPT-4 coding update",
+        "Developers get better tool use.",
+        "Hacker News",
+        "Strong match to your interests.",
+        ["generative ai", "startup funding"],
+    )
+    assert topics == ["generative ai"]
+
+
+def test_embedding_as_list_handles_numpy():
+    vec = np.array([0.1, 0.2, 0.3])
+    assert embedding_as_list(vec) == [0.1, 0.2, 0.3]

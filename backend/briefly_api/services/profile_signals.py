@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.db.models import UserProfile
+from briefly_api.services.embedding_utils import embedding_as_list
 from briefly_api.services.personalization_score import build_interest_model
 
 
@@ -28,8 +29,5 @@ async def load_profile_signals(
     model = build_interest_model(profile_dict, list(profile.topic_clusters or []))
     keywords = set(model.phrases.keys())
 
-    embedding = None
-    if profile.profile_embedding is not None:
-        embedding = list(profile.profile_embedding)
-
+    embedding = embedding_as_list(profile.profile_embedding)
     return keywords, embedding
