@@ -15,8 +15,7 @@ from briefly_api.api.router import api_router
 from briefly_api.config import get_settings
 from briefly_api.db.engine import init_db
 from briefly_api.ingestion.smtp_server import start_smtp_server
-from briefly_api.workers.enrichment_worker import continuous_enrichment_loop
-from briefly_api.workers.scheduler import digest_scheduler_loop
+from briefly_api.services.embedding_guard import validate_embedding_configuration
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,35 +34,59 @@ if _settings.sentry_dsn:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    settings = get_settings()
+
+    if not settings.runs_web_server:
+        logger.error("Web process started with BRIEFLY_PROCESS_ROLE=worker — use workers.runner instead")
+        raise RuntimeError("Invalid process role for web server")
+
     try:
         await init_db()
     except Exception:
         logger.exception("Database startup failed — check DATABASE_URL and Supabase SSL/password")
         raise
 
+    validate_embedding_configuration()
+
     try:
         from briefly_api.services.digest_failure import reschedule_stuck_failures
+
         await reschedule_stuck_failures()
     except Exception:
         logger.warning("Could not reschedule stuck failures — non-fatal", exc_info=True)
 
-    scheduler_task   = asyncio.create_task(digest_scheduler_loop())
-    enrichment_task  = asyncio.create_task(continuous_enrichment_loop())
-    logger.info("Digest scheduler + enrichment worker started")
+    background_tasks: list[asyncio.Task] = []
+    smtp_controller = None
 
-    settings = get_settings()
-    smtp_controller = start_smtp_server(settings)
+    # Dev convenience: single process runs workers inline when process_role=all
+    if settings.process_role == "all":
+        from briefly_api.services.background_jobs import background_job_loop, ensure_job_handlers
+        from briefly_api.workers.enrichment_worker import continuous_enrichment_loop
+        from briefly_api.workers.scheduler import digest_scheduler_loop
+
+        ensure_job_handlers()
+        background_tasks.append(asyncio.create_task(digest_scheduler_loop()))
+        if settings.enrichment_worker_enabled:
+            background_tasks.append(asyncio.create_task(continuous_enrichment_loop()))
+        background_tasks.append(asyncio.create_task(background_job_loop()))
+        logger.info("Digest scheduler + enrichment + jobs started (all-in-one dev mode)")
+
+        if settings.smtp_ingestion_active:
+            smtp_controller = start_smtp_server(settings)
+    else:
+        logger.info("Web-only mode — background workers run in separate process")
 
     yield
 
-    scheduler_task.cancel()
-    enrichment_task.cancel()
-    for task in (scheduler_task, enrichment_task):
+    for task in background_tasks:
+        task.cancel()
+    for task in background_tasks:
         try:
             await task
         except asyncio.CancelledError:
             pass
-    logger.info("Digest scheduler + enrichment worker stopped")
+    if background_tasks:
+        logger.info("Background tasks stopped")
 
     if smtp_controller:
         smtp_controller.stop()
@@ -90,6 +113,7 @@ def create_app() -> FastAPI:
 
     if settings.audio_enabled:
         from pathlib import Path
+
         Path(settings.audio_storage_path).mkdir(parents=True, exist_ok=True)
         app.mount("/audio", StaticFiles(directory=settings.audio_storage_path), name="audio")
 

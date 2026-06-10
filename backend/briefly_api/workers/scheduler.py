@@ -32,6 +32,7 @@ from briefly_api.services.digest_failure import (
 )
 from briefly_api.workers.footprint_scanner import run_nightly_scan
 from briefly_api.workers.job_queue import job_lock
+from briefly_api.workers.scheduler_time import is_local_time_at_or_after, is_utc_time_at_or_after
 from briefly_api.workers.scheduler_state import (
     has_digest_ran,
     has_ingest_ran,
@@ -75,7 +76,7 @@ async def _get_due_users(now_utc: datetime) -> list[dict]:
                 log.warning("Scheduler: unknown timezone '%s' for user %s", tz_name, profile.user_id)
                 continue
 
-            if local_hhmm != digest_time:
+            if not is_local_time_at_or_after(local_hhmm, digest_time):
                 continue
 
             if await has_digest_ran(profile.user_id, local_date):
@@ -120,7 +121,7 @@ async def _get_due_ingestion_users(now_utc: datetime) -> list[dict]:
         except Exception:
             continue
 
-        if local_hhmm != ingest_time:
+        if not is_local_time_at_or_after(local_hhmm, ingest_time):
             continue
 
         if await has_ingest_ran(profile.user_id, local_date):
@@ -141,6 +142,30 @@ async def _run_footprint_scan() -> None:
         await run_nightly_scan()
     except Exception:
         log.exception("Scheduler: footprint scan failed")
+
+
+async def run_footprint_scan_job() -> None:
+    await _run_footprint_scan()
+
+
+async def run_weekly_intelligence_job() -> None:
+    await _run_weekly_intelligence()
+
+
+async def run_story_thread_agent_job() -> None:
+    await _run_story_thread_agent()
+
+
+async def run_proactive_alerts_job() -> None:
+    from briefly_api.services.proactive_notifier import send_pending_proactive_alerts
+
+    await send_pending_proactive_alerts()
+
+
+async def run_weekly_reports_job() -> None:
+    from briefly_api.services.weekly_email import send_weekly_reports_for_due_users
+
+    await send_weekly_reports_for_due_users(datetime.now(timezone.utc))
 
 
 async def _run_story_thread_agent() -> None:
@@ -412,44 +437,61 @@ async def digest_scheduler_loop() -> None:
                     return_exceptions=True,
                 )
 
-            # ── Nightly footprint scan at 01:00 UTC ───────────────────────────
-            if _last_footprint_scan_date != today and now_utc.hour == 1 and now_utc.minute == 0:
+            # ── Nightly footprint scan (≥ 01:00 UTC, once per day) ─────────────
+            if (
+                _last_footprint_scan_date != today
+                and is_utc_time_at_or_after(now_utc, 1, 0)
+            ):
                 _last_footprint_scan_date = today
-                asyncio.create_task(_run_footprint_scan())
-                log.info("Scheduler: footprint scan task scheduled for %s", today)
+                from briefly_api.services.background_jobs import enqueue_background_job
 
-            # ── Weekly intelligence at configured weekday + 02:00 UTC ─────────
+                await enqueue_background_job("footprint_scan", {})
+                log.info("Scheduler: footprint scan enqueued for %s", today)
+
+            # ── Weekly intelligence (configured weekday, ≥ hour UTC) ───────────
             if (
                 s.weekly_intelligence_enabled
                 and _last_weekly_intelligence_date != today
                 and now_utc.weekday() == s.weekly_intelligence_weekday
-                and now_utc.hour == s.weekly_intelligence_hour
-                and now_utc.minute == 0
+                and is_utc_time_at_or_after(now_utc, s.weekly_intelligence_hour, 0)
             ):
                 _last_weekly_intelligence_date = today
-                asyncio.create_task(_run_weekly_intelligence())
-                log.info("Scheduler: WeeklyIntelligenceSkill task scheduled for %s", today)
+                from briefly_api.services.background_jobs import enqueue_background_job
 
-            # ── Nightly StoryThreadAgent at 02:30 UTC ─────────────────────────
+                await enqueue_background_job("weekly_intelligence", {})
+                log.info("Scheduler: weekly intelligence enqueued for %s", today)
+
+            # ── StoryThreadAgent (≥ 02:30 UTC, once per day) ─────────────────
             if (
                 s.story_thread_agent_enabled
                 and _last_story_thread_date != today
-                and now_utc.hour == 2
-                and now_utc.minute == 30
+                and is_utc_time_at_or_after(now_utc, 2, 30)
             ):
                 _last_story_thread_date = today
-                asyncio.create_task(_run_story_thread_agent())
-                log.info("Scheduler: StoryThreadAgent task scheduled for %s", today)
+                from briefly_api.services.background_jobs import enqueue_background_job
 
-            # ── Proactive breaking alerts (every poll, capped server-side) ────
+                await enqueue_background_job("story_thread_agent", {})
+                log.info("Scheduler: StoryThreadAgent enqueued for %s", today)
+
+            # ── Proactive breaking alerts (every 15 min, durable) ──────────────
             if s.proactive_surfacing_enabled and now_utc.minute % 15 == 0:
-                from briefly_api.services.proactive_notifier import send_pending_proactive_alerts
-                asyncio.create_task(send_pending_proactive_alerts())
+                from briefly_api.services.background_jobs import enqueue_background_job
 
-            # ── Weekly report emails (Sunday local 08:00 per user) ─────────────
+                await enqueue_background_job(
+                    "proactive_alerts",
+                    {},
+                    idempotency_key=f"proactive:{now_utc.strftime('%Y-%m-%d-%H')}-{now_utc.minute // 15}",
+                )
+
+            # ── Weekly report emails (hourly poll; per-user Sunday logic inside) ─
             if s.weekly_report_email_enabled and now_utc.minute == 0:
-                from briefly_api.services.weekly_email import send_weekly_reports_for_due_users
-                asyncio.create_task(send_weekly_reports_for_due_users(now_utc))
+                from briefly_api.services.background_jobs import enqueue_background_job
+
+                await enqueue_background_job(
+                    "weekly_reports",
+                    {"now_utc": now_utc.isoformat()},
+                    idempotency_key=f"weekly_reports:{now_utc.strftime('%Y-%m-%d-%H')}",
+                )
 
         except Exception:
             log.exception("Scheduler: error in poll loop — will retry next cycle")

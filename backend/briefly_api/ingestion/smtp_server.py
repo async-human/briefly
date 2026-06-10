@@ -1,47 +1,25 @@
 """
 briefly_api/ingestion/smtp_server.py
 
-Inbound SMTP server for newsletter ingestion.
+Inbound SMTP server for newsletter ingestion (local dev).
 
-Each user gets a unique catch-all address: {email_token}@{ingestion_domain}
-When an email arrives, this server:
-  1. Parses the recipient to find the owning user.
-  2. Creates a Source record for the sender (type=email) if one doesn't exist.
-  3. Stores the email as RawContent so it can be included in the next briefing.
-
-Run alongside the FastAPI app — started as an asyncio task in main.py.
+Production uses Resend inbound webhooks — see api/routes/webhooks.py.
 """
 from __future__ import annotations
 
-import asyncio
 import email as email_lib
-import hashlib
 import logging
-from email.headerregistry import Address
 
 from aiosmtpd.controller import Controller
 from aiosmtpd.smtp import SMTP as SMTPServer, Envelope, Session
-from sqlalchemy import select
 
 from briefly_api.config import Settings, get_settings
-from briefly_api.db.engine import SessionLocal
-from briefly_api.db.models import ContentStatus, RawContent, Source, SourceStatus, User
+from briefly_api.ingestion.inbound_email import store_inbound_email
 
 log = logging.getLogger(__name__)
 
 
-def _extract_token(rcpt_address: str, ingestion_domain: str) -> str | None:
-    try:
-        local, domain = rcpt_address.lower().split("@", 1)
-        if domain == ingestion_domain.lower():
-            return local
-    except ValueError:
-        pass
-    return None
-
-
 def _parse_body(msg: email_lib.message.Message) -> tuple[str, str]:
-    """Return (plain_text, html_text) extracted from a parsed email message."""
     plain = ""
     html = ""
 
@@ -85,7 +63,9 @@ class BrieflyMailHandler:
         address: str,
         rcpt_options: list[str],
     ) -> str:
-        token = _extract_token(address, self._settings.email_ingestion_domain)
+        from briefly_api.ingestion.inbound_email import extract_token_from_address
+
+        token = extract_token_from_address(address, self._settings.email_ingestion_domain)
         if token is None:
             log.debug("SMTP: rejecting address %s (not our domain)", address)
             return "550 User not found"
@@ -110,80 +90,25 @@ class BrieflyMailHandler:
 
         sender: str = envelope.mail_from or ""
         subject: str = msg.get("Subject") or "(no subject)"
-
         plain, html = _parse_body(msg)
         body_text = plain or html
-        if not body_text.strip():
-            log.info("SMTP: empty body from %s — skipping", sender)
-            return
 
-        content_hash = hashlib.sha256(body_text.encode()).hexdigest()
-
-        async with SessionLocal() as db:
-            for rcpt in envelope.rcpt_tos:
-                token = _extract_token(rcpt, self._settings.email_ingestion_domain)
-                if not token:
-                    continue
-
-                result = await db.execute(
-                    select(User).where(User.email_token == token, User.is_active == True)
-                )
-                user = result.scalar_one_or_none()
-                if not user:
-                    log.warning("SMTP: no user found for token %s", token)
-                    continue
-
-                # Find or create Source record for this sender
-                src_result = await db.execute(
-                    select(Source).where(
-                        Source.user_id == user.id,
-                        Source.source_type == "email",
-                        Source.identifier == sender.lower(),
-                    )
-                )
-                source = src_result.scalar_one_or_none()
-                if not source:
-                    source = Source(
-                        user_id=user.id,
-                        source_type="email",
-                        identifier=sender.lower(),
-                        name=sender,
-                        status=SourceStatus.active,
-                    )
-                    db.add(source)
-                    await db.flush()
-                    log.info("SMTP: created new email source %s for user %s", sender, user.id)
-
-                # Deduplicate by content hash
-                existing_rc = await db.execute(
-                    select(RawContent).where(
-                        RawContent.source_id == source.id,
-                        RawContent.content_hash == content_hash,
-                    )
-                )
-                if existing_rc.scalar_one_or_none():
-                    log.debug("SMTP: duplicate content from %s — skipping", sender)
-                    continue
-
-                db.add(RawContent(
-                    source_id=source.id,
-                    user_id=user.id,
-                    status=ContentStatus.pending,
-                    title=subject,
-                    raw_text=body_text[:50_000],
-                    content_hash=content_hash,
-                    meta={"sender": sender, "subject": subject, "has_html": bool(html)},
-                ))
-
-            await db.commit()
-            log.info("SMTP: stored email from %s (subject=%r)", sender, subject)
+        await store_inbound_email(
+            recipient_addresses=list(envelope.rcpt_tos),
+            sender=sender,
+            subject=subject,
+            body_text=body_text,
+            ingestion_domain=self._settings.email_ingestion_domain,
+            has_html=bool(html),
+        )
 
 
-def start_smtp_server(settings: Settings) -> Controller | None:
-    """
-    Create and start the aiosmtpd Controller.
-    Returns the Controller instance so it can be stopped on shutdown.
-    """
+def start_smtp_server(settings: Settings | None = None) -> Controller | None:
+    settings = settings or get_settings()
+    if not settings.smtp_ingestion_active:
+        log.info("SMTP ingestion disabled (use Resend webhook in production)")
+        return None
+
     handler = BrieflyMailHandler(settings)
     controller = Controller(
         handler,
@@ -194,7 +119,8 @@ def start_smtp_server(settings: Settings) -> Controller | None:
         controller.start()
         log.info(
             "SMTP ingestion server listening on %s:%d",
-            settings.smtp_host, settings.smtp_port,
+            settings.smtp_host,
+            settings.smtp_port,
         )
         return controller
     except Exception:

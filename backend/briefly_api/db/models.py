@@ -346,6 +346,7 @@ class ContentEmbedding(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     content_id: Mapped[str] = mapped_column(String(36), ForeignKey("raw_contents.id", ondelete="CASCADE"), unique=True)
+    # Pinned to 1024 — see services/embedding_guard.PINNED_PGVECTOR_DIM before changing.
     embedding: Mapped[list[float]] = mapped_column(Vector(1024), nullable=False)
     model: Mapped[str] = mapped_column(String(100), nullable=False)  # which model generated this
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -741,6 +742,43 @@ class ProactiveSurfacingEvent(Base):
     )
     surfaced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# ── Background jobs ───────────────────────────────────────────────────────────
+
+class BackgroundJob(Base):
+    """Durable async work processed by the worker process."""
+
+    __tablename__ = "background_jobs"
+    __table_args__ = (
+        Index("ix_background_jobs_status_run_after", "status", "run_after"),
+        Index(
+            "uq_background_jobs_idempotency",
+            "job_type",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    job_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=5)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    run_after: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 # ── Magic Links ───────────────────────────────────────────────────────────────

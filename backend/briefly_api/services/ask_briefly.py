@@ -316,29 +316,27 @@ async def _semantic_retrieve(
     never_show: list[str],
     limit: int,
 ) -> list[ContextChunk]:
-    result = await db.execute(
-        select(ContentEmbedding, RawContent)
+    max_distance = 1.0 - _MIN_SIMILARITY
+    distance_expr = ContentEmbedding.embedding.cosine_distance(query_embedding)
+
+    stmt = (
+        select(ContentEmbedding, RawContent, distance_expr.label("distance"))
         .join(RawContent, ContentEmbedding.content_id == RawContent.id)
         .where(RawContent.user_id == user_id)
-        .order_by(RawContent.ingested_at.desc())
-        .limit(_MAX_RETRIEVAL_POOL)
+        .where(distance_expr <= max_distance)
     )
-    rows = result.all()
-    candidates: list[tuple[str, list[float]]] = []
-    raw_by_id: dict[str, RawContent] = {}
-    for emb, raw in rows:
-        candidates.append((emb.content_id, emb.embedding))
-        raw_by_id[emb.content_id] = raw
+    if exclude_ids:
+        stmt = stmt.where(ContentEmbedding.content_id.notin_(list(exclude_ids)))
+    stmt = stmt.order_by(distance_expr).limit(max(limit * 3, _MAX_CHUNKS))
 
-    ranked = rank_by_similarity(
-        query_embedding, candidates, limit=limit, exclude_ids=exclude_ids
-    )
+    result = await db.execute(stmt)
+    rows = result.all()
 
     chunks: list[ContextChunk] = []
-    for content_id, _sim in ranked:
-        raw = raw_by_id.get(content_id)
-        if not raw:
-            continue
+    for emb, raw, _distance in rows:
+        if len(chunks) >= limit:
+            break
+        content_id = emb.content_id
         title = raw.title or "Untitled"
         snippet = (raw.summary or raw.clean_text or "")[:900]
         blob = f"{title} {snippet}"

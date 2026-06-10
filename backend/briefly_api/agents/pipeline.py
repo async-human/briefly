@@ -235,8 +235,14 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
         # These agents improve future digests but have zero effect on what the
         # user is about to read RIGHT NOW.  Run them in a separate background
         # task so the pipeline can return the digest_id immediately.
-        asyncio.create_task(_run_post_pipeline_agents(user_id))
-        log.info("Pipeline: scheduled post-pipeline agents for user %s", user_id)
+        from briefly_api.services.background_jobs import enqueue_background_job
+
+        await enqueue_background_job(
+            "post_pipeline_agents",
+            {"user_id": user_id},
+            idempotency_key=f"post_pipeline:{user_id}:{ctx.run_date}",
+        )
+        log.info("Pipeline: enqueued post-pipeline agents for user %s", user_id)
 
         duration_ms = ctx.pipeline_duration_ms
         log.info(
@@ -555,6 +561,13 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
         await session.commit()
 
     return digest_id
+
+
+async def run_post_pipeline_agents_job(payload: dict) -> None:
+    user_id = payload.get("user_id")
+    if not user_id:
+        return
+    await _run_post_pipeline_agents(user_id)
 
 
 async def _run_post_pipeline_agents(user_id: str) -> None:

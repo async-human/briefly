@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     # ── Redis ────────────────────────────────────────────────────────────────
     redis_url: str = "redis://localhost:6379/0"
 
+    # ── Process layout ───────────────────────────────────────────────────────
+    # web = API only | worker = scheduler + jobs + enrichment | all = dev default
+    process_role: Literal["web", "worker", "all"] = Field(
+        default="all",
+        validation_alias=AliasChoices("process_role", "briefly_process_role"),
+    )
+    background_job_poll_seconds: int = 10
+
     # ── LLM — fully agnostic ─────────────────────────────────────────────────
     # Swap provider + model from .env with zero code changes
     llm_provider: Literal["anthropic", "openai", "groq"] = "openai"
@@ -72,8 +80,12 @@ class Settings(BaseSettings):
     # ── Email ingestion ───────────────────────────────────────────────────────
     # Each user gets a unique address: {token}@{email_ingestion_domain}
     email_ingestion_domain: str = "mail.briefly.app"
+    # webhook = Resend inbound (production) | smtp = local dev server | both
+    inbound_email_mode: Literal["webhook", "smtp", "both"] = "webhook"
+    smtp_ingestion_enabled: bool = False
     smtp_host: str = "0.0.0.0"
     smtp_port: int = 2525
+    resend_inbound_webhook_secret: str = ""
 
     # ── Email delivery (Resend) ───────────────────────────────────────────────
     resend_api_key: str = ""
@@ -244,6 +256,27 @@ class Settings(BaseSettings):
             for e in self.pro_bypass_emails.split(",")
             if e.strip()
         )
+
+    @property
+    def runs_background_workers(self) -> bool:
+        return self.process_role in ("worker", "all")
+
+    @property
+    def runs_web_server(self) -> bool:
+        return self.process_role in ("web", "all")
+
+    @property
+    def scheduler_lock_strict(self) -> bool:
+        """Scheduled jobs require Redis locks in production worker mode."""
+        return self.app_env == "production" and self.runs_background_workers
+
+    @property
+    def smtp_ingestion_active(self) -> bool:
+        if self.smtp_ingestion_enabled:
+            return True
+        if self.app_env == "development" and self.inbound_email_mode in ("smtp", "both"):
+            return True
+        return self.inbound_email_mode == "both"
 
     # ── Admin ────────────────────────────────────────────────────────────────
     admin_key: str = "change-me-admin-key"

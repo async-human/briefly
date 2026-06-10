@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from briefly_api.api.routes import ask, auth, billing, capture, dashboard, discovery, graph, onboarding
+from briefly_api.api.routes import ask, auth, billing, capture, dashboard, discovery, graph, onboarding, webhooks
 
 api_router = APIRouter(prefix="/api/v1")
+api_router.include_router(webhooks.router)
 api_router.include_router(auth.router)
 api_router.include_router(billing.router)
 api_router.include_router(dashboard.router)

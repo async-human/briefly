@@ -17,7 +17,7 @@ from briefly_api.db.engine import engine
 
 log = logging.getLogger(__name__)
 
-_HEAD = "004"
+_HEAD = "005"
 # Last revision whose objects are already created by Base.metadata.create_all()
 _STAMP_IF_LEGACY = "003"
 
@@ -66,6 +66,10 @@ async def _revision_004_schema_ready() -> bool:
     return await _column_exists("digest_items", "contradiction_flag")
 
 
+async def _revision_005_schema_ready() -> bool:
+    return await _table_exists("background_jobs")
+
+
 def _run_alembic(*args: str) -> int:
     cmd = [sys.executable, "-m", "alembic", *args]
     log.info("Running: %s", " ".join(cmd))
@@ -88,8 +92,14 @@ async def ensure_migrations() -> None:
             raise SystemExit(1)
         revision = _STAMP_IF_LEGACY
 
-    if revision == _STAMP_IF_LEGACY and await _revision_004_schema_ready():
-        log.info("004 columns already present (init_db) — stamping head without upgrade")
+    if revision == _STAMP_IF_LEGACY and await _revision_005_schema_ready():
+        log.info("005 schema already present — stamping head without upgrade")
+        if _run_alembic("stamp", _HEAD) != 0:
+            raise SystemExit(1)
+        return
+
+    if revision == "004" and await _revision_005_schema_ready():
+        log.info("005 schema already present — stamping head without upgrade")
         if _run_alembic("stamp", _HEAD) != 0:
             raise SystemExit(1)
         return
@@ -101,8 +111,8 @@ async def ensure_migrations() -> None:
 
     rc = _run_alembic("upgrade", "head")
     if rc != 0:
-        if await _revision_004_schema_ready():
-            log.warning("upgrade failed but 004 schema is present — stamping head")
+        if await _revision_005_schema_ready():
+            log.warning("upgrade failed but 005 schema is present — stamping head")
             if _run_alembic("stamp", _HEAD) != 0:
                 raise SystemExit(1)
             return

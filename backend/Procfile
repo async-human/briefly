@@ -1,1 +1,2 @@
-web: uvicorn briefly_api.main:app --host 0.0.0.0 --port $PORT
+web: python -m briefly_api.scripts.ensure_migrations && uvicorn briefly_api.main:app --host 0.0.0.0 --port $PORT
+worker: python -m briefly_api.scripts.ensure_migrations && python -m briefly_api.workers.runner
