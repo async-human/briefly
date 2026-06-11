@@ -17,6 +17,12 @@ export function SourcesStrip() {
     <div className="sources-strip landing-band-base">
       <Reveal>
         <p className="sources-strip-label">Works with what you already follow</p>
+        <p className="sources-strip-sub">
+          You pick what Briefly ingests — not your whole inbox or account.{" "}
+          <a href="#trust" className="sources-strip-link">
+            See exactly what we access
+          </a>
+        </p>
         <div className="sources-strip-icons">
           {SOURCES.map((s) => (
             <div key={s.name} className="source-chip">

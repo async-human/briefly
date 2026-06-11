@@ -9,7 +9,7 @@ const VALUE_PROPS = [
   {
     fig: "FIG 0.1",
     title: "Connect once",
-    body: "Link Gmail, YouTube, Reddit, and RSS a single time. Briefly ingests every night — no tagging or inbox zero.",
+    body: "Link Gmail, YouTube, Reddit, and RSS once. Briefly ingests only the sources you approve — no tagging or inbox zero.",
   },
   {
     fig: "FIG 0.2",
@@ -39,9 +39,9 @@ export function Hero() {
           The intelligence system for everything you follow
         </h1>
         <p className="hero-linear-sub">
-          Purpose-built for people who subscribe to too much. Briefly reads your
-          feeds overnight and delivers one sharp, cited briefing — designed for
-          the way you actually consume news.
+          Purpose-built for people who subscribe to too much. Briefly processes the
+          newsletters, feeds, and channels you choose — then delivers one sharp,
+          cited briefing designed for how you actually consume news.
         </p>
         <div className="hero-linear-actions">
           <a href="/login" className="btn-light-primary">

@@ -10,13 +10,13 @@ const principles = [
   {
     num: "01",
     title: "Connect once. Never maintain.",
-    body: "Link Gmail, YouTube, Reddit, and RSS a single time. Briefly ingests your streams every night — no saving, tagging, or inbox zero required.",
+    body: "Link Gmail, YouTube, Reddit, and RSS once. You approve which newsletters, channels, and feeds Briefly follows — no saving, tagging, or inbox zero required.",
     tag: "Zero friction",
   },
   {
     num: "02",
-    title: "We read the firehose for you.",
-    body: "Newsletters pile up. Subreddits scroll by. Videos upload overnight. While you sleep, specialized agents collect, clean, and score everything.",
+    title: "We filter the firehose for you.",
+    body: "Newsletters pile up. Subreddits scroll by. Videos upload overnight. While you sleep, agents collect only from your approved sources, then clean and score what matters.",
     tag: "Nightly pipeline",
   },
   {
@@ -34,7 +34,7 @@ const principles = [
   {
     num: "05",
     title: "Ten items, not fifty.",
-    body: "Briefly reads dozens and shows only what fits your morning. Every skip is logged with a reason — so you trust what you see and what you don't.",
+    body: "Briefly processes dozens of candidates and shows only what fits your morning. Every skip is logged with a reason — so you trust what you see and what you don't.",
     tag: "Confident curation",
   },
   {

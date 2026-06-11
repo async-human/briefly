@@ -15,7 +15,7 @@ const steps = [
     id: "gather",
     index: "01",
     title: "Gather",
-    desc: "Gmail, YouTube, Reddit, RSS — all your sources, fetched automatically",
+    desc: "Gmail, YouTube, Reddit, RSS — only the sources you approved, fetched nightly",
     duration: 5000,
   },
   {
@@ -157,7 +157,7 @@ export function WorkflowDemo() {
             <p className="section-eyebrow">How it works</p>
             <h2 className="section-heading">Runs every night.<br />You do nothing.</h2>
             <p className="section-body">
-              Connect your accounts once. Every night, Briefly reads everything you follow, builds your knowledge base, and writes a briefing that knows your history. You wake up, read, done.
+              Connect your accounts once and choose what to follow. Every night, Briefly ingests from those approved sources, builds your knowledge base, and writes a briefing that knows your history. You wake up, read, done.
             </p>
           </div>
         </Reveal>

@@ -18,7 +18,7 @@ const steps = [
     number: "01",
     icon: CollectIcon,
     name: "Collect",
-    desc: "Ingests from all your sources — newsletters, RSS, YouTube, Reddit",
+    desc: "Ingests from sources you approved — newsletters, RSS, YouTube, Reddit",
   },
   {
     number: "02",
@@ -101,7 +101,7 @@ export function HowItWorks() {
         </Reveal>
         <Reveal delay={0.15}>
           <p className="section-sub">
-            Every morning at 5am, a pipeline of specialized agents reads, filters, deduplicates, and writes your personal digest. You just read it.
+            Every morning at 5am, a pipeline of specialized agents processes your approved sources, filters, deduplicates, and writes your personal digest. You just read it.
           </p>
         </Reveal>
 

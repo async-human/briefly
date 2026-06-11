@@ -22,7 +22,7 @@ const features: Feature[] = [
   {
     num: "01",
     title: "Builds itself while you sleep",
-    desc: "Connect Gmail, YouTube, Reddit, and any RSS feed once. Every night, Briefly fetches everything automatically. No saving, tagging, or organising — ever.",
+    desc: "Connect Gmail, YouTube, Reddit, and any RSS feed once. Every night, Briefly fetches only from sources you approved — newsletters, channels, feeds. No saving, tagging, or organising.",
     variant: "sleep",
     size: "large",
     sources: ["Gmail", "YouTube", "Reddit", "RSS", "Readwise", "Hacker News"],

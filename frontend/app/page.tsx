@@ -3,6 +3,7 @@ import { Nav } from "@/components/landing/Nav";
 import { Hero } from "@/components/landing/Hero";
 import { LiveDemo } from "@/components/landing/LiveDemo";
 import { SourcesStrip } from "@/components/landing/SourcesStrip";
+import { TrustSourcesSection } from "@/components/landing/TrustSourcesSection";
 import { PrinciplesSection } from "@/components/landing/PrinciplesSection";
 import { Features } from "@/components/landing/Features";
 import { Roadmap } from "@/components/landing/Roadmap";
@@ -17,6 +18,7 @@ export default function Home() {
       <Hero />
       <LiveDemo />
       <SourcesStrip />
+      <TrustSourcesSection />
       <PrinciplesSection />
       <Features />
       <Roadmap />
