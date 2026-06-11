@@ -1,7 +1,7 @@
 import { BriefLoaderArt } from "./BriefLoaderArt";
 import { GraphLoaderArt } from "./GraphLoaderArt";
 
-export type PageLoaderVariant = "dashboard" | "saved" | "history" | "settings" | "graph";
+export type PageLoaderVariant = "dashboard" | "saved" | "history" | "settings" | "graph" | "intelligence";
 
 const CAPTIONS: Record<PageLoaderVariant, string> = {
   dashboard: "Preparing your briefing…",
@@ -9,6 +9,7 @@ const CAPTIONS: Record<PageLoaderVariant, string> = {
   history: "Opening your archive…",
   settings: "Loading preferences…",
   graph: "Mapping your knowledge graph…",
+  intelligence: "Loading your intelligence profile…",
 };
 
 function Block({
@@ -37,6 +38,19 @@ function Block({
 }
 
 function LayoutSkeleton({ variant }: { variant: Exclude<PageLoaderVariant, "graph" | "dashboard"> }) {
+
+  if (variant === "intelligence") {
+    return (
+      <div className="dash-page app-loader-layout">
+        <header className="dash-page-header dash-page-header-skeleton">
+          <Block w={96} h={12} delay={0.04} />
+          <Block w={280} h={32} mb={10} delay={0.1} />
+          <Block w={360} h={14} delay={0.16} />
+        </header>
+        <div className="dash-surface app-loader-surface" style={{ minHeight: 520, animationDelay: "0.24s" }} />
+      </div>
+    );
+  }
 
   if (variant === "saved") {
     return (

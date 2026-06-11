@@ -64,6 +64,26 @@ const NAV = [
     ),
   },
   {
+    href: "/intelligence",
+    label: "Intelligence",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8L12 3Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M5 19c2.2-1.2 4.6-1.8 7-1.8s4.8.6 7 1.8"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/history",
     label: "History",
     icon: (

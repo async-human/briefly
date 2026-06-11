@@ -5322,3 +5322,22 @@ a.saved-capture-title:hover {
     grid-template-columns: 1fr;
   }
 }
+
+.app-shell .intel-settings-foot {
+  margin: 0;
+  padding: 0 0.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--app-muted);
+  text-align: center;
+}
+
+.app-shell .intel-settings-link {
+  color: var(--app-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.app-shell .intel-settings-link:hover {
+  text-decoration: underline;
+}

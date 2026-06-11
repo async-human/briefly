@@ -55,7 +55,7 @@ export function BrieflyKnowsSummary({ intel, streak, declaredInterests }: Props)
             {streak > 1 ? ` · ${streak}-day streak` : ""}
           </h3>
         </div>
-        <Link href="/settings" className="bk-summary-link">
+        <Link href="/intelligence" className="bk-summary-link">
           Full profile →
         </Link>
       </div>
