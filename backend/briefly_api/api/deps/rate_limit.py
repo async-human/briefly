@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from fastapi import Depends
 
-from briefly_api.auth.deps import get_current_user, require_pro
+from briefly_api.api.plan_limits import require_pro
+from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.models import User
 from briefly_api.services.rate_limit import enforce_rate_limit
