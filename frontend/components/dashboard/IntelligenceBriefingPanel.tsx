@@ -1,5 +1,7 @@
 "use client";
 
+import type { WrappedShift, WrappedSnapshot, WrappedTopic } from "@/lib/api";
+
 export type CalendarMeeting = {
   title: string;
   time: string;
@@ -22,35 +24,7 @@ export type BlindSpot = {
   counter_argument?: string | null;
 };
 
-export type WrappedShift = {
-  topic: string;
-  direction: string;
-  label?: string;
-  detail?: string;
-  evidence?: string;
-};
-
-export type WrappedTopic = {
-  topic: string;
-  detail?: string;
-};
-
-export type WrappedSnapshot = {
-  lead?: string;
-  depth_trend?: string;
-  depth_label?: string;
-  weekly_synthesis?: string;
-  shifts?: WrappedShift[];
-  active_topics?: WrappedTopic[];
-  emerging?: WrappedTopic[];
-  gaps?: WrappedTopic[];
-  // Legacy fields
-  current_focus?: string;
-  mind_shifts?: WrappedShift[];
-  high_engagement?: WrappedTopic[];
-  emerging_threads?: string[] | WrappedTopic[];
-  coverage_gaps?: string[];
-};
+export type { WrappedShift, WrappedSnapshot, WrappedTopic };
 
 type Props = {
   calendar?: CalendarBriefing | null;

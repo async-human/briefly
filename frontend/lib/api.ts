@@ -233,6 +233,35 @@ export type FeedbackResponse = {
   learned_message: string | null;
 };
 
+export type WrappedShift = {
+  topic: string;
+  direction: string;
+  label?: string;
+  detail?: string;
+  evidence?: string;
+};
+
+export type WrappedTopic = {
+  topic: string;
+  detail?: string;
+};
+
+export type WrappedSnapshot = {
+  lead?: string;
+  depth_trend?: string;
+  depth_label?: string;
+  weekly_synthesis?: string;
+  shifts?: WrappedShift[];
+  active_topics?: WrappedTopic[];
+  emerging?: WrappedTopic[];
+  gaps?: WrappedTopic[];
+  current_focus?: string;
+  mind_shifts?: WrappedShift[];
+  high_engagement?: WrappedTopic[];
+  emerging_threads?: string[] | WrappedTopic[];
+  coverage_gaps?: string[];
+};
+
 export type Digest = {
   id: string;
   digest_date: string;
@@ -260,21 +289,7 @@ export type Digest = {
       }[];
       meeting_count?: number;
     };
-    wrapped?: {
-      lead?: string;
-      depth_trend?: string;
-      depth_label?: string;
-      weekly_synthesis?: string;
-      shifts?: { topic: string; direction: string; label?: string; detail?: string }[];
-      active_topics?: { topic: string; detail?: string }[];
-      emerging?: { topic: string; detail?: string }[];
-      gaps?: { topic: string; detail?: string }[];
-      current_focus?: string;
-      mind_shifts?: { topic: string; direction: string; evidence: string }[];
-      high_engagement?: { topic: string; detail: string }[];
-      emerging_threads?: string[] | { topic?: string; detail?: string }[];
-      coverage_gaps?: string[];
-    };
+    wrapped?: WrappedSnapshot;
     blind_spots?: {
       type: string;
       topic: string;
