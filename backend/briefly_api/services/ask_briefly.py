@@ -7,6 +7,7 @@ persists to FollowUpThread.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -34,6 +35,9 @@ from briefly_api.embeddings.adapter import get_embedding_adapter
 from briefly_api.llm.adapter import Message, get_llm_adapter
 from briefly_api.services.browser_capture import list_recent_captures
 from briefly_api.services.profile_utils import cluster_label, iter_topic_clusters
+from briefly_api.services.url_scraper import UrlFetchError, scrape_url
+
+logger = logging.getLogger(__name__)
 
 _CITATION_RE = re.compile(r"\[S(\d+)\]")
 _SAVED_UNREAD_QUERY = re.compile(
@@ -53,9 +57,16 @@ _SAVED_UNREAD_LIMIT = 12
 _ARTICLE_CHUNK_CHARS = 750
 _ARTICLE_CHUNK_OVERLAP = 120
 _MAX_ARTICLE_PASSAGES = 5
+_MAX_FOCUSED_PASSAGES = 8
 _MAX_ARTICLE_CHUNKS_TO_SCORE = 28
 _MIN_PASSAGE_SIMILARITY = 0.22
-_MAX_ANCHOR_SNIPPET_CHARS = 5000
+_MAX_ANCHOR_SNIPPET_CHARS = 8000
+_THIN_BODY_CHARS = 600
+_FULL_BODY_PASSAGE_LIMIT = 7000
+_EXTRACTION_QUERY = re.compile(
+    r"\b(?:which|what|who|name|names|list|companies|company|startups|startup|firms|organizations|mentioned)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -239,6 +250,87 @@ async def _retrieve_saved_unread(
     return chunks[:limit]
 
 
+def _is_extraction_query(query: str) -> bool:
+    return bool(_EXTRACTION_QUERY.search(query))
+
+
+def _is_thin_article_body(raw: RawContent) -> bool:
+    clean = (raw.clean_text or "").strip()
+    summary = (raw.summary or "").strip()
+    if not clean:
+        return True
+    if len(clean) < _THIN_BODY_CHARS:
+        return True
+    if summary and clean == summary:
+        return True
+    if summary and len(clean) <= len(summary) + 80 and len(clean) < 1500:
+        return True
+    return False
+
+
+def _cached_full_text(raw: RawContent) -> str | None:
+    meta = raw.meta or {}
+    cached = meta.get("full_article_text")
+    if isinstance(cached, str) and cached.strip():
+        return cached.strip()
+    return None
+
+
+async def _resolve_article_body(db: AsyncSession, raw: RawContent) -> str:
+    """Return the best article body, fetching the live page when stored text is RSS-thin."""
+    clean = (raw.clean_text or "").strip()
+    cached = _cached_full_text(raw)
+    if cached and (not clean or len(cached) > max(len(clean) + 50, len(clean) * 2)):
+        return cached
+
+    if clean and not _is_thin_article_body(raw):
+        return clean
+
+    url = (raw.url or "").strip()
+    if not url:
+        return clean or (raw.summary or "").strip()
+
+    try:
+        articles = await scrape_url(url)
+    except UrlFetchError as exc:
+        logger.info("Ask RAG: could not fetch full article %s: %s", url, exc)
+        return clean or (raw.summary or "").strip()
+
+    if not articles:
+        return clean or (raw.summary or "").strip()
+
+    fetched = (articles[0].clean_text or "").strip()
+    if not fetched or len(fetched) <= len(clean):
+        return clean or (raw.summary or "").strip()
+
+    meta = dict(raw.meta or {})
+    meta["full_article_text"] = fetched
+    meta["full_text_fetched_at"] = datetime.now(timezone.utc).isoformat()
+    raw.meta = meta
+    await db.flush()
+    logger.info(
+        "Ask RAG: fetched full article for content %s (%d chars from %s)",
+        raw.id,
+        len(fetched),
+        url,
+    )
+    return fetched
+
+
+def _keyword_passage_boost(query: str, passage: str) -> float:
+    query_tokens = {
+        token
+        for token in re.findall(r"[a-z0-9]{3,}", query.lower())
+        if token not in {"which", "what", "who", "the", "are", "was", "were", "that", "this", "from"}
+    }
+    if not query_tokens:
+        return 0.0
+    passage_lower = passage.lower()
+    hits = sum(1 for token in query_tokens if token in passage_lower)
+    list_bonus = 0.12 if re.search(r"(?:,|\band\b|\d+\.)", passage) else 0.0
+    return min(0.35, (hits / len(query_tokens)) * 0.25 + list_bonus)
+
+
 def _split_article_passages(text: str) -> list[str]:
     """Split article body into overlapping passages for within-article retrieval."""
     text = re.sub(r"\n{3,}", "\n\n", text.strip())
@@ -282,6 +374,7 @@ async def _retrieve_article_passages(
     query_embedding: list[float],
     embedder,
     *,
+    query: str = "",
     limit: int = _MAX_ARTICLE_PASSAGES,
 ) -> list[str]:
     """Return the passages from one article most relevant to the user's question."""
@@ -291,18 +384,23 @@ async def _retrieve_article_passages(
     if len(passages) == 1:
         return passages
 
+    extraction = _is_extraction_query(query)
+    min_sim = 0.12 if extraction else _MIN_PASSAGE_SIMILARITY
+
     to_score = passages[:_MAX_ARTICLE_CHUNKS_TO_SCORE]
     embeddings = await embedder.embed_batch(to_score)
-    scored = [
-        (_cosine(query_embedding, emb), passage)
-        for emb, passage in zip(embeddings, to_score, strict=True)
-    ]
+    scored = []
+    for emb, passage in zip(embeddings, to_score, strict=True):
+        sim = _cosine(query_embedding, emb)
+        if extraction:
+            sim += _keyword_passage_boost(query, passage)
+        scored.append((sim, passage))
     scored.sort(key=lambda row: row[0], reverse=True)
 
     selected: list[str] = []
     seen_prefixes: set[str] = set()
     for sim, passage in scored:
-        if sim < _MIN_PASSAGE_SIMILARITY:
+        if sim < min_sim:
             continue
         prefix = passage[:100]
         if prefix in seen_prefixes:
@@ -331,11 +429,22 @@ async def _article_snippet_for_query(
     digest_blurb: str | None = None,
 ) -> str:
     """Build the best available text context for a focused article question."""
-    clean_text = (raw.clean_text or "").strip()
+    clean_text = await _resolve_article_body(db, raw)
     summary = (raw.summary or "").strip()
+    if not clean_text:
+        clean_text = summary
 
-    if query_embedding and clean_text and len(clean_text) > 400:
-        passages = await _retrieve_article_passages(clean_text, query_embedding, embedder)
+    if len(clean_text) <= _FULL_BODY_PASSAGE_LIMIT:
+        snippet = clean_text
+    elif query_embedding and embedder and len(clean_text) > 200:
+        passage_limit = _MAX_FOCUSED_PASSAGES if _is_extraction_query(query) else _MAX_ARTICLE_PASSAGES
+        passages = await _retrieve_article_passages(
+            clean_text,
+            query_embedding,
+            embedder,
+            query=query,
+            limit=passage_limit,
+        )
         snippet = "\n\n---\n\n".join(passages)
     else:
         snippet = summary or clean_text[:1200]
@@ -613,6 +722,9 @@ async def _prepare_ask(
 
     if digest_item_id and not thread.digest_item_id:
         thread.digest_item_id = digest_item_id
+
+    if thread and not digest_item_id and thread.digest_item_id:
+        digest_item_id = thread.digest_item_id
 
     saved_unread_mode = is_saved_unread_query(message) and not content_id and not digest_item_id
 

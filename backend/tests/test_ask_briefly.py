@@ -1,14 +1,22 @@
 """Tests for Ask Briefly retrieval helpers."""
 from __future__ import annotations
 
+import asyncio
+from unittest.mock import AsyncMock, patch
+
+from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.ask_briefly import (
     _extract_citations,
     _format_context_pack,
+    _is_extraction_query,
+    _is_thin_article_body,
+    _resolve_article_body,
     _split_article_passages,
     is_saved_unread_query,
     rank_by_similarity,
     ContextChunk,
 )
+from briefly_api.db.models import RawContent
 
 
 def test_rank_by_similarity_orders_results():
@@ -83,3 +91,80 @@ def test_format_context_pack_includes_ref():
     pack = _format_context_pack(chunks)
     assert "[S1]" in pack
     assert "Hello" in pack
+
+
+def test_is_extraction_query_detects_list_questions():
+    assert _is_extraction_query("Which are the Indian companies mentioned?")
+    assert _is_extraction_query("List the startups")
+    assert not _is_extraction_query("Summarize this article")
+
+
+def test_is_thin_article_body_detects_rss_summary_only():
+    summary = "The World Economic Forum has included nine Indian startups in its Tech Pioneers cohort."
+    raw = RawContent(
+        source_id="s1",
+        user_id="u1",
+        clean_text=summary,
+        summary=summary,
+        url="https://yourstory.com/example",
+    )
+    assert _is_thin_article_body(raw)
+
+
+def test_resolve_article_body_fetches_when_stored_text_is_thin():
+    summary = "Nine Indian startups joined the WEF cohort."
+    full_body = (
+        f"{summary} The companies are AlphaTech, BetaLabs, GammaAI, "
+        "DeltaBio, EpsilonPay, ZetaCloud, EtaHealth, ThetaMobility, and IotaEnergy."
+    )
+    raw = RawContent(
+        source_id="s1",
+        user_id="u1",
+        clean_text=summary,
+        summary=summary,
+        url="https://yourstory.com/wef-startups",
+        meta={},
+    )
+    db = AsyncMock()
+    db.flush = AsyncMock()
+
+    async def _run():
+        with patch(
+            "briefly_api.services.ask_briefly.scrape_url",
+            new=AsyncMock(
+                return_value=[
+                    NormalizedContent(
+                        title="WEF startups",
+                        url="https://yourstory.com/wef-startups",
+                        source_name="yourstory.com",
+                        source_type="url",
+                        section="Web",
+                        clean_text=full_body,
+                        summary=full_body[:400],
+                    )
+                ]
+            ),
+        ):
+            return await _resolve_article_body(db, raw)
+
+    body = asyncio.run(_run())
+    assert "AlphaTech" in body
+    assert raw.meta.get("full_article_text") == full_body
+    db.flush.assert_awaited_once()
+
+
+def test_resolve_article_body_uses_cached_full_text():
+    cached = "Long cached article body with FooCorp and BarInc listed in detail."
+    raw = RawContent(
+        source_id="s1",
+        user_id="u1",
+        clean_text="short rss",
+        summary="short rss",
+        url="https://example.com/article",
+        meta={"full_article_text": cached},
+    )
+    db = AsyncMock()
+
+    body = asyncio.run(_resolve_article_body(db, raw))
+    assert body == cached
+    db.flush.assert_not_called()
