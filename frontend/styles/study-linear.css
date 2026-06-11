@@ -525,57 +525,127 @@ body[data-landing-theme="light"].study-linear-body {
   text-align: center;
 }
 
-/* ── Footer — align to same 1120px column as sections ─────────────────── */
+/* ── Footer — Bond-style wordmark + link columns ──────────────────────── */
 
 .study-linear footer.footer-linear {
   display: block;
   text-align: left;
-  border-top: 1px solid var(--border);
-  padding: 40px 64px 48px;
-  background: var(--bg-elevated);
+  border-top: none;
+  padding: 0;
+  overflow: hidden;
+  background: var(--footer-bg, oklch(15% 0.014 75));
+  color: var(--footer-text, oklch(68% 0.01 75));
+}
+
+.study-linear[data-theme="light"] footer.footer-linear {
+  --footer-bg: oklch(14% 0.016 75);
+  --footer-text: oklch(70% 0.012 75);
+  --footer-link: oklch(78% 0.01 75);
+  --footer-link-hover: oklch(96% 0.004 75);
+  --footer-stroke: oklch(100% 0 0 / 0.12);
+  --footer-title: oklch(52% 0.01 75);
+}
+
+.study-linear[data-theme="dark"] footer.footer-linear {
+  --footer-bg: oklch(9% 0.012 270);
+  --footer-text: oklch(58% 0.014 270);
+  --footer-link: oklch(68% 0.012 270);
+  --footer-link-hover: oklch(94% 0.006 270);
+  --footer-stroke: oklch(100% 0 0 / 0.07);
+  --footer-title: oklch(48% 0.014 270);
 }
 
 .study-linear .footer-linear-inner {
   max-width: 1120px;
   margin: 0 auto;
   width: 100%;
+  padding: 48px 64px 0;
+}
+
+.study-linear .footer-linear-top {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 32px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2.5rem 3rem;
   flex-wrap: wrap;
-  font-size: 13px;
-  color: var(--text-muted);
+  padding-bottom: 2.5rem;
 }
 
-.study-linear .footer-linear-brand {
-  color: var(--text);
-  margin-right: auto;
+.study-linear .footer-linear-copy {
+  margin: 0;
+  max-width: 14rem;
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.55;
+  color: var(--footer-text);
 }
 
-.study-linear .footer-linear-nav {
+.study-linear .footer-linear-columns {
   display: flex;
-  align-items: center;
-  gap: 24px;
+  flex-wrap: wrap;
+  gap: 2.5rem 3.5rem;
 }
 
-.study-linear .footer-linear-nav a {
+.study-linear .footer-linear-col {
+  min-width: 7.5rem;
+}
+
+.study-linear .footer-linear-col-title {
+  margin: 0 0 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--footer-title);
+}
+
+.study-linear .footer-linear-col-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.study-linear .footer-linear-col-list a {
   font-family: var(--sans);
-  font-size: 13px;
-  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  color: var(--footer-link);
   text-decoration: none;
   transition: color 180ms ease;
 }
 
-.study-linear .footer-linear-nav a:hover {
-  color: var(--text);
+.study-linear .footer-linear-col-list a:hover {
+  color: var(--footer-link-hover);
 }
 
-.study-linear .footer-linear-copy {
-  font-family: var(--sans);
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-left: 0;
+.study-linear .footer-linear-wordmark {
+  position: relative;
+  margin: 0 -0.04em -0.12em;
+  padding: 0 0 0.02em;
+  line-height: 0.82;
+  pointer-events: none;
+  user-select: none;
+}
+
+.study-linear .footer-linear-wordmark span {
+  display: block;
+  font-family: var(--serif);
+  font-size: clamp(4.5rem, 17.5vw, 11.5rem);
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: -0.045em;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: 1px var(--footer-stroke);
+  text-stroke: 1px var(--footer-stroke);
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 @media (max-width: 768px) {
@@ -638,24 +708,22 @@ body[data-landing-theme="light"].study-linear-body {
     padding-right: 24px;
   }
 
-  .study-linear footer.footer-linear {
-    text-align: left;
-  }
-
   .study-linear .footer-linear-inner {
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 20px;
+    padding: 40px 24px 0;
   }
 
-  .study-linear .footer-linear-brand {
-    margin-right: 0;
-    width: 100%;
+  .study-linear .footer-linear-top {
+    flex-direction: column;
+    gap: 2rem;
+    padding-bottom: 2rem;
   }
 
-  .study-linear .footer-linear-copy {
-    margin-left: 0;
+  .study-linear .footer-linear-columns {
+    gap: 2rem 2.5rem;
+  }
+
+  .study-linear .footer-linear-wordmark span {
+    font-size: clamp(3.25rem, 22vw, 6.5rem);
   }
 }
 

@@ -579,8 +579,7 @@
 }
 
 .study-linear footer.footer-linear {
-  background: var(--band-base);
-  border-top: 0.5px solid var(--liner-divider);
+  border-top: none;
 }
 
 @media (max-width: 900px) {
