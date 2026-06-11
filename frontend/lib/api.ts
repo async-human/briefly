@@ -417,6 +417,17 @@ export type GmailDiscoverResponse = {
   senders: GmailSender[];
 };
 
+export type GmailAccessLogEvent = {
+  at: string;
+  action: string;
+  detail: string;
+  messages_scanned?: number;
+  senders_found?: number;
+  sender?: string;
+  count?: number;
+  delete_content?: boolean;
+};
+
 export type BulkAddResponse = {
   added: Source[];
   skipped: number;
@@ -771,7 +782,26 @@ export const api = {
       access_error?: string | null;
       access_error_message?: string | null;
     }>("/api/v1/auth/gmail/status"),
-  disconnectGmail: () => request<void>("/api/v1/auth/gmail", { method: "DELETE" }),
+  disconnectGmail: (deleteContent = true) =>
+    request<{
+      ok: boolean;
+      delete_content: boolean;
+      removed_sources: number;
+      removed_content_items: number;
+    }>(`/api/v1/auth/gmail?delete_content=${deleteContent ? "true" : "false"}`, {
+      method: "DELETE",
+    }),
+  getGmailAccessLog: () =>
+    request<{
+      connected: boolean;
+      email: string | null;
+      events: GmailAccessLogEvent[];
+    }>("/api/v1/privacy/gmail-access-log"),
+  deleteAccount: (confirmEmail: string) =>
+    request<void>("/api/v1/privacy/account", {
+      method: "DELETE",
+      body: JSON.stringify({ confirm_email: confirmEmail }),
+    }),
 
   startYouTubeConnect: (redirectPath = "/onboarding") =>
     request<{ url: string }>(
@@ -807,10 +837,13 @@ export const api = {
   // Gmail discovery
   discoverGmailNewsletters: () =>
     request<GmailDiscoverResponse>("/api/v1/sources/discover/gmail"),
-  bulkAddSources: (sources: { identifier: string; source_type?: string; name?: string }[]) =>
+  bulkAddSources: (
+    sources: { identifier: string; source_type?: string; name?: string }[],
+    options?: { fromGmail?: boolean },
+  ) =>
     request<BulkAddResponse>("/api/v1/sources/bulk", {
       method: "POST",
-      body: JSON.stringify({ sources }),
+      body: JSON.stringify({ sources, from_gmail: Boolean(options?.fromGmail) }),
     }),
 
   // Source suggestions

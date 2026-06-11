@@ -5,6 +5,7 @@ import { api, type DiscoveryCandidate, type DiscoveryMeta, type DiscoveryProgres
 import { AddSourceForm } from "./AddSourceForm";
 import { DiscoveryScanning } from "./DiscoveryScanning";
 import { SourceIcon } from "@/components/SourceIcon";
+import { GmailConsentModal } from "@/components/privacy/GmailConsentModal";
 
 const LAYER_LABELS: Record<string, string> = {
   inbound_footprint: "Newsletters you subscribe to",
@@ -25,6 +26,7 @@ type SourceDiscoveryWizardProps = {
   existingSources: Source[];
   gmailConnected: boolean;
   connectBanner?: string | null;
+  ingestionEmail?: string;
   onConfirmed: (sources: Source[]) => void;
   onSourceAdded: (source: Source) => void;
 };
@@ -33,6 +35,7 @@ export function SourceDiscoveryWizard({
   existingSources,
   gmailConnected,
   connectBanner,
+  ingestionEmail,
   onConfirmed,
   onSourceAdded,
 }: SourceDiscoveryWizardProps) {
@@ -43,6 +46,7 @@ export function SourceDiscoveryWizard({
   const [scanMeta, setScanMeta] = useState<DiscoveryMeta>({});
   const [error, setError] = useState("");
   const [gmailLoading, setGmailLoading] = useState(false);
+  const [gmailConsentOpen, setGmailConsentOpen] = useState(false);
   const [scanProgress, setScanProgress] = useState<DiscoveryProgress | null>(null);
   const prevGmailRef = useRef(gmailConnected);
 
@@ -98,7 +102,11 @@ export function SourceDiscoveryWizard({
     prevGmailRef.current = gmailConnected;
   }, [gmailConnected, runDiscovery]);
 
-  async function handleConnectGmail() {
+  function handleConnectGmail() {
+    setGmailConsentOpen(true);
+  }
+
+  async function startGmailOAuth() {
     setGmailLoading(true);
     setError("");
     try {
@@ -150,6 +158,16 @@ export function SourceDiscoveryWizard({
 
   return (
     <div className="discovery-wizard">
+      <GmailConsentModal
+        open={gmailConsentOpen}
+        onCancel={() => setGmailConsentOpen(false)}
+        onConfirm={() => {
+          setGmailConsentOpen(false);
+          void startGmailOAuth();
+        }}
+        confirming={gmailLoading}
+        ingestionEmail={ingestionEmail}
+      />
       <div className="discovery-wizard-inner">
         <header className="discovery-wizard-head">
           <p className="dash-card-label">Get your first brief</p>

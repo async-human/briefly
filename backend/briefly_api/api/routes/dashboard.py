@@ -826,9 +826,19 @@ async def discover_gmail_newsletters(
     )
     already_added = {s.identifier for s in existing.scalars().all()}
 
-    senders, _, access_error, access_error_message = await discover_newsletter_senders(
+    senders, messages_scanned, access_error, access_error_message = await discover_newsletter_senders(
         access_token, already_added,
     )
+    from briefly_api.services.privacy_gmail import append_gmail_access_log
+
+    await append_gmail_access_log(
+        db,
+        user.id,
+        "discovery",
+        f"Scanned {messages_scanned} message headers — found {len(senders)} newsletter senders",
+        meta={"messages_scanned": messages_scanned, "senders_found": len(senders), "format": "metadata"},
+    )
+    await db.commit()
     if access_error:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -883,11 +893,16 @@ async def bulk_create_sources(
             skipped += 1
             continue
 
+        source_meta = dict(item.meta or {})
+        if source_type == "email" and body.from_gmail and not source_meta.get("from_gmail"):
+            source_meta["from_gmail"] = True
+
         source = Source(
             user_id=user.id,
             source_type=source_type,
             identifier=identifier,
             name=item.name.strip() if item.name else None,
+            meta=source_meta,
         )
         db.add(source)
         added.append(source)

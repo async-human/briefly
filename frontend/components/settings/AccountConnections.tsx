@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { api, type OnboardingStatus, type Source } from "@/lib/api";
 import { SourceIcon } from "@/components/SourceIcon";
 import { AddSourceForm } from "@/components/dashboard/AddSourceForm";
 import { sourceDisplayName } from "@/components/dashboard/sourceLabels";
+import { GmailConsentModal } from "@/components/privacy/GmailConsentModal";
 
 const OAUTH_TYPES = new Set(["gmail", "youtube", "youtube_account", "reddit", "reddit_account"]);
 const MANUAL_TYPES = new Set(["rss", "url", "email", "readwise"]);
@@ -91,6 +93,8 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
   const [banner, setBanner] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<ConnectorId | "remove" | null>(null);
+  const [gmailConsentOpen, setGmailConsentOpen] = useState(false);
+  const [gmailDisconnectOpen, setGmailDisconnectOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const [nextStatus, nextSources] = await Promise.all([
@@ -173,7 +177,15 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
     return () => clearTimeout(t);
   }, [error]);
 
-  async function handleConnect(id: ConnectorId) {
+  function handleConnect(id: ConnectorId) {
+    if (id === "gmail") {
+      setGmailConsentOpen(true);
+      return;
+    }
+    void startOAuthConnect(id);
+  }
+
+  async function startOAuthConnect(id: ConnectorId) {
     setBusy(id);
     setError("");
     try {
@@ -193,15 +205,32 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
     }
   }
 
-  async function handleDisconnect(id: ConnectorId) {
+  function handleDisconnect(id: ConnectorId) {
+    if (id === "gmail") {
+      setGmailDisconnectOpen(true);
+      return;
+    }
+    void confirmDisconnect(id);
+  }
+
+  async function confirmDisconnect(id: ConnectorId, deleteGmailContent = true) {
     setBusy(id);
     setError("");
     try {
-      if (id === "gmail") await api.disconnectGmail();
-      else if (id === "youtube") await api.disconnectYouTube();
+      if (id === "gmail") {
+        const res = await api.disconnectGmail(deleteGmailContent);
+        setBanner(
+          res.removed_content_items > 0
+            ? `Gmail disconnected. Removed ${res.removed_sources} source(s) and ${res.removed_content_items} stored newsletter(s).`
+            : "Gmail disconnected. Google access revoked.",
+        );
+        setGmailDisconnectOpen(false);
+      } else if (id === "youtube") await api.disconnectYouTube();
       else if (id === "calendar") await api.disconnectCalendar();
       else await api.disconnectReddit();
-      setBanner(`${CONNECTORS.find((c) => c.id === id)?.name ?? "Account"} disconnected.`);
+      if (id !== "gmail") {
+        setBanner(`${CONNECTORS.find((c) => c.id === id)?.name ?? "Account"} disconnected.`);
+      }
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not disconnect");
@@ -228,6 +257,60 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
 
   return (
     <div className="settings-connections">
+      <GmailConsentModal
+        open={gmailConsentOpen}
+        onCancel={() => setGmailConsentOpen(false)}
+        onConfirm={() => {
+          setGmailConsentOpen(false);
+          void startOAuthConnect("gmail");
+        }}
+        confirming={busy === "gmail"}
+        ingestionEmail={ingestionEmail}
+      />
+
+      {gmailDisconnectOpen && (
+        <div className="privacy-modal-backdrop" role="presentation" onClick={() => setGmailDisconnectOpen(false)}>
+          <div
+            className="privacy-modal privacy-modal-sm"
+            role="dialog"
+            aria-labelledby="gmail-disconnect-title"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="gmail-disconnect-title" className="privacy-modal-title">
+              Disconnect Gmail?
+            </h2>
+            <p className="privacy-modal-lead">
+              This revokes Briefly&apos;s Google access. We will also delete Gmail-derived newsletter
+              sources and any newsletter bodies fetched from your inbox via Gmail.
+            </p>
+            <p className="privacy-modal-foot">
+              Forwarded mail to your Briefly address is kept.{" "}
+              <Link href="/privacy/data-handling" className="privacy-modal-link" target="_blank">
+                Learn more
+              </Link>
+            </p>
+            <div className="privacy-modal-actions">
+              <button
+                type="button"
+                className="privacy-modal-btn privacy-modal-btn-ghost"
+                onClick={() => setGmailDisconnectOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="privacy-modal-btn privacy-modal-btn-danger"
+                disabled={busy === "gmail"}
+                onClick={() => void confirmDisconnect("gmail", true)}
+              >
+                {busy === "gmail" ? "Disconnecting…" : "Disconnect & delete content"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {banner && <div className="settings-connections-banner">{banner}</div>}
       {error && <div className="settings-connections-error" role="alert">{error}</div>}
 
@@ -360,7 +443,10 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
             <p className="settings-connections-footnote">
               Forward newsletters to{" "}
               <code className="settings-ingestion-email">{ingestionEmail}</code> — they&apos;ll
-              appear in your briefings automatically.
+              appear in your briefings automatically.{" "}
+              <Link href="/privacy/data-handling" className="settings-connections-link">
+                How we handle email
+              </Link>
             </p>
           )}
         </>

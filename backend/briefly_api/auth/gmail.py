@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.auth.google import GOOGLE_TOKEN_URL, generate_oauth_state
 from briefly_api.config import Settings
-from briefly_api.db.models import OAuthConnection, Source, User
+from briefly_api.db.models import OAuthConnection, User
 from briefly_api.security.oauth_tokens import (
     oauth_access_token,
     oauth_refresh_token,
@@ -220,30 +220,5 @@ async def upsert_gmail_connection(
         )
         db.add(connection)
 
-    await ensure_gmail_source(db, user, account_email or user.email)
     await db.flush()
     return connection
-
-
-async def ensure_gmail_source(db: AsyncSession, user: User, account_email: str) -> Source:
-    identifier = account_email.lower()
-    result = await db.execute(
-        select(Source).where(
-            Source.user_id == user.id,
-            Source.source_type == "gmail",
-            Source.identifier == identifier,
-        )
-    )
-    source = result.scalar_one_or_none()
-    if source:
-        return source
-
-    source = Source(
-        user_id=user.id,
-        source_type="gmail",
-        identifier=identifier,
-        name="Gmail newsletters",
-    )
-    db.add(source)
-    await db.flush()
-    return source

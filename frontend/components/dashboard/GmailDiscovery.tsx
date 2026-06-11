@@ -59,7 +59,7 @@ export function GmailDiscovery({
       const toAdd = senders
         .filter((s) => selected.has(s.email))
         .map((s) => ({ identifier: s.email, source_type: "email", name: s.name }));
-      const result = await api.bulkAddSources(toAdd);
+      const result = await api.bulkAddSources(toAdd, { fromGmail: true });
       result.added.forEach((src) => onAdded(src));
       setDone(true);
       setSenders((prev) => prev.filter((s) => !selected.has(s.email)));

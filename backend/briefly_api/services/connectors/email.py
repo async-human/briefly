@@ -13,6 +13,7 @@ from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.connectors.base import BaseConnector, ConnectorValidation
 from briefly_api.services.connectors.types import EMAIL
 from briefly_api.services.gmail import fetch_newsletters_from_sender
+from briefly_api.services.privacy_gmail import append_gmail_access_log
 from briefly_api.services.medium_extractor import detect_medium_digest
 
 log = logging.getLogger(__name__)
@@ -106,6 +107,13 @@ class EmailConnector(BaseConnector):
                         access_token, normalized, limit=limit,
                     )
                     if items:
+                        await append_gmail_access_log(
+                            db,
+                            user_id,
+                            "ingest",
+                            f"Fetched {len(items)} newsletter(s) from {normalized}",
+                            meta={"sender": normalized, "count": len(items)},
+                        )
                         label = source_name or identifier
                         for item in items:
                             item.source_name = label

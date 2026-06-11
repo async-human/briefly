@@ -37,6 +37,7 @@ const SECTIONS: LegalSection[] = [
         title: "Information from connected services",
         paragraphs: [
           "When you connect Gmail, YouTube, Reddit, Readwise, RSS, or similar integrations, we access content you authorise—such as newsletter messages, feed items, video metadata and transcripts, posts, and highlights—solely to ingest, deduplicate, summarise, and personalise your briefings.",
+          "For Gmail specifically, see our plain-English guide: How Briefly handles your email (/privacy/data-handling). Discovery uses metadata only; full newsletter bodies are fetched only for senders you approve.",
         ],
       },
       {

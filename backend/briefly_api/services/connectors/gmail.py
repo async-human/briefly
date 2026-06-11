@@ -4,12 +4,11 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from briefly_api.auth.gmail import get_gmail_connection, refresh_gmail_access_token
+from briefly_api.auth.gmail import get_gmail_connection
 from briefly_api.config import Settings
 from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.connectors.base import BaseConnector, ConnectorValidation
 from briefly_api.services.connectors.types import GMAIL
-from briefly_api.services.gmail import fetch_newsletters
 
 log = logging.getLogger(__name__)
 
@@ -42,9 +41,9 @@ class GmailConnector(BaseConnector):
         if not connection:
             raise ValueError("Gmail is not connected. Connect Gmail in onboarding or settings.")
 
-        access_token = await refresh_gmail_access_token(connection, settings)
-        await db.commit()
-        return await fetch_newsletters(access_token, limit=limit)
+        # Ingestion is per approved sender (email sources) only — not a broad inbox crawl.
+        log.debug("GmailConnector: skipped broad fetch for user %s", meta.get("user_id"))
+        return []
 
     async def validate(self, identifier: str, settings: Settings) -> ConnectorValidation:
         return ConnectorValidation(valid=True)

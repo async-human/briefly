@@ -6,6 +6,7 @@ import { api, type ProfileIntelligence } from "@/lib/api";
 import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccountConnections } from "@/components/settings/AccountConnections";
+import { DataControls } from "@/components/settings/DataControls";
 import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton";
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
@@ -652,6 +653,19 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+
+            {/* ── Data & privacy ── */}
+            <div className="dash-surface dash-surface-settings dash-surface-privacy">
+              <div className="dash-surface-head">
+                <h2 className="dash-surface-title">Data & privacy</h2>
+                <p className="dash-surface-desc">
+                  See what Briefly accessed, disconnect integrations, or delete your account.
+                </p>
+              </div>
+              <div className="dash-surface-body dash-surface-body-form">
+                <DataControls ingestionEmail={me?.ingestion_email} />
+              </div>
+            </div>
 
             {/* ── Connections ── */}
             <div className="dash-surface dash-surface-settings dash-surface-connections">

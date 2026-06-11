@@ -28,6 +28,7 @@ from briefly_api.db.models import Source, UserProfile
 from briefly_api.embeddings.adapter import get_embedding_adapter
 from briefly_api.services.external_feed_discovery import discover_all_external
 from briefly_api.services.gmail_discovery import discover_newsletter_senders
+from briefly_api.services.privacy_gmail import append_gmail_access_log
 from briefly_api.services.newsletter_link_extractor import extract_outbound_links, merge_link_candidates
 from briefly_api.services.profile_utils import cluster_label
 from briefly_api.services.url_scraper import discover_rss_feed
@@ -364,6 +365,17 @@ async def run_source_discovery(
                 meta.pop("access_error", None)
                 meta.pop("access_error_message", None)
                 gmail_connection.meta = meta
+                await append_gmail_access_log(
+                    session,
+                    user_id,
+                    "discovery",
+                    f"Scanned {gmail_messages_scanned} message headers — found {len(senders)} newsletter senders",
+                    meta={
+                        "messages_scanned": gmail_messages_scanned,
+                        "senders_found": len(senders),
+                        "format": "metadata",
+                    },
+                )
             elif not senders:
                 log.warning(
                     "Gmail discovery: 0 newsletter senders for user %s after scanning %d messages",
@@ -442,6 +454,13 @@ async def run_source_discovery(
                 user_id, step="deep_links", label="Extracting links from newsletters…",
             )
             raw_links = await _fetch_newsletter_html_links(access_token, senders)
+            await append_gmail_access_log(
+                session,
+                user_id,
+                "link_extract",
+                f"Opened {min(5, len(senders))} approved newsletter(s) to extract article links",
+                meta={"senders_checked": min(5, len(senders)), "links_found": len(raw_links)},
+            )
             for item in merge_link_candidates(raw_links):
                 url = item["url"]
                 title_text = f"{item['name']} {url} linked from {item['from_newsletter']}"

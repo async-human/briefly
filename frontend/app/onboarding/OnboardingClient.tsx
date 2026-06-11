@@ -8,6 +8,7 @@ import { api, type OnboardingStatus, type MeResponse } from "@/lib/api";
 import { clearToken } from "@/lib/auth";
 import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { AddSourceForm } from "@/components/dashboard/AddSourceForm";
+import { GmailConsentModal } from "@/components/privacy/GmailConsentModal";
 import "@/styles/onboarding.css";
 
 const ROLES = ["Founder", "Product manager", "Engineer", "Investor", "Researcher", "Other"] as const;
@@ -228,6 +229,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [gmailLoading, setGmailLoading] = useState(false);
+  const [gmailConsentOpen, setGmailConsentOpen] = useState(false);
   const [youtubeLoading, setYoutubeLoading] = useState(false);
   const [redditLoading, setRedditLoading] = useState(false);
   const [finishing, setFinishing] = useState(false);
@@ -325,7 +327,11 @@ export default function OnboardingPage() {
     return () => clearTimeout(t);
   }, [error]);
 
-  async function handleConnectGmail() {
+  function handleConnectGmail() {
+    setGmailConsentOpen(true);
+  }
+
+  async function startGmailOAuth() {
     setGmailLoading(true);
     setError("");
     try {
@@ -493,6 +499,16 @@ export default function OnboardingPage() {
 
   return (
     <div className="onboard-shell">
+      <GmailConsentModal
+        open={gmailConsentOpen}
+        onCancel={() => setGmailConsentOpen(false)}
+        onConfirm={() => {
+          setGmailConsentOpen(false);
+          void startGmailOAuth();
+        }}
+        confirming={gmailLoading}
+        ingestionEmail={me?.ingestion_email}
+      />
       <div className="onboard-glow" aria-hidden />
 
       {error && (

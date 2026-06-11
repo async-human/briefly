@@ -19,6 +19,9 @@ from briefly_api.auth.gmail import GmailAccessError, classify_gmail_http_error
 log = logging.getLogger(__name__)
 
 GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
+# Discovery must stay metadata-only — never use format=full in this module.
+GMAIL_DISCOVERY_FORMAT = "metadata"
+GMAIL_DISCOVERY_HEADERS = ["From", "Subject", "List-Unsubscribe", "List-Id", "Precedence"]
 
 _QUERIES = [
     "has:list-unsubscribe newer_than:365d",
@@ -183,8 +186,8 @@ def _discover_senders_sync(
                 resp = client.get(
                     f"{GMAIL_API}/messages/{msg_id}",
                     params={
-                        "format": "metadata",
-                        "metadataHeaders": ["From", "Subject", "List-Unsubscribe", "List-Id", "Precedence"],
+                        "format": GMAIL_DISCOVERY_FORMAT,
+                        "metadataHeaders": GMAIL_DISCOVERY_HEADERS,
                     },
                 )
                 resp.raise_for_status()

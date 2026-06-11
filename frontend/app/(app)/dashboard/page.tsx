@@ -250,6 +250,7 @@ function DashboardContent() {
         existingSources={fetchableSources}
         gmailConnected={me.gmail_connected}
         connectBanner={connectBanner}
+        ingestionEmail={me.ingestion_email}
         onConfirmed={handleDiscoveryConfirmed}
         onSourceAdded={handleSourceAdded}
       />

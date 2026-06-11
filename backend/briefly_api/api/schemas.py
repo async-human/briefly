@@ -254,6 +254,7 @@ class SourceCreate(BaseModel):
     identifier: str
     source_type: str | None = None
     name: str | None = None
+    meta: dict = Field(default_factory=dict)
 
 
 class SourceDetectOut(BaseModel):
@@ -276,6 +277,7 @@ class GmailDiscoverOut(BaseModel):
 
 class BulkSourceCreate(BaseModel):
     sources: list[SourceCreate]
+    from_gmail: bool = False
 
 
 class BulkSourceOut(BaseModel):

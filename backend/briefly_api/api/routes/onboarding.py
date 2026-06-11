@@ -65,6 +65,7 @@ from briefly_api.db.engine import SessionLocal, get_db
 from briefly_api.db.models import Source, User, UserProfile
 from briefly_api.embeddings.adapter import get_embedding_adapter
 from briefly_api.services.gmail import count_newsletters
+from briefly_api.services.privacy_gmail import append_gmail_access_log, disconnect_gmail_privacy
 
 log = logging.getLogger(__name__)
 from briefly_api.services.youtube import count_subscriptions
@@ -267,6 +268,13 @@ async def gmail_callback(
         probe_gmail_messages_access(access_token)
         newsletter_count = await count_newsletters(access_token)
         connection.meta = {**(connection.meta or {}), "newsletter_count": newsletter_count}
+        await append_gmail_access_log(
+            db,
+            user.id,
+            "connect",
+            "Gmail connected — inbox access verified",
+            meta={"newsletter_count": newsletter_count},
+        )
     except GmailAccessError as exc:
         connection.meta = {
             **(connection.meta or {}),
@@ -296,21 +304,26 @@ async def gmail_status(
     )
 
 
-@router.delete("/auth/gmail", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+@router.delete("/auth/gmail")
 async def disconnect_gmail(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> Response:
-    connection = await get_gmail_connection(db, user.id)
-    if connection:
-        await db.delete(connection)
-    gmail_sources = await db.execute(
-        select(Source).where(Source.user_id == user.id, Source.source_type == "gmail")
+    settings: Settings = Depends(get_settings),
+    delete_content: bool = Query(
+        True,
+        description="Remove Gmail-derived sources and stored newsletter bodies fetched via Gmail",
+    ),
+) -> dict:
+    stats = await disconnect_gmail_privacy(
+        db, user.id, settings, delete_content=delete_content,
     )
-    for source in gmail_sources.scalars().all():
-        await db.delete(source)
     await db.commit()
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return {
+        "ok": True,
+        "delete_content": delete_content,
+        "removed_sources": stats["sources"],
+        "removed_content_items": stats["content_items"],
+    }
 
 
 # ── Google Calendar OAuth ─────────────────────────────────────────────────────
