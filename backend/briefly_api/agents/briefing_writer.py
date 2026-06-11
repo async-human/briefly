@@ -35,6 +35,27 @@ log = logging.getLogger(__name__)
 # agents/skills/narrative_skill.py.
 
 
+async def _refresh_style_prefs(ctx: PipelineContext) -> None:
+    """Reload brief_style/language from DB — profile may have changed since pipeline start."""
+    session = ctx.db_session
+    if not session:
+        return
+    from sqlalchemy import select
+
+    from briefly_api.db.models import UserProfile
+
+    result = await session.execute(
+        select(UserProfile.brief_style, UserProfile.brief_language).where(
+            UserProfile.user_id == ctx.user.user_id,
+        )
+    )
+    row = result.one_or_none()
+    if not row:
+        return
+    ctx.user.profile["brief_style"] = row.brief_style or "analyst"
+    ctx.user.profile["brief_language"] = row.brief_language or "en"
+
+
 async def run(ctx: PipelineContext) -> PipelineContext:
     """
     Write the personalized briefing for all planned items.
@@ -57,6 +78,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         ctx.log_error("BriefingWriterAgent", "No items to write")
         return ctx
 
+    await _refresh_style_prefs(ctx)
     skill = NarrativeSkill()
 
     try:
@@ -141,6 +163,17 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         drafts = _fallback_drafts(items_to_write, ctx)
         drafts = _ensure_personalized_why(drafts, items_to_write, ctx.user.profile)
         _attach_score_breakdowns(drafts, items_to_write)
+
+    brief_language = (ctx.user.profile.get("brief_language") or "en").strip().lower()
+    if brief_language == "hi":
+        from briefly_api.services.brief_localization import localize_digest_to_hindi
+
+        ctx.subject_line, ctx.preview_text, drafts = await localize_digest_to_hindi(
+            subject_line=ctx.subject_line,
+            preview_text=ctx.preview_text,
+            drafts=drafts,
+        )
+        ctx.__dict__["brief_language_applied"] = "hi"
 
     ctx.digest_items = drafts
     ctx.total_shown = len(drafts)

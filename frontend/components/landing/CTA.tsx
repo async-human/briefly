@@ -1,12 +1,27 @@
 "use client";
 
-import { Reveal } from "./Reveal";
+import { motion, useInView, useReducedMotion } from "framer-motion";
+import { useRef } from "react";
+
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 export function CTA() {
+  const ref = useRef<HTMLDivElement>(null);
+  const reducedMotion = useReducedMotion();
+  const inView = useInView(ref, { once: true, margin: "-80px", amount: 0.35 });
+  const duration = reducedMotion ? 0.01 : 0.52;
+  const scaleFrom = reducedMotion ? 1 : 0.96;
+
   return (
     <section className="cta-linear landing-section landing-band-accent" id="start">
-      <div className="landing-section-inner cta-linear-inner">
-        <Reveal>
+      <div className="cta-linear-glow" aria-hidden />
+      <div className="landing-section-inner cta-linear-inner" ref={ref}>
+        <motion.div
+          className="cta-linear-content"
+          initial={{ opacity: 0, scale: scaleFrom }}
+          animate={inView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: scaleFrom }}
+          transition={{ duration, ease: EASE }}
+        >
           <div className="section-header-centered">
             <p className="section-eyebrow">Get started</p>
             <h2 className="section-heading">
@@ -17,18 +32,22 @@ export function CTA() {
               briefing is ready when you are.
             </p>
           </div>
-        </Reveal>
-        <Reveal delay={0.08}>
-          <div className="cta-linear-actions">
+
+          <motion.div
+            className="cta-linear-actions"
+            initial={{ opacity: 0, y: 10 }}
+            animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+            transition={{ duration: duration * 0.85, delay: reducedMotion ? 0 : 0.12, ease: EASE }}
+          >
             <a href="/login" className="btn-light-primary">
               Start free →
             </a>
             <a href="#pricing" className="btn-light-ghost">
               See pricing
             </a>
-          </div>
+          </motion.div>
           <p className="cta-linear-fine">Free to start · No credit card required</p>
-        </Reveal>
+        </motion.div>
       </div>
     </section>
   );

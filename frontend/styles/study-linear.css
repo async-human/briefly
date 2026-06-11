@@ -53,7 +53,18 @@ body[data-landing-theme="dark"].study-linear-body {
 
 body[data-landing-theme="light"].study-linear-body {
   background: oklch(99% 0.004 270);
-  background-image: none;
+  background-image: radial-gradient(
+    ellipse 90% 55% at 50% -8%,
+    var(--linear-glow) 0%,
+    transparent 58%
+  );
+}
+
+.study-linear {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-short: 220ms;
+  --dur-long: 420ms;
 }
 
 /* ── N5 floating pill nav ─────────────────────────────────────────────── */
@@ -84,6 +95,21 @@ body[data-landing-theme="light"].study-linear-body {
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   box-shadow: 0 8px 32px -12px oklch(0% 0 0 / 0.35);
+  transition:
+    padding var(--dur-short) var(--ease-out),
+    background-color var(--dur-short) var(--ease-out),
+    box-shadow var(--dur-short) var(--ease-out),
+    border-color var(--dur-short) var(--ease-out);
+}
+
+.study-linear nav.nav-fp.is-scrolled .nav-fp-inner {
+  padding: 4px 6px 4px 14px;
+  background: color-mix(in oklch, var(--bg) 88%, transparent);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  box-shadow:
+    0 4px 24px -8px oklch(0% 0 0 / 0.4),
+    0 0 0 1px oklch(96% 0.01 270 / 0.06);
 }
 
 .study-linear .nav-fp-logo {
@@ -131,11 +157,18 @@ body[data-landing-theme="light"].study-linear-body {
   border-radius: 999px;
   text-decoration: none;
   white-space: nowrap;
-  transition: opacity 180ms ease;
+  transition:
+    opacity var(--dur-short) var(--ease-out),
+    transform var(--dur-short) var(--ease-out);
 }
 
 .study-linear .nav-fp-cta:hover {
-  opacity: 0.88;
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.study-linear .nav-fp-cta:active {
+  transform: translateY(0);
 }
 
 .study-linear .nav-hamburger {
@@ -148,6 +181,82 @@ body[data-landing-theme="light"].study-linear-body {
   position: relative;
   padding: calc(var(--landing-nav-h, 64px) + 72px) 24px 48px;
   overflow: hidden;
+  isolation: isolate;
+}
+
+.study-linear .hero-linear-atmosphere {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.study-linear .hero-linear-mesh {
+  position: absolute;
+  inset: -20% -10%;
+  background:
+    radial-gradient(ellipse 55% 45% at 18% 22%, var(--linear-glow) 0%, transparent 62%),
+    radial-gradient(ellipse 48% 38% at 82% 28%, oklch(52% 0.2 275 / 0.06) 0%, transparent 58%),
+    radial-gradient(ellipse 40% 30% at 50% 85%, oklch(52% 0.14 275 / 0.04) 0%, transparent 55%);
+  animation: hero-mesh-drift 22s var(--ease-in-out) infinite alternate;
+}
+
+.study-linear .hero-linear-brain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.55;
+  mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 92%);
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, black 55%, transparent 92%);
+}
+
+.study-linear[data-theme="light"] .hero-linear-brain {
+  opacity: 0.38;
+}
+
+@keyframes hero-mesh-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(2%, -1.5%, 0) scale(1.03); }
+}
+
+.study-linear .hero-linear-intro,
+.study-linear .hero-linear-product {
+  position: relative;
+  z-index: 1;
+}
+
+.study-linear .stagger-headline-word {
+  display: inline-block;
+  margin-right: 0.28em;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.study-linear .hero-linear-eyebrow a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.study-linear .hero-eyebrow-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: hero-pulse 2.4s var(--ease-in-out) infinite;
+  box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent) 40%, transparent);
+}
+
+@keyframes hero-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent) 35%, transparent);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 6px color-mix(in oklch, var(--accent) 0%, transparent);
+  }
 }
 
 .study-linear .hero-linear-intro {
@@ -239,6 +348,26 @@ body[data-landing-theme="light"].study-linear-body {
     0 32px 80px -24px oklch(0% 0 0 / 0.55);
 }
 
+.study-linear .digest-window-float {
+  animation: digest-float 6s var(--ease-in-out) infinite;
+  will-change: transform;
+}
+
+@keyframes digest-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -7px, 0); }
+}
+
+.study-linear .status-dot.generating {
+  animation: status-breathe 1.8s var(--ease-in-out) infinite;
+  box-shadow: 0 0 8px color-mix(in oklch, var(--accent) 45%, transparent);
+}
+
+@keyframes status-breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.88); }
+}
+
 .study-linear .window-dots {
   display: none;
 }
@@ -285,10 +414,38 @@ body[data-landing-theme="light"].study-linear-body {
   box-shadow: none !important;
 }
 
+.study-linear .btn-light-primary,
+.study-linear .btn-hero-primary {
+  transition:
+    opacity var(--dur-short) var(--ease-out),
+    transform var(--dur-short) var(--ease-out),
+    background-color var(--dur-short) var(--ease-out);
+}
+
 .study-linear .btn-light-primary:hover,
 .study-linear .btn-hero-primary:hover {
-  opacity: 0.9;
-  transform: none;
+  opacity: 0.94;
+  transform: translateY(-1px);
+}
+
+.study-linear .btn-light-primary:active,
+.study-linear .btn-hero-primary:active {
+  transform: translateY(0);
+}
+
+.study-linear .btn-light-ghost,
+.study-linear .btn-hero-ghost {
+  transition:
+    color var(--dur-short) var(--ease-out),
+    border-color var(--dur-short) var(--ease-out),
+    background-color var(--dur-short) var(--ease-out),
+    transform var(--dur-short) var(--ease-out);
+}
+
+.study-linear .btn-light-ghost:hover,
+.study-linear .btn-hero-ghost:hover {
+  transform: translateY(-1px);
+  background: var(--accent-dim);
 }
 
 .study-linear .btn-light-ghost,
@@ -748,7 +905,20 @@ body[data-landing-theme="light"].study-linear-body {
 
 @media (prefers-reduced-motion: reduce) {
   .study-linear .nav-fp-links a,
-  .study-linear .nav-fp-cta {
+  .study-linear .nav-fp-cta,
+  .study-linear .btn-light-primary,
+  .study-linear .btn-light-ghost {
     transition-duration: 0.01ms;
+  }
+
+  .study-linear .hero-linear-mesh,
+  .study-linear .digest-window-float,
+  .study-linear .hero-eyebrow-pulse,
+  .study-linear .status-dot.generating {
+    animation: none;
+  }
+
+  .study-linear .hero-linear-brain {
+    display: none;
   }
 }

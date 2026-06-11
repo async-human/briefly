@@ -8,7 +8,27 @@ interface BPulse { a: number; b: number; t: number; speed: number }
 const CURSOR_RADIUS = 170;   // px — proximity zone around cursor
 const LERP          = 0.075; // how fast the smooth cursor chases the real one
 
-export function BrainCanvas() {
+const PALETTES = {
+  warm: {
+    halo: ["rgba(200,155,60,0.07)", "rgba(200,155,60,0.025)", "rgba(200,155,60,0)"],
+    edge: (a: number) => `rgba(158,123,63,${a})`,
+    pulse: (a: number) => `rgba(200,155,60,${a})`,
+    node: (a: number) => `rgba(158,123,63,${a})`,
+  },
+  accent: {
+    halo: ["rgba(120,100,220,0.08)", "rgba(120,100,220,0.03)", "rgba(120,100,220,0)"],
+    edge: (a: number) => `rgba(100,90,200,${a})`,
+    pulse: (a: number) => `rgba(130,110,230,${a})`,
+    node: (a: number) => `rgba(100,90,200,${a})`,
+  },
+} as const;
+
+type BrainCanvasProps = {
+  tone?: keyof typeof PALETTES;
+};
+
+export function BrainCanvas({ tone = "warm" }: BrainCanvasProps) {
+  const palette = PALETTES[tone];
   const wrapRef   = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -107,9 +127,9 @@ export function BrainCanvas() {
       // ── Cursor halo (drawn first so it sits behind everything) ────────────────
       if (cursorOnCanvas) {
         const g = ctx.createRadialGradient(smoothX, smoothY, 0, smoothX, smoothY, CURSOR_RADIUS);
-        g.addColorStop(0, "rgba(200,155,60,0.07)");
-        g.addColorStop(0.5, "rgba(200,155,60,0.025)");
-        g.addColorStop(1, "rgba(200,155,60,0)");
+        g.addColorStop(0, palette.halo[0]);
+        g.addColorStop(0.5, palette.halo[1]);
+        g.addColorStop(1, palette.halo[2]);
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(smoothX, smoothY, CURSOR_RADIUS, 0, Math.PI * 2);
@@ -134,7 +154,7 @@ export function BrainCanvas() {
       for (const [a, b] of edges) {
         const na = nodes[a], nb = nodes[b];
         const heat = (na.act + nb.act) * 0.5;
-        ctx.strokeStyle = `rgba(158,123,63,${0.05 + heat * 0.10})`;
+        ctx.strokeStyle = palette.edge(0.05 + heat * 0.10);
         ctx.lineWidth   = 0.4 + heat * 0.45;
         ctx.beginPath();
         ctx.moveTo(na.x, na.y);
@@ -152,8 +172,8 @@ export function BrainCanvas() {
         const py = na.y + (nb.y - na.y) * p.t;
         const fade = Math.max(0, 1 - Math.abs(p.t - 0.5) * 2.5);
         const g = ctx.createRadialGradient(px, py, 0, px, py, 6);
-        g.addColorStop(0, `rgba(200,155,60,${0.35 * fade})`);
-        g.addColorStop(1, "rgba(200,155,60,0)");
+        g.addColorStop(0, palette.pulse(0.35 * fade));
+        g.addColorStop(1, palette.pulse(0));
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(px, py, 6, 0, Math.PI * 2);
@@ -165,7 +185,7 @@ export function BrainCanvas() {
         n.act = Math.max(0, n.act - n.decay);
         const alpha = 0.08 + n.act * 0.28;
         const r     = 1.0 + n.act * 1.8;
-        ctx.fillStyle = `rgba(158,123,63,${alpha})`;
+        ctx.fillStyle = palette.node(alpha);
         ctx.beginPath();
         ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
         ctx.fill();
@@ -188,7 +208,8 @@ export function BrainCanvas() {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseleave", onMouseLeave);
     };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- palette is keyed by tone
+  }, [tone]);
 
   return (
     <div

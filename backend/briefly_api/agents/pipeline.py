@@ -613,6 +613,8 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
             "wrapped": getattr(ctx, "wrapped_snapshot", None),
             "adjustment_confirmation": list(ctx.adjustment_confirmation_lines or []),
             "closing_stats": getattr(ctx, "closing_stats", None),
+            "brief_language": ctx.user.profile.get("brief_language", "en"),
+            "brief_language_applied": ctx.__dict__.get("brief_language_applied"),
         },
     )
     session.add(digest)

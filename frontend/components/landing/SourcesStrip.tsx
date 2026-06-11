@@ -1,3 +1,5 @@
+"use client";
+
 import { Reveal } from "./Reveal";
 import { SourceIcon } from "@/components/SourceIcon";
 
@@ -12,7 +14,21 @@ const SOURCES = [
   { name: "Any URL",      type: "url"     },
 ];
 
+function SourceChip({ name, type, nameOverride }: (typeof SOURCES)[number]) {
+  const label = nameOverride ?? name;
+  return (
+    <div className="source-chip">
+      <span className="source-chip-logo">
+        <SourceIcon type={type} name={label} size={18} />
+      </span>
+      <span className="source-chip-name">{name}</span>
+    </div>
+  );
+}
+
 export function SourcesStrip() {
+  const marqueeSources = [...SOURCES, ...SOURCES];
+
   return (
     <div className="sources-strip landing-band-base">
       <Reveal>
@@ -23,17 +39,21 @@ export function SourcesStrip() {
             See exactly what we access
           </a>
         </p>
-        <div className="sources-strip-icons">
-          {SOURCES.map((s) => (
-            <div key={s.name} className="source-chip">
-              <span className="source-chip-logo">
-                <SourceIcon type={s.type} name={s.nameOverride ?? s.name} size={18} />
-              </span>
-              <span className="source-chip-name">{s.name}</span>
-            </div>
+      </Reveal>
+
+      <div className="sources-marquee" aria-hidden>
+        <div className="sources-marquee-track">
+          {marqueeSources.map((s, i) => (
+            <SourceChip key={`${s.name}-${i}`} {...s} />
           ))}
         </div>
-      </Reveal>
+      </div>
+
+      <div className="sources-strip-icons sources-strip-icons-static">
+        {SOURCES.map((s) => (
+          <SourceChip key={s.name} {...s} />
+        ))}
+      </div>
     </div>
   );
 }

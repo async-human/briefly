@@ -85,7 +85,7 @@ export function DigestPreview() {
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
     >
-      <div className="digest-window">
+      <div className="digest-window digest-window-float">
         <div className="window-bar">
           <div className="window-dots">
             <div className="window-dot" />

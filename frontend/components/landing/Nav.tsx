@@ -18,11 +18,19 @@ const NAV_LINKS = [
 
 export function Nav() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [menuOpen]);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const open = () => setMenuOpen(true);
   const close = () => setMenuOpen(false);
@@ -30,7 +38,7 @@ export function Nav() {
   return (
     <>
       {/* N5 — Floating pill */}
-      <nav className={`nav-fp${menuOpen ? " menu-open" : ""}`}>
+      <nav className={`nav-fp${scrolled ? " is-scrolled" : ""}${menuOpen ? " menu-open" : ""}`}>
         <div className="nav-fp-inner">
           <a href="#" className="nav-fp-logo">
             <BrieflyLogo variant="full" size="sm" />

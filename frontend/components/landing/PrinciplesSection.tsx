@@ -59,20 +59,32 @@ function PrincipleRow({
     <motion.li
       ref={ref}
       className="principle-row"
-      initial={{ opacity: 0, y: 8 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.42, delay: Math.min(index * 0.05, 0.25), ease: EASE }}
+      initial={{ opacity: 0 }}
+      animate={inView ? { opacity: 1 } : {}}
+      transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.2), ease: EASE }}
     >
+      <motion.span
+        className="principle-rule"
+        aria-hidden
+        initial={{ scaleX: 0 }}
+        animate={inView ? { scaleX: 1 } : {}}
+        transition={{ duration: 0.55, delay: Math.min(index * 0.05, 0.25), ease: EASE }}
+      />
       <span className="principle-num" aria-hidden>
         {principle.num}
       </span>
-      <div className="principle-body">
+      <motion.div
+        className="principle-body"
+        initial={{ x: -10, opacity: 0 }}
+        animate={inView ? { x: 0, opacity: 1 } : {}}
+        transition={{ duration: 0.42, delay: 0.08 + Math.min(index * 0.05, 0.25), ease: EASE }}
+      >
         <div className="principle-head">
           <h3 className="principle-title">{principle.title}</h3>
           <span className="principle-tag">{principle.tag}</span>
         </div>
         <p className="principle-desc">{principle.body}</p>
-      </div>
+      </motion.div>
     </motion.li>
   );
 }
@@ -94,12 +106,13 @@ export function PrinciplesSection() {
           </div>
         </Reveal>
 
+        <ol className="principles-list">
+          {principles.map((p, i) => (
+            <PrincipleRow key={p.num} principle={p} index={i} />
+          ))}
+        </ol>
+
         <Reveal delay={0.12}>
-          <ol className="principles-list">
-            {principles.map((p, i) => (
-              <PrincipleRow key={p.num} principle={p} index={i} />
-            ))}
-          </ol>
           <p className="principles-footnote">
             Every item links to its original source. Claims are verified before delivery.
           </p>

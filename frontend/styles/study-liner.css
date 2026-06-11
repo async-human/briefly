@@ -97,6 +97,65 @@
   text-decoration: underline;
 }
 
+/* ── Sources marquee (ambient motion) ─────────────────────────────────── */
+
+.study-linear .sources-marquee {
+  position: relative;
+  overflow: hidden;
+  margin-top: 28px;
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    black 10%,
+    black 90%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    black 10%,
+    black 90%,
+    transparent 100%
+  );
+}
+
+.study-linear .sources-marquee-track {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  padding: 4px 0;
+  animation: sources-marquee 42s linear infinite;
+}
+
+.study-linear .sources-marquee .source-chip {
+  flex-shrink: 0;
+}
+
+@keyframes sources-marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+.study-linear .sources-strip-icons-static {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .study-linear .sources-marquee {
+    display: none;
+  }
+
+  .study-linear .sources-strip-icons-static {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+  }
+}
+
 .study-linear .trust-sources-section {
   padding: 72px 64px 88px;
   border-bottom: 0.5px solid var(--liner-divider);
@@ -441,6 +500,7 @@
 }
 
 .study-linear .landing-band-warm .principle-row {
+  position: relative;
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
   gap: 20px;
@@ -451,6 +511,22 @@
   border-bottom: 0.5px solid var(--liner-divider);
   background: var(--band-card);
   transition: background-color 220ms var(--liner-ease-out);
+  overflow: hidden;
+}
+
+.study-linear .principle-rule {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    color-mix(in oklch, var(--accent) 30%, transparent) 100%
+  );
+  transform-origin: left center;
+  pointer-events: none;
 }
 
 .study-linear .landing-band-warm .principle-row:first-child {
@@ -557,7 +633,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .study-linear .features-sticky-intro {
+  .study-linear .features-sticky-intro,
+  .study-linear .sources-marquee-track,
+  .study-linear .cta-linear-glow {
     animation: none;
   }
 }
@@ -571,11 +649,41 @@
 /* ── Footer gradient edge (Liner learn→faq handoff) ───────────────────── */
 
 .study-linear .cta-linear.landing-band-accent {
+  position: relative;
+  overflow: hidden;
   background: linear-gradient(
     0deg,
     var(--band-base) 12%,
     var(--band-accent) 100%
   );
+}
+
+.study-linear .cta-linear-glow {
+  position: absolute;
+  inset: -20% 0 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 55% 70% at 50% 100%,
+    color-mix(in oklch, var(--accent) 14%, transparent) 0%,
+    transparent 68%
+  );
+  animation: cta-glow-pulse 8s var(--liner-ease-out) infinite alternate;
+}
+
+.study-linear .cta-linear-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.study-linear .cta-linear-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+@keyframes cta-glow-pulse {
+  from { opacity: 0.65; transform: scale(1); }
+  to { opacity: 1; transform: scale(1.04); }
 }
 
 .study-linear footer.footer-linear {
