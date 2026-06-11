@@ -692,7 +692,14 @@ export type AskThread = {
 export type AskStreamEvent =
   | { type: "thread_id"; thread_id: string }
   | { type: "delta"; content: string }
-  | { type: "done"; citations: AskCitation[]; created_at: string }
+  | {
+      type: "done";
+      citations: AskCitation[];
+      created_at: string;
+      content_id?: string | null;
+      digest_item_id?: string | null;
+      anchor_title?: string | null;
+    }
   | { type: "error"; message: string };
 
 function parseAskSseBuffer(buffer: string): AskStreamEvent[] {

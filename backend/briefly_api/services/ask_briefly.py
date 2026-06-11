@@ -61,6 +61,15 @@ _MAX_FOCUSED_PASSAGES = 8
 _MAX_ARTICLE_CHUNKS_TO_SCORE = 28
 _MIN_PASSAGE_SIMILARITY = 0.22
 _MAX_ANCHOR_SNIPPET_CHARS = 8000
+_REFERENTIAL_FOLLOWUP = re.compile(
+    r"(?:"
+    r"\b(?:this|the|that|same)\s+(?:article|story|piece|post|read|item|source)\b|"
+    r"\b(?:it|this)\s+(?:says|said|mentions|mentioned|discusses|discussed|covers|covered)\b|"
+    r"\babout\s+(?:it|this|that)\b|"
+    r"\b(?:go|dive)\s+(?:deeper|in\s+depth)\b"
+    r")",
+    re.IGNORECASE,
+)
 _THIN_BODY_CHARS = 600
 _FULL_BODY_PASSAGE_LIMIT = 7000
 _EXTRACTION_QUERY = re.compile(
@@ -87,7 +96,10 @@ class AskPrepared:
     all_chunks: list[ContextChunk]
     llm_messages: list[Message]
     digest_item_id: str | None
+    content_id: str | None
     user_id: str
+    focused: bool = False
+    focus_title: str | None = None
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -675,11 +687,55 @@ You answer using ONLY the sources in the context pack, labeled [S1], [S2], etc.
 - Cite sources inline like [S1] when you use them.
 - If the sources don't contain enough information, say so honestly. Do not invent articles or URLs.
 - When excerpts from a focused article are provided, extract concrete facts (names, numbers, lists, dates) directly from those excerpts before saying information is missing.
+- When CONVERSATION FOCUS is set, follow-up questions like "this article", "it", or "what does it say about X" refer to that focused article. Answer from [S1] unless the user clearly names a different source.
 - Be concise, direct, and personal (use what you know about the user from the profile).
 - Connect dots across sources when relevant.
 - Never mention that you are an AI or language model.
 - Never tell the user to check external apps (Reader, email, etc.) — Briefly IS their reading system.
 - When the pack is a SAVED/UNREAD INDEX, list each item by title with a short note on why it's unread. If the index is empty, say their saved queue is clear."""
+
+
+def _is_referential_followup(message: str) -> bool:
+    return bool(_REFERENTIAL_FOLLOWUP.search(message))
+
+
+def _infer_content_id_from_messages(messages: list[dict]) -> str | None:
+    for msg in reversed(messages):
+        if msg.get("role") != "assistant":
+            continue
+        for cite in msg.get("citations") or []:
+            cid = cite.get("content_id")
+            if cid and not str(cid).startswith("digest-item"):
+                return str(cid)
+    return None
+
+
+def _resolve_thread_anchor(
+    thread: FollowUpThread | None,
+    *,
+    content_id: str | None,
+    digest_item_id: str | None,
+    message: str,
+) -> tuple[str | None, str | None]:
+    """Merge request scope with persisted thread scope and conversation history."""
+    tid = digest_item_id
+    cid = content_id
+
+    if thread:
+        if not tid and thread.digest_item_id:
+            tid = thread.digest_item_id
+        if not cid and getattr(thread, "content_id", None):
+            cid = thread.content_id
+
+    history = list(thread.messages or []) if thread else []
+    if not cid and not tid and history and _is_referential_followup(message):
+        cid = _infer_content_id_from_messages(history)
+
+    # Keep multi-turn threads on the last cited article when scope was never stored.
+    if not cid and not tid and history and len(history) >= 2:
+        cid = _infer_content_id_from_messages(history)
+
+    return cid, tid
 
 
 def _sse_event(payload: dict) -> str:
@@ -715,16 +771,26 @@ async def _prepare_ask(
             user_id=user.id,
             digest_id=None,
             digest_item_id=digest_item_id,
+            content_id=content_id,
             messages=[],
         )
         db.add(thread)
         await db.flush()
 
+    content_id, digest_item_id = _resolve_thread_anchor(
+        thread,
+        content_id=content_id,
+        digest_item_id=digest_item_id,
+        message=message,
+    )
+
     if digest_item_id and not thread.digest_item_id:
         thread.digest_item_id = digest_item_id
+    if content_id and not thread.content_id:
+        thread.content_id = content_id
 
-    if thread and not digest_item_id and thread.digest_item_id:
-        digest_item_id = thread.digest_item_id
+    focused = bool(content_id or digest_item_id)
+    focus_title: str | None = None
 
     saved_unread_mode = is_saved_unread_query(message) and not content_id and not digest_item_id
 
@@ -751,21 +817,30 @@ async def _prepare_ask(
             query_embedding=query_embedding,
             embedder=embedder,
         )
-        exclude = {c.content_id for c in anchor_chunks if not c.content_id.startswith("digest-item")}
-        extra_limit = _MAX_CHUNKS - len(anchor_chunks)
+        if anchor_chunks:
+            focus_title = anchor_chunks[0].title
+
         extra: list[ContextChunk] = []
-        if extra_limit > 0:
-            extra = await _semantic_retrieve(
-                db,
-                user.id,
-                query_embedding,
-                exclude_ids=exclude,
-                never_show=never_show,
-                limit=extra_limit,
-            )
+        if not focused:
+            exclude = {c.content_id for c in anchor_chunks if not c.content_id.startswith("digest-item")}
+            extra_limit = _MAX_CHUNKS - len(anchor_chunks)
+            if extra_limit > 0:
+                extra = await _semantic_retrieve(
+                    db,
+                    user.id,
+                    query_embedding,
+                    exclude_ids=exclude,
+                    never_show=never_show,
+                    limit=extra_limit,
+                )
 
         all_chunks = _assign_refs(anchor_chunks + extra, start_index=1)
         context_pack = _format_context_pack(all_chunks) if all_chunks else "(No matching sources in your library yet.)"
+        if focused and focus_title:
+            context_pack = (
+                f"CONVERSATION FOCUS: Stay on \"{focus_title}\" ([S1]) unless the user "
+                f"explicitly asks about a different article.\n\n{context_pack}"
+            )
 
     profile_text = _profile_blurb(profile)
 
@@ -790,7 +865,10 @@ async def _prepare_ask(
         all_chunks=all_chunks,
         llm_messages=llm_messages,
         digest_item_id=digest_item_id,
+        content_id=content_id,
         user_id=user.id,
+        focused=focused,
+        focus_title=focus_title,
     )
 
 
@@ -810,6 +888,17 @@ async def _persist_ask_response(
             "timestamp": now,
         },
     ]
+
+    if not prepared.thread.content_id and prepared.content_id:
+        prepared.thread.content_id = prepared.content_id
+    elif (
+        not prepared.thread.content_id
+        and not prepared.thread.digest_item_id
+        and citations
+    ):
+        primary = citations[0].get("content_id")
+        if primary and not str(primary).startswith("digest-item"):
+            prepared.thread.content_id = str(primary)
 
     if prepared.digest_item_id:
         item_result = await db.execute(
@@ -910,7 +999,14 @@ async def stream_ask_briefly(
     answer = "".join(parts).strip()
     citations = _extract_citations(answer, prepared.all_chunks)
     created_at = await _persist_ask_response(db, prepared, answer, citations)
-    yield _sse_event({"type": "done", "citations": citations, "created_at": created_at})
+    yield _sse_event({
+        "type": "done",
+        "citations": citations,
+        "created_at": created_at,
+        "content_id": prepared.thread.content_id,
+        "digest_item_id": prepared.thread.digest_item_id,
+        "anchor_title": prepared.focus_title,
+    })
 
 
 async def list_threads(db: AsyncSession, user_id: str, *, limit: int = 30) -> list[dict]:
@@ -940,16 +1036,22 @@ async def list_threads(db: AsyncSession, user_id: str, *, limit: int = 30) -> li
                 title = str(m["content"])[:80]
                 break
         anchor = items_by_id.get(t.digest_item_id) if t.digest_item_id else None
-        if anchor and title == "Ask Briefly":
-            title = f"Re: {anchor.headline[:72]}"
+        thread_content_id = getattr(t, "content_id", None) or (anchor.content_id if anchor else None)
+        anchor_title = anchor.headline if anchor else None
+        if not anchor_title and thread_content_id:
+            raw = await db.get(RawContent, thread_content_id)
+            if raw and raw.title:
+                anchor_title = raw.title
+        if anchor_title:
+            title = f"Re: {anchor_title[:72]}"
         out.append(
             {
                 "id": t.id,
                 "title": title,
                 "preview": preview,
                 "digest_item_id": t.digest_item_id,
-                "content_id": anchor.content_id if anchor else None,
-                "anchor_title": anchor.headline if anchor else None,
+                "content_id": thread_content_id,
+                "anchor_title": anchor_title,
                 "updated_at": t.updated_at.isoformat() if t.updated_at else None,
                 "message_count": len(msgs),
             }
@@ -983,12 +1085,17 @@ async def get_thread(db: AsyncSession, user_id: str, thread_id: str) -> dict | N
     if not thread:
         return None
     anchor_title: str | None = None
-    anchor_content_id: str | None = None
+    anchor_content_id = thread.content_id
     if thread.digest_item_id:
         item = await db.get(DigestItem, thread.digest_item_id)
         if item:
             anchor_title = item.headline
-            anchor_content_id = item.content_id
+            if not anchor_content_id:
+                anchor_content_id = item.content_id
+    if not anchor_title and anchor_content_id:
+        raw = await db.get(RawContent, anchor_content_id)
+        if raw and raw.title:
+            anchor_title = raw.title
     return {
         "id": thread.id,
         "digest_item_id": thread.digest_item_id,

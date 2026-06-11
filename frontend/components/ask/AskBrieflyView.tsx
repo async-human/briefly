@@ -168,6 +168,13 @@ export function AskBrieflyView({
               return next;
             });
           } else if (event.type === "done") {
+            if (event.content_id || event.digest_item_id) {
+              setStoryScope((prev) => ({
+                contentId: event.content_id ?? prev?.contentId,
+                digestItemId: event.digest_item_id ?? prev?.digestItemId,
+                title: event.anchor_title ?? prev?.title,
+              }));
+            }
             setMessages((prev) => {
               const next = [...prev];
               const last = next[next.length - 1];

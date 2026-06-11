@@ -518,6 +518,7 @@ class FollowUpThread(Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
     digest_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("digests.id", ondelete="SET NULL"))
     digest_item_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("digest_items.id", ondelete="SET NULL"))
+    content_id: Mapped[str | None] = mapped_column(String(36), index=True)
 
     # Full conversation history as JSONB
     # [{"role": "user"|"assistant", "content": "...", "timestamp": "..."}]

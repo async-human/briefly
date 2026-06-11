@@ -8,15 +8,18 @@ from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.ask_briefly import (
     _extract_citations,
     _format_context_pack,
+    _infer_content_id_from_messages,
     _is_extraction_query,
+    _is_referential_followup,
     _is_thin_article_body,
     _resolve_article_body,
+    _resolve_thread_anchor,
     _split_article_passages,
     is_saved_unread_query,
     rank_by_similarity,
     ContextChunk,
 )
-from briefly_api.db.models import RawContent
+from briefly_api.db.models import FollowUpThread, RawContent
 
 
 def test_rank_by_similarity_orders_results():
@@ -151,6 +154,61 @@ def test_resolve_article_body_fetches_when_stored_text_is_thin():
     assert "AlphaTech" in body
     assert raw.meta.get("full_article_text") == full_body
     db.flush.assert_awaited_once()
+
+
+def test_is_referential_followup_detects_this_article():
+    assert _is_referential_followup("what does this article say about memory?")
+    assert _is_referential_followup("can we go in depth on it?")
+    assert not _is_referential_followup("summarize my active story threads")
+
+
+def test_infer_content_id_from_messages_uses_last_citations():
+    messages = [
+        {"role": "user", "content": "tell me about agents"},
+        {
+            "role": "assistant",
+            "content": "Answer",
+            "citations": [{"content_id": "article-abc", "title": "Context guide"}],
+        },
+    ]
+    assert _infer_content_id_from_messages(messages) == "article-abc"
+
+
+def test_resolve_thread_anchor_restores_persisted_content_id():
+    thread = FollowUpThread(
+        user_id="u1",
+        content_id="saved-article",
+        messages=[{"role": "user", "content": "first"}],
+    )
+    cid, did = _resolve_thread_anchor(
+        thread,
+        content_id=None,
+        digest_item_id=None,
+        message="what does this article say?",
+    )
+    assert cid == "saved-article"
+    assert did is None
+
+
+def test_resolve_thread_anchor_infers_from_history_on_followup():
+    thread = FollowUpThread(
+        user_id="u1",
+        messages=[
+            {"role": "user", "content": "context management guide"},
+            {
+                "role": "assistant",
+                "content": "Summary",
+                "citations": [{"content_id": "ctx-guide", "title": "Context Management"}],
+            },
+        ],
+    )
+    cid, _ = _resolve_thread_anchor(
+        thread,
+        content_id=None,
+        digest_item_id=None,
+        message="what does this article say about long term memory?",
+    )
+    assert cid == "ctx-guide"
 
 
 def test_resolve_article_body_uses_cached_full_text():
