@@ -268,12 +268,20 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
         # task so the pipeline can return the digest_id immediately.
         from briefly_api.services.background_jobs import enqueue_background_job
 
-        await enqueue_background_job(
-            "post_pipeline_agents",
-            {"user_id": user_id},
-            idempotency_key=f"post_pipeline:{user_id}:{ctx.run_date}",
-        )
-        log.info("Pipeline: enqueued post-pipeline agents for user %s", user_id)
+        try:
+            await enqueue_background_job(
+                "post_pipeline_agents",
+                {"user_id": user_id},
+                idempotency_key=f"post_pipeline:{user_id}:{ctx.run_date}",
+            )
+            log.info("Pipeline: enqueued post-pipeline agents for user %s", user_id)
+        except Exception as exc:
+            # Digest is already persisted — never fail the briefing for post-pipeline enqueue.
+            log.warning(
+                "Pipeline: post-pipeline enqueue failed for user %s: %s",
+                user_id,
+                exc,
+            )
 
         duration_ms = ctx.pipeline_duration_ms
         log.info(

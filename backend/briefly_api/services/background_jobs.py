@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable
 
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -55,6 +55,8 @@ async def enqueue_background_job(
                 )
                 .on_conflict_do_nothing(
                     index_elements=["job_type", "idempotency_key"],
+                    # Must match partial unique index uq_background_jobs_idempotency (migration 005).
+                    index_where=text("idempotency_key IS NOT NULL"),
                 )
                 .returning(BackgroundJob.id)
             )
