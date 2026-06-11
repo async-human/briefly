@@ -334,9 +334,14 @@
 
 .study-linear .compare-verdicts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-top: 48px;
+}
+
+.study-linear .compare-verdicts > .landing-reveal {
+  min-width: 0;
+  height: 100%;
 }
 
 .study-linear .compare-verdict {
@@ -620,6 +625,10 @@
   .study-linear .compare-section {
     padding-top: 64px;
     padding-bottom: 64px;
+  }
+
+  .study-linear .compare-verdicts {
+    grid-template-columns: 1fr;
   }
 
   .study-linear .sources-strip.landing-band-base {
