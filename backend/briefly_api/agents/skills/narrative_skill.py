@@ -67,6 +67,22 @@ class NarrativeSkill:
             f"Apply style_presets.md for summary and why_it_matters_to_you only.\n\n"
         )
 
+    @staticmethod
+    def _language_instructions(brief_language: str) -> str:
+        language = (brief_language or "en").strip().lower()
+        if language == "hi":
+            return (
+                "LANGUAGE (mandatory): brief_language is hi.\n"
+                "- Write summary and why_it_matters_to_you in natural Hindi using Devanagari script.\n"
+                "- Translate any English pre_computed_* hints into Hindi — do NOT copy them verbatim in English.\n"
+                "- headline MUST stay in English exactly as the source title (do not translate headlines).\n"
+                "- memory_reference and confidence_signal may be Hindi or short English proper nouns.\n"
+            )
+        return (
+            "LANGUAGE: brief_language is en. Write summary and why_it_matters_to_you in English.\n"
+            "Headlines stay in English.\n"
+        )
+
     def build_cached_prefix(
         self,
         profile_summary: str,
@@ -95,6 +111,9 @@ class NarrativeSkill:
         items: list[RawItem],
         enrichment_cache: dict[str, dict],
         ctx: PipelineContext,
+        *,
+        brief_style: str = "analyst",
+        brief_language: str = "en",
     ) -> str:
         """
         Build the variable items section.  Includes pre-computed enrichment
@@ -137,18 +156,23 @@ class NarrativeSkill:
 
             slim.append(entry)
 
+        style = (brief_style or "analyst").strip().lower()
+        lang_block = self._language_instructions(brief_language)
         instructions = (
-            f"Write a personalized morning briefing. For each item:\n"
+            f"Write a personalized morning briefing. brief_style={style}.\n"
+            f"{lang_block}\n"
+            f"For each item:\n"
             f"- section: MUST equal the item's pre-assigned digest_section exactly "
             f"({SECTION_WHATS_NEW} or {SECTION_HIGHLY_RELEVANT})\n"
-            f"- headline: sharp, specific, active voice (see voice_and_style.md)\n"
-            f"- summary: 2 sentences max, factual\n"
-            f"- why_it_matters_to_you: 1-2 sentences, use pre_computed fields if provided\n"
+            f"- headline: use the source title in English — do not translate\n"
+            f"- summary: 2 sentences max, factual — follow LANGUAGE rules above\n"
+            f"- why_it_matters_to_you: 1-2 sentences — follow LANGUAGE rules; "
+            f"adapt pre_computed hints to the target language\n"
             f"- source_name, source_url: required\n"
-            f"- memory_reference: use pre_computed_connection or pre_computed_thread_update if set\n"
+            f"- memory_reference: adapt pre_computed_connection or thread_update to target language\n"
             f"- confidence_signal: 1 short phrase or empty\n"
             f"- evolution_note: only if behavioral fingerprint shows genuine divergence\n\n"
-            f"Also generate: subject_line, preview_text, skipped_note.\n\n"
+            f"Also generate: subject_line, preview_text, skipped_note (in the same language as summary).\n\n"
             f"Return JSON per output_schema.md."
         )
 

@@ -85,10 +85,19 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         cached_prefix += _build_wrapped_section(getattr(ctx, "wrapped_snapshot", None))
 
         # Variable section — items + pre-computed enrichment
+        brief_language = (ctx.user.profile.get("brief_language") or "en").strip().lower()
+        brief_style = (ctx.user.profile.get("brief_style") or "analyst").strip().lower()
+        log.info(
+            "BriefingWriterAgent: brief_style=%s brief_language=%s",
+            brief_style,
+            brief_language,
+        )
         items_section = skill.build_items_section(
             items=items_to_write,
             enrichment_cache=ctx.enrichment_cache,
             ctx=ctx,
+            brief_style=brief_style,
+            brief_language=brief_language,
         )
 
         from briefly_api.config import get_settings
@@ -219,9 +228,15 @@ def _profile_anchor_terms(profile: dict) -> set[str]:
     return terms
 
 
+def _has_devanagari(text: str) -> bool:
+    return any("\u0900" <= ch <= "\u097F" for ch in (text or ""))
+
+
 def _why_is_personalized(text: str, profile: dict) -> bool:
     if not text or len(text.strip()) < 24:
         return False
+    if (profile.get("brief_language") or "en") == "hi" and _has_devanagari(text):
+        return True
     lower = text.lower()
     generic = (
         "worth a read",
@@ -306,6 +321,9 @@ def _ensure_personalized_why(
     items: list[RawItem],
     profile: dict,
 ) -> list[DigestItemDraft]:
+    # Hindi briefs: never replace writer output with English fallback copy.
+    if (profile.get("brief_language") or "en") == "hi":
+        return drafts
     item_by_id = {i.id: i for i in items}
     for draft in drafts:
         if _why_is_personalized(draft.why_it_matters, profile):

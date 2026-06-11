@@ -115,3 +115,40 @@ def test_ensure_personalized_why_rewrites_generic():
     ]
     fixed = _ensure_personalized_why(drafts, [item], profile)
     assert "engineer" in fixed[0].why_it_matters.lower() or "llm" in fixed[0].why_it_matters.lower()
+
+
+def test_hindi_why_is_personalized_with_devanagari():
+    profile = {"brief_language": "hi", "role": "founder", "interests": []}
+    hindi = "यह आपकी रुचि के स्टार्टअप फंडिंग से जुड़ा है — आज पढ़ने लायक।"
+    assert _why_is_personalized(hindi, profile) is True
+
+
+def test_ensure_personalized_why_skips_english_fallback_for_hindi():
+    profile = {"brief_language": "hi", "role": "founder", "interests": []}
+    item = RawItem(
+        id="x",
+        source_id="s",
+        source_type="rss",
+        source_name="HN",
+        title="T",
+        url=None,
+        author=None,
+        published_at=None,
+        clean_text="c",
+        content_hash="h",
+    )
+    hindi_why = "यह आपके AI टूल्स के रुचि से मेल खाता है।"
+    drafts = [
+        DigestItemDraft(
+            content_id="x",
+            position=1,
+            section="What's new",
+            headline="T",
+            summary="S",
+            why_it_matters=hindi_why,
+            source_name="HN",
+            source_url=None,
+        )
+    ]
+    fixed = _ensure_personalized_why(drafts, [item], profile)
+    assert fixed[0].why_it_matters == hindi_why
