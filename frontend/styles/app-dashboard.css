@@ -4119,10 +4119,11 @@ a.saved-capture-title:hover {
 }
 
 .app-shell .dash-insights-drawer {
-  margin-top: 0.5rem;
-  border: 1px solid var(--app-border);
+  margin-top: 0.75rem;
+  border: 1px solid oklch(72% 0.04 75 / 0.55);
   border-radius: var(--app-radius);
-  background: var(--app-paper-2);
+  background: var(--app-surface);
+  box-shadow: 0 1px 0 rgba(28, 24, 18, 0.04);
   overflow: hidden;
 }
 
@@ -4132,9 +4133,13 @@ a.saved-capture-title:hover {
   justify-content: space-between;
   gap: 1rem;
   width: 100%;
-  padding: 1rem 1.125rem;
+  padding: 1.125rem 1.25rem;
   border: none;
-  background: transparent;
+  background: linear-gradient(
+    180deg,
+    oklch(97.5% 0.018 75) 0%,
+    oklch(96% 0.012 75) 100%
+  );
   text-align: left;
   cursor: pointer;
   color: inherit;
@@ -4142,7 +4147,11 @@ a.saved-capture-title:hover {
 }
 
 .app-shell .dash-insights-drawer-trigger:hover {
-  background: rgba(255, 255, 255, 0.45);
+  background: linear-gradient(
+    180deg,
+    oklch(97% 0.022 75) 0%,
+    oklch(95.5% 0.015 75) 100%
+  );
 }
 
 .app-shell .dash-insights-drawer-trigger-main {
@@ -4161,10 +4170,12 @@ a.saved-capture-title:hover {
 }
 
 .app-shell .dash-insights-drawer-title {
-  font-size: 0.9375rem;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 1.125rem;
   font-weight: 600;
   color: var(--app-ink);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
 }
 
 .app-shell .dash-insights-drawer-chips {
@@ -4186,16 +4197,26 @@ a.saved-capture-title:hover {
 
 .app-shell .dash-insights-drawer-chevron {
   flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 8px;
   font-size: 1.125rem;
   line-height: 1;
-  color: var(--app-muted);
-  margin-top: 0.15rem;
+  color: var(--app-ink-secondary);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--app-border);
+  margin-top: 0.1rem;
 }
 
 .app-shell .dash-insights-drawer-body {
-  padding: 0 1.125rem 1.125rem;
-  border-top: 1px solid var(--app-border);
-  background: var(--app-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid oklch(72% 0.04 75 / 0.45);
+  background: oklch(98.2% 0.008 75);
 }
 
 .app-shell .dash-insights-drawer-intro {
@@ -4223,55 +4244,78 @@ a.saved-capture-title:hover {
 }
 
 .app-shell .dash-accordion {
-  border: 1px solid var(--app-border);
+  border: 1px solid oklch(74% 0.04 75 / 0.5);
   border-radius: var(--app-radius-sm);
-  background: var(--app-paper-2);
+  background: var(--app-surface);
+  box-shadow: 0 1px 2px rgba(28, 24, 18, 0.04);
   overflow: hidden;
 }
 
-.app-shell .dash-accordion + .dash-accordion {
-  margin-top: 0.5rem;
+.app-shell .dash-accordion--open {
+  border-color: oklch(68% 0.07 75 / 0.55);
+  box-shadow: 0 2px 8px rgba(28, 24, 18, 0.06);
 }
 
 .app-shell .dash-accordion-trigger {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.85rem;
   width: 100%;
-  padding: 0.7rem 0.85rem;
+  padding: 0.85rem 1rem;
   border: none;
-  background: transparent;
+  background: var(--app-surface);
   text-align: left;
   cursor: pointer;
   color: inherit;
   font: inherit;
 }
 
-.app-shell .dash-accordion-trigger:hover {
-  background: rgba(255, 255, 255, 0.5);
+.app-shell .dash-accordion--open .dash-accordion-trigger {
+  background: linear-gradient(
+    180deg,
+    oklch(97.8% 0.02 75) 0%,
+    oklch(96.5% 0.015 75) 100%
+  );
+  border-bottom: 1px solid oklch(72% 0.04 75 / 0.45);
 }
 
-.app-shell .dash-accordion-trigger-text {
+.app-shell .dash-accordion-trigger:hover {
+  background: oklch(97.5% 0.015 75);
+}
+
+.app-shell .dash-accordion--open .dash-accordion-trigger:hover {
+  background: linear-gradient(
+    180deg,
+    oklch(97.5% 0.022 75) 0%,
+    oklch(96% 0.018 75) 100%
+  );
+}
+
+.app-shell .dash-accordion-trigger-main {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.2rem;
   min-width: 0;
 }
 
 .app-shell .dash-accordion-title {
-  font-size: 0.8125rem;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--app-ink);
+  letter-spacing: -0.015em;
+  line-height: 1.25;
 }
 
 .app-shell .dash-accordion-desc {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
   color: var(--app-muted);
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 28rem;
 }
 
 .app-shell .dash-accordion-meta {
@@ -4279,6 +4323,7 @@ a.saved-capture-title:hover {
   align-items: center;
   gap: 0.45rem;
   flex-shrink: 0;
+  padding-top: 0.35rem;
 }
 
 .app-shell .dash-accordion-badge {
@@ -4286,37 +4331,87 @@ a.saved-capture-title:hover {
   font-weight: 600;
   padding: 0.15rem 0.4rem;
   border-radius: 100px;
-  background: var(--app-surface);
+  background: var(--app-paper-2);
   border: 1px solid var(--app-border);
   color: var(--app-muted);
 }
 
+.app-shell .dash-accordion-chevron-wrap {
+  display: grid;
+  place-items: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 7px;
+  background: var(--app-paper-2);
+  border: 1px solid var(--app-border);
+  color: var(--app-ink-secondary);
+}
+
 .app-shell .dash-accordion-chevron {
-  font-size: 1rem;
-  color: var(--app-muted);
+  transition: transform 0.18s ease;
+}
+
+.app-shell .dash-accordion-chevron--open {
+  transform: rotate(180deg);
 }
 
 .app-shell .dash-accordion-panel {
-  padding: 0.75rem 0.85rem 0.85rem;
-  border-top: 1px solid var(--app-border);
-  background: var(--app-surface);
+  background: oklch(99% 0.006 75);
 }
 
-.app-shell .dash-accordion-panel .intelligence-briefing-panel {
+.app-shell .dash-accordion-content {
+  padding: 0.85rem 1rem 1.125rem;
+  border-top: 3px solid oklch(88% 0.04 75 / 0.65);
+}
+
+.app-shell .dash-accordion-content-label {
+  margin: 0 0 0.65rem;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+.app-shell .dash-accordion-content .intelligence-briefing-panel {
   margin-bottom: 0;
   gap: 0;
 }
 
-.app-shell .dash-accordion-panel .intel-card--embedded {
+.app-shell .dash-accordion-content .intel-card--embedded {
   padding: 0;
   border: none;
   box-shadow: none;
   background: transparent;
 }
 
-.app-shell .dash-accordion-panel .story-threads-rail,
-.app-shell .dash-accordion-panel .serendipity-panel,
-.app-shell .dash-accordion-panel .weekly-report-card {
+/* Subordinate headings inside accordion body (vs section title above) */
+.app-shell .dash-accordion-content .wif-synthesis {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.app-shell .dash-accordion-content .intel-wrapped-section-title,
+.app-shell .dash-accordion-content .wif-section-head .intel-wrapped-section-title {
+  font-size: 0.5625rem;
+  color: oklch(50% 0.05 75);
+}
+
+.app-shell .dash-accordion-content .wif-hero {
+  margin-bottom: 0.65rem;
+  padding: 0.75rem 0.85rem;
+  background: var(--app-surface);
+  border: 1px solid oklch(78% 0.04 75 / 0.35);
+}
+
+.app-shell .dash-accordion-content .wif-topic-row,
+.app-shell .dash-accordion-content .intel-shift-card {
+  background: var(--app-surface);
+}
+
+.app-shell .dash-accordion-content .story-threads-rail,
+.app-shell .dash-accordion-content .serendipity-panel,
+.app-shell .dash-accordion-content .weekly-report-card {
   margin-bottom: 0;
 }
 
