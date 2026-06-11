@@ -525,7 +525,8 @@ body[data-landing-theme="light"].study-linear-body {
   text-align: center;
 }
 
-/* ── Footer — Bond-style wordmark + link columns ──────────────────────── */
+/* Hallmark · footer · editorial wordmark · tone: austere · anchor: ink */
+/* ── Footer — wordmark + link columns ─────────────────────────────────── */
 
 .study-linear footer.footer-linear {
   display: block;
@@ -533,42 +534,49 @@ body[data-landing-theme="light"].study-linear-body {
   border-top: none;
   padding: 0;
   overflow: hidden;
-  background: var(--footer-bg, oklch(15% 0.014 75));
+  background:
+    radial-gradient(ellipse 90% 55% at 50% 0%, var(--footer-glow) 0%, transparent 58%),
+    var(--footer-bg, oklch(15% 0.014 75));
   color: var(--footer-text, oklch(68% 0.01 75));
 }
 
 .study-linear[data-theme="light"] footer.footer-linear {
-  --footer-bg: oklch(14% 0.016 75);
-  --footer-text: oklch(70% 0.012 75);
-  --footer-link: oklch(78% 0.01 75);
-  --footer-link-hover: oklch(96% 0.004 75);
-  --footer-stroke: oklch(100% 0 0 / 0.12);
-  --footer-title: oklch(52% 0.01 75);
+  --footer-bg: oklch(13% 0.018 75);
+  --footer-text: oklch(62% 0.012 75);
+  --footer-link: oklch(76% 0.01 75);
+  --footer-link-hover: oklch(97% 0.004 75);
+  --footer-stroke: oklch(100% 0 0 / 0.28);
+  --footer-fill: oklch(100% 0 0 / 0.045);
+  --footer-title: oklch(48% 0.01 75);
+  --footer-rule: oklch(100% 0 0 / 0.08);
+  --footer-glow: oklch(52% 0.16 275 / 0.07);
 }
 
 .study-linear[data-theme="dark"] footer.footer-linear {
-  --footer-bg: oklch(9% 0.012 270);
-  --footer-text: oklch(58% 0.014 270);
-  --footer-link: oklch(68% 0.012 270);
-  --footer-link-hover: oklch(94% 0.006 270);
-  --footer-stroke: oklch(100% 0 0 / 0.07);
-  --footer-title: oklch(48% 0.014 270);
+  --footer-bg: oklch(8% 0.014 270);
+  --footer-text: oklch(54% 0.014 270);
+  --footer-link: oklch(66% 0.012 270);
+  --footer-link-hover: oklch(95% 0.006 270);
+  --footer-stroke: oklch(100% 0 0 / 0.2);
+  --footer-fill: oklch(100% 0 0 / 0.035);
+  --footer-title: oklch(44% 0.014 270);
+  --footer-rule: oklch(100% 0 0 / 0.06);
+  --footer-glow: oklch(58% 0.18 275 / 0.09);
 }
 
 .study-linear .footer-linear-inner {
   max-width: 1120px;
   margin: 0 auto;
   width: 100%;
-  padding: 48px 64px 0;
+  padding: 56px 64px 0;
 }
 
 .study-linear .footer-linear-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 2.5rem 3rem;
-  flex-wrap: wrap;
-  padding-bottom: 2.5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 2rem 4rem;
+  padding-bottom: 2.75rem;
 }
 
 .study-linear .footer-linear-copy {
@@ -624,26 +632,32 @@ body[data-landing-theme="light"].study-linear-body {
   color: var(--footer-link-hover);
 }
 
+.study-linear .footer-linear-wordmark-wrap {
+  position: relative;
+  padding: 2rem 0 0.35rem;
+  border-top: 1px solid var(--footer-rule);
+}
+
 .study-linear .footer-linear-wordmark {
   position: relative;
-  margin: 0 -0.04em -0.12em;
-  padding: 0 0 0.02em;
-  line-height: 0.82;
+  margin: 0 -0.055em -0.2em -0.02em;
+  line-height: 0.78;
   pointer-events: none;
   user-select: none;
 }
 
 .study-linear .footer-linear-wordmark span {
   display: block;
+  width: 100%;
   font-family: var(--serif);
-  font-size: clamp(4.5rem, 17.5vw, 11.5rem);
+  font-size: clamp(5.5rem, 26vw, 18.5rem);
   font-weight: 600;
   font-style: normal;
-  letter-spacing: -0.045em;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  -webkit-text-stroke: 1px var(--footer-stroke);
-  text-stroke: 1px var(--footer-stroke);
+  letter-spacing: -0.048em;
+  color: var(--footer-fill);
+  -webkit-text-fill-color: var(--footer-fill);
+  -webkit-text-stroke: 1.5px var(--footer-stroke);
+  paint-order: stroke fill;
   overflow-wrap: anywhere;
   min-width: 0;
 }
@@ -709,11 +723,11 @@ body[data-landing-theme="light"].study-linear-body {
   }
 
   .study-linear .footer-linear-inner {
-    padding: 40px 24px 0;
+    padding: 44px 24px 0;
   }
 
   .study-linear .footer-linear-top {
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
     gap: 2rem;
     padding-bottom: 2rem;
   }
@@ -722,8 +736,13 @@ body[data-landing-theme="light"].study-linear-body {
     gap: 2rem 2.5rem;
   }
 
+  .study-linear .footer-linear-wordmark-wrap {
+    padding-top: 1.5rem;
+  }
+
   .study-linear .footer-linear-wordmark span {
-    font-size: clamp(3.25rem, 22vw, 6.5rem);
+    font-size: clamp(4.25rem, 28vw, 9rem);
+    -webkit-text-stroke-width: 1.25px;
   }
 }
 

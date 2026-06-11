@@ -47,8 +47,10 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="footer-linear-wordmark" aria-hidden>
-          <span>Briefly</span>
+        <div className="footer-linear-wordmark-wrap">
+          <div className="footer-linear-wordmark" aria-hidden>
+            <span>Briefly</span>
+          </div>
         </div>
       </div>
     </footer>
