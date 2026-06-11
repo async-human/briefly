@@ -1,5 +1,7 @@
 "use client";
 
+import "@/styles/read-page.css";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -142,16 +144,15 @@ function ReadingCard({
   const articleUrl = isReadableArticleUrl(item.source_url) ? item.source_url : null;
 
   return (
-    <div className={`read-stage${mode === "deep" ? " read-stage--deep" : ""}`}>
+    <article className={`read-article${mode === "deep" ? " read-article--deep" : ""}`}>
 
-      {/* ── Meta row ── */}
-      <motion.div
-        className="read-meta"
+      <motion.header
+        className="read-article-top"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3, ease: EASE }}
       >
-        <div className="read-meta-left">
+        <div className="read-meta-source-row">
           <SourceIcon
             name={item.source_name ?? undefined}
             url={item.source_url ?? undefined}
@@ -170,20 +171,7 @@ function ReadingCard({
             <span className="read-meta-coverage">{coverageNote}</span>
           )}
         </div>
-        <div className="read-meta-actions">
-          {item.content_id ? (
-            <>
-              <Link
-                href={askAboutContent(item.content_id, item.id, item.headline)}
-                className="read-ask-link read-ask-link-primary"
-              >
-                Ask about this
-              </Link>
-              <Link href={graphItemUrl(item.content_id)} className="read-graph-link">
-                Graph
-              </Link>
-            </>
-          ) : null}
+        <div className="read-meta-toolbar" aria-label="Article actions">
           <button
             type="button"
             className="read-ask-link"
@@ -209,7 +197,7 @@ function ReadingCard({
             <SaveIcon filled={isSaved} />
           </button>
         </div>
-      </motion.div>
+      </motion.header>
 
       {/* ── Memory callout — shown on the item Briefly remembers (both modes) ── */}
       {showMemoryCallout && memoryText && (
@@ -252,8 +240,8 @@ function ReadingCard({
       </div>
 
       {/* ── Why this matters ── */}
-      <motion.div
-        className="read-why-v2"
+      <motion.aside
+        className="read-insight read-why-v2"
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: hasDeepSummary ? 0.18 : 0.12, ease: EASE }}
@@ -329,7 +317,7 @@ function ReadingCard({
             </motion.div>
           ) : null}
         </div>
-      </motion.div>
+      </motion.aside>
 
       {/* ── Evolution note (deep mode) — surfaces when behavior diverges from stated interests ── */}
       {item.evolution_note && mode === "deep" && (
@@ -356,7 +344,7 @@ function ReadingCard({
           <p className="read-memory-v2-text">{firstMemory.description}</p>
         </motion.div>
       )}
-    </div>
+    </article>
   );
 }
 
@@ -562,7 +550,7 @@ function ProgressDots({ current, total }: { current: number; total: number }) {
 // ── Skeleton loading screen ───────────────────────────────────────────────────
 function ReadingSkeleton() {
   return (
-    <div className="read-shell">
+    <div className="read-shell read-shell-v2">
       <header className="read-header">
         <div className="rsk rsk-back" />
         <div className="read-progress-bar" />
@@ -574,16 +562,15 @@ function ReadingSkeleton() {
 
       <main className="read-card-area">
         <div className="read-card-wrapper">
-          <div className="read-stage">
-            {/* Meta row */}
-            <div className="read-meta">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <article className="read-article read-stage read-skeleton-stage">
+            <header className="read-article-top">
+              <div className="read-meta-source-row">
                 <div className="rsk" style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0 }} />
                 <div className="rsk rsk-chip" />
                 <div className="rsk rsk-chip-sm" />
               </div>
               <div className="rsk rsk-save" />
-            </div>
+            </header>
 
             {/* Headline zone */}
             <div className="read-headline-zone">
@@ -603,7 +590,7 @@ function ReadingSkeleton() {
               <div className="rsk rsk-why-line" />
               <div className="rsk rsk-why-line" style={{ width: "74%" }} />
             </div>
-          </div>
+          </article>
         </div>
       </main>
 
@@ -778,7 +765,7 @@ export default function ReadingPage() {
 
   if (!digest || items.length === 0) {
     return (
-      <div className="read-shell read-shell-center">
+      <div className="read-shell read-shell-v2 read-shell-center">
         <p style={{ color: "var(--text-secondary)", marginBottom: 16 }}>
           No items to read.
         </p>
@@ -791,7 +778,7 @@ export default function ReadingPage() {
 
   if (isComplete) {
     return (
-      <div className="read-shell">
+      <div className="read-shell read-shell-v2">
         <CompletionScreen
           digest={digest}
           savedCount={saved.size}
@@ -811,7 +798,7 @@ export default function ReadingPage() {
   const progress = (currentIndex / items.length) * 100;
 
   return (
-    <div className="read-shell">
+    <div className="read-shell read-shell-v2">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <header className="read-header">
