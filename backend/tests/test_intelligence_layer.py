@@ -15,15 +15,48 @@ def test_build_wrapped_snapshot_monday():
     fp = SimpleNamespace(
         mind_shifts=[{"topic": "AI agents", "direction": "rising", "evidence": "3 saves"}],
         current_focus="Building with LLMs",
-        high_engagement_topics=[{"topic": "startups", "follow_up_count": 4}],
+        high_engagement_topics=[{"topic": "startups", "follow_up_count": 4, "recent_pos": 2, "click_count": 4}],
         coverage_gaps=["crypto"],
         weekly_snapshot={"depth_trend": "deepening", "weekly_synthesis": "You went deep on agents."},
     )
     snap = build_wrapped_snapshot(fp, run_date="2026-06-08")
     assert snap is not None
-    assert snap["current_focus"] == "Building with LLMs"
     assert snap["depth_trend"] == "deepening"
-    assert len(snap["mind_shifts"]) == 1
+    assert snap["depth_label"] == "Reading deeper than usual"
+    assert len(snap["shifts"]) == 1
+    assert snap["shifts"][0]["label"] == "Picking up"
+    assert snap["active_topics"][0]["topic"] == "startups"
+    assert "this week" in snap["active_topics"][0]["detail"]
+
+
+def test_build_wrapped_snapshot_excludes_declining_from_active_topics():
+    fp = SimpleNamespace(
+        mind_shifts=[
+            {
+                "topic": "newsletters",
+                "direction": "declining",
+                "evidence": "clicked 3x in last month but 0x in last week",
+            }
+        ],
+        current_focus="",
+        high_engagement_topics=[
+            {
+                "topic": "newsletters",
+                "follow_up_count": 0,
+                "engagement_rate": 1.0,
+                "recent_pos": 0,
+                "click_count": 3,
+            }
+        ],
+        coverage_gaps=[],
+        weekly_snapshot={},
+    )
+    snap = build_wrapped_snapshot(fp, run_date="2026-06-08", force=True)
+    assert snap is not None
+    assert len(snap["shifts"]) == 1
+    assert snap["shifts"][0]["label"] == "Cooling off"
+    assert snap["active_topics"] == []
+    assert snap["high_engagement"] == []
 
 
 def test_detect_blind_spot_consensus_gap():

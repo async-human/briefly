@@ -22,13 +22,33 @@ export type BlindSpot = {
   counter_argument?: string | null;
 };
 
+export type WrappedShift = {
+  topic: string;
+  direction: string;
+  label?: string;
+  detail?: string;
+  evidence?: string;
+};
+
+export type WrappedTopic = {
+  topic: string;
+  detail?: string;
+};
+
 export type WrappedSnapshot = {
-  current_focus?: string;
+  lead?: string;
   depth_trend?: string;
+  depth_label?: string;
   weekly_synthesis?: string;
-  mind_shifts?: { topic: string; direction: string; evidence: string }[];
-  high_engagement?: { topic: string; detail: string }[];
-  emerging_threads?: string[] | { topic?: string }[];
+  shifts?: WrappedShift[];
+  active_topics?: WrappedTopic[];
+  emerging?: WrappedTopic[];
+  gaps?: WrappedTopic[];
+  // Legacy fields
+  current_focus?: string;
+  mind_shifts?: WrappedShift[];
+  high_engagement?: WrappedTopic[];
+  emerging_threads?: string[] | WrappedTopic[];
   coverage_gaps?: string[];
 };
 
@@ -65,14 +85,86 @@ function LensIcon() {
   );
 }
 
+function normalizeShifts(wrapped: WrappedSnapshot): WrappedShift[] {
+  const raw = wrapped.shifts ?? wrapped.mind_shifts ?? [];
+  return raw.map((s) => ({
+    topic: s.topic,
+    direction: s.direction,
+    label: s.label ?? s.direction,
+    detail: s.detail ?? s.evidence ?? "",
+  }));
+}
+
+function normalizeTopics(
+  primary: WrappedTopic[] | undefined,
+  legacy: WrappedTopic[] | undefined,
+): WrappedTopic[] {
+  return primary ?? legacy ?? [];
+}
+
+function normalizeEmerging(wrapped: WrappedSnapshot): WrappedTopic[] {
+  if (wrapped.emerging?.length) return wrapped.emerging;
+  const raw = wrapped.emerging_threads ?? [];
+  return raw
+    .map((entry) => {
+      if (typeof entry === "string") return { topic: entry, detail: "" };
+      return { topic: entry.topic ?? "", detail: entry.detail ?? "" };
+    })
+    .filter((e) => e.topic);
+}
+
+function normalizeGaps(wrapped: WrappedSnapshot): WrappedTopic[] {
+  if (wrapped.gaps?.length) return wrapped.gaps;
+  return (wrapped.coverage_gaps ?? []).map((topic) => ({
+    topic,
+    detail: "No matching stories in your brief lately",
+  }));
+}
+
+function depthTrendIcon(trend?: string) {
+  if (trend === "deepening") {
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <path d="M12 19V5M7 10l5-5 5 5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (trend === "shallowing") {
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <path d="M12 5v14M7 14l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M5 12h14" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function IntelligenceBriefingPanel({ calendar, wrapped, blindSpots = [] }: Props) {
   const meetings = calendar?.meetings ?? [];
   const hasCalendar = meetings.length > 0;
+
+  const shifts = wrapped ? normalizeShifts(wrapped) : [];
+  const activeTopics = wrapped ? normalizeTopics(wrapped.active_topics, wrapped.high_engagement) : [];
+  const emerging = wrapped ? normalizeEmerging(wrapped) : [];
+  const gaps = wrapped ? normalizeGaps(wrapped) : [];
+
+  const lead =
+    wrapped?.lead ||
+    (wrapped?.current_focus ? `This week: ${wrapped.current_focus}` : "");
+
   const hasWrapped = Boolean(
     wrapped &&
-      (wrapped.current_focus ||
-        (wrapped.mind_shifts && wrapped.mind_shifts.length > 0) ||
-        wrapped.weekly_synthesis),
+      (lead ||
+        shifts.length > 0 ||
+        activeTopics.length > 0 ||
+        emerging.length > 0 ||
+        gaps.length > 0 ||
+        wrapped.weekly_synthesis ||
+        wrapped.depth_label),
   );
   const hasBlindSpots = blindSpots.length > 0;
 
@@ -131,39 +223,83 @@ export function IntelligenceBriefingPanel({ calendar, wrapped, blindSpots = [] }
             </span>
             <div className="intel-card-head-text">
               <h3 className="intel-card-title">Your week in focus</h3>
-              <p className="intel-card-desc">How your attention shifted — the memory loop at work</p>
+              <p className="intel-card-desc">Where your attention went — and where it&apos;s shifting</p>
             </div>
           </header>
 
-          {wrapped.current_focus && (
-            <blockquote className="intel-wrapped-focus">{wrapped.current_focus}</blockquote>
-          )}
-
-          {wrapped.mind_shifts && wrapped.mind_shifts.length > 0 && (
-            <ul className="intel-shift-list">
-              {wrapped.mind_shifts.map((s) => (
-                <li key={`${s.topic}-${s.direction}`} className="intel-shift-card">
-                  <div className="intel-shift-top">
-                    <span className="intel-shift-topic">{s.topic}</span>
-                    <span className={`intel-shift-badge intel-shift-badge--${s.direction || "stable"}`}>
-                      {s.direction}
-                    </span>
-                  </div>
-                  {s.evidence && <p className="intel-shift-evidence">{s.evidence}</p>}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {wrapped.high_engagement && wrapped.high_engagement.length > 0 && (
-            <div className="intel-wrapped-chips">
-              {wrapped.high_engagement.map((h) => (
-                <span key={h.topic} className="intel-wrapped-chip">
-                  {h.topic}
-                  <span className="intel-wrapped-chip-sub">{h.detail}</span>
+          {(lead || wrapped.depth_label) && (
+            <div className="intel-wrapped-hero">
+              {lead && <p className="intel-wrapped-lead">{lead}</p>}
+              {wrapped.depth_label && (
+                <span className={`intel-depth-pill intel-depth-pill--${wrapped.depth_trend || "stable"}`}>
+                  <span className="intel-depth-pill-icon" aria-hidden>
+                    {depthTrendIcon(wrapped.depth_trend)}
+                  </span>
+                  {wrapped.depth_label}
                 </span>
-              ))}
+              )}
             </div>
+          )}
+
+          {activeTopics.length > 0 && (
+            <section className="intel-wrapped-section">
+              <h4 className="intel-wrapped-section-title">Active this week</h4>
+              <ul className="intel-topic-list">
+                {activeTopics.map((t) => (
+                  <li key={t.topic} className="intel-topic-row intel-topic-row--active">
+                    <span className="intel-topic-name">{t.topic}</span>
+                    {t.detail && <span className="intel-topic-meta">{t.detail}</span>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {shifts.length > 0 && (
+            <section className="intel-wrapped-section">
+              <h4 className="intel-wrapped-section-title">Shifting</h4>
+              <ul className="intel-shift-list">
+                {shifts.map((s) => (
+                  <li key={`${s.topic}-${s.direction}`} className="intel-shift-card">
+                    <div className="intel-shift-top">
+                      <span className="intel-shift-topic">{s.topic}</span>
+                      <span className={`intel-shift-badge intel-shift-badge--${s.direction || "stable"}`}>
+                        {s.label}
+                      </span>
+                    </div>
+                    {s.detail && <p className="intel-shift-evidence">{s.detail}</p>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {emerging.length > 0 && (
+            <section className="intel-wrapped-section">
+              <h4 className="intel-wrapped-section-title">Worth watching</h4>
+              <ul className="intel-topic-list">
+                {emerging.map((t) => (
+                  <li key={t.topic} className="intel-topic-row intel-topic-row--emerging">
+                    <span className="intel-topic-name">{t.topic}</span>
+                    {t.detail && <span className="intel-topic-meta">{t.detail}</span>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {gaps.length > 0 && (
+            <section className="intel-wrapped-section">
+              <h4 className="intel-wrapped-section-title">Thin coverage</h4>
+              <ul className="intel-topic-list">
+                {gaps.map((g) => (
+                  <li key={g.topic} className="intel-topic-row intel-topic-row--gap">
+                    <span className="intel-topic-name">{g.topic}</span>
+                    {g.detail && <span className="intel-topic-meta">{g.detail}</span>}
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
 
           {wrapped.weekly_synthesis && (

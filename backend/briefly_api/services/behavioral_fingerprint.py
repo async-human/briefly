@@ -129,6 +129,8 @@ async def build_and_save(session, user_id: str) -> BehavioralFingerprint | None:
                 "engagement_rate": round(engagement_rate, 2),
                 "follow_up_count": follow_up_count,
                 "avg_depth": round(avg_depth, 1),
+                "recent_pos": stats.get("recent_pos", 0),
+                "click_count": stats["pos"],
             })
 
     high_engagement.sort(key=lambda x: (x["follow_up_count"], x["engagement_rate"]), reverse=True)

@@ -261,12 +261,18 @@ export type Digest = {
       meeting_count?: number;
     };
     wrapped?: {
-      current_focus?: string;
+      lead?: string;
       depth_trend?: string;
+      depth_label?: string;
       weekly_synthesis?: string;
+      shifts?: { topic: string; direction: string; label?: string; detail?: string }[];
+      active_topics?: { topic: string; detail?: string }[];
+      emerging?: { topic: string; detail?: string }[];
+      gaps?: { topic: string; detail?: string }[];
+      current_focus?: string;
       mind_shifts?: { topic: string; direction: string; evidence: string }[];
       high_engagement?: { topic: string; detail: string }[];
-      emerging_threads?: string[] | { topic?: string }[];
+      emerging_threads?: string[] | { topic?: string; detail?: string }[];
       coverage_gaps?: string[];
     };
     blind_spots?: {

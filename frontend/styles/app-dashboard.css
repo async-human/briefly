@@ -4547,17 +4547,123 @@ a.saved-capture-title:hover {
   background: oklch(52% 0.1 230);
 }
 
-.app-shell .intel-wrapped-focus {
-  margin: 0 0 0.85rem;
-  padding: 0.75rem 0.9rem;
-  border-left: 3px solid oklch(62% 0.1 75);
-  border-radius: 0 var(--app-radius-sm) var(--app-radius-sm) 0;
-  background: rgba(255, 255, 255, 0.55);
+.app-shell .intel-wrapped-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 0.9rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: var(--app-radius-sm);
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid oklch(78% 0.05 75 / 0.32);
+}
+
+.app-shell .intel-wrapped-lead {
+  margin: 0;
   font-size: 0.9375rem;
   font-weight: 500;
-  font-style: normal;
-  line-height: 1.55;
+  line-height: 1.5;
   color: var(--app-ink);
+  letter-spacing: -0.01em;
+}
+
+.app-shell .intel-depth-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  align-self: flex-start;
+  padding: 0.25rem 0.55rem;
+  border-radius: 100px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--app-muted);
+  background: var(--app-paper-2);
+  border: 1px solid var(--app-border);
+}
+
+.app-shell .intel-depth-pill-icon {
+  display: grid;
+  place-items: center;
+  opacity: 0.75;
+}
+
+.app-shell .intel-depth-pill--deepening {
+  color: oklch(40% 0.1 145);
+  background: oklch(95% 0.035 145);
+  border-color: oklch(72% 0.07 145 / 0.4);
+}
+
+.app-shell .intel-depth-pill--shallowing {
+  color: oklch(42% 0.08 55);
+  background: oklch(96% 0.03 55);
+  border-color: oklch(74% 0.06 55 / 0.4);
+}
+
+.app-shell .intel-wrapped-section {
+  margin-top: 0.65rem;
+}
+
+.app-shell .intel-wrapped-section + .intel-wrapped-section {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid oklch(78% 0.04 75 / 0.28);
+}
+
+.app-shell .intel-wrapped-section-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: oklch(48% 0.06 75);
+}
+
+.app-shell .intel-topic-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.app-shell .intel-topic-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--app-radius-sm);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid oklch(78% 0.04 75 / 0.28);
+}
+
+.app-shell .intel-topic-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--app-ink);
+  text-transform: capitalize;
+}
+
+.app-shell .intel-topic-meta {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--app-muted);
+  text-align: right;
+  line-height: 1.35;
+}
+
+.app-shell .intel-topic-row--emerging {
+  border-color: oklch(72% 0.07 145 / 0.35);
+  background: oklch(97% 0.02 145 / 0.45);
+}
+
+.app-shell .intel-topic-row--gap {
+  border-style: dashed;
+  border-color: oklch(74% 0.04 75 / 0.45);
+  background: transparent;
 }
 
 .app-shell .intel-shift-card {
@@ -4612,35 +4718,9 @@ a.saved-capture-title:hover {
   line-height: 1.45;
 }
 
-.app-shell .intel-wrapped-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.75rem;
-}
-
-.app-shell .intel-wrapped-chip {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  padding: 0.4rem 0.7rem;
-  border-radius: 100px;
-  border: 1px solid oklch(78% 0.05 75 / 0.35);
-  background: rgba(255, 255, 255, 0.65);
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--app-ink);
-}
-
-.app-shell .intel-wrapped-chip-sub {
-  font-size: 0.625rem;
-  font-weight: 500;
-  color: var(--app-muted);
-}
-
 .app-shell .intel-wrapped-synthesis {
-  margin: 0.75rem 0 0;
-  padding-top: 0.75rem;
+  margin: 0.85rem 0 0;
+  padding-top: 0.85rem;
   border-top: 1px dashed oklch(78% 0.04 75 / 0.45);
   font-size: 0.8125rem;
   line-height: 1.55;
