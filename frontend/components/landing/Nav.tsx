@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: "#why", label: "Why" },
   { href: "#features", label: "Features" },
   { href: "#roadmap", label: "Roadmap" },
+  { href: "#compare", label: "Compare" },
   { href: "#pricing", label: "Pricing" },
 ];
 

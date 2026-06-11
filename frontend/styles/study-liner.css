@@ -213,12 +213,202 @@
   text-decoration: underline;
 }
 
+/* ── Compare section ──────────────────────────────────────────────────── */
+
+.study-linear .compare-section {
+  padding: 88px 64px;
+  border-bottom: 0.5px solid var(--liner-divider);
+}
+
+.study-linear .compare-inner {
+  max-width: 1060px;
+  margin: 0 auto;
+}
+
+.study-linear .compare-header {
+  margin-bottom: 48px;
+}
+
+.study-linear .compare-lede {
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.study-linear .compare-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 0.5px solid var(--liner-divider);
+  border-radius: 14px;
+  background: var(--band-card, var(--surface));
+}
+
+.study-linear .compare-table {
+  width: 100%;
+  min-width: 840px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.study-linear .compare-table th,
+.study-linear .compare-table td {
+  padding: 14px 16px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 0.5px solid var(--liner-divider);
+}
+
+.study-linear .compare-table tbody tr:last-child th,
+.study-linear .compare-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.study-linear .compare-table thead th {
+  font-size: 0.84rem;
+  font-weight: 600;
+  background: var(--band-card-mid, var(--surface));
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.study-linear .compare-table thead th:first-child {
+  border-top-left-radius: 13px;
+}
+
+.study-linear .compare-table thead th:last-child {
+  border-top-right-radius: 13px;
+}
+
+.study-linear .compare-feature-col {
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  font-weight: 500;
+  min-width: 190px;
+  max-width: 220px;
+}
+
+.study-linear .compare-col-briefly,
+.study-linear .compare-cell-briefly {
+  background: color-mix(in oklch, var(--accent) 7%, var(--band-card, var(--surface)));
+}
+
+.study-linear .compare-table thead .compare-col-briefly {
+  color: var(--accent);
+}
+
+.study-linear .compare-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 0.5px solid color-mix(in oklch, var(--accent) 45%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: 8px;
+  vertical-align: 2px;
+}
+
+.study-linear .compare-cell-yes {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.study-linear .compare-cell-no {
+  color: color-mix(in oklch, var(--text) 38%, transparent);
+}
+
+.study-linear .compare-cell-note {
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.study-linear .compare-cell-strong {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.study-linear .compare-verdicts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 48px;
+}
+
+.study-linear .compare-verdict {
+  border: 0.5px solid var(--liner-divider);
+  border-radius: 14px;
+  padding: 22px 22px 20px;
+  background: var(--band-card, var(--surface));
+  height: 100%;
+}
+
+.study-linear .compare-verdict-title {
+  font-family: var(--serif);
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 14px;
+  color: var(--text);
+}
+
+.study-linear .compare-verdict p {
+  font-size: 0.875rem;
+  line-height: 1.55;
+  margin: 0 0 12px;
+}
+
+.study-linear .compare-verdict p:last-child {
+  margin-bottom: 0;
+}
+
+.study-linear .compare-verdict-them {
+  color: var(--text-secondary);
+}
+
+.study-linear .compare-verdict-them b,
+.study-linear .compare-verdict-us b {
+  font-weight: 600;
+}
+
+.study-linear .compare-verdict-us b {
+  color: var(--accent);
+}
+
+.study-linear .compare-cta-row {
+  margin-top: 56px;
+  text-align: center;
+}
+
+.study-linear .compare-cta {
+  display: inline-block;
+}
+
+.study-linear .compare-cta-sub {
+  margin: 12px 0 0;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+}
+
+.study-linear .compare-foot {
+  margin: 40px auto 0;
+  max-width: 760px;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
 /* Override globals amber dividers when liner bands active */
 .study-linear .landing-section,
 .study-linear .livedemo-section,
 .study-linear .features-v2,
 .study-linear .principles-section,
 .study-linear .roadmap-section,
+.study-linear .compare-section,
 .study-linear .pricing-v2,
 .study-linear .cta-linear {
   border-top: none !important;
@@ -421,9 +611,15 @@
   .study-linear .features-v2,
   .study-linear .principles-section,
   .study-linear .roadmap-section,
+  .study-linear .compare-section,
   .study-linear .pricing-v2 {
     padding-left: 24px;
     padding-right: 24px;
+  }
+
+  .study-linear .compare-section {
+    padding-top: 64px;
+    padding-bottom: 64px;
   }
 
   .study-linear .sources-strip.landing-band-base {
