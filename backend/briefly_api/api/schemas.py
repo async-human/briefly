@@ -27,6 +27,8 @@ class ProfileOut(BaseModel):
     never_show: list[str] = Field(default_factory=list)
     recent_insight: str | None = None
     onboarding_completed: bool = False
+    brief_style: str = "analyst"
+    brief_language: str = "en"
 
     model_config = {"from_attributes": True}
 
@@ -39,6 +41,12 @@ class ProfileUpdate(BaseModel):
     interests: list[str] | None = None       # topic strings → stored as {topic, weight, source}
     never_show: list[str] | None = None      # hard-filter strings
     recent_insight: str | None = None        # a piece of content that changed their thinking
+    brief_style: Literal["analyst", "scan", "plain"] | None = None
+    brief_language: Literal["en", "hi"] | None = None
+
+
+class NeverShowIn(BaseModel):
+    topic: str
 
 
 class OnboardingStatusOut(BaseModel):
@@ -138,8 +146,22 @@ class DigestItemOut(BaseModel):
     contradiction_flag: bool = False
     contradiction_explanation: str | None = None
     was_disliked: bool = False
+    score_breakdown: dict = Field(default_factory=dict)
+    why_this_summary: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class DigestStatsOut(BaseModel):
+    closing_line: str
+    dedup_line: str | None = None
+    items_ingested: int = 0
+    items_shown: int = 0
+    source_count: int = 0
+    merged_story_count: int = 0
+    monthly_time_saved_minutes: int = 0
+    monthly_time_saved_label: str = "~0m"
+    avg_read_minutes: float = 1.5
 
 
 class FeedbackOut(BaseModel):
@@ -173,6 +195,7 @@ class DigestOut(BaseModel):
     created_at: datetime
     items: list[DigestItemOut] = Field(default_factory=list)
     meta: dict = Field(default_factory=dict)  # skipped items, pipeline extras
+    stats: DigestStatsOut | None = None
 
     model_config = {"from_attributes": True}
 

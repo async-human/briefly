@@ -13,6 +13,7 @@ from briefly_api.api.schemas import (
     GmailStatusOut,
     CalendarConnectOut,
     CalendarStatusOut,
+    NeverShowIn,
     OnboardingCompleteOut,
     OnboardingStatusOut,
     ProfileUpdate,
@@ -141,8 +142,34 @@ async def update_onboarding_profile(
         profile.never_show = [t.strip().lower() for t in body.never_show if t.strip()]
     if body.recent_insight is not None:
         profile.recent_insight = body.recent_insight.strip() or None
+    if body.brief_style is not None:
+        profile.brief_style = body.brief_style
+    if body.brief_language is not None:
+        profile.brief_language = body.brief_language
     await db.commit()
     return await _build_onboarding_status(user, db)
+
+
+@router.post("/profile/never-show")
+async def add_never_show_topic(
+    body: NeverShowIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    if not user.profile:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
+    topic = body.topic.strip().lower()
+    if not topic:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Topic is required.")
+    never = list(user.profile.never_show or [])
+    if topic not in never:
+        never.append(topic)
+        user.profile.never_show = never
+        from sqlalchemy.orm.attributes import flag_modified
+
+        flag_modified(user.profile, "never_show")
+    await db.commit()
+    return {"never_show": user.profile.never_show}
 
 
 @router.post("/onboarding/complete", response_model=OnboardingCompleteOut)

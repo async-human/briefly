@@ -127,6 +127,23 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
         )
         ctx.db_session = session
 
+        from sqlalchemy import select as sa_select_profile
+
+        from briefly_api.db.models import UserProfile
+        from briefly_api.services.learned_adjustments import (
+            build_confirmation_lines,
+            get_profile_meta,
+            ready_for_confirmation,
+        )
+
+        profile_result = await session.execute(
+            sa_select_profile(UserProfile).where(UserProfile.user_id == user_id)
+        )
+        profile_row = profile_result.scalar_one_or_none()
+        if profile_row:
+            meta = get_profile_meta(profile_row)
+            ctx.adjustments_to_confirm = ready_for_confirmation(meta)
+
         # ── Run agents in sequence ────────────────────────────────────────────
         # Each agent is wrapped in try/except — pipeline degrades gracefully
 
@@ -138,6 +155,12 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
         ctx = await _run_agent("ContentCleanerAgent",    cleaner.run,          ctx)
         ctx = await _run_agent("DeduplicationAgent",     deduplication.run,    ctx)
         ctx = await _run_agent("RelevanceAgent",         relevance.run,        ctx)
+
+        if ctx.adjustments_to_confirm:
+            ctx.adjustment_confirmation_lines = build_confirmation_lines(
+                ctx.adjustments_to_confirm,
+                ctx.adjustment_drop_counts,
+            )
 
         if not ctx.has_enough_items:
             log.warning("Pipeline: insufficient relevant items for user %s (%d)", user_id, len(ctx.scored_items))
@@ -207,6 +230,12 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
             }
 
         digest_id = await _persist_digest(session, ctx)
+
+        if profile_row and ctx.adjustments_to_confirm:
+            from briefly_api.services.learned_adjustments import confirm_in_digest
+
+            confirm_in_digest(profile_row, digest_id, ctx.adjustment_drop_counts)
+            await session.commit()
 
         # Mark ingested pool rows as processed (only rows that exist in raw_contents)
         from sqlalchemy import select as sa_select
@@ -560,6 +589,7 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
         total_items_ingested=ctx.total_ingested,
         total_items_scored=ctx.total_after_relevance,
         total_items_shown=ctx.total_shown,
+        sources_included=list({i.source_id for i in ctx.raw_items if i.source_id}),
         pipeline_duration_ms=ctx.pipeline_duration_ms,
         resend_message_id=resend_message_id,
         meta={
@@ -573,6 +603,8 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
             "calendar": getattr(ctx, "calendar_briefing", None),
             "blind_spots": list(getattr(ctx, "blind_spots", []) or []),
             "wrapped": getattr(ctx, "wrapped_snapshot", None),
+            "adjustment_confirmation": list(ctx.adjustment_confirmation_lines or []),
+            "closing_stats": getattr(ctx, "closing_stats", None),
         },
     )
     session.add(digest)
@@ -618,6 +650,7 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
             evolution_note=draft.evolution_note or None,
             contradiction_flag=bool(draft.contradiction_flag),
             contradiction_explanation=draft.contradiction_explanation or None,
+            score_breakdown=dict(draft.score_breakdown or {}),
         )
         session.add(item)
 

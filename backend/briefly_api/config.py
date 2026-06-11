@@ -108,6 +108,8 @@ class Settings(BaseSettings):
     reddit_user_agent: str = "briefly-digest/1.0"
 
     # ── Pipeline config ───────────────────────────────────────────────────────
+    # Heuristic: minutes to read one filtered item (closing stats card; labeled est.)
+    avg_read_minutes: float = 1.5
     # Relevance: items below this score are dropped from digest pool
     relevance_threshold: float = 0.55
     # Dedup: items with cosine similarity above this are merged

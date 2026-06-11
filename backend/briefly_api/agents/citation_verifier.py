@@ -13,6 +13,11 @@ import logging
 from collections import defaultdict
 
 from briefly_api.agents.context import DigestItemDraft, PipelineContext
+from briefly_api.services.digest_stats import (
+    build_closing_stats,
+    monthly_stats,
+    render_closing_html,
+)
 from briefly_api.services.outcome_metrics import build_outcome_meta
 
 log = logging.getLogger(__name__)
@@ -33,8 +38,20 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     ctx.verification_warnings = warnings
     ctx.__dict__["outcome"] = build_outcome_meta(ctx)
 
+    monthly = {}
+    if ctx.db_session:
+        monthly = await monthly_stats(ctx.db_session, ctx.user.user_id)
+    source_fallback = len({i.source_id for i in ctx.raw_items}) if ctx.raw_items else 0
+    closing = build_closing_stats(
+        _DigestStatsProxy(ctx),
+        ctx.digest_items,
+        monthly,
+        source_count_fallback=source_fallback,
+    )
+    ctx.__dict__["closing_stats"] = closing
+
     # Render HTML email body
-    ctx.html_body = _render_html(ctx)
+    ctx.html_body = await _render_html(ctx)
     ctx.web_body = _render_web(ctx)
 
     log.info(
@@ -42,6 +59,15 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         len(ctx.digest_items), len(warnings),
     )
     return ctx
+
+
+class _DigestStatsProxy:
+    """Minimal digest-like object for closing stats during pipeline render."""
+
+    def __init__(self, ctx: PipelineContext) -> None:
+        self.total_items_ingested = ctx.total_ingested
+        self.total_items_shown = ctx.total_shown or len(ctx.digest_items)
+        self.sources_included = list({i.source_id for i in ctx.raw_items if i.source_id})
 
 
 def _build_skipped_log(ctx: PipelineContext) -> dict:
@@ -64,7 +90,7 @@ def _build_skipped_log(ctx: PipelineContext) -> dict:
     }
 
 
-def _render_html(ctx: PipelineContext) -> str:
+async def _render_html(ctx: PipelineContext) -> str:
     """Render the digest as an inline-CSS HTML email."""
     user_name = ctx.user.name or "there"
     outcome = ctx.__dict__.get("outcome") or {}
@@ -79,22 +105,17 @@ def _render_html(ctx: PipelineContext) -> str:
         )[:3]
     rest_items = [i for i in ctx.digest_items if i not in top_items]
 
-    saved = outcome.get("saved_minutes")
-    filtered = outcome.get("filtered_count", 0)
-    words = outcome.get("words_scanned", 0)
-    skipped_note = (outcome.get("skipped_note") or "").strip()
-    outcome_banner = ""
-    if saved or words:
-        detail = skipped_note or (
-            f"Briefly read {outcome.get('items_scanned', ctx.total_ingested)} stories "
-            f"({words:,} words) and filtered {filtered} you can safely skip."
+    adjustment_html = ""
+    for line in list(ctx.adjustment_confirmation_lines or [])[:2]:
+        adjustment_html += (
+            f'<p style="margin:0 0 10px;font-size:14px;color:#444;line-height:1.55;">'
+            f'<strong style="color:#5b47e0;">Briefly learned:</strong> {_esc(line)}</p>'
         )
-        outcome_banner = f"""
-          <div style="margin:0 0 28px 0;padding:16px 18px;background:#f4f1ff;border-radius:10px;border-left:4px solid #5b47e0;">
-            <p style="margin:0;font-size:14px;color:#444;line-height:1.55;">
-              <strong style="color:#5b47e0;">~{saved} min saved</strong> — {detail}
-            </p>
-          </div>"""
+    if adjustment_html:
+        adjustment_html = (
+            f'<div style="margin:0 0 24px 0;padding:14px 16px;background:#faf8f5;'
+            f'border-radius:10px;border-left:4px solid #c9b896;">{adjustment_html}</div>'
+        )
 
     serendipity = list(getattr(ctx, "serendipity_connections", []) or [])
     serendipity_html = ""
@@ -125,33 +146,8 @@ def _render_html(ctx: PipelineContext) -> str:
     for section_name, items in sections.items():
         sections_html += _render_items_block(items, section_name)
 
-    sl = _build_skipped_log(ctx)
-    n_skipped = sl["n_ingested"] - sl["n_shown"]
-    rows = ""
-    if sl["n_dupes"]:
-        rows += _skip_row(str(sl["n_dupes"]), "duplicate stories merged into the items above")
-    if sl["n_low_relevance"]:
-        rows += _skip_row(str(sl["n_low_relevance"]), "didn’t match your interests closely enough")
-    if sl["n_never_show"]:
-        label_str = (", ".join(_esc(t) for t in sl["never_show_labels"]) + " &amp; others") if sl["never_show_labels"] else "your topics"
-        rows += _skip_row(str(sl["n_never_show"]), f"blocked by your never-show filters ({label_str})")
-    if sl["n_crowded_out"]:
-        rows += _skip_row(str(sl["n_crowded_out"]), "crowded out — already featured enough from that source today")
-
-    skipped_html = f"""
-          <div style="margin-top:40px;padding-top:20px;border-top:1px solid #f0ede8;">
-            <p style="font-size:10px;font-weight:700;color:#ccc;letter-spacing:1.8px;
-                      text-transform:uppercase;margin:0 0 12px 0;">Briefly&rsquo;s reading log</p>
-            <p style="font-size:13px;color:#aaa;margin:0 0 14px 0;line-height:1.6;">
-              Scanned <strong style="color:#888;">{sl["n_ingested"]}</strong> stories across
-              <strong style="color:#888;">{sl["n_sources"]}</strong> sources today &mdash;
-              showed you <strong style="color:#888;">{sl["n_shown"]}</strong>.
-              {"The other <strong style=’color:#888;’>" + str(n_skipped) + "</strong>:" if n_skipped else ""}
-            </p>
-            <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
-              {rows}
-            </table>
-          </div>"""
+    closing = ctx.__dict__.get("closing_stats") or {}
+    closing_html = render_closing_html(closing) if closing else ""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -175,10 +171,10 @@ def _render_html(ctx: PipelineContext) -> str:
         <!-- Body -->
         <tr><td style="padding:32px;">
           <p style="margin:0 0 24px 0;font-size:15px;color:#555;">Hey {_esc(user_name)},</p>
-          {outcome_banner}
+          {adjustment_html}
           {serendipity_html}
           {sections_html}
-          {skipped_html}
+          {closing_html}
         </td></tr>
 
         <!-- Footer -->
@@ -203,7 +199,7 @@ def _render_items_block(items: list[DigestItemDraft], section_name: str) -> str:
         if item.duplicate_count > 1:
             dupe_note = (
                 f'<p style="font-size:12px;color:#888;margin:4px 0 0 0;">'
-                f"Also covered by {item.duplicate_count - 1} other source(s).</p>"
+                f"{item.duplicate_count} sources covered this — merged.</p>"
             )
         memory_note = ""
         if item.memory_reference:

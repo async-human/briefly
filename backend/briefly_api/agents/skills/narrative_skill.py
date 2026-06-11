@@ -46,6 +46,8 @@ _SYSTEM = (
     + _SKILL.reference("section_assignment.md")
     + "\n\n---\n\n"
     + _SKILL.reference("output_schema.md")
+    + "\n\n---\n\n"
+    + _SKILL.reference("style_presets.md")
 )
 
 
@@ -54,6 +56,16 @@ class NarrativeSkill:
     The enhanced briefing writer that uses pre-computed enrichment +
     behavioral fingerprint.  Called by BriefingWriterAgent.run().
     """
+
+    def build_style_block(self, *, brief_style: str, brief_language: str) -> str:
+        style = (brief_style or "analyst").strip().lower()
+        language = (brief_language or "en").strip().lower()
+        return (
+            f"## Style preset\n"
+            f"- brief_style: {style}\n"
+            f"- brief_language: {language}\n"
+            f"Apply style_presets.md for summary and why_it_matters_to_you only.\n\n"
+        )
 
     def build_cached_prefix(
         self,

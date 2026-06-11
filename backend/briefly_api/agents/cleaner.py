@@ -70,8 +70,29 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     return ctx
 
 
+_SPONSOR_BLOCK_RE = re.compile(
+    r"(?is)"
+    r"(?:sponsored\s+by|paid\s+partnership|advertisement|ad\s+content|"
+    r"presented\s+by|in\s+partnership\s+with|#ad\b|#sponsored\b)"
+    r".{0,400}?(?:\n\n|$)"
+)
+
+
+def _strip_sponsor_blocks(text: str) -> str:
+    """Remove common newsletter sponsor sections (Substack, Beehiiv, etc.)."""
+    if not text:
+        return ""
+    cleaned = _SPONSOR_BLOCK_RE.sub("\n\n", text)
+    cleaned = re.sub(
+        r"(?im)^\s*(?:sponsored|advertisement|paid\s+post)\s*$",
+        "",
+        cleaned,
+    )
+    return cleaned
+
+
 def _normalize(text: str) -> str:
-    """Strip HTML tags and normalize whitespace."""
+    """Strip HTML tags, sponsor blocks, and normalize whitespace."""
     if not text:
         return ""
     # Remove HTML tags
@@ -85,6 +106,7 @@ def _normalize(text: str) -> str:
         .replace("&#39;", "'")
         .replace("&nbsp;", " ")
     )
+    text = _strip_sponsor_blocks(text)
     # Collapse whitespace
     text = re.sub(r"\s+", " ", text).strip()
     return text

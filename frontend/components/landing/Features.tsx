@@ -43,8 +43,8 @@ const features: Feature[] = [
   },
   {
     num: "04",
-    title: "Confident, not comprehensive",
-    desc: "Reads 50 items, shows 10. Then tells you exactly what it skipped and why.",
+    title: "Sponsor-free and deduplicated",
+    desc: "Strips newsletter ads, merges duplicate coverage across sources, and reads 50 items to show you 10 — then closes the brief with exactly what it did.",
     variant: "filter",
     size: "small",
   },

@@ -227,7 +227,9 @@ async def get_latest_digest(
     digest = result.scalar_one_or_none()
     if not digest:
         return None
-    return DigestOut.model_validate(digest)
+    from briefly_api.services.digest_response import digest_to_out
+
+    return await digest_to_out(digest, db)
 
 
 @router.get("/digests/today", response_model=DigestOut | None)
@@ -257,7 +259,9 @@ async def get_today_digest(
     item_count = (digest.total_items_shown or 0) or len(digest.items or [])
     if item_count <= 0:
         return None
-    return DigestOut.model_validate(digest)
+    from briefly_api.services.digest_response import digest_to_out
+
+    return await digest_to_out(digest, db)
 
 
 @router.get("/digests/{digest_id}", response_model=DigestOut)
@@ -274,7 +278,9 @@ async def get_digest(
     digest = result.scalar_one_or_none()
     if not digest:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Digest not found")
-    return DigestOut.model_validate(digest)
+    from briefly_api.services.digest_response import digest_to_out
+
+    return await digest_to_out(digest, db)
 
 
 @router.get("/digests/{digest_id}/feedback")
@@ -606,7 +612,9 @@ async def get_briefing_generation_status(
         if digest:
             item_count = (digest.total_items_shown or 0) or len(digest.items or [])
             if item_count > 0:
-                digest_out = DigestOut.model_validate(digest)
+                from briefly_api.services.digest_response import digest_to_out
+
+                digest_out = await digest_to_out(digest, db)
             else:
                 now = datetime.now(timezone.utc).isoformat()
                 gen = {
@@ -668,9 +676,11 @@ async def generate_digest_now(
     digest = existing.scalar_one_or_none()
     item_count = (digest.total_items_shown if digest else 0) or len(digest.items if digest else [])
     if digest and item_count > 0 and not (force or restart):
+        from briefly_api.services.digest_response import digest_to_out
+
         return GenerateDigestOut(
             status="complete",
-            digest=DigestOut.model_validate(digest),
+            digest=await digest_to_out(digest, db),
             warnings=[],
         )
 
@@ -1350,6 +1360,16 @@ async def record_feedback(
     if item.source_name and user.profile:
         await _bump_source_weight(
             user, item.source_name, body.signal_type, db, source_id=source_id,
+        )
+
+    if body.signal_type in ("liked", "saved", "disliked", "skipped") and user.profile:
+        from briefly_api.services.learned_adjustments import queue_adjustment
+
+        queue_adjustment(
+            user.profile,
+            signal_type=body.signal_type,
+            source_name=item.source_name,
+            headline=item.headline,
         )
 
     await db.commit()

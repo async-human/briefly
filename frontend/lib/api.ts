@@ -112,6 +112,9 @@ export type User = {
   created_at: string;
 };
 
+export type BriefStyle = "analyst" | "scan" | "plain";
+export type BriefLanguage = "en" | "hi";
+
 export type Profile = {
   role: string | null;
   goal: string | null;
@@ -120,6 +123,8 @@ export type Profile = {
   interests: { topic: string; weight: number; source: string }[];
   never_show: string[];
   recent_insight: string | null;
+  brief_style?: BriefStyle;
+  brief_language?: BriefLanguage;
 };
 
 export type MeResponse = {
@@ -206,6 +211,20 @@ export type DigestItem = {
   contradiction_flag?: boolean;
   contradiction_explanation?: string | null;
   was_disliked?: boolean;
+  score_breakdown?: Record<string, unknown>;
+  why_this_summary?: string | null;
+};
+
+export type DigestStats = {
+  closing_line: string;
+  dedup_line?: string | null;
+  items_ingested: number;
+  items_shown: number;
+  source_count: number;
+  merged_story_count: number;
+  monthly_time_saved_minutes: number;
+  monthly_time_saved_label: string;
+  avg_read_minutes: number;
 };
 
 export type SerendipityConnection = {
@@ -308,7 +327,10 @@ export type Digest = {
   total_items_shown: number;
   created_at: string;
   items: DigestItem[];
+  stats?: DigestStats | null;
   meta: {
+    adjustment_confirmation?: string[];
+    closing_stats?: DigestStats;
     skipped?: SkippedItem[];      // backward compat: truly filtered items
     blocked?: SkippedItem[];      // explicitly rejected: never_show, low_relevance
     more_today?: BonusItem[];     // good fit but cut for daily length cap
@@ -824,10 +846,17 @@ export const api = {
     interests?: string[];
     never_show?: string[];
     recent_insight?: string;
+    brief_style?: BriefStyle;
+    brief_language?: BriefLanguage;
   }) =>
     request<OnboardingStatus>("/api/v1/onboarding/profile", {
       method: "PATCH",
       body: JSON.stringify(body),
+    }),
+  addNeverShowTopic: (topic: string) =>
+    request<{ never_show: string[] }>("/api/v1/profile/never-show", {
+      method: "POST",
+      body: JSON.stringify({ topic }),
     }),
   completeOnboarding: () =>
     request<{ onboarding_completed: boolean }>("/api/v1/onboarding/complete", {

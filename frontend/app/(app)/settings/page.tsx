@@ -147,6 +147,8 @@ export default function SettingsPage() {
   const [topics, setTopics] = useState<string[]>([]);
   const [neverShow, setNeverShow] = useState<string[]>([]);
   const [deliveryTime, setDeliveryTime] = useState("07:00");
+  const [briefStyle, setBriefStyle] = useState<"analyst" | "scan" | "plain">("analyst");
+  const [briefLanguage, setBriefLanguage] = useState<"en" | "hi">("en");
 
   // Per-section save state
   const [profileSaving, setProfileSaving] = useState(false);
@@ -157,6 +159,8 @@ export default function SettingsPage() {
   const [filtersSaved, setFiltersSaved] = useState(false);
   const [deliverySaving, setDeliverySaving] = useState(false);
   const [deliverySaved, setDeliverySaved] = useState(false);
+  const [styleSaving, setStyleSaving] = useState(false);
+  const [styleSaved, setStyleSaved] = useState(false);
   // Auto-clear "Saved" badge after 2s
   const savedTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   function flashSaved(setter: (v: boolean) => void) {
@@ -183,6 +187,8 @@ export default function SettingsPage() {
           setTopics(p.interests?.map((i) => i.topic).filter(Boolean) ?? []);
           setNeverShow(p.never_show ?? []);
           setDeliveryTime(p.digest_time ?? "07:00");
+          setBriefStyle(p.brief_style ?? "analyst");
+          setBriefLanguage(p.brief_language ?? "en");
         }
       })
       .catch(() => router.replace("/login"))
@@ -228,6 +234,17 @@ export default function SettingsPage() {
       });
       flashSaved(setDeliverySaved);
     } finally { setDeliverySaving(false); }
+  }
+
+  async function saveStyle() {
+    setStyleSaving(true);
+    try {
+      await api.updateOnboardingProfile({
+        brief_style: briefStyle,
+        brief_language: briefLanguage,
+      });
+      flashSaved(setStyleSaved);
+    } finally { setStyleSaving(false); }
   }
 
   return (
@@ -355,6 +372,46 @@ export default function SettingsPage() {
                   suggestions={NEVER_SHOW_SUGGESTIONS}
                   variant="danger"
                 />
+              </div>
+            </Section>
+
+            {/* ── Brief style ── */}
+            <Section
+              title="Brief style"
+              description="How summaries and “why it matters” are written. Headlines stay unchanged for link integrity."
+              onSave={saveStyle}
+              saving={styleSaving}
+              saved={styleSaved}
+            >
+              <div className="settings-field">
+                <label className="settings-field-label">Voice</label>
+                <div className="read-mode-toggle" role="group" aria-label="Brief style">
+                  {(["analyst", "scan", "plain"] as const).map((style) => (
+                    <button
+                      key={style}
+                      type="button"
+                      className={`read-mode-opt${briefStyle === style ? " active" : ""}`}
+                      onClick={() => setBriefStyle(style)}
+                    >
+                      {style === "analyst" ? "Analyst" : style === "scan" ? "Scan" : "Plain"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="settings-field">
+                <label className="settings-field-label">Language</label>
+                <div className="read-mode-toggle" role="group" aria-label="Brief language">
+                  {(["en", "hi"] as const).map((lang) => (
+                    <button
+                      key={lang}
+                      type="button"
+                      className={`read-mode-opt${briefLanguage === lang ? " active" : ""}`}
+                      onClick={() => setBriefLanguage(lang)}
+                    >
+                      {lang === "en" ? "English" : "Hindi"}
+                    </button>
+                  ))}
+                </div>
               </div>
             </Section>
 

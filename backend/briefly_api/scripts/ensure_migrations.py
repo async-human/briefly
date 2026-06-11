@@ -17,7 +17,7 @@ from briefly_api.db.engine import engine
 
 log = logging.getLogger(__name__)
 
-_HEAD = "008"
+_HEAD = "009"
 # Last revision whose objects are already created by Base.metadata.create_all()
 _STAMP_IF_LEGACY = "003"
 

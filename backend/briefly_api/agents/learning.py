@@ -185,12 +185,27 @@ async def _update_topic_clusters(ctx: PipelineContext, session) -> None:
             sig_row.source_name,
         )
 
+        matched_topics: list[str] = []
         for label_key, cluster in clusters.items():
-            if not topic_matches(item_text, label_key):
+            if topic_matches(item_text, label_key):
+                matched_topics.append(label_key)
                 old_strength = float(cluster.get("strength", 0.3))
                 cluster["strength"] = round(min(1.0, max(0.0, old_strength + delta)), 4)
                 cluster["last_reinforced_at"] = _now_iso()
                 cluster["item_count"] = cluster.get("item_count", 0) + 1
+
+        from briefly_api.services.feedback_learned import _topic_from_headline
+        from briefly_api.services.learned_adjustments import mark_applied_from_learning
+
+        headline_topic = _topic_from_headline(sig_row.headline or "")
+        if headline_topic:
+            mark_applied_from_learning(profile, topic_hint=headline_topic, source_name=None)
+        for topic in matched_topics:
+            mark_applied_from_learning(profile, topic_hint=topic, source_name=None)
+        if sig_row.source_name:
+            mark_applied_from_learning(
+                profile, topic_hint=None, source_name=sig_row.source_name,
+            )
 
         # Also create new clusters from positive signals if a match exists in declared interests
         if delta > 0:

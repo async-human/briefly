@@ -120,7 +120,7 @@ function DislikeIcon() {
 }
 
 function ReadingCard({
-  item, mode, isSaved, isDisliked, onSave, onDislike, index, showMemoryCallout,
+  item, mode, isSaved, isDisliked, onSave, onDislike, onLike, index, showMemoryCallout,
 }: {
   item: DigestItem;
   mode: Mode;
@@ -128,13 +128,15 @@ function ReadingCard({
   isDisliked: boolean;
   onSave: () => void;
   onDislike: () => void;
+  onLike: () => void;
   index: number;
   showMemoryCallout: boolean;
 }) {
+  const [whyOpen, setWhyOpen] = useState(false);
   const firstMemory = item.memory_connections?.[0];
   const memoryText = item.memory_reference || firstMemory?.description || null;
   const coverageNote = item.duplicate_count > 1
-    ? `Also covered by ${item.duplicate_count - 1} other source${item.duplicate_count > 2 ? "s" : ""}`
+    ? `${item.duplicate_count} sources covered this — merged`
     : null;
   const hasDeepSummary = mode === "deep" && !!item.summary;
   const articleUrl = isReadableArticleUrl(item.source_url) ? item.source_url : null;
@@ -182,7 +184,15 @@ function ReadingCard({
               </Link>
             </>
           ) : null}
-          {/* Dislike — one tap, "less like this" */}
+          <button
+            type="button"
+            className="read-ask-link"
+            onClick={onLike}
+            aria-label="More like this"
+            title="More like this"
+          >
+            More
+          </button>
           <button
             className={`read-dislike-btn${isDisliked ? " disliked" : ""}`}
             onClick={onDislike}
@@ -257,6 +267,24 @@ function ReadingCard({
         {/* Confidence signal — how Briefly knows this is relevant */}
         {item.confidence_signal && (
           <p className="read-confidence-signal">◈ {item.confidence_signal}</p>
+        )}
+
+        {(item.why_this_summary || item.score_breakdown) && (
+          <div className="read-why-disclosure">
+            <button
+              type="button"
+              className="read-why-disclosure-toggle"
+              onClick={() => setWhyOpen((v) => !v)}
+              aria-expanded={whyOpen}
+            >
+              Why am I seeing this? {whyOpen ? "▴" : "▾"}
+            </button>
+            {whyOpen && (
+              <p className="read-why-disclosure-body">
+                {item.why_this_summary || "Briefly scored this against your interests, sources, and recency."}
+              </p>
+            )}
+          </div>
         )}
 
         {item.contradiction_flag && item.contradiction_explanation && (
@@ -358,8 +386,16 @@ function CompletionScreen({
           <h1 className="read-complete-heading">You&apos;re up to speed.</h1>
           <p className="read-complete-sub">
             {savedCount > 0 ? `${savedCount} saved for later · ` : ""}
-            That&apos;s everything that matters today.
+            {digest.stats?.closing_line ?? "That's everything that matters today."}
           </p>
+          {digest.stats?.dedup_line && (
+            <p className="read-complete-dedup">{digest.stats.dedup_line}</p>
+          )}
+          {(digest.meta?.adjustment_confirmation?.length ?? 0) > 0 && (
+            <p className="read-complete-learned">
+              {digest.meta?.adjustment_confirmation?.[0]}
+            </p>
+          )}
         </div>
 
         {/* Stat boxes — stories / time / streak */}
@@ -709,6 +745,15 @@ export default function ReadingPage() {
       .catch(() => {});
   }, [currentIndex, items, digest, disliked, showLearned]);
 
+  const toggleLike = useCallback(() => {
+    if (!digest) return;
+    const item = items[currentIndex];
+    if (!item) return;
+    api.recordFeedback({ signal_type: "liked", digest_item_id: item.id, digest_id: digest.id })
+      .then((r) => showLearned(r.learned_message))
+      .catch(() => {});
+  }, [currentIndex, items, digest, showLearned]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handle = (e: KeyboardEvent) => {
@@ -860,6 +905,7 @@ export default function ReadingPage() {
               isDisliked={disliked.has(item.id)}
               onSave={toggleSave}
               onDislike={toggleDislike}
+              onLike={toggleLike}
               index={currentIndex}
               showMemoryCallout={currentIndex === memoryCalloutIndex}
             />

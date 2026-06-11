@@ -77,6 +77,10 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             story_threads_text=story_threads_text,
             memory_json=memory_json,
         )
+        cached_prefix += skill.build_style_block(
+            brief_style=ctx.user.profile.get("brief_style", "analyst"),
+            brief_language=ctx.user.profile.get("brief_language", "en"),
+        )
         cached_prefix += _build_calendar_section(getattr(ctx, "calendar_briefing", None))
         cached_prefix += _build_wrapped_section(getattr(ctx, "wrapped_snapshot", None))
 
@@ -112,11 +116,13 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             written_by_id = {w.get("content_id"): w for w in result.get("items", [])}
             drafts = _drafts_from_llm(items_to_write, written_by_id, ctx)
             drafts = _ensure_personalized_why(drafts, items_to_write, ctx.user.profile)
+            _attach_score_breakdowns(drafts, items_to_write)
         else:
             ctx.subject_line = f"Your briefing — {ctx.run_date}"
             ctx.preview_text = items_to_write[0].title[:120] if items_to_write else ""
             drafts = _fallback_drafts(items_to_write, ctx)
             drafts = _ensure_personalized_why(drafts, items_to_write, ctx.user.profile)
+            _attach_score_breakdowns(drafts, items_to_write)
 
     except Exception as e:
         log.exception("BriefingWriterAgent: failed — using fallback drafts")
@@ -125,6 +131,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         ctx.preview_text = items_to_write[0].title[:120] if items_to_write else ""
         drafts = _fallback_drafts(items_to_write, ctx)
         drafts = _ensure_personalized_why(drafts, items_to_write, ctx.user.profile)
+        _attach_score_breakdowns(drafts, items_to_write)
 
     ctx.digest_items = drafts
     ctx.total_shown = len(drafts)
@@ -170,6 +177,7 @@ def _fallback_drafts(items: list[RawItem], ctx: PipelineContext) -> list[DigestI
                 memory_connections=ctx.memory_connections.get(item.id, []),
                 relevance_score=item.relevance_score,
                 novelty_score=item.novelty_score,
+                score_breakdown=dict(item.score_breakdown or {}),
                 memory_reference=_fallback_memory_reference(item, ctx.memory_connections),
                 confidence_signal=_fallback_confidence_signal(item, ctx.user.profile),
             )
@@ -310,6 +318,17 @@ def _ensure_personalized_why(
     return drafts
 
 
+def _attach_score_breakdowns(
+    drafts: list[DigestItemDraft],
+    items: list[RawItem],
+) -> None:
+    by_id = {item.id: item for item in items}
+    for draft in drafts:
+        source = by_id.get(draft.content_id or "")
+        if source and source.score_breakdown:
+            draft.score_breakdown = dict(source.score_breakdown)
+
+
 def _drafts_from_llm(
     items_to_write: list[RawItem],
     written_by_id: dict,
@@ -340,6 +359,7 @@ def _drafts_from_llm(
             memory_connections=ctx.memory_connections.get(item.id, []),
             relevance_score=source_item.relevance_score if source_item else 0.0,
             novelty_score=source_item.novelty_score if source_item else 0.5,
+            score_breakdown=dict(source_item.score_breakdown or {}) if source_item else {},
             memory_reference=written.get("memory_reference", ""),
             confidence_signal=written.get("confidence_signal", ""),
             evolution_note=written.get("evolution_note", ""),

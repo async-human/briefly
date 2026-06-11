@@ -33,6 +33,7 @@ from briefly_api.services.personalization_score import (
     deprioritized_penalty,
     topic_alignment_score,
 )
+from briefly_api.services.score_explain import build_score_breakdown
 
 log = logging.getLogger(__name__)
 
@@ -119,6 +120,24 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         recency_score  = _recency_score(item)
         source_score   = _source_score(item, ctx)
         thread_boost   = _story_thread_boost(item, ctx.user.active_story_threads)
+        penalty        = deprioritized_penalty(item, interest_model)
+
+        item.score_breakdown = build_score_breakdown(
+            semantic=semantic_score,
+            topic=topic_score,
+            quality=quality_score,
+            recency=recency_score,
+            source=source_score,
+            thread_boost=thread_boost,
+            deprioritized_penalty=penalty,
+            weights={
+                "semantic": W_SEMANTIC,
+                "topic": W_TOPIC,
+                "quality": W_QUALITY,
+                "recency": W_RECENCY,
+                "source": W_SOURCE,
+            },
+        )
 
         # Weighted final score
         final = (
@@ -128,7 +147,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             W_RECENCY  * recency_score  +
             W_SOURCE   * source_score   +
             thread_boost
-            - deprioritized_penalty(item, interest_model)
+            - penalty
         )
         final = round(min(1.0, max(0.0, final)), 4)
         item.relevance_score = final
@@ -166,6 +185,13 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     ctx.scored_items = scored
     ctx.dropped_items = dropped
     ctx.total_after_relevance = len(scored)
+
+    if ctx.adjustments_to_confirm:
+        from briefly_api.services.learned_adjustments import count_drop_for_adjustments
+
+        ctx.adjustment_drop_counts = count_drop_for_adjustments(
+            dropped, ctx.adjustments_to_confirm,
+        )
 
     log.info(
         "RelevanceAgent: %d items passed, %d dropped (never-show=%d, low_relevance=%d)",

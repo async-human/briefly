@@ -6995,7 +6995,32 @@ footer {
   color: var(--text);
   margin: 0;
 }
-.read-complete-sub { font-size: 14px; color: var(--text-secondary); margin: 0; }
+.read-complete-sub { font-size: 14px; color: var(--text-secondary); margin: 0; line-height: 1.55; }
+.read-complete-dedup,
+.read-complete-learned {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+.read-complete-learned { color: var(--accent); }
+
+.read-why-disclosure { margin-top: 12px; }
+.read-why-disclosure-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.read-why-disclosure-body {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
 
 .read-stats-row {
   display: flex;

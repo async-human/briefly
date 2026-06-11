@@ -45,6 +45,7 @@ class RawItem:
     canonical_id: str | None = None     # ID of primary item if this is a dupe
     duplicate_sources: list[dict] = field(default_factory=list)  # other sources that covered this
     drop_reason: str = ""               # "never_show" | "low_relevance" | "crowded_out"
+    score_breakdown: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -63,6 +64,7 @@ class DigestItemDraft:
     memory_connections: list[dict] = field(default_factory=list)
     relevance_score: float = 0.0
     novelty_score: float = 0.0
+    score_breakdown: dict = field(default_factory=dict)
     # Compounding intelligence fields — populated by BriefingWriterAgent
     memory_reference: str = ""    # explicit past-reading connection ("You've been following this for 6 weeks...")
     confidence_signal: str = ""   # how strongly Briefly knows this matches the user ("94% match to top cluster")
@@ -168,6 +170,11 @@ class PipelineContext:
     # Cross-source blind spots + weekly wrapped snapshot (digest meta)
     blind_spots: list[dict] = field(default_factory=list)
     wrapped_snapshot: dict | None = None
+
+    # Learned-adjustment loop — pending confirmations for this digest
+    adjustments_to_confirm: list[dict] = field(default_factory=list)
+    adjustment_drop_counts: dict[str, int] = field(default_factory=dict)
+    adjustment_confirmation_lines: list[str] = field(default_factory=list)
 
     # Shared DB session — set by pipeline orchestrator, used by agents that need DB
     db_session: Any | None = field(default=None, repr=False)

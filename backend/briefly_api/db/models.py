@@ -179,6 +179,11 @@ class UserProfile(Base):
     discovered_articles: Mapped[list[dict]] = mapped_column(JSONB, default=list)
     discovered_articles_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Brief rendering preferences (Phase 1)
+    brief_style: Mapped[str] = mapped_column(String(32), default="analyst")
+    brief_language: Mapped[str] = mapped_column(String(8), default="en")
+    profile_meta: Mapped[dict] = mapped_column(JSONB, default=dict)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -430,6 +435,7 @@ class DigestItem(Base):
     # Scoring
     relevance_score: Mapped[float | None] = mapped_column(Float)
     novelty_score: Mapped[float | None] = mapped_column(Float)
+    score_breakdown: Mapped[dict] = mapped_column(JSONB, default=dict)
 
     # Compounding intelligence fields — written by BriefingWriterAgent
     memory_reference: Mapped[str | None] = mapped_column(Text)    # "You've been tracking this for 6 weeks..."

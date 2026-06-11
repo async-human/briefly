@@ -73,6 +73,9 @@ async def get_user_with_profile(session: AsyncSession, user_id: str) -> dict | N
             "discovered_articles_at": (
                 p.discovered_articles_at.isoformat() if p.discovered_articles_at else None
             ),
+            "brief_style": p.brief_style or "analyst",
+            "brief_language": p.brief_language or "en",
+            "profile_meta": dict(p.profile_meta or {}),
         }
 
     return data
