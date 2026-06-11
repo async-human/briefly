@@ -20,6 +20,7 @@ from briefly_api.api.schemas import (
     UrlCaptureOut,
     BrowserCaptureListOut,
 )
+from briefly_api.api.deps.rate_limit import rate_limit_transcribe_preview_dep
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
@@ -209,7 +210,11 @@ async def capture_page_url(
     )
 
 
-@router.post("/brain-dumps/transcribe-preview", response_model=BrainDumpTranscribeOut)
+@router.post(
+    "/brain-dumps/transcribe-preview",
+    response_model=BrainDumpTranscribeOut,
+    dependencies=[Depends(rate_limit_transcribe_preview_dep)],
+)
 async def transcribe_brain_dump_preview(
     file: UploadFile = File(...),
     user: User = Depends(require_pro),

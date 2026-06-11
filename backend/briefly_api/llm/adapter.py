@@ -26,6 +26,7 @@ from tenacity import (
 )
 
 from briefly_api.config import Settings, get_settings
+from briefly_api.services.llm_usage import record_llm_usage
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +67,8 @@ class LLMAdapter:
         max_tokens: int | None = None,
         json_mode: bool = False,
         cached_prefix: str | None = None,
+        user_id: str | None = None,
+        agent: str | None = None,
     ) -> LLMResponse:
         """
         Send a chat completion request to the configured provider.
@@ -95,16 +98,30 @@ class LLMAdapter:
         log.debug("LLM call: provider=%s model=%s msgs=%d", provider, _model, len(messages))
 
         if provider == "anthropic":
-            return await self._anthropic(
+            resp = await self._anthropic(
                 messages, system=system, model=_model, temperature=_temp,
                 max_tokens=_max, cached_prefix=cached_prefix,
             )
         elif provider == "openai":
-            return await self._openai(messages, system=system, model=_model, temperature=_temp, max_tokens=_max, json_mode=json_mode)
+            resp = await self._openai(
+                messages, system=system, model=_model, temperature=_temp,
+                max_tokens=_max, json_mode=json_mode,
+            )
         elif provider == "groq":
-            return await self._groq(messages, system=system, model=_model, temperature=_temp, max_tokens=_max)
+            resp = await self._groq(
+                messages, system=system, model=_model, temperature=_temp, max_tokens=_max,
+            )
         else:
             raise ValueError(f"Unknown LLM provider: {provider}")
+
+        await record_llm_usage(
+            user_id=user_id,
+            agent=agent,
+            model=resp.model or _model,
+            input_tokens=resp.input_tokens,
+            output_tokens=resp.output_tokens,
+        )
+        return resp
 
     async def stream_complete(
         self,
@@ -114,30 +131,48 @@ class LLMAdapter:
         model: str | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
+        user_id: str | None = None,
+        agent: str | None = None,
     ) -> AsyncIterator[str]:
         """Yield text deltas from the configured provider's streaming API."""
         provider = self._s.llm_provider
         _model = model or self._s.llm_model
         _temp = temperature if temperature is not None else self._s.llm_temperature
         _max = max_tokens or self._s.llm_max_tokens
+        usage = {"input_tokens": 0, "output_tokens": 0}
 
         if provider == "anthropic":
-            async for delta in self._anthropic_stream(
-                messages, system=system, model=_model, temperature=_temp, max_tokens=_max,
-            ):
-                yield delta
+            stream = self._anthropic_stream(
+                messages,
+                system=system,
+                model=_model,
+                temperature=_temp,
+                max_tokens=_max,
+                usage=usage,
+            )
         elif provider in ("openai", "groq"):
-            async for delta in self._openai_stream(
+            stream = self._openai_stream(
                 messages,
                 system=system,
                 model=_model,
                 temperature=_temp,
                 max_tokens=_max,
                 provider=provider,
-            ):
-                yield delta
+                usage=usage,
+            )
         else:
             raise ValueError(f"Unknown LLM provider: {provider}")
+
+        async for delta in stream:
+            yield delta
+
+        await record_llm_usage(
+            user_id=user_id,
+            agent=agent,
+            model=_model,
+            input_tokens=usage.get("input_tokens", 0),
+            output_tokens=usage.get("output_tokens", 0),
+        )
 
     async def complete_json(
         self,
@@ -147,14 +182,22 @@ class LLMAdapter:
         model: str | None = None,
         max_tokens: int | None = None,
         cached_prefix: str | None = None,
+        user_id: str | None = None,
+        agent: str | None = None,
     ) -> Any:
         """
         Convenience method: complete + parse JSON response.
         Strips markdown fences if present. Raises ValueError on parse failure.
         """
         resp = await self.complete(
-            messages, system=system, model=model, json_mode=True,
-            max_tokens=max_tokens, cached_prefix=cached_prefix,
+            messages,
+            system=system,
+            model=model,
+            json_mode=True,
+            max_tokens=max_tokens,
+            cached_prefix=cached_prefix,
+            user_id=user_id,
+            agent=agent,
         )
         raw = resp.content.strip()
         if raw.startswith("```"):
@@ -261,6 +304,7 @@ class LLMAdapter:
         model: str,
         temperature: float,
         max_tokens: int,
+        usage: dict[str, int] | None = None,
     ) -> AsyncIterator[str]:
         if not self._s.anthropic_api_key:
             raise RuntimeError("ANTHROPIC_API_KEY not set")
@@ -298,7 +342,16 @@ class LLMAdapter:
                         event = json.loads(raw)
                     except json.JSONDecodeError:
                         continue
-                    if event.get("type") == "content_block_delta":
+                    event_type = event.get("type")
+                    if event_type == "message_start":
+                        msg_usage = (event.get("message") or {}).get("usage") or {}
+                        if usage is not None and msg_usage:
+                            usage["input_tokens"] = msg_usage.get("input_tokens", 0)
+                    elif event_type == "message_delta":
+                        msg_usage = event.get("usage") or {}
+                        if usage is not None and msg_usage:
+                            usage["output_tokens"] = msg_usage.get("output_tokens", 0)
+                    elif event_type == "content_block_delta":
                         text = event.get("delta", {}).get("text")
                         if text:
                             yield text
@@ -369,6 +422,7 @@ class LLMAdapter:
         temperature: float,
         max_tokens: int,
         provider: str,
+        usage: dict[str, int] | None = None,
     ) -> AsyncIterator[str]:
         if provider == "openai":
             if not self._s.openai_api_key:
@@ -399,6 +453,8 @@ class LLMAdapter:
             "max_tokens": max_tokens,
             "stream": True,
         }
+        if provider == "openai" and usage is not None:
+            payload["stream_options"] = {"include_usage": True}
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             async with client.stream("POST", url, headers=headers, json=payload) as resp:
@@ -413,6 +469,10 @@ class LLMAdapter:
                         event = json.loads(raw)
                     except json.JSONDecodeError:
                         continue
+                    event_usage = event.get("usage")
+                    if usage is not None and event_usage:
+                        usage["input_tokens"] = event_usage.get("prompt_tokens", 0)
+                        usage["output_tokens"] = event_usage.get("completion_tokens", 0)
                     choices = event.get("choices") or []
                     if not choices:
                         continue

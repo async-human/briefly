@@ -93,7 +93,7 @@ async def process_text_dump(
     if len(raw) > 50_000:
         raise ValueError("Brain dump exceeds 50,000 character limit.")
 
-    structured = await _structure_dump(raw, settings)
+    structured = await _structure_dump(raw, settings, user_id=user_id)
     return await _persist_dump(
         db,
         user_id,
@@ -161,7 +161,7 @@ async def process_audio_dump(
     if not transcript.strip():
         raise ValueError("Could not transcribe any speech from the audio.")
 
-    structured = await _structure_dump(transcript, settings)
+    structured = await _structure_dump(transcript, settings, user_id=user_id)
     return await _persist_dump(
         db,
         user_id,
@@ -275,7 +275,12 @@ async def list_recent_dumps(
     return [_raw_to_result(row) for row in rows]
 
 
-async def _structure_dump(raw_text: str, settings: Settings | None) -> dict:
+async def _structure_dump(
+    raw_text: str,
+    settings: Settings | None,
+    *,
+    user_id: str | None = None,
+) -> dict:
     llm = get_llm_adapter(settings)
     try:
         resp = await llm.complete(
@@ -283,6 +288,8 @@ async def _structure_dump(raw_text: str, settings: Settings | None) -> dict:
             system=_STRUCTURE_SYSTEM,
             temperature=0.1,
             json_mode=True,
+            user_id=user_id,
+            agent="brain_dump",
         )
         raw = resp.content.strip()
         if raw.startswith("```"):

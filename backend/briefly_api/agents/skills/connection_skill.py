@@ -89,6 +89,7 @@ class ConnectionSkill:
                 system=system,
                 model=_SKILL.model or "claude-sonnet-4-5",
                 max_tokens=_SKILL.max_tokens or 200,
+                agent="connection",
             )
             return ConnectionResult(
                 connected=bool(result.get("connected")),

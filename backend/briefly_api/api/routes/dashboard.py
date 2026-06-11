@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
+from briefly_api.api.deps.rate_limit import rate_limit_digest_generate_dep
 from briefly_api.api.schemas import (
     BulkSourceCreate,
     BulkSourceOut,
@@ -637,7 +638,11 @@ async def get_briefing_generation_status(
     )
 
 
-@router.post("/digests/generate", response_model=GenerateDigestOut)
+@router.post(
+    "/digests/generate",
+    response_model=GenerateDigestOut,
+    dependencies=[Depends(rate_limit_digest_generate_dep)],
+)
 async def generate_digest_now(
     force: bool = False,
     restart: bool = False,

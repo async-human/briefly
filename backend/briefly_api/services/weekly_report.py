@@ -172,6 +172,8 @@ async def generate_weekly_report(
         report = await llm.complete_json(
             messages=[Message(role="user", content=prompt)],
             system=_WEEKLY_REPORT_SYSTEM,
+            user_id=user_id,
+            agent="weekly_report",
         )
     except Exception:
         log.exception("WeeklyReport: LLM call failed for user %s", user_id)

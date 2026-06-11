@@ -89,6 +89,7 @@ class WeeklyIntelligenceSkill:
                 system=_SYSTEM,
                 model=_SKILL.model or "claude-sonnet-4-5",
                 max_tokens=_SKILL.max_tokens or 600,
+                agent="weekly_intelligence",
             )
             return WeeklyIntelligenceResult(
                 mind_shifts=result.get("mind_shifts", []),

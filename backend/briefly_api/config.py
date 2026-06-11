@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     )
     background_job_poll_seconds: int = 10
 
+    # ── API rate limits (Redis-backed, per user per hour) ────────────────────
+    rate_limit_enabled: bool = True
+    rate_limit_ask_per_hour: int = 60
+    rate_limit_ask_stream_per_hour: int = 60
+    rate_limit_transcribe_preview_per_hour: int = 30
+    rate_limit_digest_generate_per_hour: int = 6
+
     # ── LLM — fully agnostic ─────────────────────────────────────────────────
     # Swap provider + model from .env with zero code changes
     llm_provider: Literal["anthropic", "openai", "groq"] = "openai"

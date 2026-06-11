@@ -35,6 +35,7 @@ from briefly_api.agents import (
 )
 from briefly_api.agents.context import PipelineContext, UserContext
 from briefly_api.config import get_settings
+from briefly_api.llm.usage_context import llm_usage_scope
 from briefly_api.db.engine import get_session_factory
 from briefly_api.db.models import (
     ContentEnrichmentCache,
@@ -69,11 +70,12 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
     log.info("Pipeline starting: user=%s date=%s", user_id, run_date)
 
     try:
-        async with get_session_factory()() as session:
-            return await asyncio.wait_for(
-                _run_pipeline(session, user_id, run_date, s),
-                timeout=300.0,  # match briefing worker budget (+ audio)
-            )
+        with llm_usage_scope(user_id=user_id):
+            async with get_session_factory()() as session:
+                return await asyncio.wait_for(
+                    _run_pipeline(session, user_id, run_date, s),
+                    timeout=300.0,  # match briefing worker budget (+ audio)
+                )
     except asyncio.TimeoutError:
         log.error("Pipeline timed out (>3 min) for user %s", user_id)
         return {"success": False, "error": "Briefing took too long to generate. Please try again — it will be faster next time."}

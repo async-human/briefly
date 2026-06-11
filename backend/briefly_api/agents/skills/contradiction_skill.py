@@ -73,6 +73,7 @@ class ContradictionSkill:
                 system=system,
                 model=_SKILL.model or "gpt-5-mini",
                 max_tokens=_SKILL.max_tokens or 120,
+                agent="contradiction",
             )
             return ContradictionResult(
                 contradicts=bool(result.get("contradicts")),

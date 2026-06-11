@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, status
+
+from briefly_api.api.deps.rate_limit import rate_limit_ask_dep, rate_limit_ask_stream_dep
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +30,7 @@ class AskIn(BaseModel):
     digest_item_id: str | None = Field(default=None, max_length=36)
 
 
-@router.post("/ask")
+@router.post("/ask", dependencies=[Depends(rate_limit_ask_dep)])
 async def post_ask(
     body: AskIn,
     user: User = Depends(get_current_user),
@@ -47,7 +49,7 @@ async def post_ask(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@router.post("/ask/stream")
+@router.post("/ask/stream", dependencies=[Depends(rate_limit_ask_stream_dep)])
 async def post_ask_stream(
     body: AskIn,
     user: User = Depends(get_current_user),

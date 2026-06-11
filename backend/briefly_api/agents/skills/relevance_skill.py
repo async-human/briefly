@@ -62,6 +62,7 @@ class RelevanceSkill:
                 model=_SKILL.model or "gpt-5-mini",
                 max_tokens=_SKILL.max_tokens or 80,
                 temperature=0.2,
+                agent="relevance",
             )
             return resp.content.strip()
         except Exception:

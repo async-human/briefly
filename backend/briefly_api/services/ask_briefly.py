@@ -949,6 +949,8 @@ async def ask_briefly(
         system=_ASK_SYSTEM,
         temperature=0.35,
         max_tokens=1200,
+        user_id=user.id,
+        agent="ask_briefly",
     )
     answer = response.content.strip()
     citations = _extract_citations(answer, prepared.all_chunks)
@@ -992,6 +994,8 @@ async def stream_ask_briefly(
         system=_ASK_SYSTEM,
         temperature=0.35,
         max_tokens=1200,
+        user_id=user.id,
+        agent="ask_briefly",
     ):
         parts.append(delta)
         yield _sse_event({"type": "delta", "content": delta})

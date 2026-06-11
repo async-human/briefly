@@ -164,6 +164,7 @@ class NarrativeSkill:
                     model=model or _SKILL.model or None,
                     max_tokens=_SKILL.max_tokens or 2200,
                     cached_prefix=cached_prefix,
+                    agent="narrative",
                 ),
                 timeout=45.0,
             )
