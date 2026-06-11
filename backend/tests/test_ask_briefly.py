@@ -4,6 +4,7 @@ from __future__ import annotations
 from briefly_api.services.ask_briefly import (
     _extract_citations,
     _format_context_pack,
+    _split_article_passages,
     is_saved_unread_query,
     rank_by_similarity,
     ContextChunk,
@@ -56,6 +57,23 @@ def test_is_saved_unread_query_detects_backlog_questions():
     assert is_saved_unread_query("What did I save recently that I haven't read yet?")
     assert is_saved_unread_query("show my unread saves")
     assert not is_saved_unread_query("Summarize my active story threads.")
+
+
+def test_split_article_passages_splits_long_body():
+    intro = "Nine Indian startups joined the WEF cohort."
+    names = "The companies are AlphaTech, BetaLabs, GammaAI, DeltaBio, EpsilonPay, ZetaCloud, EtaHealth, ThetaMobility, and IotaEnergy."
+    filler = " ".join(["context"] * 120)
+    body = f"{intro}\n\n{filler}\n\n{names}"
+    passages = _split_article_passages(body)
+    assert len(passages) >= 2
+    joined = "\n".join(passages)
+    assert "AlphaTech" in joined
+    assert "Nine Indian startups" in joined
+
+
+def test_split_article_passages_keeps_short_body_intact():
+    text = "Short article with two names: FooCorp and BarInc."
+    assert _split_article_passages(text) == [text]
 
 
 def test_format_context_pack_includes_ref():

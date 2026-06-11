@@ -50,6 +50,12 @@ _MAX_RETRIEVAL_POOL = 250
 _MAX_CHUNKS = 8
 _MIN_SIMILARITY = 0.32
 _SAVED_UNREAD_LIMIT = 12
+_ARTICLE_CHUNK_CHARS = 750
+_ARTICLE_CHUNK_OVERLAP = 120
+_MAX_ARTICLE_PASSAGES = 5
+_MAX_ARTICLE_CHUNKS_TO_SCORE = 28
+_MIN_PASSAGE_SIMILARITY = 0.22
+_MAX_ANCHOR_SNIPPET_CHARS = 5000
 
 
 @dataclass
@@ -233,45 +239,145 @@ async def _retrieve_saved_unread(
     return chunks[:limit]
 
 
+def _split_article_passages(text: str) -> list[str]:
+    """Split article body into overlapping passages for within-article retrieval."""
+    text = re.sub(r"\n{3,}", "\n\n", text.strip())
+    if not text:
+        return []
+    if len(text) <= _ARTICLE_CHUNK_CHARS:
+        return [text]
+
+    paragraphs = [p.strip() for p in re.split(r"\n\n+", text) if p.strip()]
+    chunks: list[str] = []
+    current = ""
+    for para in paragraphs:
+        if len(para) > _ARTICLE_CHUNK_CHARS:
+            if current:
+                chunks.append(current)
+                current = ""
+            start = 0
+            while start < len(para):
+                end = min(start + _ARTICLE_CHUNK_CHARS, len(para))
+                chunks.append(para[start:end])
+                if end >= len(para):
+                    break
+                start = end - _ARTICLE_CHUNK_OVERLAP
+            continue
+
+        candidate = f"{current}\n\n{para}".strip() if current else para
+        if len(candidate) <= _ARTICLE_CHUNK_CHARS:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+            current = para
+
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+async def _retrieve_article_passages(
+    clean_text: str,
+    query_embedding: list[float],
+    embedder,
+    *,
+    limit: int = _MAX_ARTICLE_PASSAGES,
+) -> list[str]:
+    """Return the passages from one article most relevant to the user's question."""
+    passages = _split_article_passages(clean_text)
+    if not passages:
+        return []
+    if len(passages) == 1:
+        return passages
+
+    to_score = passages[:_MAX_ARTICLE_CHUNKS_TO_SCORE]
+    embeddings = await embedder.embed_batch(to_score)
+    scored = [
+        (_cosine(query_embedding, emb), passage)
+        for emb, passage in zip(embeddings, to_score, strict=True)
+    ]
+    scored.sort(key=lambda row: row[0], reverse=True)
+
+    selected: list[str] = []
+    seen_prefixes: set[str] = set()
+    for sim, passage in scored:
+        if sim < _MIN_PASSAGE_SIMILARITY:
+            continue
+        prefix = passage[:100]
+        if prefix in seen_prefixes:
+            continue
+        seen_prefixes.add(prefix)
+        selected.append(passage)
+        if len(selected) >= limit:
+            break
+
+    if not selected:
+        selected = [scored[0][1]] if scored else [passages[0]]
+        if passages[0] not in selected:
+            selected.insert(0, passages[0])
+
+    return selected[:limit]
+
+
+async def _article_snippet_for_query(
+    db: AsyncSession,
+    user_id: str,
+    raw: RawContent,
+    *,
+    query: str,
+    query_embedding: list[float] | None,
+    embedder,
+    digest_blurb: str | None = None,
+) -> str:
+    """Build the best available text context for a focused article question."""
+    clean_text = (raw.clean_text or "").strip()
+    summary = (raw.summary or "").strip()
+
+    if query_embedding and clean_text and len(clean_text) > 400:
+        passages = await _retrieve_article_passages(clean_text, query_embedding, embedder)
+        snippet = "\n\n---\n\n".join(passages)
+    else:
+        snippet = summary or clean_text[:1200]
+
+    if digest_blurb:
+        snippet = f"{digest_blurb}\n\n---\n\n{snippet}"
+
+    enrich = await db.execute(
+        select(ContentEnrichmentCache).where(
+            ContentEnrichmentCache.user_id == user_id,
+            ContentEnrichmentCache.content_id == raw.id,
+        )
+    )
+    enrichment = enrich.scalar_one_or_none()
+    if enrichment and enrichment.connection_sentence:
+        snippet += f"\n\nConnection: {enrichment.connection_sentence}"
+
+    return snippet[:_MAX_ANCHOR_SNIPPET_CHARS]
+
+
 async def _load_anchor_chunks(
     db: AsyncSession,
     user_id: str,
     *,
     content_id: str | None,
     digest_item_id: str | None,
+    query: str = "",
+    query_embedding: list[float] | None = None,
+    embedder=None,
 ) -> list[ContextChunk]:
-    chunks: list[ContextChunk] = []
-
+    digest_item = None
     if digest_item_id:
         result = await db.execute(
             select(DigestItem)
             .join(Digest, DigestItem.digest_id == Digest.id)
             .where(DigestItem.id == digest_item_id, Digest.user_id == user_id)
         )
-        item = result.scalar_one_or_none()
-        if item:
-            snippet = f"{item.summary}\n\nWhy it matters: {item.why_it_matters}"
-            cid = item.content_id or f"digest-item:{item.id}"
-            kind = "brief_anchor"
-            if item.content_id:
-                raw = await db.get(RawContent, item.content_id)
-                if raw and (raw.meta or {}).get("brain_dump"):
-                    kind = "brain_dump"
-            chunks.append(
-                ContextChunk(
-                    ref="S1",
-                    content_id=cid if not cid.startswith("digest-item:") else item.content_id or item.id,
-                    title=item.headline,
-                    url=item.source_url,
-                    source_name=item.source_name,
-                    snippet=snippet[:1200],
-                    kind=kind,
-                )
-            )
-            if not content_id and item.content_id:
-                content_id = item.content_id
+        digest_item = result.scalar_one_or_none()
+        if digest_item and not content_id and digest_item.content_id:
+            content_id = digest_item.content_id
 
-    if content_id and not any(c.content_id == content_id for c in chunks):
+    if content_id:
         raw = await db.execute(
             select(RawContent)
             .options(selectinload(RawContent.source))
@@ -281,30 +387,57 @@ async def _load_anchor_chunks(
         if row:
             meta = row.meta or {}
             kind = "brain_dump" if meta.get("brain_dump") else "article"
+            if digest_item:
+                kind = "brief_anchor"
             source_name = row.source.name if row.source else None
-            snippet = (row.summary or row.clean_text or "")[:1200]
-            enrich = await db.execute(
-                select(ContentEnrichmentCache).where(
-                    ContentEnrichmentCache.user_id == user_id,
-                    ContentEnrichmentCache.content_id == row.id,
-                )
+            title = (digest_item.headline if digest_item else None) or row.title or "Untitled"
+            url = (digest_item.source_url if digest_item else None) or row.url
+            if digest_item and digest_item.source_name:
+                source_name = digest_item.source_name
+
+            digest_blurb = None
+            if digest_item:
+                digest_blurb = (
+                    f"Briefing summary: {digest_item.summary}\n"
+                    f"Why it matters: {digest_item.why_it_matters}"
+                )[:800]
+
+            snippet = await _article_snippet_for_query(
+                db,
+                user_id,
+                row,
+                query=query,
+                query_embedding=query_embedding if embedder else None,
+                embedder=embedder,
+                digest_blurb=digest_blurb,
             )
-            enrichment = enrich.scalar_one_or_none()
-            if enrichment and enrichment.connection_sentence:
-                snippet += f"\n\nConnection: {enrichment.connection_sentence}"
-            chunks.append(
+            return [
                 ContextChunk(
                     ref="S1",
                     content_id=row.id,
-                    title=row.title or "Untitled",
-                    url=row.url,
+                    title=title,
+                    url=url,
                     source_name=source_name,
                     snippet=snippet,
                     kind=kind,
                 )
-            )
+            ]
 
-    return chunks
+    if digest_item:
+        snippet = f"{digest_item.summary}\n\nWhy it matters: {digest_item.why_it_matters}"
+        return [
+            ContextChunk(
+                ref="S1",
+                content_id=digest_item.content_id or f"digest-item:{digest_item.id}",
+                title=digest_item.headline,
+                url=digest_item.source_url,
+                source_name=digest_item.source_name,
+                snippet=snippet[:1200],
+                kind="brief_anchor",
+            )
+        ]
+
+    return []
 
 
 async def _semantic_retrieve(
@@ -432,6 +565,7 @@ _ASK_SYSTEM = """You are Briefly — the user's chief-of-staff for their persona
 You answer using ONLY the sources in the context pack, labeled [S1], [S2], etc.
 - Cite sources inline like [S1] when you use them.
 - If the sources don't contain enough information, say so honestly. Do not invent articles or URLs.
+- When excerpts from a focused article are provided, extract concrete facts (names, numbers, lists, dates) directly from those excerpts before saying information is missing.
 - Be concise, direct, and personal (use what you know about the user from the profile).
 - Connect dots across sources when relevant.
 - Never mention that you are an AI or language model.
@@ -497,7 +631,13 @@ async def _prepare_ask(
         query_embedding = await embedder.embed(message)
 
         anchor_chunks = await _load_anchor_chunks(
-            db, user.id, content_id=content_id, digest_item_id=digest_item_id
+            db,
+            user.id,
+            content_id=content_id,
+            digest_item_id=digest_item_id,
+            query=message,
+            query_embedding=query_embedding,
+            embedder=embedder,
         )
         exclude = {c.content_id for c in anchor_chunks if not c.content_id.startswith("digest-item")}
         extra_limit = _MAX_CHUNKS - len(anchor_chunks)
