@@ -7,6 +7,7 @@ type Props = {
   intel: ProfileIntelligence;
   streak: number;
   declaredInterests: string[];
+  variant?: "default" | "compact";
 };
 
 function pct(value: number | undefined): number {
@@ -14,7 +15,12 @@ function pct(value: number | undefined): number {
   return Math.round(value <= 1 ? value * 100 : value);
 }
 
-export function BrieflyKnowsSummary({ intel, streak, declaredInterests }: Props) {
+export function BrieflyKnowsSummary({
+  intel,
+  streak,
+  declaredInterests,
+  variant = "default",
+}: Props) {
   const insights = intel.behavioral?.insights ?? [];
   const beh = intel.behavioral ?? {};
   const stats = intel.reading_stats ?? { total_digests: 0, avg_open_rate: 0, avg_click_rate: 0 };
@@ -41,6 +47,36 @@ export function BrieflyKnowsSummary({ intel, streak, declaredInterests }: Props)
       <div className="bk-summary bk-summary-empty">
         <p className="bk-summary-eyebrow">What Briefly knows</p>
         <p className="bk-summary-hint">Your intelligence profile builds with every briefing you read.</p>
+      </div>
+    );
+  }
+
+  if (variant === "compact") {
+    const topTopics = Object.entries(intel.topic_strengths ?? {})
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([topic]) => topic);
+    const topInsight = insights[0]?.text;
+    return (
+      <div className="bk-summary bk-summary--compact">
+        <div className="bk-summary-head">
+          <div>
+            <p className="bk-summary-eyebrow">What Briefly knows</p>
+            <h3 className="bk-summary-title">
+              Day {intel.digest_day || 1}
+              {streak > 1 ? ` · ${streak}-day streak` : ""}
+            </h3>
+          </div>
+          <Link href="/intelligence" className="bk-summary-link">
+            Full profile →
+          </Link>
+        </div>
+        {topInsight && <p className="bk-summary-compact-insight">{topInsight}</p>}
+        {topTopics.length > 0 && (
+          <p className="bk-summary-compact-topics">
+            Strongest: {topTopics.join(" · ")}
+          </p>
+        )}
       </div>
     );
   }

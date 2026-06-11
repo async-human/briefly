@@ -21,11 +21,7 @@ import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton"
 import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
-import { BrieflyKnowsSummary } from "@/components/dashboard/BrieflyKnowsSummary";
-import { StoryThreadsRail } from "@/components/dashboard/StoryThreadsRail";
-import { SerendipityPanel } from "@/components/dashboard/SerendipityPanel";
-import { IntelligenceBriefingPanel } from "@/components/dashboard/IntelligenceBriefingPanel";
-import { WeeklyReportCard } from "@/components/dashboard/WeeklyReportCard";
+import { DashboardInsightsDrawer } from "@/components/dashboard/DashboardInsightsDrawer";
 import { ProactiveAlertsBanner } from "@/components/dashboard/ProactiveAlertsBanner";
 import type { ProfileIntelligence } from "@/lib/api";
 
@@ -274,42 +270,9 @@ function DashboardContent() {
 
       <ProactiveAlertsBanner />
 
-      {intel && (
-        <div className="dash-intelligence-row">
-          <BrieflyKnowsSummary
-            intel={intel}
-            streak={me.reading_streak ?? 0}
-            declaredInterests={me.profile?.interests?.map((i) => i.topic).filter(Boolean) ?? []}
-          />
-          <StoryThreadsRail threads={intel.active_threads ?? []} />
-        </div>
-      )}
-
-      <WeeklyReportCard />
-
-      {digest?.meta?.serendipity && digest.meta.serendipity.length > 0 && (
-        <SerendipityPanel
-          connections={digest.meta.serendipity}
-          digestId={digest.id}
-          inBriefContentIds={
-            new Set(
-              digest.items
-                .map((item) => item.content_id)
-                .filter((id): id is string => Boolean(id)),
-            )
-          }
-        />
-      )}
-
-      {digest?.meta && (
-        <IntelligenceBriefingPanel
-          calendar={digest.meta.calendar}
-          wrapped={digest.meta.wrapped}
-          blindSpots={digest.meta.blind_spots ?? []}
-        />
-      )}
-
-      <div className="dash-page-grid">
+      <div className="dash-primary-zone">
+        <p className="dash-primary-label">Today&apos;s briefing</p>
+        <div className="dash-page-grid">
         <section className="dash-surface dash-surface-briefing" aria-labelledby="briefing-surface-title">
           <h2 id="briefing-surface-title" className="sr-only">
             Today&apos;s briefing
@@ -361,7 +324,15 @@ function DashboardContent() {
             />
           </div>
         </aside>
+        </div>
       </div>
+
+      <DashboardInsightsDrawer
+        intel={intel}
+        digest={digest}
+        streak={me.reading_streak ?? 0}
+        declaredInterests={me.profile?.interests?.map((i) => i.topic).filter(Boolean) ?? []}
+      />
     </div>
     </PageContentTransition>
   );

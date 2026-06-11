@@ -31,6 +31,8 @@ type Props = {
   calendar?: CalendarBriefing | null;
   wrapped?: WrappedSnapshot | null;
   blindSpots?: BlindSpot[];
+  /** Strip card chrome when nested inside dashboard accordion */
+  embedded?: boolean;
 };
 
 function CalendarIcon() {
@@ -77,7 +79,12 @@ function hasWrappedContent(wrapped: WrappedSnapshot): boolean {
   );
 }
 
-export function IntelligenceBriefingPanel({ calendar, wrapped, blindSpots = [] }: Props) {
+export function IntelligenceBriefingPanel({
+  calendar,
+  wrapped,
+  blindSpots = [],
+  embedded = false,
+}: Props) {
   const meetings = calendar?.meetings ?? [];
   const hasCalendar = meetings.length > 0;
   const hasWrapped = Boolean(wrapped && hasWrappedContent(wrapped));
@@ -85,10 +92,15 @@ export function IntelligenceBriefingPanel({ calendar, wrapped, blindSpots = [] }
 
   if (!hasCalendar && !hasWrapped && !hasBlindSpots) return null;
 
+  const panelClass = embedded
+    ? "intelligence-briefing-panel intelligence-briefing-panel--embedded"
+    : "intelligence-briefing-panel";
+
   return (
-    <section className="intelligence-briefing-panel" aria-label="Intelligence layer">
+    <section className={panelClass} aria-label="Intelligence layer">
       {hasCalendar && (
-        <article className="intel-card intel-card-calendar">
+        <article className={`intel-card intel-card-calendar${embedded ? " intel-card--embedded" : ""}`}>
+          {!embedded && (
           <header className="intel-card-head">
             <span className="intel-card-icon" aria-hidden>
               <CalendarIcon />
@@ -98,6 +110,7 @@ export function IntelligenceBriefingPanel({ calendar, wrapped, blindSpots = [] }
               <p className="intel-card-desc">Stories in your brief matched to your calendar</p>
             </div>
           </header>
+          )}
           <ul className="intel-meeting-list">
             {meetings.map((m) => (
               <li key={`${m.time}-${m.title}`} className="intel-meeting-card">
@@ -131,7 +144,8 @@ export function IntelligenceBriefingPanel({ calendar, wrapped, blindSpots = [] }
       )}
 
       {hasWrapped && wrapped && (
-        <article className="intel-card intel-card-wrapped">
+        <article className={`intel-card intel-card-wrapped${embedded ? " intel-card--embedded" : ""}`}>
+          {!embedded && (
           <header className="intel-card-head">
             <span className="intel-card-icon" aria-hidden>
               <SparkIcon />
@@ -141,12 +155,14 @@ export function IntelligenceBriefingPanel({ calendar, wrapped, blindSpots = [] }
               <p className="intel-card-desc">Where your attention went — and where it&apos;s shifting</p>
             </div>
           </header>
-          <WeekInFocusCard wrapped={wrapped} variant="teaser" />
+          )}
+          <WeekInFocusCard wrapped={wrapped} variant={embedded ? "full" : "teaser"} />
         </article>
       )}
 
       {hasBlindSpots && (
-        <article className="intel-card intel-card-blind">
+        <article className={`intel-card intel-card-blind${embedded ? " intel-card--embedded" : ""}`}>
+          {!embedded && (
           <header className="intel-card-head">
             <span className="intel-card-icon" aria-hidden>
               <LensIcon />
@@ -156,6 +172,7 @@ export function IntelligenceBriefingPanel({ calendar, wrapped, blindSpots = [] }
               <p className="intel-card-desc">Where your sources agree — and what you might be missing</p>
             </div>
           </header>
+          )}
           <ul className="intel-blind-list">
             {blindSpots.map((spot) => (
               <li key={spot.topic} className="intel-blind-item">

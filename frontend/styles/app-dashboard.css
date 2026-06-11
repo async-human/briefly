@@ -4103,6 +4103,247 @@ a.saved-capture-title:hover {
   filter: brightness(1.06);
 }
 
+/* ── Dashboard progressive disclosure ─────────────────────────────────────── */
+
+.app-shell .dash-primary-zone {
+  margin-bottom: 1.25rem;
+}
+
+.app-shell .dash-primary-label {
+  margin: 0 0 0.75rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+.app-shell .dash-insights-drawer {
+  margin-top: 0.5rem;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  background: var(--app-paper-2);
+  overflow: hidden;
+}
+
+.app-shell .dash-insights-drawer-trigger {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 1rem 1.125rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.app-shell .dash-insights-drawer-trigger:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.app-shell .dash-insights-drawer-trigger-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.app-shell .dash-insights-drawer-eyebrow {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+.app-shell .dash-insights-drawer-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--app-ink);
+  letter-spacing: -0.01em;
+}
+
+.app-shell .dash-insights-drawer-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+}
+
+.app-shell .dash-insights-drawer-chip {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 100px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  color: var(--app-ink-secondary);
+}
+
+.app-shell .dash-insights-drawer-chevron {
+  flex-shrink: 0;
+  font-size: 1.125rem;
+  line-height: 1;
+  color: var(--app-muted);
+  margin-top: 0.15rem;
+}
+
+.app-shell .dash-insights-drawer-body {
+  padding: 0 1.125rem 1.125rem;
+  border-top: 1px solid var(--app-border);
+  background: var(--app-surface);
+}
+
+.app-shell .dash-insights-drawer-intro {
+  margin: 0.85rem 0 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--app-muted);
+}
+
+.app-shell .dash-insights-drawer-foot {
+  margin: 0.75rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--app-border);
+}
+
+.app-shell .dash-insights-drawer-link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--app-accent);
+  text-decoration: none;
+}
+
+.app-shell .dash-insights-drawer-link:hover {
+  text-decoration: underline;
+}
+
+.app-shell .dash-accordion {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-paper-2);
+  overflow: hidden;
+}
+
+.app-shell .dash-accordion + .dash-accordion {
+  margin-top: 0.5rem;
+}
+
+.app-shell .dash-accordion-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.app-shell .dash-accordion-trigger:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.app-shell .dash-accordion-trigger-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.app-shell .dash-accordion-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.app-shell .dash-accordion-desc {
+  font-size: 0.6875rem;
+  color: var(--app-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 28rem;
+}
+
+.app-shell .dash-accordion-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.app-shell .dash-accordion-badge {
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: 100px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  color: var(--app-muted);
+}
+
+.app-shell .dash-accordion-chevron {
+  font-size: 1rem;
+  color: var(--app-muted);
+}
+
+.app-shell .dash-accordion-panel {
+  padding: 0.75rem 0.85rem 0.85rem;
+  border-top: 1px solid var(--app-border);
+  background: var(--app-surface);
+}
+
+.app-shell .dash-accordion-panel .intelligence-briefing-panel {
+  margin-bottom: 0;
+  gap: 0;
+}
+
+.app-shell .dash-accordion-panel .intel-card--embedded {
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.app-shell .dash-accordion-panel .story-threads-rail,
+.app-shell .dash-accordion-panel .serendipity-panel,
+.app-shell .dash-accordion-panel .weekly-report-card {
+  margin-bottom: 0;
+}
+
+.app-shell .bk-summary--compact {
+  gap: 0.55rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.app-shell .bk-summary-compact-insight {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--app-ink-2);
+}
+
+.app-shell .bk-summary-compact-topics {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--app-muted);
+}
+
+.app-shell .intelligence-briefing-panel--embedded {
+  margin-bottom: 0;
+}
+
 /* ── Intelligence dashboard surfaces (Sprint 1–6) ─────────────────────────── */
 
 .app-shell .dash-intelligence-row {
