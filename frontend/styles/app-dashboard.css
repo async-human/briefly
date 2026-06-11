@@ -4727,6 +4727,221 @@ a.saved-capture-title:hover {
   color: var(--app-ink-2);
 }
 
+/* Week in focus card */
+.app-shell .dash-surface-week-focus {
+  border-color: oklch(78% 0.06 75 / 0.38);
+  background: linear-gradient(
+    135deg,
+    oklch(97.5% 0.025 75) 0%,
+    var(--app-surface) 100%
+  );
+}
+
+.app-shell .wif-page-head {
+  margin-bottom: 1rem;
+}
+
+.app-shell .wif-page-eyebrow {
+  margin: 0 0 0.2rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: oklch(48% 0.08 75);
+}
+
+.app-shell .wif-page-title {
+  margin: 0 0 0.25rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--app-ink);
+}
+
+.app-shell .wif-page-desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--app-muted);
+}
+
+.app-shell .wif-hero {
+  margin-bottom: 0.85rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--app-radius-sm);
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid oklch(78% 0.05 75 / 0.32);
+}
+
+.app-shell .wif-synthesis {
+  margin: 0 0 0.55rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--app-ink);
+  letter-spacing: -0.01em;
+}
+
+.app-shell .wif-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.app-shell .wif-week-stat {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--app-muted);
+  padding: 0.2rem 0.5rem;
+  border-radius: 100px;
+  background: var(--app-paper-2);
+  border: 1px solid var(--app-border);
+}
+
+.app-shell .wif-section-head {
+  margin-bottom: 0.45rem;
+}
+
+.app-shell .wif-section-hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--app-muted);
+}
+
+.app-shell .wif-topic-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.app-shell .wif-topic-row {
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--app-radius-sm);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid oklch(78% 0.04 75 / 0.28);
+}
+
+.app-shell .wif-topic-row--active {
+  border-color: oklch(72% 0.07 75 / 0.35);
+}
+
+.app-shell .wif-topic-row--shifting,
+.app-shell .wif-topic-row--shift {
+  border-color: oklch(74% 0.05 75 / 0.32);
+}
+
+.app-shell .wif-topic-row--ignored {
+  border-color: oklch(72% 0.05 25 / 0.3);
+  background: oklch(98% 0.015 25 / 0.5);
+}
+
+.app-shell .wif-topic-row--uncovered {
+  border-style: dashed;
+  border-color: oklch(74% 0.04 75 / 0.42);
+  background: transparent;
+}
+
+.app-shell .wif-topic-row--emerging {
+  border-color: oklch(72% 0.07 145 / 0.35);
+  background: oklch(97% 0.02 145 / 0.45);
+}
+
+.app-shell .wif-topic-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.app-shell .wif-topic-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--app-ink);
+  text-transform: capitalize;
+}
+
+.app-shell .wif-topic-meta {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--app-muted);
+  text-align: right;
+}
+
+.app-shell .wif-topic-detail {
+  margin: 0.3rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--app-muted);
+}
+
+.app-shell .wif-examples {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.app-shell .wif-example {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--app-ink-2);
+}
+
+.app-shell .wif-example-dot {
+  flex-shrink: 0;
+  width: 4px;
+  height: 4px;
+  margin-top: 0.45rem;
+  border-radius: 50%;
+  background: oklch(52% 0.08 75);
+}
+
+.app-shell .wif-example-src {
+  color: var(--app-muted);
+}
+
+.app-shell .wif-action-link {
+  display: inline-block;
+  margin-top: 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: oklch(42% 0.1 75);
+  text-decoration: none;
+}
+
+.app-shell .wif-action-link:hover {
+  text-decoration: underline;
+}
+
+.app-shell .wif-teaser-more {
+  margin: 0.75rem 0 0;
+  padding-top: 0.65rem;
+  border-top: 1px dashed oklch(78% 0.04 75 / 0.35);
+}
+
+.app-shell .wif-teaser-link {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: oklch(42% 0.1 75);
+  text-decoration: none;
+}
+
+.app-shell .wif-teaser-link:hover {
+  text-decoration: underline;
+}
+
 .app-shell .intel-blind-item {
   padding: 0.8rem 0.9rem;
   border-radius: var(--app-radius-sm);

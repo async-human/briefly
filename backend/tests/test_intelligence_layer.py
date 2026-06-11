@@ -13,20 +13,37 @@ def test_should_surface_wrapped_on_monday():
 
 def test_build_wrapped_snapshot_monday():
     fp = SimpleNamespace(
-        mind_shifts=[{"topic": "AI agents", "direction": "rising", "evidence": "3 saves"}],
+        mind_shifts=[{
+            "topic": "AI agents",
+            "direction": "rising",
+            "evidence": "3 saves",
+            "examples": [{"headline": "Agents take over", "source": "TechCrunch"}],
+        }],
         current_focus="Building with LLMs",
-        high_engagement_topics=[{"topic": "startups", "follow_up_count": 4, "recent_pos": 2, "click_count": 4}],
+        high_engagement_topics=[{
+            "topic": "startups",
+            "follow_up_count": 4,
+            "recent_pos": 2,
+            "click_count": 4,
+            "examples": [{"headline": "Startup raises", "source": "FT"}],
+        }],
+        low_engagement_topics=[],
         coverage_gaps=["crypto"],
+        reading_time_pattern={"reads_this_week": 5, "reads_prior_week": 2},
         weekly_snapshot={"depth_trend": "deepening", "weekly_synthesis": "You went deep on agents."},
     )
     snap = build_wrapped_snapshot(fp, run_date="2026-06-08")
     assert snap is not None
+    assert snap["synthesis"] == "You went deep on agents."
     assert snap["depth_trend"] == "deepening"
     assert snap["depth_label"] == "Reading deeper than usual"
     assert len(snap["shifts"]) == 1
     assert snap["shifts"][0]["label"] == "Picking up"
     assert snap["active_topics"][0]["topic"] == "startups"
     assert "this week" in snap["active_topics"][0]["detail"]
+    assert snap["week_stats"]["delta_label"] == "3 more reads than last week"
+    assert snap["uncovered"][0]["topic"] == "crypto"
+    assert snap["section_hints"]["ignored"]
 
 
 def test_build_wrapped_snapshot_excludes_declining_from_active_topics():
@@ -36,6 +53,7 @@ def test_build_wrapped_snapshot_excludes_declining_from_active_topics():
                 "topic": "newsletters",
                 "direction": "declining",
                 "evidence": "clicked 3x in last month but 0x in last week",
+                "examples": [{"headline": "Lenny's Newsletter", "source": "Lenny"}],
             }
         ],
         current_focus="",
@@ -48,15 +66,46 @@ def test_build_wrapped_snapshot_excludes_declining_from_active_topics():
                 "click_count": 3,
             }
         ],
+        low_engagement_topics=[],
         coverage_gaps=[],
+        reading_time_pattern={},
         weekly_snapshot={},
     )
     snap = build_wrapped_snapshot(fp, run_date="2026-06-08", force=True)
     assert snap is not None
     assert len(snap["shifts"]) == 1
     assert snap["shifts"][0]["label"] == "Cooling off"
+    assert snap["shifts"][0]["examples"][0]["headline"] == "Lenny's Newsletter"
     assert snap["active_topics"] == []
     assert snap["high_engagement"] == []
+    assert "newsletters" in snap["synthesis"].lower()
+
+
+def test_build_wrapped_snapshot_splits_ignored_and_uncovered():
+    fp = SimpleNamespace(
+        mind_shifts=[],
+        current_focus="",
+        high_engagement_topics=[],
+        low_engagement_topics=[
+            {
+                "topic": "crypto",
+                "skip_count": 8,
+                "actual_clicks": 1,
+                "examples": [{"headline": "Bitcoin hits ATH", "source": "CoinDesk"}],
+            }
+        ],
+        coverage_gaps=["context engineering", "crypto"],
+        reading_time_pattern={},
+        weekly_snapshot={},
+    )
+    snap = build_wrapped_snapshot(fp, run_date="2026-06-08", force=True)
+    assert snap is not None
+    assert len(snap["ignored"]) == 1
+    assert snap["ignored"][0]["topic"] == "crypto"
+    assert "skipped" in snap["ignored"][0]["detail"]
+    assert len(snap["uncovered"]) == 1
+    assert snap["uncovered"][0]["topic"] == "context engineering"
+    assert snap["uncovered"][0]["action"]["href"] == "/settings"
 
 
 def test_detect_blind_spot_consensus_gap():

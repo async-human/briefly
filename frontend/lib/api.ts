@@ -233,32 +233,68 @@ export type FeedbackResponse = {
   learned_message: string | null;
 };
 
+export type WrappedExample = {
+  headline: string;
+  source?: string | null;
+};
+
+export type WrappedAction = {
+  label: string;
+  href: string;
+};
+
 export type WrappedShift = {
   topic: string;
   direction: string;
   label?: string;
   detail?: string;
   evidence?: string;
+  examples?: WrappedExample[];
+  action?: WrappedAction;
 };
 
-export type WrappedTopic = {
+export type WrappedTopicRow = {
   topic: string;
   detail?: string;
+  examples?: WrappedExample[];
+  action?: WrappedAction;
+};
+
+/** @deprecated Use WrappedTopicRow */
+export type WrappedTopic = WrappedTopicRow;
+
+export type WrappedWeekStats = {
+  reads_this_week?: number;
+  reads_prior_week?: number;
+  delta_label?: string;
+};
+
+export type WrappedSectionHints = {
+  active?: string;
+  shifting?: string;
+  ignored?: string;
+  uncovered?: string;
+  emerging?: string;
 };
 
 export type WrappedSnapshot = {
+  synthesis?: string;
   lead?: string;
   depth_trend?: string;
   depth_label?: string;
   weekly_synthesis?: string;
+  week_stats?: WrappedWeekStats;
+  section_hints?: WrappedSectionHints;
   shifts?: WrappedShift[];
-  active_topics?: WrappedTopic[];
-  emerging?: WrappedTopic[];
-  gaps?: WrappedTopic[];
+  active_topics?: WrappedTopicRow[];
+  ignored?: WrappedTopicRow[];
+  uncovered?: WrappedTopicRow[];
+  emerging?: WrappedTopicRow[];
+  gaps?: WrappedTopicRow[];
   current_focus?: string;
   mind_shifts?: WrappedShift[];
-  high_engagement?: WrappedTopic[];
-  emerging_threads?: string[] | WrappedTopic[];
+  high_engagement?: WrappedTopicRow[];
+  emerging_threads?: string[] | WrappedTopicRow[];
   coverage_gaps?: string[];
 };
 
@@ -898,6 +934,10 @@ export const api = {
   // Profile intelligence — accumulated learning data
   getProfileIntelligence: () =>
     request<ProfileIntelligence>("/api/v1/profile/intelligence"),
+
+  // Week in focus (live behavioral snapshot)
+  getWeekInFocus: () =>
+    request<WrappedSnapshot>("/api/v1/week-in-focus"),
 
   // Weekly intelligence report
   getWeeklyReport: () =>

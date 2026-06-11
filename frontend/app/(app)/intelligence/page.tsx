@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, type ProfileIntelligence } from "@/lib/api";
+import { api, type ProfileIntelligence, type WrappedSnapshot } from "@/lib/api";
 import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { BrieflyKnowsCard } from "@/components/intelligence/BrieflyKnowsCard";
+import { WeekInFocusCard } from "@/components/intelligence/WeekInFocusCard";
 import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton";
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
@@ -26,16 +27,19 @@ export default function IntelligencePage() {
   });
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [weekInFocus, setWeekInFocus] = useState<WrappedSnapshot | null>(null);
 
   async function refreshIntelligence() {
     setRefreshing(true);
     try {
-      const [meData, intelData] = await Promise.all([
+      const [meData, intelData, weekData] = await Promise.all([
         api.getMe(),
         api.getProfileIntelligence(),
+        api.getWeekInFocus().catch(() => null),
       ]);
       setStreak(meData.reading_streak ?? 0);
       setIntel(intelData);
+      setWeekInFocus(weekData);
       setUpdatedAt(new Date());
       const p = meData.profile;
       if (p) {
@@ -57,8 +61,12 @@ export default function IntelligencePage() {
       router.replace("/login");
       return;
     }
-    Promise.all([api.getMe(), api.getProfileIntelligence().catch(() => null)])
-      .then(([meData, intelData]) => {
+    Promise.all([
+      api.getMe(),
+      api.getProfileIntelligence().catch(() => null),
+      api.getWeekInFocus().catch(() => null),
+    ])
+      .then(([meData, intelData, weekData]) => {
         if (!meData.onboarding_completed) {
           router.replace("/onboarding");
           return;
@@ -76,6 +84,9 @@ export default function IntelligencePage() {
         if (intelData) {
           setIntel(intelData);
           setUpdatedAt(new Date());
+        }
+        if (weekData) {
+          setWeekInFocus(weekData);
         }
       })
       .catch(() => router.replace("/login"))
@@ -118,6 +129,23 @@ export default function IntelligencePage() {
         ) : (
           <PageContentTransition>
             <div className="dash-page-stack">
+              {weekInFocus && (
+                <section id="week-in-focus" className="dash-surface dash-surface-week-focus">
+                  <div className="dash-surface-body">
+                    <header className="wif-page-head">
+                      <div>
+                        <p className="wif-page-eyebrow">Weekly snapshot</p>
+                        <h2 className="wif-page-title">Your week in focus</h2>
+                        <p className="wif-page-desc">
+                          Patterns from your opens, saves, and skips — updated as you read.
+                        </p>
+                      </div>
+                    </header>
+                    <WeekInFocusCard wrapped={weekInFocus} variant="full" />
+                  </div>
+                </section>
+              )}
+
               {intel ? (
                 <div className="dash-surface dash-surface-knows">
                   <div className="dash-surface-body dash-surface-body-knows">

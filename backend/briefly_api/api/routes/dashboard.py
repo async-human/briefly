@@ -1215,6 +1215,25 @@ async def list_proactive_events(
     return [ProactiveEventOut(**e) for e in events]
 
 
+# ── Week in focus (live fingerprint snapshot) ─────────────────────────────────
+
+@router.get("/week-in-focus")
+async def get_week_in_focus_endpoint(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Return the current week-in-focus snapshot from behavioral fingerprint."""
+    from briefly_api.services.wrapped_snapshot import get_week_in_focus
+
+    snapshot = await get_week_in_focus(db, user.id)
+    if not snapshot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Not enough reading activity yet to build a week-in-focus snapshot.",
+        )
+    return snapshot
+
+
 # ── Weekly intelligence report ────────────────────────────────────────────────
 
 @router.get("/weekly-report")

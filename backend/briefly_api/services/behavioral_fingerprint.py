@@ -34,6 +34,16 @@ log = logging.getLogger(__name__)
 _SHORT_WINDOW = 7    # days — "current focus"
 _LONG_WINDOW  = 30   # days — engagement trends, divergence detection
 _MIN_SIGNALS  = 5    # minimum signals before we attempt pattern detection
+_MAX_TOPIC_HEADLINES = 3
+
+
+def _append_topic_headline(headlines: list[dict], headline: str, source: str | None) -> None:
+    text = headline.strip()[:140]
+    if not text:
+        return
+    headlines[:] = [h for h in headlines if h.get("headline") != text]
+    headlines.insert(0, {"headline": text, "source": source})
+    del headlines[_MAX_TOPIC_HEADLINES:]
 
 
 async def build_and_save(session, user_id: str) -> BehavioralFingerprint | None:
@@ -58,6 +68,7 @@ async def build_and_save(session, user_id: str) -> BehavioralFingerprint | None:
     # ── Load signals with item context ────────────────────────────────────────
     cutoff_long  = datetime.now(timezone.utc) - timedelta(days=_LONG_WINDOW)
     cutoff_short = datetime.now(timezone.utc) - timedelta(days=_SHORT_WINDOW)
+    cutoff_prior = cutoff_short - timedelta(days=_SHORT_WINDOW)
 
     sig_result = await session.execute(
         select(
@@ -86,30 +97,54 @@ async def build_and_save(session, user_id: str) -> BehavioralFingerprint | None:
         return None
 
     # ── Build topic-level engagement maps ─────────────────────────────────────
-    # topic_key → {"pos": int, "neg": int, "follow_up_depth": list[int], "recent_pos": int}
+    # topic_key → stats incl. headlines for example stories in weekly UI
     topic_stats: dict[str, dict] = {}
+    reads_this_week = 0
+    reads_prior_week = 0
 
     for row in signals:
         item_text = " ".join(filter(None, [row.headline, row.why_it_matters])).lower()
         sig_type  = row.signal_type
-        is_recent = row.created_at >= cutoff_short.replace(tzinfo=timezone.utc) if row.created_at.tzinfo else row.created_at >= cutoff_short.replace(tzinfo=None)
+        created = row.created_at
+        if created and created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        is_recent = created >= cutoff_short if created else False
+        is_prior_week = (
+            created >= cutoff_prior and created < cutoff_short if created else False
+        )
         depth     = row.follow_up_depth or 0
 
         positive = sig_type in (SignalType.clicked, SignalType.saved, SignalType.followed_up)
         negative = sig_type in (SignalType.skipped, SignalType.disliked)
+
+        if positive:
+            if is_recent:
+                reads_this_week += 1
+            elif is_prior_week:
+                reads_prior_week += 1
 
         for topic in declared_interests:
             words = {w for w in topic.split() if len(w) > 3}
             if not words:
                 continue
             if any(w in item_text for w in words):
-                stats = topic_stats.setdefault(topic, {"pos": 0, "neg": 0, "depths": [], "recent_pos": 0})
+                stats = topic_stats.setdefault(
+                    topic,
+                    {"pos": 0, "neg": 0, "depths": [], "recent_pos": 0, "headlines": []},
+                )
                 if positive:
                     stats["pos"] += 1
                     if is_recent:
                         stats["recent_pos"] += 1
                     if depth > 0:
                         stats["depths"].append(depth)
+                    headline = (row.headline or "").strip()
+                    if headline:
+                        _append_topic_headline(
+                            stats["headlines"],
+                            headline,
+                            row.source_name,
+                        )
                 elif negative:
                     stats["neg"] += 1
 
@@ -131,6 +166,7 @@ async def build_and_save(session, user_id: str) -> BehavioralFingerprint | None:
                 "avg_depth": round(avg_depth, 1),
                 "recent_pos": stats.get("recent_pos", 0),
                 "click_count": stats["pos"],
+                "examples": list(stats.get("headlines") or [])[:2],
             })
 
     high_engagement.sort(key=lambda x: (x["follow_up_count"], x["engagement_rate"]), reverse=True)
@@ -152,6 +188,7 @@ async def build_and_save(session, user_id: str) -> BehavioralFingerprint | None:
                 "declared": True,
                 "actual_clicks": stats["pos"],
                 "skip_count": stats["neg"],
+                "examples": list(stats.get("headlines") or [])[:2],
             })
 
     # ── Depth preference score ────────────────────────────────────────────────
@@ -164,24 +201,27 @@ async def build_and_save(session, user_id: str) -> BehavioralFingerprint | None:
         recent_pos = stats.get("recent_pos", 0)
         old_pos    = stats["pos"] - recent_pos
         # Rough signal: declining if user engaged before but not recently
+        examples = list(stats.get("headlines") or [])[:2]
         if old_pos >= 3 and recent_pos == 0:
             mind_shifts.append({
                 "topic": topic,
                 "direction": "declining",
                 "evidence": f"clicked {old_pos}x in last month but 0x in last week",
+                "examples": examples,
             })
         elif recent_pos >= 3 and old_pos == 0:
             mind_shifts.append({
                 "topic": topic,
                 "direction": "rising",
                 "evidence": f"0 clicks before last week, then {recent_pos}x recently",
+                "examples": examples,
             })
 
-    # ── Coverage gaps (declared interests with no recent signals) ─────────────
+    # ── Coverage gaps (declared interests with no matching content surfaced) ─
     coverage_gaps: list[str] = []
     for topic in declared_interests:
         stats = topic_stats.get(topic)
-        if stats is None or stats.get("recent_pos", 0) == 0:
+        if stats is None:
             coverage_gaps.append(topic)
 
     # ── Current focus (top engaged topics in last 7 days) ────────────────────
@@ -198,6 +238,11 @@ async def build_and_save(session, user_id: str) -> BehavioralFingerprint | None:
     )
     fp = existing.scalar_one_or_none()
 
+    reading_time_pattern = {
+        "reads_this_week": reads_this_week,
+        "reads_prior_week": reads_prior_week,
+    }
+
     if fp:
         fp.high_engagement_topics = high_engagement[:10]
         fp.low_engagement_topics  = low_engagement[:10]
@@ -205,6 +250,7 @@ async def build_and_save(session, user_id: str) -> BehavioralFingerprint | None:
         fp.coverage_gaps          = coverage_gaps[:10]
         fp.mind_shifts            = mind_shifts[:6]
         fp.current_focus          = current_focus
+        fp.reading_time_pattern   = reading_time_pattern
         fp.total_signals_analyzed = len(signals)
     else:
         fp = BehavioralFingerprint(
@@ -215,6 +261,7 @@ async def build_and_save(session, user_id: str) -> BehavioralFingerprint | None:
             coverage_gaps=coverage_gaps[:10],
             mind_shifts=mind_shifts[:6],
             current_focus=current_focus,
+            reading_time_pattern=reading_time_pattern,
             total_signals_analyzed=len(signals),
         )
         session.add(fp)
