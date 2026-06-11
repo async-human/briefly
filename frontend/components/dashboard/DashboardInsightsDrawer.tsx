@@ -9,6 +9,7 @@ import { SerendipityPanel } from "@/components/dashboard/SerendipityPanel";
 import { IntelligenceBriefingPanel } from "@/components/dashboard/IntelligenceBriefingPanel";
 import { WeeklyReportCard } from "@/components/dashboard/WeeklyReportCard";
 import { DashboardAccordion } from "@/components/dashboard/DashboardAccordion";
+import { getBrieflyKnowsTeaser } from "@/lib/brieflyKnows";
 
 const STORAGE_KEY = "briefly:dash-insights-open";
 
@@ -151,7 +152,7 @@ export function DashboardInsightsDrawer({
             <DashboardAccordion
               id="knows"
               title="What Briefly knows"
-              description={`Day ${intel.digest_day} · reading patterns`}
+              description={getBrieflyKnowsTeaser(intel, streak)}
               defaultOpen={!hasWeekFocus}
             >
               <BrieflyKnowsSummary

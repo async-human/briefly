@@ -4435,6 +4435,123 @@ a.saved-capture-title:hover {
   color: var(--app-muted);
 }
 
+.app-shell .bk-summary-compact-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.app-shell .bk-summary-compact-insight-card {
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--app-border);
+  background: color-mix(in oklch, var(--app-surface) 88%, var(--app-accent) 12%);
+}
+
+.app-shell .bk-summary-compact-insight-card--divergence,
+.app-shell .bk-summary-compact-insight-card--drift {
+  background: color-mix(in oklch, var(--app-surface) 82%, var(--app-warn, #c49a3c) 18%);
+}
+
+.app-shell .bk-summary-compact-topics-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.app-shell .bk-summary-compact-topic-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.app-shell .bk-summary-compact-topic-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.app-shell .bk-summary-compact-topic-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.app-shell .bk-summary-compact-topic-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.app-shell .bk-summary-compact-topic-rate {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--app-accent);
+}
+
+.app-shell .bk-summary-compact-topic-meta {
+  font-size: 0.72rem;
+  color: var(--app-muted);
+}
+
+.app-shell .bk-summary-compact-thread {
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-2, var(--app-surface));
+}
+
+.app-shell .bk-summary-compact-thread-topic {
+  margin: 0.15rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.app-shell .bk-summary-compact-thread-latest {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--app-ink-2);
+}
+
+.app-shell .bk-summary-compact-thread-meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: var(--app-muted);
+}
+
+.app-shell .bk-summary-compact-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.app-shell .bk-summary-compact-foot-line {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--app-ink-2);
+}
+
+.app-shell .bk-summary-compact-foot-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+  margin-bottom: 0.1rem;
+}
+
+.app-shell .bk-summary-compact-foot-note {
+  color: var(--app-muted);
+}
+
 .app-shell .intelligence-briefing-panel--embedded {
   margin-bottom: 0;
 }

@@ -2,6 +2,13 @@
 
 import Link from "next/link";
 import type { ProfileIntelligence } from "@/lib/api";
+import {
+  formatTopicSignal,
+  getFeaturedThread,
+  getTopSourceEngagement,
+  getTopTopicEngagement,
+  rankInsights,
+} from "@/lib/brieflyKnows";
 
 type Props = {
   intel: ProfileIntelligence;
@@ -21,7 +28,7 @@ export function BrieflyKnowsSummary({
   declaredInterests,
   variant = "default",
 }: Props) {
-  const insights = intel.behavioral?.insights ?? [];
+  const insights = rankInsights(intel.behavioral?.insights ?? []);
   const beh = intel.behavioral ?? {};
   const stats = intel.reading_stats ?? { total_digests: 0, avg_open_rate: 0, avg_click_rate: 0 };
 
@@ -52,11 +59,12 @@ export function BrieflyKnowsSummary({
   }
 
   if (variant === "compact") {
-    const topTopics = Object.entries(intel.topic_strengths ?? {})
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3)
-      .map(([topic]) => topic);
-    const topInsight = insights[0]?.text;
+    const topInsights = insights.slice(0, 2);
+    const topicRows = getTopTopicEngagement(intel, 3);
+    const topSource = getTopSourceEngagement(intel);
+    const featuredThread = getFeaturedThread(intel.active_threads);
+    const emergingTopics = emerging.slice(0, 3);
+
     return (
       <div className="bk-summary bk-summary--compact">
         <div className="bk-summary-head">
@@ -65,16 +73,89 @@ export function BrieflyKnowsSummary({
             <h3 className="bk-summary-title">
               Day {intel.digest_day || 1}
               {streak > 1 ? ` · ${streak}-day streak` : ""}
+              {engagement > 0 ? ` · ${engagement}% engaged` : ""}
             </h3>
           </div>
           <Link href="/intelligence" className="bk-summary-link">
             Full profile →
           </Link>
         </div>
-        {topInsight && <p className="bk-summary-compact-insight">{topInsight}</p>}
-        {topTopics.length > 0 && (
-          <p className="bk-summary-compact-topics">
-            Strongest: {topTopics.join(" · ")}
+
+        {topInsights.length > 0 && (
+          <div className="bk-summary-compact-insights">
+            {topInsights.map((insight) => (
+              <div
+                key={`${insight.type}-${insight.label}`}
+                className={`bk-summary-compact-insight-card bk-summary-compact-insight-card--${insight.type}`}
+              >
+                <span className="bk-summary-insight-label">{insight.label}</span>
+                <p className="bk-summary-compact-insight">{insight.text}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {topicRows.length > 0 && (
+          <div className="bk-summary-compact-topics-block">
+            <p className="bk-summary-section-label">Where your attention goes</p>
+            <ul className="bk-summary-compact-topic-list">
+              {topicRows.map((row) => (
+                <li key={row.topic} className="bk-summary-compact-topic-row">
+                  <div className="bk-summary-compact-topic-head">
+                    <span className="bk-summary-compact-topic-name">{row.topic}</span>
+                    <span className="bk-summary-compact-topic-rate">
+                      {Math.round(row.rate * 100)}%
+                    </span>
+                  </div>
+                  <span className="bk-summary-topic-track" aria-hidden>
+                    <span
+                      className="bk-summary-topic-fill"
+                      style={{ width: `${Math.min(100, Math.round(row.rate * 100))}%` }}
+                    />
+                  </span>
+                  <span className="bk-summary-compact-topic-meta">{formatTopicSignal(row)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {featuredThread && (
+          <div className="bk-summary-compact-thread">
+            <p className="bk-summary-section-label">Story Briefly is tracking</p>
+            <p className="bk-summary-compact-thread-topic">{featuredThread.topic}</p>
+            {featuredThread.latest && (
+              <p className="bk-summary-compact-thread-latest">&ldquo;{featuredThread.latest}&rdquo;</p>
+            )}
+            <p className="bk-summary-compact-thread-meta">
+              {featuredThread.appearances} briefing update
+              {featuredThread.appearances === 1 ? "" : "s"}
+              {featuredThread.weeks > 0 ? ` · ${featuredThread.weeks}w running` : ""}
+            </p>
+          </div>
+        )}
+
+        {(topSource || emergingTopics.length > 0) && (
+          <div className="bk-summary-compact-foot">
+            {topSource && (
+              <p className="bk-summary-compact-foot-line">
+                <span className="bk-summary-compact-foot-label">Trusted source</span>
+                {topSource.name} — {Math.round(topSource.rate * 100)}% of items opened or saved
+              </p>
+            )}
+            {emergingTopics.length > 0 && (
+              <p className="bk-summary-compact-foot-line">
+                <span className="bk-summary-compact-foot-label">Emerging</span>
+                {emergingTopics.join(" · ")}
+                <span className="bk-summary-compact-foot-note"> — not in your declared interests</span>
+              </p>
+            )}
+          </div>
+        )}
+
+        {topInsights.length === 0 && topicRows.length === 0 && !featuredThread && (
+          <p className="bk-summary-hint">
+            Save, skip, or open stories in read mode — Briefly learns what to prioritize next.
           </p>
         )}
       </div>

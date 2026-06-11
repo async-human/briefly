@@ -1050,6 +1050,15 @@ def _build_behavioral_intelligence(profile, analytics) -> dict:
 
     latest_signal_at = analytics.latest_signal_at
 
+    _insight_priority = {
+        "divergence": 0,
+        "drift": 1,
+        "source_loyalty": 2,
+        "engagement": 3,
+        "saves": 9,
+    }
+    insights.sort(key=lambda i: _insight_priority.get(i.get("type", ""), 5))
+
     return {
         "total_signals":       total,
         "overall_engagement":  overall_engagement,
