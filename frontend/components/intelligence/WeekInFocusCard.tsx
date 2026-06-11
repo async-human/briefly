@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { WrappedAction, WrappedExample, WrappedShift, WrappedSnapshot, WrappedTopicRow } from "@/lib/api";
+import { IntelSection } from "./IntelSection";
 
 type Props = {
   wrapped: WrappedSnapshot;
@@ -76,13 +77,13 @@ function normalizeUncovered(wrapped: WrappedSnapshot): WrappedTopicRow[] {
 function ExampleStories({ examples }: { examples?: WrappedExample[] }) {
   if (!examples?.length) return null;
   return (
-    <ul className="wif-examples">
+    <ul className="intel-doc-examples">
       {examples.map((ex) => (
-        <li key={ex.headline} className="wif-example">
-          <span className="wif-example-dot" aria-hidden />
-          <span className="wif-example-text">
+        <li key={ex.headline} className="intel-doc-example">
+          <span className="intel-doc-example-dot" aria-hidden />
+          <span className="intel-doc-example-text">
             {ex.headline}
-            {ex.source ? <span className="wif-example-src"> · {ex.source}</span> : null}
+            {ex.source ? <span className="intel-doc-example-src"> · {ex.source}</span> : null}
           </span>
         </li>
       ))}
@@ -93,7 +94,7 @@ function ExampleStories({ examples }: { examples?: WrappedExample[] }) {
 function TopicAction({ action }: { action?: WrappedAction }) {
   if (!action?.href) return null;
   return (
-    <Link href={action.href} className="wif-action-link">
+    <Link href={action.href} className="intel-doc-action">
       {action.label}
     </Link>
   );
@@ -116,42 +117,32 @@ function TopicSection({
 }) {
   if (!items.length) return null;
   return (
-    <section className="intel-wrapped-section">
-      <div className="wif-section-head">
-        <h4 className="intel-wrapped-section-title">{title}</h4>
-        {hint && <p className="wif-section-hint">{hint}</p>}
-      </div>
-      <ul className="wif-topic-list">
+    <IntelSection title={title} hint={hint}>
+      <ul className="intel-doc-rows">
         {items.map((item) => {
           const shift = item as WrappedShift;
           const isShift = Boolean(shift.direction);
           return (
             <li
               key={`${item.topic}-${shift.direction ?? "row"}`}
-              className={`wif-topic-row ${rowClass}${isShift ? " wif-topic-row--shift" : ""}`}
+              className={`intel-doc-row ${rowClass}${isShift ? " intel-doc-row--shift" : ""}`}
             >
-              <div className="wif-topic-main">
-                <div className="wif-topic-top">
-                  <span className="wif-topic-name">{item.topic}</span>
-                  {isShift && (
-                    <span className={`intel-shift-badge intel-shift-badge--${shift.direction || "stable"}`}>
-                      {shift.label}
-                    </span>
-                  )}
-                </div>
-                {item.detail && (
-                  <p className={`wif-topic-detail${isShift ? "" : " wif-topic-detail--solo"}`}>
-                    {item.detail}
-                  </p>
+              <div className="intel-doc-row-top">
+                <span className="intel-doc-row-name">{item.topic}</span>
+                {isShift && (
+                  <span className={`intel-doc-badge intel-doc-badge--${shift.direction || "stable"}`}>
+                    {shift.label}
+                  </span>
                 )}
-                {showExamples && <ExampleStories examples={item.examples} />}
-                {showActions && <TopicAction action={item.action} />}
               </div>
+              {item.detail && <p className="intel-doc-row-detail">{item.detail}</p>}
+              {showExamples && <ExampleStories examples={item.examples} />}
+              {showActions && <TopicAction action={item.action} />}
             </li>
           );
         })}
       </ul>
-    </section>
+    </IntelSection>
   );
 }
 
@@ -182,17 +173,17 @@ export function WeekInFocusCard({ wrapped, variant = "full" }: Props) {
       emerging.length > visibleEmerging.length);
 
   return (
-    <div className={`wif-card wif-card--${variant}`}>
+    <div className={`intel-doc wif-card wif-card--${variant}`}>
       {(synthesis || wrapped.depth_label || wrapped.week_stats?.delta_label) && (
-        <div className="wif-hero">
-          {synthesis && <p className="wif-synthesis">{synthesis}</p>}
-          <div className="wif-hero-meta">
+        <div className="intel-doc-lead">
+          {synthesis && <p className="intel-doc-lead-text">{synthesis}</p>}
+          <div className="intel-doc-lead-meta">
             {wrapped.week_stats?.delta_label && (
-              <span className="wif-week-stat">{wrapped.week_stats.delta_label}</span>
+              <span className="intel-doc-pill">{wrapped.week_stats.delta_label}</span>
             )}
             {wrapped.depth_label && (
-              <span className={`intel-depth-pill intel-depth-pill--${wrapped.depth_trend || "stable"}`}>
-                <span className="intel-depth-pill-icon" aria-hidden>
+              <span className={`intel-doc-pill intel-doc-pill--${wrapped.depth_trend || "stable"}`}>
+                <span className="intel-doc-pill-icon" aria-hidden>
                   {depthTrendIcon(wrapped.depth_trend)}
                 </span>
                 {wrapped.depth_label}
@@ -250,8 +241,8 @@ export function WeekInFocusCard({ wrapped, variant = "full" }: Props) {
       )}
 
       {isTeaser && hasMore && (
-        <p className="wif-teaser-more">
-          <Link href="/intelligence#week-in-focus" className="wif-teaser-link">
+        <p className="intel-doc-teaser-more">
+          <Link href="/intelligence#week-in-focus" className="intel-doc-teaser-link">
             See full week in focus →
           </Link>
         </p>

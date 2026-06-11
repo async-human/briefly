@@ -1,9 +1,14 @@
 "use client";
 
 import type { ProfileIntelligence } from "@/lib/api";
+import { formatTopicSignal, rankInsights } from "@/lib/brieflyKnows";
+import { IntelSection } from "./IntelSection";
 
 const INTERNAL_LABELS = new Set([
-  "what's new", "whats new", "highly relevant to you", "highly relevant",
+  "what's new",
+  "whats new",
+  "highly relevant to you",
+  "highly relevant",
 ]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -23,74 +28,6 @@ function formatSignalAge(iso: string | null | undefined): string | null {
   return `Last activity ${weeks} weeks ago`;
 }
 
-function topicBreakdown(saves: number, engaged: number, skipped: number): string {
-  if (saves > 0 && skipped > 0) return `${saves} saved · ${skipped} skipped`;
-  if (saves > 0) return `${saves} saved`;
-  if (engaged > 0 && skipped > 0) return `${engaged} kept · ${skipped} skipped`;
-  if (engaged > 0) return `${engaged} kept`;
-  if (skipped > 0) return `${skipped} skipped`;
-  return "No actions yet";
-}
-
-function TopicTile({
-  topic, storiesShown, saves, engaged, skipped, actions, isDiscovered, isEmpty,
-}: {
-  topic: string;
-  storiesShown: number;
-  saves: number;
-  engaged: number;
-  skipped: number;
-  actions: number;
-  isDiscovered?: boolean;
-  isEmpty?: boolean;
-}) {
-  const variant = isEmpty ? "declared"
-    : isDiscovered ? "discovered"
-    : actions > 0 && saves >= skipped ? "above"
-    : "engaged";
-  const fill = storiesShown > 0 && actions > 0
-    ? `${Math.round((engaged / actions) * 100)}%`
-    : storiesShown > 0 ? "18%" : "0%";
-
-  return (
-    <div
-      className={`bk-topic-tile bk-topic-tile--${variant}`}
-      style={{ "--bk-fill": fill } as React.CSSProperties}
-      title={
-        isEmpty
-          ? "No matching stories in your briefings yet"
-          : actions > 0
-            ? `${storiesShown} stories in briefings · ${topicBreakdown(saves, engaged, skipped)}`
-            : `${storiesShown} stor${storiesShown === 1 ? "y" : "ies"} in your briefings`
-      }
-    >
-      {isEmpty ? (
-        <>
-          <span className="bk-topic-metric bk-topic-metric--muted">0</span>
-          <span className="bk-topic-detail">stories so far</span>
-        </>
-      ) : (
-        <>
-          <span className="bk-topic-metric">{storiesShown}</span>
-          <span className="bk-topic-detail">
-            {actions > 0
-              ? topicBreakdown(saves, engaged, skipped)
-              : storiesShown === 1 ? "story in briefings" : "stories in briefings"}
-          </span>
-        </>
-      )}
-      <span className="bk-topic-name">{topic}</span>
-      {isEmpty && <span className="bk-topic-sub">Not in your briefings yet</span>}
-      {!isEmpty && actions === 0 && (
-        <span className="bk-topic-sub">Save or skip in read mode to track taste</span>
-      )}
-      {!isEmpty && isDiscovered && (
-        <span className="bk-topic-sub">From your reading, not declared</span>
-      )}
-    </div>
-  );
-}
-
 function formatIntelFreshness(updatedAt: Date | null): string | null {
   if (!updatedAt) return null;
   const mins = Math.round((Date.now() - updatedAt.getTime()) / 60_000);
@@ -98,6 +35,29 @@ function formatIntelFreshness(updatedAt: Date | null): string | null {
   if (mins < 60) return `Updated ${mins}m ago`;
   const hrs = Math.round(mins / 60);
   return `Updated ${hrs}h ago`;
+}
+
+function topicDetail(
+  storiesShown: number,
+  saves: number,
+  engaged: number,
+  skipped: number,
+  actions: number,
+): string {
+  if (actions > 0) {
+    return formatTopicSignal({
+      topic: "",
+      rate: actions > 0 ? engaged / actions : 0,
+      storiesShown,
+      saves,
+      skipped,
+      engaged,
+    });
+  }
+  if (storiesShown > 0) {
+    return `${storiesShown} ${storiesShown === 1 ? "story" : "stories"} in your briefings · save or skip to train taste`;
+  }
+  return "Not in your briefings yet";
 }
 
 export type DeclaredProfile = {
@@ -113,254 +73,208 @@ type Props = {
   updatedAt: Date | null;
   onRefresh: () => void;
   refreshing: boolean;
-  /** On /intelligence — skip duplicate page-level masthead */
-  variant?: "full" | "embedded";
 };
 
 export function BrieflyKnowsCard({
   intel,
-  streak,
   declared,
   updatedAt,
   onRefresh,
   refreshing,
-  variant = "full",
 }: Props) {
-  const embedded = variant === "embedded";
   const freshness = formatIntelFreshness(updatedAt);
-  const stats = intel.reading_stats ?? { total_digests: 0, avg_open_rate: 0, avg_click_rate: 0 };
   const beh = intel.behavioral ?? {};
-  const insights = beh.insights ?? [];
+  const insights = rankInsights(beh.insights ?? []);
   const topicActual = beh.topic_actual ?? {};
   const srcEngage = beh.source_engagement ?? {};
   const emerging = (beh.emerging_topics ?? []).filter(isCleanLabel).slice(0, 6);
-
   const windowDays = beh.window_days ?? 45;
   const lastActivity = formatSignalAge(beh.latest_signal_at);
-
   const declaredKeys = new Set(declared.interests.map((t) => t.toLowerCase()));
 
-  const comparisonRows = declared.interests
-    .filter(isCleanLabel)
+  const topicNames = Array.from(
+    new Set([
+      ...declared.interests.filter(isCleanLabel),
+      ...Object.keys(topicActual).filter(isCleanLabel),
+    ]),
+  );
+
+  const topicRows = topicNames
     .map((topic) => {
       const key = topic.toLowerCase();
       const data = topicActual[key];
       const storiesShown = data?.stories_shown ?? 0;
+      const saves = data?.saves ?? 0;
+      const engaged = data?.engaged ?? 0;
+      const skipped = data?.skipped ?? 0;
+      const actions = data?.total ?? 0;
+      const rate = data?.rate ?? (actions > 0 ? engaged / actions : 0);
       return {
         topic,
         storiesShown,
-        saves: data?.saves ?? 0,
-        engaged: data?.engaged ?? 0,
-        skipped: data?.skipped ?? 0,
-        actions: data?.total ?? 0,
+        saves,
+        engaged,
+        skipped,
+        actions,
+        rate,
         isDiscovered: data?.source === "discovered" || !declaredKeys.has(key),
-        isEmpty: storiesShown === 0,
+        isEmpty: storiesShown === 0 && actions === 0,
       };
     })
-    .sort((a, b) => b.storiesShown - a.storiesShown || b.saves - a.saves)
+    .sort((a, b) => b.rate - a.rate || b.saves - a.saves || b.storiesShown - a.storiesShown)
     .slice(0, 12);
-
-  const hasTopicEngagement = comparisonRows.some((r) => r.storiesShown > 0);
 
   const cleanSources = (intel.top_sources ?? []).filter(isCleanLabel);
   const cleanDeprioritized = (intel.deprioritized_sources ?? []).filter(isCleanLabel);
   const cleanThreads = intel.active_threads.slice(0, 4);
 
   const topSrcRows = Object.entries(srcEngage)
-    .filter(([s, r]) => isCleanLabel(s) && r >= 0.55)
+    .filter(([s, r]) => isCleanLabel(s) && r >= 0.45)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5);
 
   if (intel.digest_day === 0 && !declared.role && declared.interests.length === 0) {
     return (
-      <div className="bk-card bk-card-empty">
-        <div className="bk-masthead">
-          <div className="bk-masthead-left">
-            <span className="bk-eyebrow">intelligence profile</span>
-            <h2 className="bk-title">What Briefly knows about you</h2>
-          </div>
-        </div>
-        <p className="bk-empty-hint">Your profile builds with every digest you read.</p>
+      <div className="intel-doc intel-doc-empty">
+        <p className="intel-doc-empty-hint">Your profile builds with every briefing you read.</p>
       </div>
     );
   }
 
   return (
-    <div className={`bk-card${embedded ? " bk-card--embedded" : ""}`}>
-      {embedded ? (
-        <div className="bk-embedded-bar">
-          <p className="bk-freshness">
-            {freshness ?? `Based on your last ${windowDays} days`}
-            {lastActivity ? ` · ${lastActivity}` : ""}
-          </p>
-          <button
-            type="button"
-            className="bk-refresh-btn"
-            onClick={onRefresh}
-            disabled={refreshing}
-            aria-label="Refresh intelligence profile"
-          >
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
-      ) : (
-        <div className="bk-masthead">
-          <div className="bk-masthead-left">
-            <span className="bk-eyebrow">intelligence profile</span>
-            <h2 className="bk-title">What Briefly knows about you</h2>
-            <p className="bk-freshness">
-              {freshness ?? `Based on your last ${windowDays} days`}
-              {lastActivity ? ` · ${lastActivity}` : ""}
-              <button
-                type="button"
-                className="bk-refresh-btn"
-                onClick={onRefresh}
-                disabled={refreshing}
-                aria-label="Refresh intelligence profile"
-              >
-                {refreshing ? "Refreshing…" : "Refresh"}
-              </button>
-            </p>
-          </div>
-          <div className="bk-masthead-stats">
-            {stats.total_digests > 0 && (
-              <div className="bk-stat">
-                <span className="bk-stat-n">{stats.total_digests}</span>
-                <span className="bk-stat-l">digests</span>
-              </div>
-            )}
-            {(beh.total_signals ?? 0) > 0 && (
-              <div className="bk-stat">
-                <span className="bk-stat-n">{beh.total_signals}</span>
-                <span className="bk-stat-l">signals</span>
-              </div>
-            )}
-            {streak > 0 && (
-              <div className="bk-stat bk-stat--streak">
-                <span className="bk-stat-n">{streak}</span>
-                <span className="bk-stat-l">day streak</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+    <div className="intel-doc">
+      <div className="intel-doc-meta">
+        <p className="intel-doc-meta-text">
+          {freshness ?? `Based on your last ${windowDays} days`}
+          {lastActivity ? ` · ${lastActivity}` : ""}
+        </p>
+        <button
+          type="button"
+          className="intel-doc-refresh"
+          onClick={onRefresh}
+          disabled={refreshing}
+          aria-label="Refresh intelligence profile"
+        >
+          {refreshing ? "Refreshing…" : "Refresh"}
+        </button>
+      </div>
 
       {insights.length > 0 && (
-        <div className="bk-section">
-          <p className="bk-section-label">Reading insights</p>
-          <div className="bk-insight-cards">
-            {insights.map((ins, i) => (
-              <div key={i} className={`bk-insight-card bk-insight-card--${ins.type}`}>
-                <span className="bk-insight-label">{ins.label}</span>
-                <p className="bk-insight-text">{ins.text}</p>
-              </div>
+        <IntelSection title="Reading insights">
+          <ul className="intel-doc-insights">
+            {insights.slice(0, 3).map((ins) => (
+              <li key={`${ins.type}-${ins.label}`} className={`intel-doc-insight intel-doc-insight--${ins.type}`}>
+                <p className="intel-doc-insight-label">{ins.label}</p>
+                <p className="intel-doc-insight-text">{ins.text}</p>
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </IntelSection>
       )}
 
-      {comparisonRows.length > 0 && (
-        <div className="bk-section">
-          <div className="bk-section-head-row">
-            <p className="bk-section-label">
-              {hasTopicEngagement ? "Topic engagement" : "Your tracked topics"}
-            </p>
-            <span className="bk-section-hint">
-              Stories Briefly included in your briefings (last {windowDays} days)
-            </span>
-          </div>
-          {!hasTopicEngagement && (
-            <p className="bk-declared-hint">
-              Topics appear here once Briefly surfaces matching stories in a briefing.
-            </p>
-          )}
-          <div className="bk-topics-grid">
-            {comparisonRows.map((row) => (
-              <TopicTile
+      {topicRows.length > 0 && (
+        <IntelSection
+          title="Topic engagement"
+          hint={`Stories in your briefings · last ${windowDays} days`}
+        >
+          <ul className="intel-doc-rows">
+            {topicRows.map((row) => (
+              <li
                 key={row.topic}
-                topic={row.topic}
-                storiesShown={row.storiesShown}
-                saves={row.saves}
-                engaged={row.engaged}
-                skipped={row.skipped}
-                actions={row.actions}
-                isDiscovered={row.isDiscovered}
-                isEmpty={row.isEmpty ?? false}
-              />
+                className={`intel-doc-row${row.isEmpty ? " intel-doc-row--muted" : ""}${row.isDiscovered ? " intel-doc-row--discovered" : ""}`}
+              >
+                <div className="intel-doc-row-top">
+                  <span className="intel-doc-row-name">{row.topic}</span>
+                  {row.rate > 0 && row.actions > 0 && (
+                    <span className="intel-doc-row-metric">{Math.round(row.rate * 100)}% engaged</span>
+                  )}
+                </div>
+                <p className="intel-doc-row-detail">
+                  {topicDetail(row.storiesShown, row.saves, row.engaged, row.skipped, row.actions)}
+                </p>
+                {row.isDiscovered && !row.isEmpty && (
+                  <p className="intel-doc-row-note">Discovered from your reading</p>
+                )}
+              </li>
             ))}
-          </div>
+          </ul>
           {emerging.length > 0 && (
-            <div className="bk-emerging">
-              <span className="bk-emerging-label">Emerging in your reads (not declared)</span>
-              <div className="bk-emerging-chips">
+            <div className="intel-doc-chips-block">
+              <p className="intel-doc-chips-label">Emerging · not declared</p>
+              <div className="intel-doc-chips">
                 {emerging.map((t) => (
-                  <span key={t} className="bk-chip bk-chip-emerging">{t}</span>
+                  <span key={t} className="intel-doc-chip">
+                    {t}
+                  </span>
                 ))}
               </div>
             </div>
           )}
-        </div>
+        </IntelSection>
       )}
 
       {topSrcRows.length > 0 && (
-        <div className="bk-section">
-          <p className="bk-section-label">Sources you consistently engage with</p>
-          <div className="bk-source-list">
-            {topSrcRows.map(([src, rate], i) => (
-              <div key={src} className="bk-source-item">
-                <span className="bk-source-num">{String(i + 1).padStart(2, "0")}</span>
-                <span className="bk-source-name-text">{src}</span>
-                <span className="bk-source-signal" style={{ opacity: Math.max(0.25, rate) }}>
-                  <span className="bk-source-dot" />
-                </span>
-                <span className="bk-source-pct-badge">{Math.round(rate * 100)}%</span>
-              </div>
+        <IntelSection title="Sources you engage with">
+          <ul className="intel-doc-rows intel-doc-rows--compact">
+            {topSrcRows.map(([src, rate]) => (
+              <li key={src} className="intel-doc-row intel-doc-row--source">
+                <div className="intel-doc-row-top">
+                  <span className="intel-doc-row-name">{src}</span>
+                  <span className="intel-doc-row-metric">{Math.round(rate * 100)}%</span>
+                </div>
+                <p className="intel-doc-row-detail">Opened or saved from this source</p>
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </IntelSection>
       )}
 
       {cleanThreads.length > 0 && (
-        <div className="bk-section">
-          <p className="bk-section-label">Stories Briefly is tracking for you</p>
-          <div className="bk-threads">
+        <IntelSection title="Stories Briefly is tracking">
+          <ul className="intel-doc-rows">
             {cleanThreads.map((t) => (
-              <div key={t.topic} className="bk-thread">
-                <span className="bk-thread-dot" />
-                <div className="bk-thread-body">
-                  <div className="bk-thread-header">
-                    <span className="bk-thread-topic">{t.topic}</span>
-                    <span className="bk-thread-meta">{t.weeks}w · {t.appearances} briefings</span>
-                  </div>
-                  {t.latest && <p className="bk-thread-latest">&ldquo;{t.latest}&rdquo;</p>}
+              <li key={t.topic} className="intel-doc-row intel-doc-row--thread">
+                <div className="intel-doc-row-top">
+                  <span className="intel-doc-row-name">{t.topic}</span>
+                  <span className="intel-doc-row-metric">
+                    {t.appearances} update{t.appearances === 1 ? "" : "s"}
+                    {t.weeks > 0 ? ` · ${t.weeks}w` : ""}
+                  </span>
                 </div>
-              </div>
+                {t.latest && <p className="intel-doc-row-quote">&ldquo;{t.latest}&rdquo;</p>}
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </IntelSection>
       )}
 
       {(cleanDeprioritized.length > 0 || (cleanSources.length > 0 && topSrcRows.length === 0)) && (
-        <div className="bk-section bk-section-dim">
+        <IntelSection title="Source signals">
           {cleanSources.length > 0 && topSrcRows.length === 0 && (
-            <>
-              <p className="bk-section-label">Sources Briefly watches for you</p>
-              <div className="bk-chips">
-                {cleanSources.map((s) => <span key={s} className="bk-chip bk-chip-source">{s}</span>)}
+            <div className="intel-doc-chips-block">
+              <p className="intel-doc-chips-label">Watching</p>
+              <div className="intel-doc-chips">
+                {cleanSources.map((s) => (
+                  <span key={s} className="intel-doc-chip">
+                    {s}
+                  </span>
+                ))}
               </div>
-            </>
+            </div>
           )}
           {cleanDeprioritized.length > 0 && (
-            <>
-              <p className="bk-section-label" style={{ marginTop: cleanSources.length > 0 ? 12 : 0 }}>
-                Sources with low engagement
-              </p>
-              <div className="bk-chips">
-                {cleanDeprioritized.map((s) => <span key={s} className="bk-chip bk-chip-faded">{s}</span>)}
+            <div className="intel-doc-chips-block">
+              <p className="intel-doc-chips-label">Low engagement</p>
+              <div className="intel-doc-chips">
+                {cleanDeprioritized.map((s) => (
+                  <span key={s} className="intel-doc-chip intel-doc-chip--muted">
+                    {s}
+                  </span>
+                ))}
               </div>
-            </>
+            </div>
           )}
-        </div>
+        </IntelSection>
       )}
     </div>
   );

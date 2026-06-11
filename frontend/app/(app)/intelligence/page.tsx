@@ -130,7 +130,7 @@ export default function IntelligencePage() {
           <PageContentTransition>
             <div className="dash-page-stack">
               {weekInFocus && (
-                <section id="week-in-focus" className="dash-surface dash-surface-week-focus">
+                <section id="week-in-focus" className="dash-surface dash-surface-intel">
                   <div className="dash-surface-head dash-surface-head-intel">
                     <p className="dash-surface-eyebrow">Weekly snapshot</p>
                     <h2 className="dash-surface-title">Your week in focus</h2>
@@ -145,7 +145,7 @@ export default function IntelligencePage() {
               )}
 
               {intel ? (
-                <section className="dash-surface dash-surface-knows">
+                <section className="dash-surface dash-surface-intel">
                   <div className="dash-surface-head dash-surface-head-intel">
                     <p className="dash-surface-eyebrow">Reading profile</p>
                     <h2 className="dash-surface-title">Topics &amp; sources</h2>
@@ -153,7 +153,7 @@ export default function IntelligencePage() {
                       What Briefly weights up or down based on your behavior.
                     </p>
                   </div>
-                  <div className="dash-surface-body dash-surface-body-pad dash-surface-body-knows">
+                  <div className="dash-surface-body dash-surface-body-pad">
                     <BrieflyKnowsCard
                       intel={intel}
                       streak={streak}
@@ -161,12 +161,11 @@ export default function IntelligencePage() {
                       updatedAt={updatedAt}
                       onRefresh={() => void refreshIntelligence()}
                       refreshing={refreshing}
-                      variant="embedded"
                     />
                   </div>
                 </section>
               ) : (
-                <section className="dash-surface dash-surface-knows">
+                <section className="dash-surface dash-surface-intel">
                   <div className="dash-surface-body dash-surface-body-pad">
                     <p className="bk-empty-hint">
                       Your intelligence profile builds with every briefing you read.
