@@ -131,24 +131,29 @@ export default function IntelligencePage() {
             <div className="dash-page-stack">
               {weekInFocus && (
                 <section id="week-in-focus" className="dash-surface dash-surface-week-focus">
-                  <div className="dash-surface-body">
-                    <header className="wif-page-head">
-                      <div>
-                        <p className="wif-page-eyebrow">Weekly snapshot</p>
-                        <h2 className="wif-page-title">Your week in focus</h2>
-                        <p className="wif-page-desc">
-                          Patterns from your opens, saves, and skips — updated as you read.
-                        </p>
-                      </div>
-                    </header>
+                  <div className="dash-surface-head dash-surface-head-intel">
+                    <p className="dash-surface-eyebrow">Weekly snapshot</p>
+                    <h2 className="dash-surface-title">Your week in focus</h2>
+                    <p className="dash-surface-desc">
+                      Patterns from your opens, saves, and skips — updated as you read.
+                    </p>
+                  </div>
+                  <div className="dash-surface-body dash-surface-body-pad">
                     <WeekInFocusCard wrapped={weekInFocus} variant="full" />
                   </div>
                 </section>
               )}
 
               {intel ? (
-                <div className="dash-surface dash-surface-knows">
-                  <div className="dash-surface-body dash-surface-body-knows">
+                <section className="dash-surface dash-surface-knows">
+                  <div className="dash-surface-head dash-surface-head-intel">
+                    <p className="dash-surface-eyebrow">Reading profile</p>
+                    <h2 className="dash-surface-title">Topics &amp; sources</h2>
+                    <p className="dash-surface-desc">
+                      What Briefly weights up or down based on your behavior.
+                    </p>
+                  </div>
+                  <div className="dash-surface-body dash-surface-body-pad dash-surface-body-knows">
                     <BrieflyKnowsCard
                       intel={intel}
                       streak={streak}
@@ -156,17 +161,18 @@ export default function IntelligencePage() {
                       updatedAt={updatedAt}
                       onRefresh={() => void refreshIntelligence()}
                       refreshing={refreshing}
+                      variant="embedded"
                     />
                   </div>
-                </div>
+                </section>
               ) : (
-                <div className="dash-surface dash-surface-knows">
-                  <div className="dash-surface-body dash-surface-body-knows">
+                <section className="dash-surface dash-surface-knows">
+                  <div className="dash-surface-body dash-surface-body-pad">
                     <p className="bk-empty-hint">
                       Your intelligence profile builds with every briefing you read.
                     </p>
                   </div>
-                </div>
+                </section>
               )}
 
               <p className="intel-settings-foot">

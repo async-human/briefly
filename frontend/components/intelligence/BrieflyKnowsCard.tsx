@@ -113,11 +113,20 @@ type Props = {
   updatedAt: Date | null;
   onRefresh: () => void;
   refreshing: boolean;
+  /** On /intelligence — skip duplicate page-level masthead */
+  variant?: "full" | "embedded";
 };
 
 export function BrieflyKnowsCard({
-  intel, streak, declared, updatedAt, onRefresh, refreshing,
+  intel,
+  streak,
+  declared,
+  updatedAt,
+  onRefresh,
+  refreshing,
+  variant = "full",
 }: Props) {
+  const embedded = variant === "embedded";
   const freshness = formatIntelFreshness(updatedAt);
   const stats = intel.reading_stats ?? { total_digests: 0, avg_open_rate: 0, avg_click_rate: 0 };
   const beh = intel.behavioral ?? {};
@@ -177,46 +186,64 @@ export function BrieflyKnowsCard({
   }
 
   return (
-    <div className="bk-card">
-      <div className="bk-masthead">
-        <div className="bk-masthead-left">
-          <span className="bk-eyebrow">intelligence profile</span>
-          <h2 className="bk-title">What Briefly knows about you</h2>
+    <div className={`bk-card${embedded ? " bk-card--embedded" : ""}`}>
+      {embedded ? (
+        <div className="bk-embedded-bar">
           <p className="bk-freshness">
             {freshness ?? `Based on your last ${windowDays} days`}
             {lastActivity ? ` · ${lastActivity}` : ""}
-            <button
-              type="button"
-              className="bk-refresh-btn"
-              onClick={onRefresh}
-              disabled={refreshing}
-              aria-label="Refresh intelligence profile"
-            >
-              {refreshing ? "Refreshing…" : "Refresh"}
-            </button>
           </p>
+          <button
+            type="button"
+            className="bk-refresh-btn"
+            onClick={onRefresh}
+            disabled={refreshing}
+            aria-label="Refresh intelligence profile"
+          >
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
         </div>
-        <div className="bk-masthead-stats">
-          {stats.total_digests > 0 && (
-            <div className="bk-stat">
-              <span className="bk-stat-n">{stats.total_digests}</span>
-              <span className="bk-stat-l">digests</span>
-            </div>
-          )}
-          {(beh.total_signals ?? 0) > 0 && (
-            <div className="bk-stat">
-              <span className="bk-stat-n">{beh.total_signals}</span>
-              <span className="bk-stat-l">signals</span>
-            </div>
-          )}
-          {streak > 0 && (
-            <div className="bk-stat bk-stat--streak">
-              <span className="bk-stat-n">{streak}</span>
-              <span className="bk-stat-l">day streak</span>
-            </div>
-          )}
+      ) : (
+        <div className="bk-masthead">
+          <div className="bk-masthead-left">
+            <span className="bk-eyebrow">intelligence profile</span>
+            <h2 className="bk-title">What Briefly knows about you</h2>
+            <p className="bk-freshness">
+              {freshness ?? `Based on your last ${windowDays} days`}
+              {lastActivity ? ` · ${lastActivity}` : ""}
+              <button
+                type="button"
+                className="bk-refresh-btn"
+                onClick={onRefresh}
+                disabled={refreshing}
+                aria-label="Refresh intelligence profile"
+              >
+                {refreshing ? "Refreshing…" : "Refresh"}
+              </button>
+            </p>
+          </div>
+          <div className="bk-masthead-stats">
+            {stats.total_digests > 0 && (
+              <div className="bk-stat">
+                <span className="bk-stat-n">{stats.total_digests}</span>
+                <span className="bk-stat-l">digests</span>
+              </div>
+            )}
+            {(beh.total_signals ?? 0) > 0 && (
+              <div className="bk-stat">
+                <span className="bk-stat-n">{beh.total_signals}</span>
+                <span className="bk-stat-l">signals</span>
+              </div>
+            )}
+            {streak > 0 && (
+              <div className="bk-stat bk-stat--streak">
+                <span className="bk-stat-n">{streak}</span>
+                <span className="bk-stat-l">day streak</span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {insights.length > 0 && (
         <div className="bk-section">

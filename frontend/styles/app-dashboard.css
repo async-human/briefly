@@ -567,6 +567,27 @@
   padding: 0;
 }
 
+.dash-surface-body-pad {
+  padding: clamp(1.125rem, 2.5vw, 1.625rem) clamp(1.25rem, 3vw, 1.75rem)
+    clamp(1.375rem, 3vw, 1.875rem);
+}
+
+.dash-surface-head-intel {
+  padding: clamp(1.125rem, 2.5vw, 1.5rem) clamp(1.25rem, 3vw, 1.75rem) 0;
+  border-bottom: none;
+  background: transparent;
+}
+
+.dash-surface-eyebrow {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
 .dash-surface-body-flush {
   padding: 0;
 }
@@ -1542,7 +1563,11 @@
   border: none;
   border-radius: 0;
   background: transparent;
-  padding: 1.25rem;
+  padding: 0;
+  gap: 1.75rem;
+}
+
+.app-shell .dash-surface-knows .bk-card--embedded {
   gap: 1.5rem;
 }
 
@@ -5178,6 +5203,155 @@ a.saved-capture-title:hover {
   font-size: 0.8125rem;
   line-height: 1.55;
   color: var(--app-ink-2);
+}
+
+/* Hallmark · intelligence page — editorial document rhythm, generous inset */
+.app-shell .dash-page-intelligence {
+  padding-bottom: clamp(5.5rem, 14vh, 7.5rem);
+}
+
+.app-shell .dash-page-intelligence .dash-page-stack {
+  gap: 1.125rem;
+}
+
+.app-shell .dash-page-intelligence .dash-surface-week-focus,
+.app-shell .dash-page-intelligence .dash-surface-knows {
+  overflow: visible;
+}
+
+.app-shell .dash-page-intelligence .dash-surface-title {
+  font-size: 1.0625rem;
+  letter-spacing: -0.02em;
+}
+
+.app-shell .dash-page-intelligence .wif-card {
+  min-width: 0;
+}
+
+.app-shell .dash-page-intelligence .wif-hero {
+  margin-bottom: 0;
+  padding: 1rem 1.125rem;
+}
+
+.app-shell .dash-page-intelligence .wif-synthesis {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.app-shell .dash-page-intelligence .intel-wrapped-section {
+  margin-top: 1.375rem;
+}
+
+.app-shell .dash-page-intelligence .intel-wrapped-section:first-child {
+  margin-top: 0;
+}
+
+.app-shell .dash-page-intelligence .intel-wrapped-section + .intel-wrapped-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.app-shell .dash-page-intelligence .intel-wrapped-section-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--app-muted);
+}
+
+.app-shell .dash-page-intelligence .wif-section-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  max-width: 42rem;
+}
+
+.app-shell .dash-page-intelligence .wif-topic-list {
+  gap: 0.5rem;
+}
+
+.app-shell .dash-page-intelligence .wif-topic-row {
+  padding: 0.875rem 1rem;
+  min-width: 0;
+}
+
+.app-shell .dash-page-intelligence .wif-topic-main {
+  min-width: 0;
+}
+
+.app-shell .dash-page-intelligence .wif-topic-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.5rem 0.875rem;
+}
+
+.app-shell .dash-page-intelligence .wif-topic-name {
+  font-size: 0.875rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.app-shell .dash-page-intelligence .intel-shift-badge {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.app-shell .dash-page-intelligence .wif-topic-detail {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--app-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.app-shell .dash-page-intelligence .wif-topic-detail--solo {
+  margin-top: 0.35rem;
+  color: var(--app-muted);
+}
+
+.app-shell .dash-page-intelligence .wif-action-link {
+  margin-top: 0.625rem;
+}
+
+.app-shell .dash-page-intelligence .bk-embedded-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.app-shell .dash-page-intelligence .bk-embedded-bar .bk-freshness {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--app-muted);
+}
+
+.app-shell .dash-page-intelligence .intel-settings-foot {
+  padding: 0.5rem 0 0;
+}
+
+@media (max-width: 520px) {
+  .app-shell .dash-page-intelligence .wif-topic-top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell .dash-page-intelligence .intel-shift-badge {
+    justify-self: start;
+  }
+
+  .app-shell .dash-page-intelligence .dash-surface-body-pad {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
 }
 
 /* Week in focus card */

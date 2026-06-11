@@ -138,11 +138,12 @@ function TopicSection({
                       {shift.label}
                     </span>
                   )}
-                  {!isShift && item.detail && (
-                    <span className="wif-topic-meta">{item.detail}</span>
-                  )}
                 </div>
-                {isShift && item.detail && <p className="wif-topic-detail">{item.detail}</p>}
+                {item.detail && (
+                  <p className={`wif-topic-detail${isShift ? "" : " wif-topic-detail--solo"}`}>
+                    {item.detail}
+                  </p>
+                )}
                 {showExamples && <ExampleStories examples={item.examples} />}
                 {showActions && <TopicAction action={item.action} />}
               </div>
