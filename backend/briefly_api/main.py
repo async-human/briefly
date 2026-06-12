@@ -36,6 +36,8 @@ if _settings.sentry_dsn:
 async def lifespan(_app: FastAPI):
     settings = get_settings()
 
+    settings.validate_production_security()
+
     if not settings.runs_web_server:
         logger.error("Web process started with BRIEFLY_PROCESS_ROLE=worker — use workers.runner instead")
         raise RuntimeError("Invalid process role for web server")

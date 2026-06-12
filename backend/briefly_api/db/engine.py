@@ -24,6 +24,14 @@ engine = create_async_engine(
     _settings.database_url,
     echo=_settings.app_env == "development",
     connect_args=_connect_args(_settings.database_url),
+    # Sized for web requests + scheduler + enrichment worker sharing one process.
+    # pre_ping recovers from hosted-Postgres idle disconnects (Supabase/Railway);
+    # recycle keeps connections younger than typical LB idle timeouts.
+    pool_size=_settings.db_pool_size,
+    max_overflow=_settings.db_max_overflow,
+    pool_timeout=30,
+    pool_pre_ping=True,
+    pool_recycle=1800,
 )
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 

@@ -1,4 +1,4 @@
-import { API_URL, getToken } from "./auth";
+import { API_URL, clearToken, getToken, setAuthNext } from "./auth";
 
 export class ApiError extends Error {
   constructor(
@@ -7,6 +7,21 @@ export class ApiError extends Error {
   ) {
     super(message);
   }
+}
+
+/**
+ * Session expired (JWT past its 7-day window) — clear the stale token and
+ * send the user to login instead of surfacing raw 401 errors in the UI.
+ * The login page owns all post-login redirect logic.
+ */
+function handleUnauthorized(): void {
+  if (typeof window === "undefined") return;
+  const path = window.location.pathname;
+  if (path.startsWith("/login") || path.startsWith("/auth")) return;
+  if (!getToken()) return; // never had a session — page guards handle this
+  clearToken();
+  setAuthNext(path);
+  window.location.assign("/login?reason=session_expired");
 }
 
 async function request<T>(
@@ -36,6 +51,7 @@ async function request<T>(
     });
 
     if (!res.ok) {
+      if (res.status === 401) handleUnauthorized();
       const body = await res.json().catch(() => ({}));
       const detail = body.detail;
       const message =
@@ -88,6 +104,7 @@ async function requestFormData<T>(
   });
 
   if (!res.ok) {
+    if (res.status === 401) handleUnauthorized();
     const body = await res.json().catch(() => ({}));
     const detail = body.detail;
     const message =

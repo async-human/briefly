@@ -23,6 +23,7 @@ async def _run() -> None:
     from briefly_api.workers.scheduler import digest_scheduler_loop
 
     settings = get_settings()
+    settings.validate_production_security()
     if not settings.runs_background_workers:
         log.error("BRIEFLY_PROCESS_ROLE must be worker or all — got %s", settings.process_role)
         sys.exit(1)

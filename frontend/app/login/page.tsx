@@ -202,6 +202,7 @@ function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [checking, setChecking] = useState(true);
+  const sessionExpired = searchParams.get("reason") === "session_expired";
 
   useEffect(() => {
     const next = searchParams.get("next");
@@ -313,6 +314,11 @@ function LoginPageContent() {
                 <TimeGreetingCardTitle />
               </h2>
               <p className="login-card-sub">Your personalised briefing, delivered when you need it.</p>
+              {sessionExpired && (
+                <p className="login-session-note" role="status">
+                  Your session expired — sign in again to pick up where you left off.
+                </p>
+              )}
             </div>
 
             <div className="lp-perks">

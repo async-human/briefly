@@ -42,7 +42,13 @@ async def resend_inbound_email(
         if not _verify_resend_signature(raw, sig, secret):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid signature")
     elif settings.app_env == "production":
-        log.warning("RESEND_INBOUND_WEBHOOK_SECRET unset — inbound webhook signatures not verified")
+        # Fail closed: unsigned inbound email would let anyone inject content
+        # into a user's pool if they learn the user's forwarding address.
+        log.error("RESEND_INBOUND_WEBHOOK_SECRET unset — rejecting inbound webhook")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Inbound email webhook not configured",
+        )
 
     import json
 

@@ -34,6 +34,10 @@ class Settings(BaseSettings):
 
     # ── Database ─────────────────────────────────────────────────────────────
     database_url: str = "postgresql+asyncpg://briefly:briefly@localhost:5432/briefly"
+    # Connection pool — keep pool_size + max_overflow below your Postgres
+    # max_connections budget across ALL processes (web + worker).
+    db_pool_size: int = 10
+    db_max_overflow: int = 15
 
     # ── Redis ────────────────────────────────────────────────────────────────
     redis_url: str = "redis://localhost:6379/0"
@@ -45,6 +49,11 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("process_role", "briefly_process_role"),
     )
     background_job_poll_seconds: int = 10
+    # Max simultaneous per-user pipeline/ingestion runs in the scheduler.
+    # Each digest run holds DB connections and makes several LLM calls, so
+    # this must stay well below db_pool_size.
+    scheduler_max_concurrent_digests: int = 3
+    scheduler_max_concurrent_ingestions: int = 4
 
     # ── API rate limits (Redis-backed, per user per hour) ────────────────────
     rate_limit_enabled: bool = True
@@ -297,6 +306,27 @@ class Settings(BaseSettings):
 
     # ── Admin ────────────────────────────────────────────────────────────────
     admin_key: str = "change-me-admin-key"
+
+    def validate_production_security(self) -> None:
+        """
+        Hard safety checks before serving real users.
+        JWT signing AND OAuth-token encryption both derive from secret_key,
+        so a default/weak value in production is a critical compromise.
+        """
+        if self.app_env != "production":
+            return
+        problems: list[str] = []
+        if self.secret_key == "change-me-in-production" or len(self.secret_key) < 32:
+            problems.append(
+                "SECRET_KEY is default or shorter than 32 chars — JWTs would be "
+                "forgeable and stored OAuth tokens trivially decryptable. "
+                "Set a strong SECRET_KEY (e.g. `openssl rand -hex 32`)."
+            )
+        if problems:
+            raise RuntimeError(
+                "Refusing to start in production with insecure settings:\n- "
+                + "\n- ".join(problems)
+            )
 
 
 @lru_cache

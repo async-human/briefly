@@ -425,26 +425,35 @@ async def digest_scheduler_loop() -> None:
             due_ingest = await _get_due_ingestion_users(now_utc)
             if due_ingest:
                 log.info("Scheduler: %d user(s) due for ingestion", len(due_ingest))
+                ingest_sem = asyncio.Semaphore(max(1, s.scheduler_max_concurrent_ingestions))
+
+                async def _bounded_ingest(entry: dict) -> None:
+                    async with ingest_sem:
+                        await _run_ingestion_for_user(entry["user_id"], entry["local_date"])
+
                 await asyncio.gather(
-                    *[
-                        _run_ingestion_for_user(entry["user_id"], entry["local_date"])
-                        for entry in due_ingest
-                    ],
+                    *[_bounded_ingest(entry) for entry in due_ingest],
                     return_exceptions=True,
                 )
 
             # ── Per-user digest ───────────────────────────────────────────────
+            # Bounded: each pipeline run holds DB connections and fires several
+            # LLM calls. Unbounded fan-out melts the pool when one timezone's
+            # cohort all hit their digest_time in the same minute.
             due_users = await _get_due_users(now_utc)
             if due_users:
                 log.info(
                     "Scheduler: %d user(s) due for digest at %s UTC",
                     len(due_users), now_utc.strftime("%H:%M"),
                 )
+                digest_sem = asyncio.Semaphore(max(1, s.scheduler_max_concurrent_digests))
+
+                async def _bounded_digest(u: dict) -> None:
+                    async with digest_sem:
+                        await _run_pipeline_for_user(u["user_id"], u["local_date"])
+
                 await asyncio.gather(
-                    *[
-                        _run_pipeline_for_user(u["user_id"], u["local_date"])
-                        for u in due_users
-                    ],
+                    *[_bounded_digest(u) for u in due_users],
                     return_exceptions=True,
                 )
 

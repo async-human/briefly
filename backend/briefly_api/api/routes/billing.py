@@ -46,9 +46,18 @@ async def lemon_squeezy_webhook(
 ) -> dict:
     body = await request.body()
 
-    if settings.lemon_squeezy_webhook_secret:
-        if not _verify_signature(body, x_signature, settings.lemon_squeezy_webhook_secret):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid signature")
+    if not settings.lemon_squeezy_webhook_secret:
+        # Never process unsigned billing events in production — a forged
+        # subscription_created payload would grant free Pro to any email.
+        if settings.app_env == "production":
+            logger.error("Billing webhook called but LEMON_SQUEEZY_WEBHOOK_SECRET is unset — rejecting")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Billing webhook not configured",
+            )
+        logger.warning("LEMON_SQUEEZY_WEBHOOK_SECRET unset — accepting unsigned webhook (non-production only)")
+    elif not _verify_signature(body, x_signature, settings.lemon_squeezy_webhook_secret):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid signature")
 
     payload = await request.json()
     event_name: str = payload.get("meta", {}).get("event_name", "")
