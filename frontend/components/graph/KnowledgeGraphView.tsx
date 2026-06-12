@@ -9,6 +9,7 @@ import { applyThreadFocusFilter } from "@/lib/graphFilter";
 import Link from "next/link";
 import { askAboutContent } from "@/lib/askLinks";
 import type { GraphTimeRange, GraphViewFilter } from "@/lib/graphLinks";
+import { applyHubLayout, linkDistance, type LayoutLink, type LayoutNode } from "@/lib/graphLayout";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
@@ -29,6 +30,16 @@ const NODE_LABELS: Record<KnowledgeGraphNodeType, string> = {
 };
 
 const ANCHOR_TYPES = new Set<KnowledgeGraphNodeType>(["topic", "thread", "source"]);
+
+const EDGE_LEGEND: { type: string; label: string; hint: string }[] = [
+  { type: "belongs_to", label: "Brief → topic", hint: "Article matched an interest in your brief" },
+  { type: "part_of", label: "Thread → topic", hint: "Story thread grouped under a topic" },
+  { type: "produces", label: "Source → article", hint: "Where an article was published" },
+  { type: "updates", label: "Article → thread", hint: "Article advances a story thread" },
+  { type: "related_to", label: "Article ↔ article", hint: "Semantically similar (embedding match)" },
+  { type: "relates_to", label: "Thought → topic", hint: "Your note relates to an interest" },
+  { type: "captures", label: "Source → thought", hint: "Brain dump you saved" },
+];
 
 function truncateLabel(label: string, max: number): string {
   if (label.length <= max) return label;
@@ -62,9 +73,12 @@ function shouldShowCanvasLabel(
 ): boolean {
   if (focusIds && !focusIds.has(node.id)) return false;
   if (node.id === hoveredId || node.id === selectedId) return true;
-  if (node.type === "item" || node.type === "thought") return false;
+  if (focusIds && focusIds.has(node.id)) return true;
+  if (node.type === "item" || node.type === "thought") {
+    return globalScale >= 1.6;
+  }
   if (!ANCHOR_TYPES.has(node.type)) return false;
-  return globalScale >= 1.35;
+  return globalScale >= 0.72;
 }
 
 const ALL_TYPES: KnowledgeGraphNodeType[] = ["topic", "source", "item", "thought", "thread"];
@@ -117,7 +131,29 @@ function drawNodeLabel(
   }
 }
 
-type ForceNode = KnowledgeGraphNode & { x?: number; y?: number };
+type ForceNode = LayoutNode;
+
+function connectionsForNode(
+  nodeId: string,
+  links: LayoutLink[],
+  nodesById: Map<string, KnowledgeGraphNode>,
+) {
+  return links
+    .filter((link) => link.source === nodeId || link.target === nodeId)
+    .map((link) => {
+      const outbound = link.source === nodeId;
+      const otherId = outbound ? link.target : link.source;
+      const other = nodesById.get(otherId);
+      return {
+        id: `${link.type}:${otherId}`,
+        label: link.label ?? link.type ?? "Connected",
+        otherLabel: other?.label ?? otherId,
+        otherType: other?.type,
+        edgeType: link.type,
+      };
+    })
+    .sort((a, b) => a.otherLabel.localeCompare(b.otherLabel));
+}
 
 const FILTER_SHORT: Record<KnowledgeGraphNodeType, string> = {
   topic: "Topics",
@@ -224,13 +260,16 @@ export function KnowledgeGraphView({
   );
   const [selected, setSelected] = useState<KnowledgeGraphNode | null>(null);
   const [hovered, setHovered] = useState<KnowledgeGraphNode | null>(null);
+  const [legendOpen, setLegendOpen] = useState(false);
   const [actionPending, setActionPending] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
 
   const filtered = useMemo(() => {
-    const nodes = viewData.nodes.filter((n) => activeTypes.has(n.type));
+    const nodes = viewData.nodes
+      .filter((n) => activeTypes.has(n.type))
+      .map((n) => ({ ...n })) as LayoutNode[];
     const nodeIds = new Set(nodes.map((n) => n.id));
-    const links = viewData.edges
+    const links: LayoutLink[] = viewData.edges
       .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
       .map((e) => ({
         source: e.source,
@@ -239,8 +278,14 @@ export function KnowledgeGraphView({
         label: e.label,
         type: e.type,
       }));
+    applyHubLayout(nodes, links);
     return { nodes, links };
   }, [viewData, activeTypes]);
+
+  const nodesById = useMemo(
+    () => new Map(viewData.nodes.map((n) => [n.id, n])),
+    [viewData.nodes],
+  );
 
   const toggleType = useCallback((type: KnowledgeGraphNodeType) => {
     setActiveTypes((prev) => {
@@ -342,9 +387,64 @@ export function KnowledgeGraphView({
     [selectedId, filtered.links],
   );
 
+  const nodeConnections = useMemo(
+    () => (selectedId ? connectionsForNode(selectedId, filtered.links, nodesById) : []),
+    [selectedId, filtered.links, nodesById],
+  );
+
+  const accuracyNote = useMemo(() => {
+    const stats = data.stats;
+    const parts: string[] = [];
+    if (
+      stats.items_total_candidates != null &&
+      stats.items_displayed != null &&
+      stats.items_total_candidates > stats.items_displayed
+    ) {
+      parts.push(
+        `Top ${stats.items_displayed} of ${stats.items_total_candidates} articles`,
+      );
+    }
+    if (stats.digests_scanned) {
+      parts.push(`from last ${stats.digests_scanned} briefings`);
+    }
+    if (stats.similarity_edges_capped) {
+      parts.push("similarity links capped for clarity");
+    }
+    return parts.length ? parts.join(" · ") : null;
+  }, [data.stats]);
+
+  const tuneGraphForces = useCallback(() => {
+    const graph = graphRef.current;
+    if (!graph) return;
+    const charge = graph.d3Force("charge") as unknown as {
+      strength: (v: number) => void;
+      distanceMax: (v: number) => void;
+    } | undefined;
+    charge?.strength(-110);
+    charge?.distanceMax(340);
+    const link = graph.d3Force("link") as unknown as {
+      distance: (fn: (l: LayoutLink) => number) => void;
+      strength: (fn: (l: LayoutLink) => number) => void;
+    } | undefined;
+    link?.distance((l) => linkDistance(l));
+    link?.strength((l) => {
+      if (l.type === "related_to") return 0.12;
+      if (l.type === "belongs_to" || l.type === "produces") return 0.55;
+      return 0.38;
+    });
+    const center = graph.d3Force("center") as unknown as { strength: (v: number) => void } | undefined;
+    center?.strength(0.035);
+    graph.d3ReheatSimulation();
+  }, []);
+
   useEffect(() => {
     setDidFit(false);
   }, [filtered.nodes.length, activeTypes]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => tuneGraphForces(), 0);
+    return () => window.clearTimeout(timer);
+  }, [filtered, tuneGraphForces]);
 
   useEffect(() => {
     const graph = graphRef.current;
@@ -426,16 +526,22 @@ export function KnowledgeGraphView({
 
   const linkWidth = useCallback(
     (link: object) => {
-      const l = link as { weight?: number; source?: string | ForceNode; target?: string | ForceNode };
+      const l = link as { weight?: number; type?: string; source?: string | ForceNode; target?: string | ForceNode };
       const base = 0.5 + (l.weight ?? 0.3) * 2.5;
-      if (!focusIds || !l.source || !l.target) return base;
+      const thin = l.type === "related_to" ? 0.75 : 1;
+      if (!focusIds || !l.source || !l.target) return base * thin;
       const src = linkEndpointId(l.source);
       const tgt = linkEndpointId(l.target);
       const active = focusIds.has(src) && focusIds.has(tgt);
-      return active ? base * 1.65 : base * 0.35;
+      return (active ? base * 1.65 : base * 0.35) * thin;
     },
     [focusIds],
   );
+
+  const linkCurvature = useCallback((link: object) => {
+    const l = link as { type?: string };
+    return l.type === "related_to" ? 0.22 : 0;
+  }, []);
 
   const inspectorContent = focusNode ? (
     <>
@@ -460,6 +566,27 @@ export function KnowledgeGraphView({
           </div>
         ))}
       </dl>
+      {nodeConnections.length > 0 ? (
+        <div className="kg-inspector-connections">
+          <p className="kg-inspector-connections-title">Connections ({nodeConnections.length})</p>
+          <ul className="kg-inspector-connections-list">
+            {nodeConnections.map((conn) => (
+              <li key={conn.id} className="kg-inspector-connection">
+                <span
+                  className="kg-inspector-connection-dot"
+                  style={{
+                    background: conn.otherType ? NODE_COLORS[conn.otherType] : "var(--app-muted)",
+                  }}
+                />
+                <span className="kg-inspector-connection-text">
+                  <span className="kg-inspector-connection-edge">{conn.label}</span>
+                  <span className="kg-inspector-connection-node">{conn.otherLabel}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {focusNode.type === "item" || focusNode.type === "thought" ? (
         <Link
           href={askAboutContent(
@@ -528,6 +655,11 @@ export function KnowledgeGraphView({
 
   return (
     <div className={`kg-stage${mobile ? " kg-stage-mobile" : ""}${focusIds ? " kg-stage-focused" : ""}`}>
+      {accuracyNote ? (
+        <p className="kg-accuracy-note" title="Graph shows your highest-engagement content within sampling limits">
+          {accuracyNote}
+        </p>
+      ) : null}
       <div className={`kg-canvas-wrap${focusIds ? " is-focused" : ""}`}>
         {filtered.nodes.length === 0 ? (
           <div className="kg-empty">
@@ -561,6 +693,7 @@ export function KnowledgeGraphView({
             }}
             linkWidth={linkWidth}
             linkColor={linkColor}
+            linkCurvature={linkCurvature}
             linkDirectionalParticles={0}
             onNodeClick={(node) => handleNodeClick(node as ForceNode)}
             onNodeHover={canHover ? (node) => setHovered(node as KnowledgeGraphNode | null) : undefined}
@@ -571,9 +704,10 @@ export function KnowledgeGraphView({
                 setDidFit(true);
               }
             }}
-            cooldownTicks={mobile ? 60 : 80}
-            d3AlphaDecay={0.03}
-            d3VelocityDecay={0.4}
+            cooldownTicks={mobile ? 80 : 120}
+            warmupTicks={mobile ? 40 : 60}
+            d3AlphaDecay={0.022}
+            d3VelocityDecay={0.45}
           />
         )}
 
@@ -591,10 +725,44 @@ export function KnowledgeGraphView({
                 ? "Tap empty space to show full graph"
                 : "Click empty space to show full graph"
               : mobile
-                ? "Tap a node to inspect"
-                : "Click a node to inspect"}
+                ? "Tap a node to inspect connections"
+                : "Topics anchor the map · click a node to inspect"}
           </p>
         ) : null}
+
+        <div className={`kg-legend${legendOpen ? " is-open" : ""}`}>
+          <button
+            type="button"
+            className="kg-legend-toggle"
+            onClick={() => setLegendOpen((v) => !v)}
+            aria-expanded={legendOpen}
+          >
+            {legendOpen ? "Hide legend" : "How to read this"}
+          </button>
+          {legendOpen ? (
+            <div className="kg-legend-body">
+              <p className="kg-legend-intro">
+                Topics sit at the center; articles cluster around the interest they matched in your brief.
+              </p>
+              <ul className="kg-legend-nodes">
+                {ALL_TYPES.map((type) => (
+                  <li key={type}>
+                    <span className="kg-legend-dot" style={{ background: NODE_COLORS[type] }} />
+                    {NODE_LABELS[type]}
+                  </li>
+                ))}
+              </ul>
+              <ul className="kg-legend-edges">
+                {EDGE_LEGEND.map((edge) => (
+                  <li key={edge.type}>
+                    <span className="kg-legend-edge-type">{edge.label}</span>
+                    <span className="kg-legend-edge-hint">{edge.hint}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="kg-float-bar">

@@ -12,6 +12,7 @@ from briefly_api.services.knowledge_graph import (
     _topic_match_score,
     filter_graph_by_days,
 )
+from briefly_api.services.topic_matching import topics_for_digest_item
 
 
 def test_slug_normalizes_labels():
@@ -26,6 +27,18 @@ def test_topic_match_score_finds_keywords():
 def test_cosine_identical_vectors():
     vec = [1.0, 0.0, 0.0]
     assert _cosine(vec, vec) == 1.0
+
+
+def test_topics_for_digest_item_matches_multiple_interests():
+    topics = topics_for_digest_item(
+        "New LLM benchmarks for agentic AI startups",
+        "OpenAI and Anthropic released agent tools for developers.",
+        "Hacker News",
+        "94% match to agentic AI",
+        ["agentic AI", "startup funding", "bill of materials"],
+    )
+    assert "agentic AI" in topics
+    assert "startup funding" not in topics
 
 
 def test_filter_graph_by_days_keeps_connected_anchors():

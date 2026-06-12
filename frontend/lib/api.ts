@@ -780,6 +780,10 @@ export type KnowledgeGraphResponse = {
     edge_count: number;
     time_window_days?: number;
     thread_focus?: boolean;
+    items_total_candidates?: number;
+    items_displayed?: number;
+    digests_scanned?: number;
+    similarity_edges_capped?: boolean;
   };
 };
 

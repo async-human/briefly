@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from briefly_api.services.topic_matching import topic_match_score
+from briefly_api.services.topic_matching import topic_match_score, topics_for_digest_item
 from briefly_api.db.models import (
     ContentEmbedding,
     ContentEnrichmentCache,
@@ -375,6 +375,7 @@ async def build_knowledge_graph(
                     "memory_connections": item.memory_connections or [],
                     "memory_reference": item.memory_reference,
                     "section": item.section,
+                    "confidence_signal": item.confidence_signal,
                     "digest_date": digest.digest_date,
                 }
             )
@@ -469,37 +470,39 @@ async def build_knowledge_graph(
             )
 
         text_blob = f"{headline} {cand['summary'] or ''}"
-        best_topic = None
-        best_score = 0.0
-        for topic in topic_labels:
-            score = _topic_match_score(text_blob, topic)
-            if score > best_score:
-                best_score = score
-                best_topic = topic
-        if best_topic and best_score >= 0.34:
+        matched_topics = topics_for_digest_item(
+            cand["headline"],
+            cand["summary"],
+            cand["source_name"],
+            cand.get("confidence_signal"),
+            topic_labels,
+        )
+        if not matched_topics:
+            best_topic = None
+            best_score = 0.0
+            for topic in topic_labels:
+                score = _topic_match_score(text_blob, topic)
+                if score > best_score:
+                    best_score = score
+                    best_topic = topic
+            if best_topic and best_score >= 0.5:
+                matched_topics = [best_topic]
+
+        for topic in matched_topics:
+            score = _topic_match_score(text_blob, topic) or 0.5
             builder.add_edge(
                 node_id,
-                builder.topic_id(best_topic),
+                builder.topic_id(topic),
                 "belongs_to",
-                0.3 + best_score * 0.55,
-                label="Topic match",
+                0.3 + score * 0.55,
+                label="In your brief",
             )
 
         thread_key = enrichment.thread_key if enrichment else None
         if thread_key:
             t_norm = thread_key.lower().strip()
-            if t_norm in thread_label_by_key or t_norm:
-                tid = builder.thread_id(thread_key, thread_label_by_key.get(t_norm, thread_key))
-                if tid not in builder.nodes:
-                    builder.add_node(
-                        GraphNode(
-                            id=tid,
-                            type="thread",
-                            label=thread_label_by_key.get(t_norm, thread_key),
-                            size=12,
-                            meta={"appearances": 1},
-                        )
-                    )
+            if t_norm in thread_label_by_key:
+                tid = builder.thread_id(thread_key, thread_label_by_key[t_norm])
                 builder.add_edge(
                     node_id,
                     tid,
@@ -508,12 +511,22 @@ async def build_knowledge_graph(
                     label=enrichment.thread_update if enrichment else "Thread update",
                 )
 
-        for conn in cand["memory_connections"]:
-            thread_key = conn.get("thread_key") or conn.get("topic")
+        connections = list(cand["memory_connections"])
+        if enrichment and enrichment.memory_connections:
+            connections.extend(enrichment.memory_connections)
+        for conn in connections:
+            thread_key = conn.get("thread_key")
             if isinstance(thread_key, str) and thread_key.strip():
-                tid = builder.thread_id(thread_key, thread_key)
-                if tid in builder.nodes:
-                    builder.add_edge(node_id, tid, "updates", 0.55, label=conn.get("description"))
+                t_norm = thread_key.lower().strip()
+                if t_norm in thread_label_by_key:
+                    tid = builder.thread_id(thread_key, thread_label_by_key[t_norm])
+                    builder.add_edge(
+                        node_id,
+                        tid,
+                        "updates",
+                        0.55,
+                        label=conn.get("description") or "Thread connection",
+                    )
 
     brain_source = next((s for s in sources if s.source_type == "brain_dump"), None)
     if brain_source:
@@ -562,13 +575,13 @@ async def build_knowledge_graph(
                         label="Your interest",
                     )
 
+    sim_edges_added = 0
     if selected_content_ids:
         emb_result = await db.execute(
             select(ContentEmbedding).where(ContentEmbedding.content_id.in_(selected_content_ids))
         )
         embeddings = {e.content_id: e.embedding for e in emb_result.scalars().all()}
         ids = [cid for cid in selected_content_ids if cid in embeddings]
-        sim_edges_added = 0
         for i, id_a in enumerate(ids):
             if sim_edges_added >= MAX_SIMILARITY_EDGES:
                 break
@@ -601,6 +614,10 @@ async def build_knowledge_graph(
         "thought_count": sum(1 for n in nodes if n.type == "thought"),
         "source_count": sum(1 for n in nodes if n.type == "source"),
         "edge_count": len(edges),
+        "items_total_candidates": len(item_candidates),
+        "items_displayed": len(selected_items),
+        "digests_scanned": len(digests),
+        "similarity_edges_capped": sim_edges_added >= MAX_SIMILARITY_EDGES if selected_content_ids else False,
     }
 
     graph = KnowledgeGraph(nodes=nodes, edges=edges, stats=stats)
