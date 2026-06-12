@@ -4385,8 +4385,9 @@ a.saved-capture-title:hover {
 }
 
 .app-shell .dash-accordion-content {
-  padding: 0.85rem 1rem 1.125rem;
-  border-top: 3px solid oklch(88% 0.04 75 / 0.65);
+  padding: 1rem 1.125rem 1.25rem;
+  border-top: 1px solid var(--app-border);
+  background: var(--app-paper-2, oklch(98% 0.004 75));
 }
 
 .app-shell .dash-accordion-content-label {
@@ -5238,14 +5239,14 @@ a.saved-capture-title:hover {
 }
 
 /* ── intel-doc: shared document primitives ── */
-.app-shell .dash-page-intelligence .intel-doc {
+.app-shell .intel-doc {
   display: flex;
   flex-direction: column;
   gap: 0;
   min-width: 0;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-meta {
+.app-shell .intel-doc-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -5256,14 +5257,14 @@ a.saved-capture-title:hover {
   border-bottom: 1px solid var(--app-border);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-meta-text {
+.app-shell .intel-doc-meta-text {
   margin: 0;
   font-size: 0.8125rem;
   line-height: 1.5;
   color: var(--app-muted);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-refresh {
+.app-shell .intel-doc-refresh {
   border: none;
   padding: 0;
   background: none;
@@ -5275,17 +5276,17 @@ a.saved-capture-title:hover {
   text-decoration: none;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-refresh:hover:not(:disabled) {
+.app-shell .intel-doc-refresh:hover:not(:disabled) {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-refresh:disabled {
+.app-shell .intel-doc-refresh:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-lead {
+.app-shell .intel-doc-lead {
   padding: 1.125rem 1.25rem;
   margin-bottom: 0.25rem;
   border-radius: var(--app-radius-sm);
@@ -5293,7 +5294,7 @@ a.saved-capture-title:hover {
   border: 1px solid var(--app-border);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-lead-text {
+.app-shell .intel-doc-lead-text {
   margin: 0;
   font-size: 0.9375rem;
   font-weight: 500;
@@ -5303,14 +5304,14 @@ a.saved-capture-title:hover {
   overflow-wrap: anywhere;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-lead-meta {
+.app-shell .intel-doc-lead-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
   margin-top: 0.75rem;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-pill {
+.app-shell .intel-doc-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -5323,48 +5324,49 @@ a.saved-capture-title:hover {
   border: 1px solid var(--app-border);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-pill--deepening {
+.app-shell .intel-doc-pill--deepening {
   color: oklch(40% 0.1 145);
   background: oklch(97% 0.025 145);
   border-color: oklch(78% 0.06 145 / 0.35);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-pill--shallowing {
+.app-shell .intel-doc-pill--shallowing {
   color: oklch(42% 0.08 55);
   background: oklch(97% 0.02 55);
   border-color: oklch(78% 0.05 55 / 0.35);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-pill-icon {
+.app-shell .intel-doc-pill-icon {
   display: grid;
   place-items: center;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-section {
+.app-shell .intel-doc-section {
   padding-top: 1.5rem;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-section + .intel-doc-section {
+.app-shell .intel-doc-section + .intel-doc-section {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--app-border);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-section-head {
+.app-shell .intel-doc-section-head {
   margin-bottom: 0.875rem;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-section-title {
+.app-shell .intel-doc-section-title {
   margin: 0;
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 0.625rem;
+  font-family: var(--font-serif), ui-serif, Georgia, serif;
+  font-size: 0.9375rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--app-muted);
+  letter-spacing: -0.02em;
+  text-transform: none;
+  color: var(--app-ink);
+  line-height: 1.3;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-section-hint {
+.app-shell .intel-doc-section-hint {
   margin: 0.35rem 0 0;
   font-size: 0.8125rem;
   line-height: 1.5;
@@ -5372,7 +5374,7 @@ a.saved-capture-title:hover {
   max-width: 40rem;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-insights {
+.app-shell .intel-doc-insights {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -5381,14 +5383,14 @@ a.saved-capture-title:hover {
   gap: 0.625rem;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-insight {
+.app-shell .intel-doc-insight {
   padding: 1rem 1.125rem;
   border-radius: var(--app-radius-sm);
   border: 1px solid var(--app-border);
   background: var(--app-paper-2, oklch(98% 0.004 75));
 }
 
-.app-shell .dash-page-intelligence .intel-doc-insight-label {
+.app-shell .intel-doc-insight-label {
   margin: 0 0 0.4rem;
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.625rem;
@@ -5398,7 +5400,7 @@ a.saved-capture-title:hover {
   color: var(--app-accent);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-insight-text {
+.app-shell .intel-doc-insight-text {
   margin: 0;
   font-size: 0.875rem;
   line-height: 1.6;
@@ -5406,7 +5408,7 @@ a.saved-capture-title:hover {
   overflow-wrap: anywhere;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-rows {
+.app-shell .intel-doc-rows {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -5415,7 +5417,7 @@ a.saved-capture-title:hover {
   gap: 0.5rem;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-row {
+.app-shell .intel-doc-row {
   padding: 0.9375rem 1.125rem;
   border-radius: var(--app-radius-sm);
   border: 1px solid var(--app-border);
@@ -5423,14 +5425,44 @@ a.saved-capture-title:hover {
   min-width: 0;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-row-top {
+.app-shell .intel-doc-row-top {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 0.5rem 1rem;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-row-name {
+.app-shell .intel-doc-row-aside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  max-width: 100%;
+}
+
+.app-shell .intel-doc-row-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  justify-content: flex-end;
+}
+
+.app-shell .intel-doc-metric-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 100px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--app-muted);
+  background: var(--app-paper-2);
+  border: 1px solid var(--app-border);
+  white-space: nowrap;
+}
+
+.app-shell .intel-doc-row-name {
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.4;
@@ -5440,7 +5472,7 @@ a.saved-capture-title:hover {
   min-width: 0;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-row-metric {
+.app-shell .intel-doc-row-metric {
   flex-shrink: 0;
   font-size: 0.75rem;
   font-weight: 600;
@@ -5448,7 +5480,7 @@ a.saved-capture-title:hover {
   white-space: nowrap;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-row-detail {
+.app-shell .intel-doc-row-detail {
   margin: 0.45rem 0 0;
   font-size: 0.8125rem;
   line-height: 1.55;
@@ -5456,13 +5488,13 @@ a.saved-capture-title:hover {
   overflow-wrap: anywhere;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-row-note {
+.app-shell .intel-doc-row-note {
   margin: 0.35rem 0 0;
   font-size: 0.75rem;
   color: var(--app-muted);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-row-quote {
+.app-shell .intel-doc-row-quote {
   margin: 0.5rem 0 0;
   font-size: 0.8125rem;
   line-height: 1.55;
@@ -5470,7 +5502,7 @@ a.saved-capture-title:hover {
   overflow-wrap: anywhere;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-badge {
+.app-shell .intel-doc-badge {
   flex-shrink: 0;
   font-size: 0.625rem;
   font-weight: 700;
@@ -5484,43 +5516,43 @@ a.saved-capture-title:hover {
   white-space: nowrap;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-badge--rising {
+.app-shell .intel-doc-badge--rising {
   color: oklch(40% 0.11 145);
   background: oklch(97% 0.03 145);
   border-color: oklch(76% 0.07 145 / 0.4);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-badge--declining {
+.app-shell .intel-doc-badge--declining {
   color: oklch(42% 0.1 25);
   background: oklch(97% 0.02 25);
   border-color: oklch(76% 0.06 25 / 0.4);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-row--muted {
+.app-shell .intel-doc-row--muted {
   opacity: 0.72;
   background: transparent;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-row--discovered {
+.app-shell .intel-doc-row--discovered {
   border-color: oklch(72% 0.06 250 / 0.35);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-row.wif-topic-row--ignored {
+.app-shell .intel-doc-row.wif-topic-row--ignored {
   border-color: oklch(72% 0.05 25 / 0.28);
   background: oklch(99% 0.01 25);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-row.wif-topic-row--uncovered {
+.app-shell .intel-doc-row.wif-topic-row--uncovered {
   border-style: dashed;
   background: transparent;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-row.wif-topic-row--emerging {
+.app-shell .intel-doc-row.wif-topic-row--emerging {
   border-color: oklch(72% 0.06 145 / 0.32);
   background: oklch(99% 0.015 145);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-examples {
+.app-shell .intel-doc-examples {
   list-style: none;
   margin: 0.5rem 0 0;
   padding: 0;
@@ -5529,7 +5561,7 @@ a.saved-capture-title:hover {
   gap: 0.35rem;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-example {
+.app-shell .intel-doc-example {
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
@@ -5538,7 +5570,7 @@ a.saved-capture-title:hover {
   color: var(--app-ink-2);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-example-dot {
+.app-shell .intel-doc-example-dot {
   flex-shrink: 0;
   width: 4px;
   height: 4px;
@@ -5547,30 +5579,38 @@ a.saved-capture-title:hover {
   background: var(--app-muted);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-example-src {
+.app-shell .intel-doc-example-src {
   color: var(--app-muted);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-action {
-  display: inline-block;
+.app-shell .intel-doc-action {
+  display: inline-flex;
+  align-items: center;
   margin-top: 0.625rem;
-  font-size: 0.8125rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 100px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--app-accent);
   text-decoration: none;
+  background: oklch(97% 0.02 250 / 0.6);
+  border: 1px solid oklch(78% 0.05 250 / 0.35);
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-action:hover {
-  text-decoration: underline;
+.app-shell .intel-doc-action:hover {
+  background: oklch(96% 0.03 250 / 0.85);
+  border-color: oklch(72% 0.07 250 / 0.45);
+  text-decoration: none;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-chips-block {
+.app-shell .intel-doc-chips-block {
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px dashed var(--app-border);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-chips-label {
+.app-shell .intel-doc-chips-label {
   margin: 0 0 0.5rem;
   font-size: 0.6875rem;
   font-weight: 600;
@@ -5579,13 +5619,13 @@ a.saved-capture-title:hover {
   color: var(--app-muted);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-chips {
+.app-shell .intel-doc-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
 }
 
-.app-shell .dash-page-intelligence .intel-doc-chip {
+.app-shell .intel-doc-chip {
   padding: 0.3rem 0.65rem;
   border-radius: 100px;
   font-size: 0.75rem;
@@ -5594,37 +5634,95 @@ a.saved-capture-title:hover {
   border: 1px solid var(--app-border);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-chip--muted {
+.app-shell .intel-doc-chip--muted {
   color: var(--app-muted);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-empty-hint {
+.app-shell .intel-doc-empty-hint {
   margin: 0;
   font-size: 0.875rem;
   line-height: 1.55;
   color: var(--app-muted);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-teaser-more {
+.app-shell .intel-doc-teaser-more {
   margin: 1.25rem 0 0;
   padding-top: 1rem;
   border-top: 1px dashed var(--app-border);
 }
 
-.app-shell .dash-page-intelligence .intel-doc-teaser-link {
+.app-shell .intel-doc-teaser-link {
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--app-accent);
   text-decoration: none;
 }
 
+/* Section tone accents */
+.app-shell .intel-doc-section--active .intel-doc-section-head {
+  padding-left: 0.75rem;
+  border-left: 3px solid oklch(72% 0.08 75 / 0.55);
+}
+
+.app-shell .intel-doc-section--shifting .intel-doc-section-head {
+  padding-left: 0.75rem;
+  border-left: 3px solid oklch(72% 0.06 250 / 0.5);
+}
+
+.app-shell .intel-doc-section--ignored .intel-doc-section-head {
+  padding-left: 0.75rem;
+  border-left: 3px solid oklch(72% 0.06 25 / 0.45);
+}
+
+.app-shell .intel-doc-section--uncovered .intel-doc-section-head {
+  padding-left: 0.75rem;
+  border-left: 3px dashed oklch(74% 0.04 75 / 0.5);
+}
+
+.app-shell .intel-doc-section--emerging .intel-doc-section-head {
+  padding-left: 0.75rem;
+  border-left: 3px solid oklch(72% 0.07 145 / 0.5);
+}
+
+.app-shell .intel-doc-row.wif-topic-row--ignored .intel-doc-metric-chip {
+  color: oklch(42% 0.08 25);
+  background: oklch(98% 0.015 25);
+  border-color: oklch(78% 0.05 25 / 0.35);
+}
+
+/* Dashboard accordion: week-in-focus embed */
+.app-shell .dash-accordion-content .intel-doc-lead {
+  padding: 0.875rem 1rem;
+}
+
+.app-shell .dash-accordion-content .intel-doc-section {
+  padding-top: 1.125rem;
+}
+
+.app-shell .dash-accordion-content .intel-doc-section + .intel-doc-section {
+  margin-top: 1.125rem;
+  padding-top: 1.125rem;
+}
+
+.app-shell .dash-accordion-content .intel-doc-rows {
+  gap: 0.625rem;
+}
+
+.app-shell .dash-accordion-content .intel-card--embedded {
+  padding: 0;
+}
+
 @media (max-width: 520px) {
-  .app-shell .dash-page-intelligence .intel-doc-row-top {
+  .app-shell .intel-doc-row-top {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .app-shell .dash-page-intelligence .intel-doc-badge,
-  .app-shell .dash-page-intelligence .intel-doc-row-metric {
+  .app-shell .intel-doc-row-aside {
+    justify-content: flex-start;
+  }
+
+  .app-shell .intel-doc-badge,
+  .app-shell .intel-doc-row-metric {
     justify-self: start;
   }
 

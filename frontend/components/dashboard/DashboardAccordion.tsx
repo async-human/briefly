@@ -56,10 +56,7 @@ export function DashboardAccordion({
       </button>
       {open && (
         <div id={panelId} className="dash-accordion-panel" role="region" aria-label={title}>
-          <div className="dash-accordion-content">
-            <p className="dash-accordion-content-label">Details</p>
-            {children}
-          </div>
+          <div className="dash-accordion-content">{children}</div>
         </div>
       )}
     </div>

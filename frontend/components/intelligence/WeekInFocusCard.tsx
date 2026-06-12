@@ -2,12 +2,23 @@
 
 import Link from "next/link";
 import type { WrappedAction, WrappedExample, WrappedShift, WrappedSnapshot, WrappedTopicRow } from "@/lib/api";
-import { IntelSection } from "./IntelSection";
+import { IntelSection, type IntelSectionTone } from "./IntelSection";
 
 type Props = {
   wrapped: WrappedSnapshot;
   variant?: "teaser" | "full";
 };
+
+const METRICS_ONLY = /^(\d+\s+\w+)(\s*·\s*\d+\s+\w+)*$/;
+
+function splitDetail(detail?: string): { metrics: string[] | null; prose: string | null } {
+  if (!detail?.trim()) return { metrics: null, prose: null };
+  const trimmed = detail.trim();
+  if (METRICS_ONLY.test(trimmed)) {
+    return { metrics: trimmed.split(/\s*·\s*/).map((s) => s.trim()), prose: null };
+  }
+  return { metrics: null, prose: trimmed };
+}
 
 function depthTrendIcon(trend?: string) {
   if (trend === "deepening") {
@@ -100,9 +111,22 @@ function TopicAction({ action }: { action?: WrappedAction }) {
   );
 }
 
+function TopicMetrics({ metrics }: { metrics: string[] }) {
+  return (
+    <div className="intel-doc-row-metrics">
+      {metrics.map((metric) => (
+        <span key={metric} className="intel-doc-metric-chip">
+          {metric}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function TopicSection({
   title,
   hint,
+  tone,
   items,
   rowClass,
   showExamples = true,
@@ -110,6 +134,7 @@ function TopicSection({
 }: {
   title: string;
   hint?: string;
+  tone: IntelSectionTone;
   items: WrappedTopicRow[] | WrappedShift[];
   rowClass: string;
   showExamples?: boolean;
@@ -117,11 +142,12 @@ function TopicSection({
 }) {
   if (!items.length) return null;
   return (
-    <IntelSection title={title} hint={hint}>
+    <IntelSection title={title} hint={hint} tone={tone}>
       <ul className="intel-doc-rows">
         {items.map((item) => {
           const shift = item as WrappedShift;
           const isShift = Boolean(shift.direction);
+          const { metrics, prose } = splitDetail(item.detail);
           return (
             <li
               key={`${item.topic}-${shift.direction ?? "row"}`}
@@ -129,13 +155,16 @@ function TopicSection({
             >
               <div className="intel-doc-row-top">
                 <span className="intel-doc-row-name">{item.topic}</span>
-                {isShift && (
-                  <span className={`intel-doc-badge intel-doc-badge--${shift.direction || "stable"}`}>
-                    {shift.label}
-                  </span>
-                )}
+                <div className="intel-doc-row-aside">
+                  {metrics && <TopicMetrics metrics={metrics} />}
+                  {isShift && (
+                    <span className={`intel-doc-badge intel-doc-badge--${shift.direction || "stable"}`}>
+                      {shift.label}
+                    </span>
+                  )}
+                </div>
               </div>
-              {item.detail && <p className="intel-doc-row-detail">{item.detail}</p>}
+              {prose && <p className="intel-doc-row-detail">{prose}</p>}
               {showExamples && <ExampleStories examples={item.examples} />}
               {showActions && <TopicAction action={item.action} />}
             </li>
@@ -196,6 +225,7 @@ export function WeekInFocusCard({ wrapped, variant = "full" }: Props) {
       <TopicSection
         title="Active this week"
         hint={hints.active}
+        tone="active"
         items={visibleActive}
         rowClass="wif-topic-row--active"
         showExamples={!isTeaser}
@@ -205,6 +235,7 @@ export function WeekInFocusCard({ wrapped, variant = "full" }: Props) {
       <TopicSection
         title="Shifting"
         hint={hints.shifting}
+        tone="shifting"
         items={visibleShifts}
         rowClass="wif-topic-row--shifting"
         showExamples={!isTeaser}
@@ -214,6 +245,7 @@ export function WeekInFocusCard({ wrapped, variant = "full" }: Props) {
       <TopicSection
         title="Often skipped"
         hint={hints.ignored}
+        tone="ignored"
         items={visibleIgnored}
         rowClass="wif-topic-row--ignored"
         showExamples={!isTeaser}
@@ -223,6 +255,7 @@ export function WeekInFocusCard({ wrapped, variant = "full" }: Props) {
       <TopicSection
         title="Thin coverage"
         hint={hints.uncovered}
+        tone="uncovered"
         items={visibleUncovered}
         rowClass="wif-topic-row--uncovered"
         showExamples={false}
@@ -233,6 +266,7 @@ export function WeekInFocusCard({ wrapped, variant = "full" }: Props) {
         <TopicSection
           title="Worth watching"
           hint={hints.emerging}
+          tone="emerging"
           items={visibleEmerging}
           rowClass="wif-topic-row--emerging"
           showExamples
