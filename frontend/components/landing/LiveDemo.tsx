@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SourceIcon } from "@/components/SourceIcon";
+import { StaggerHeadline } from "./StaggerHeadline";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -307,7 +308,7 @@ export function LiveDemo() {
       <div className="livedemo-inner">
         <div className="section-header-centered livedemo-header">
           <p className="section-eyebrow">Live demo</p>
-          <h2 className="section-heading">Watch it work</h2>
+          <StaggerHeadline as="h2" trigger="inView" className="section-heading" text="Watch it work" />
           <p className="section-body">
             This is exactly what runs every night for your sources — tap a step to explore.
           </p>
@@ -348,10 +349,10 @@ export function LiveDemo() {
               <motion.div
                 key={`${phase}-${runId}`}
                 className="livedemo-stage-panel"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.32, ease: EASE }}
+                initial={{ opacity: 0, y: 10, scale: 0.985 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.99 }}
+                transition={{ duration: 0.36, ease: EASE }}
               >
                 {phase === "collect" && <CollectPhase runId={runId} />}
                 {phase === "process" && <ProcessPhase runId={runId} />}

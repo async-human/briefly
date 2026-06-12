@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Reveal } from "./Reveal";
 import { CompareQuadrant } from "./CompareQuadrant";
 import { CompareFullTable } from "./CompareFullTable";
+import { StaggerHeadline } from "./StaggerHeadline";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -53,11 +54,12 @@ export function CompareSection() {
         <Reveal>
           <div className="section-header-centered compare-header">
             <p className="section-eyebrow">How Briefly compares</p>
-            <h2 className="section-heading">
-              Plenty of apps organize your reading.
-              <br />
-              One actually does it for you — and learns.
-            </h2>
+            <StaggerHeadline
+              as="h2"
+              trigger="inView"
+              className="section-heading"
+              text={"Plenty of apps organize your reading.\nOne actually does it for you — and learns."}
+            />
             <p className="section-body compare-lede">
               An honest comparison. Some of these tools are excellent at a different job —
               here&apos;s where each one fits on the map, and where Briefly is the only option.

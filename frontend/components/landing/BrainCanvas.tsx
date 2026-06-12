@@ -66,8 +66,11 @@ export function BrainCanvas({ tone = "warm" }: BrainCanvasProps) {
       if (!wrap || !canvas) return;
       W = wrap.offsetWidth;
       H = wrap.offsetHeight;
-      canvas.width  = W;
-      canvas.height = H;
+      // Render at device resolution, draw in CSS pixels — otherwise blurry on HiDPI
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width  = W * dpr;
+      canvas.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       nodes = [];
       const count = Math.min(220, Math.floor((W * H) / 4500));

@@ -137,7 +137,8 @@ body[data-landing-theme="light"].study-linear-body {
   white-space: nowrap;
 }
 
-.study-linear .nav-fp-links a:hover {
+.study-linear .nav-fp-links a:hover,
+.study-linear .nav-fp-links a.is-active {
   color: var(--text);
   background: var(--accent-dim);
 }
@@ -149,6 +150,8 @@ body[data-landing-theme="light"].study-linear-body {
 }
 
 .study-linear .nav-fp-cta {
+  position: relative;
+  overflow: hidden;
   font-size: 13px;
   font-weight: 500;
   color: var(--bg) !important;
@@ -160,6 +163,31 @@ body[data-landing-theme="light"].study-linear-body {
   transition:
     opacity var(--dur-short) var(--ease-out),
     transform var(--dur-short) var(--ease-out);
+}
+
+/* Shine sweep — tinted with --bg so it contrasts on the inverted button */
+.study-linear .nav-fp-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-130%) skewX(-18deg);
+  background: linear-gradient(
+    100deg,
+    transparent 32%,
+    color-mix(in oklch, var(--bg) 22%, transparent) 50%,
+    transparent 68%
+  );
+  transition: transform 600ms var(--ease-out);
+  pointer-events: none;
+}
+
+.study-linear .nav-fp-cta:hover::after {
+  transform: translateX(130%) skewX(-18deg);
+}
+
+.study-linear .nav-fp-cta-label {
+  position: relative;
+  z-index: 1;
 }
 
 .study-linear .nav-fp-cta:hover {
@@ -348,14 +376,16 @@ body[data-landing-theme="light"].study-linear-body {
     0 32px 80px -24px oklch(0% 0 0 / 0.55);
 }
 
-.study-linear .digest-window-float {
-  animation: digest-float 6s var(--ease-in-out) infinite;
-  will-change: transform;
+/* Digest items respond to hover with transform only — no layout work */
+.study-linear .digest-item {
+  transition:
+    transform var(--dur-short) var(--ease-out),
+    box-shadow var(--dur-short) var(--ease-out);
 }
 
-@keyframes digest-float {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(0, -7px, 0); }
+.study-linear .digest-item:hover {
+  transform: translateX(6px);
+  box-shadow: inset 2px 0 0 color-mix(in oklch, var(--accent) 35%, transparent);
 }
 
 .study-linear .status-dot.generating {
@@ -416,16 +446,32 @@ body[data-landing-theme="light"].study-linear-body {
 
 .study-linear .btn-light-primary,
 .study-linear .btn-hero-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   transition:
     opacity var(--dur-short) var(--ease-out),
     transform var(--dur-short) var(--ease-out),
-    background-color var(--dur-short) var(--ease-out);
+    background-color var(--dur-short) var(--ease-out),
+    box-shadow var(--dur-short) var(--ease-out);
 }
 
 .study-linear .btn-light-primary:hover,
 .study-linear .btn-hero-primary:hover {
   opacity: 0.94;
   transform: translateY(-1px);
+  box-shadow: 0 0 28px -8px color-mix(in oklch, var(--accent) 60%, transparent) !important;
+}
+
+.study-linear .btn-arrow {
+  display: inline-flex;
+  align-items: center;
+  transition: transform var(--dur-short) var(--ease-out);
+}
+
+.study-linear .btn-light-primary:hover .btn-arrow,
+.study-linear .btn-hero-primary:hover .btn-arrow {
+  transform: translateX(3px);
 }
 
 .study-linear .btn-light-primary:active,
@@ -656,6 +702,72 @@ body[data-landing-theme="light"].study-linear-body {
   background: var(--surface);
 }
 
+/* ── Accent shimmer (key hero phrase) ─────────────────────────────────── */
+
+.study-linear .headline-shimmer {
+  background: linear-gradient(
+    110deg,
+    var(--text) 0%,
+    var(--text) 38%,
+    var(--accent) 50%,
+    var(--text) 62%,
+    var(--text) 100%
+  );
+  background-size: 240% 100%;
+  background-position: 120% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: headline-shimmer 7s var(--ease-in-out) infinite;
+}
+
+@keyframes headline-shimmer {
+  0%, 14% { background-position: 120% 0; }
+  52%, 100% { background-position: -120% 0; }
+}
+
+/* ── Section header glow — carries hero atmosphere down the page ──────── */
+
+.study-linear .section-header-centered {
+  position: relative;
+}
+
+.study-linear .section-header-centered::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -90px;
+  width: min(560px, 90vw);
+  height: 240px;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    ellipse 60% 55% at 50% 35%,
+    color-mix(in oklch, var(--accent) 7%, transparent) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ── Pricing checkmarks — theme tokens, not hardcoded colors ──────────── */
+
+.study-linear .pricing-check-ring {
+  stroke: color-mix(in oklch, var(--accent) 45%, transparent);
+}
+
+.study-linear .pricing-check-mark {
+  stroke: var(--accent);
+}
+
+.study-linear .pricing-check-dim .pricing-check-ring {
+  stroke: color-mix(in oklch, var(--text) 14%, transparent);
+}
+
+.study-linear .pricing-check-dim .pricing-check-mark {
+  stroke: color-mix(in oklch, var(--text) 18%, transparent);
+}
+
 /* ── Closing CTA — centered like other sections ─────────────────────────── */
 
 .study-linear .cta-linear {
@@ -801,6 +913,8 @@ body[data-landing-theme="light"].study-linear-body {
   line-height: 0.78;
   pointer-events: none;
   user-select: none;
+  /* Clip so the wordmark rises into view from behind the top rule */
+  overflow: hidden;
 }
 
 .study-linear .footer-linear-wordmark span {
@@ -912,10 +1026,12 @@ body[data-landing-theme="light"].study-linear-body {
   }
 
   .study-linear .hero-linear-mesh,
-  .study-linear .digest-window-float,
   .study-linear .hero-eyebrow-pulse,
-  .study-linear .status-dot.generating {
+  .study-linear .status-dot.generating,
+  .study-linear .headline-shimmer,
+  .study-linear .nav-fp-cta::after {
     animation: none;
+    transition: none;
   }
 
   .study-linear .hero-linear-brain {

@@ -2,6 +2,8 @@
 
 import { motion, useInView, useReducedMotion } from "framer-motion";
 import { useRef } from "react";
+import { StaggerHeadline } from "./StaggerHeadline";
+import { ArrowRightIcon } from "./icons";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -24,9 +26,12 @@ export function CTA() {
         >
           <div className="section-header-centered">
             <p className="section-eyebrow">Get started</p>
-            <h2 className="section-heading">
-              Built for mornings. Available tonight.
-            </h2>
+            <StaggerHeadline
+              as="h2"
+              trigger="inView"
+              className="section-heading"
+              text="Built for mornings. Available tonight."
+            />
             <p className="section-body">
               Connect your sources once. Briefly runs on your schedule — your first
               briefing is ready when you are.
@@ -40,7 +45,10 @@ export function CTA() {
             transition={{ duration: duration * 0.85, delay: reducedMotion ? 0 : 0.12, ease: EASE }}
           >
             <a href="/login" className="btn-light-primary">
-              Start free →
+              Start free
+              <span className="btn-arrow" aria-hidden>
+                <ArrowRightIcon size={14} />
+              </span>
             </a>
             <a href="#pricing" className="btn-light-ghost">
               See pricing

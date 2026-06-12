@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Reveal } from "./Reveal";
+import { StaggerHeadline } from "./StaggerHeadline";
 
 const freeFeatures = [
   { text: "3 source connections", included: true },
@@ -28,10 +29,27 @@ const proFeatures = [
 
 function Check({ dim }: { dim?: boolean }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
-      <circle cx="7" cy="7" r="6.5" stroke={dim ? "rgba(255,255,255,0.12)" : "rgba(201,184,150,0.4)"} />
-      {!dim && <path d="M4 7l2 2 4-4" stroke="#c9b896" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />}
-      {dim && <path d="M5 7h4" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" strokeLinecap="round" />}
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      fill="none"
+      className={`pricing-check${dim ? " pricing-check-dim" : ""}`}
+      style={{ flexShrink: 0 }}
+    >
+      <circle cx="7" cy="7" r="6.5" className="pricing-check-ring" />
+      {!dim && (
+        <path
+          d="M4 7l2 2 4-4"
+          className="pricing-check-mark"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+      {dim && (
+        <path d="M5 7h4" className="pricing-check-mark" strokeWidth="1.5" strokeLinecap="round" />
+      )}
     </svg>
   );
 }
@@ -43,9 +61,12 @@ export function Pricing() {
         <Reveal>
           <div className="section-header-centered">
             <p className="section-eyebrow">Pricing</p>
-            <h2 className="section-heading">
-              Start free.<br />Upgrade when it&apos;s indispensable.
-            </h2>
+            <StaggerHeadline
+              as="h2"
+              trigger="inView"
+              className="section-heading"
+              text={"Start free.\nUpgrade when it's indispensable."}
+            />
             <p className="section-body">
               Free is enough to feel the value. Pro is what it becomes when you
               can&apos;t live without it.
@@ -125,8 +146,8 @@ export function Pricing() {
 
         <Reveal delay={0.2}>
           <p className="pricing-footnote">
-            LLM pipeline costs ~$0.20/user/day. Break-even at 400 paying users.
-            Every dollar above that goes into making Briefly smarter.
+            Cancel anytime. Your sources, briefings, and history stay yours —
+            export everything, no lock-in.
           </p>
         </Reveal>
       </div>

@@ -19,6 +19,7 @@ const NAV_LINKS = [
 export function Nav() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
@@ -30,6 +31,35 @@ export function Nav() {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const sections = NAV_LINKS
+      .map((l) => document.querySelector<HTMLElement>(l.href))
+      .filter((el): el is HTMLElement => el !== null);
+    if (!sections.length) return;
+
+    // A section is "active" when it crosses the band just below the nav
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveId(`#${entry.target.id}`);
+        }
+      },
+      { rootMargin: "-25% 0px -65% 0px" }
+    );
+    sections.forEach((s) => observer.observe(s));
+
+    // Clear highlight when scrolled back above the first section
+    const onScrollTop = () => {
+      if (window.scrollY < 200) setActiveId(null);
+    };
+    window.addEventListener("scroll", onScrollTop, { passive: true });
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", onScrollTop);
+    };
   }, []);
 
   const open = () => setMenuOpen(true);
@@ -47,14 +77,18 @@ export function Nav() {
           <ul className="nav-fp-links">
             {NAV_LINKS.map((l) => (
               <li key={l.href}>
-                <a href={l.href}>{l.label}</a>
+                <a href={l.href} className={activeId === l.href ? "is-active" : undefined}>
+                  {l.label}
+                </a>
               </li>
             ))}
           </ul>
 
           <div className="nav-fp-right">
             <ThemeToggle compact />
-            <a href="/login" className="nav-fp-cta">Start free →</a>
+            <a href="/login" className="nav-fp-cta">
+              <span className="nav-fp-cta-label">Start free →</span>
+            </a>
           </div>
 
           <button

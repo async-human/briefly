@@ -3,6 +3,7 @@
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
 import { Reveal } from "./Reveal";
+import { StaggerHeadline } from "./StaggerHeadline";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -96,9 +97,12 @@ export function PrinciplesSection() {
         <Reveal>
           <div className="section-header-centered">
             <p className="section-eyebrow">Why Briefly</p>
-            <h2 className="section-heading">
-              A chief-of-staff briefing, not another app to maintain.
-            </h2>
+            <StaggerHeadline
+              as="h2"
+              trigger="inView"
+              className="section-heading"
+              text="A chief-of-staff briefing, not another app to maintain."
+            />
             <p className="section-body">
               Briefly is built on a simple promise: your information diet runs itself.
               You wake up informed — without highlighting, filing, or drowning in tabs.

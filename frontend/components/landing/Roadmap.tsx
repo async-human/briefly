@@ -7,6 +7,7 @@ import {
   useInView,
 } from "framer-motion";
 import { Reveal } from "./Reveal";
+import { StaggerHeadline } from "./StaggerHeadline";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -514,9 +515,12 @@ export function Roadmap() {
         <Reveal>
           <div className="section-header-centered rm3-header">
             <p className="section-eyebrow">Roadmap</p>
-            <h2 className="section-heading">
-              You&apos;re joining at V1. Here&apos;s the journey ahead.
-            </h2>
+            <StaggerHeadline
+              as="h2"
+              trigger="inView"
+              className="section-heading"
+              text="You're joining at V1. Here's the journey ahead."
+            />
             <p className="section-body rm3-subcopy">
               Tap a version to explore. Each release stands on its own — Pro includes them all.
             </p>

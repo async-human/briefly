@@ -1,27 +1,55 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useRef } from "react";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { BrainCanvas } from "./BrainCanvas";
 import { DigestPreview } from "./DigestPreview";
 import { StaggerHeadline } from "./StaggerHeadline";
+import { ArrowRightIcon } from "./icons";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 export function Hero() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const reducedMotion = useReducedMotion();
+
+  // Scroll-linked depth: atmosphere drifts down and fades while the product
+  // window lifts slightly faster than the page, so layers separate on scroll
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end start"],
+  });
+  const meshY = useTransform(scrollYProgress, [0, 1], [0, 90]);
+  const brainY = useTransform(scrollYProgress, [0, 1], [0, 140]);
+  const atmosphereOpacity = useTransform(scrollYProgress, [0, 0.65], [1, 0]);
+  const introY = useTransform(scrollYProgress, [0, 1], [0, 60]);
+  const productY = useTransform(scrollYProgress, [0, 1], [0, -36]);
+
   return (
-    <section className="hero-linear landing-band-base">
-      <div className="hero-linear-atmosphere" aria-hidden>
-        <div className="hero-linear-mesh" />
-        <div className="hero-linear-brain">
+    <section className="hero-linear landing-band-base" ref={sectionRef}>
+      <motion.div
+        className="hero-linear-atmosphere"
+        aria-hidden
+        style={reducedMotion ? undefined : { opacity: atmosphereOpacity }}
+      >
+        <motion.div
+          className="hero-linear-mesh"
+          style={reducedMotion ? undefined : { y: meshY }}
+        />
+        <motion.div
+          className="hero-linear-brain"
+          style={reducedMotion ? undefined : { y: brainY }}
+        >
           <BrainCanvas tone="accent" />
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
       <motion.div
         className="hero-linear-intro"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.42, ease: EASE }}
+        style={reducedMotion ? undefined : { y: introY }}
       >
         <p className="hero-linear-eyebrow">
           <a href="#demo">
@@ -32,6 +60,7 @@ export function Hero() {
         <StaggerHeadline
           className="hero-linear-headline"
           text="The intelligence system for everything you follow"
+          highlight="intelligence system"
         />
         <motion.p
           className="hero-linear-sub"
@@ -50,7 +79,10 @@ export function Hero() {
           transition={{ duration: 0.42, delay: 0.68, ease: EASE }}
         >
           <a href="/login" className="btn-light-primary">
-            Start free →
+            Start free
+            <span className="btn-arrow" aria-hidden>
+              <ArrowRightIcon size={14} />
+            </span>
           </a>
           <a href="#demo" className="btn-light-ghost">
             See it work
@@ -66,9 +98,12 @@ export function Hero() {
         </motion.p>
       </motion.div>
 
-      <div className="hero-linear-product">
+      <motion.div
+        className="hero-linear-product"
+        style={reducedMotion ? undefined : { y: productY }}
+      >
         <DigestPreview />
-      </div>
+      </motion.div>
     </section>
   );
 }

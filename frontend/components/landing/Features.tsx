@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { motion, useInView, useSpring, useTransform } from "framer-motion";
 import { Reveal } from "./Reveal";
 import { SourceIcon } from "@/components/SourceIcon";
+import { StaggerHeadline } from "./StaggerHeadline";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
@@ -283,16 +284,15 @@ function SpotlightCard({
   accent?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ x: 50, y: 50 });
   const [hovered, setHovered] = useState(false);
 
+  // Write spotlight coords straight to the element — a setState here would
+  // re-render the whole card on every mousemove
   function onMove(e: React.MouseEvent) {
     if (!ref.current) return;
     const r = ref.current.getBoundingClientRect();
-    setPos({
-      x: ((e.clientX - r.left) / r.width) * 100,
-      y: ((e.clientY - r.top) / r.height) * 100,
-    });
+    ref.current.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
+    ref.current.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
   }
 
   return (
@@ -300,8 +300,8 @@ function SpotlightCard({
       ref={ref}
       className={`bento-card bento-card-${variant}${accent ? " bento-card-accent" : ""}`}
       style={{
-        ["--mx" as string]: `${pos.x}%`,
-        ["--my" as string]: `${pos.y}%`,
+        ["--mx" as string]: "50%",
+        ["--my" as string]: "50%",
       }}
       onMouseMove={onMove}
       onMouseEnter={() => setHovered(true)}
@@ -344,7 +344,12 @@ export function Features() {
             <aside className="features-sticky-pane">
               <div className="section-header-centered features-sticky-intro">
                 <p className="section-eyebrow">In practice</p>
-                <h2 className="section-heading">Four ideas behind every briefing</h2>
+                <StaggerHeadline
+                  as="h2"
+                  trigger="inView"
+                  className="section-heading"
+                  text="Four ideas behind every briefing"
+                />
                 <p className="section-body">
                   Most tools wait for you to save, sort, and revisit.
                   Briefly works in the background — and meets you each morning with exactly what matters.

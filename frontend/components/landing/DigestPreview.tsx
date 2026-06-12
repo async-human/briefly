@@ -1,6 +1,12 @@
 "use client";
 
-import { motion } from "framer-motion";
+import {
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+  useTransform,
+} from "framer-motion";
 import { useEffect, useState } from "react";
 import { ArrowDownIcon } from "./icons";
 
@@ -51,6 +57,30 @@ function formatLiveDate(date: Date) {
 }
 
 export function DigestPreview() {
+  const reducedMotion = useReducedMotion();
+  const pointerX = useMotionValue(0.5);
+  const pointerY = useMotionValue(0.5);
+  const rotateX = useSpring(useTransform(pointerY, [0, 1], [3, -3]), {
+    stiffness: 160,
+    damping: 22,
+  });
+  const rotateY = useSpring(useTransform(pointerX, [0, 1], [-4, 4]), {
+    stiffness: 160,
+    damping: 22,
+  });
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "mouse") return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    pointerX.set((e.clientX - rect.left) / rect.width);
+    pointerY.set((e.clientY - rect.top) / rect.height);
+  };
+
+  const handlePointerLeave = () => {
+    pointerX.set(0.5);
+    pointerY.set(0.5);
+  };
+
   const [liveDate, setLiveDate] = useState("");
   const [itemCount, setItemCount] = useState("0 / 10 items");
   const [status, setStatus] = useState<"generating" | "ready">("generating");
@@ -84,8 +114,17 @@ export function DigestPreview() {
       initial={{ opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
+      onPointerMove={reducedMotion ? undefined : handlePointerMove}
+      onPointerLeave={reducedMotion ? undefined : handlePointerLeave}
     >
-      <div className="digest-window digest-window-float">
+      <motion.div
+        className="digest-window"
+        style={
+          reducedMotion
+            ? undefined
+            : { rotateX, rotateY, transformPerspective: 1100 }
+        }
+      >
         <div className="window-bar">
           <div className="window-dots">
             <div className="window-dot" />
@@ -155,10 +194,6 @@ export function DigestPreview() {
                     : { opacity: 0, y: 8 }
                 }
                 transition={{ duration: 0.4, ease: "easeOut" }}
-                whileHover={{
-                  paddingLeft: 8,
-                  borderLeft: "2px solid rgba(201,168,92,0.15)",
-                }}
               >
                 <div className="item-meta">
                   <span className="item-source">{item.source}</span>
@@ -188,7 +223,7 @@ export function DigestPreview() {
 
           <div className="digest-fade" />
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   );
 }

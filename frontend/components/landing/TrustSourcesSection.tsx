@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Reveal } from "./Reveal";
 import { SourceIcon } from "@/components/SourceIcon";
+import { StaggerHeadline } from "./StaggerHeadline";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -46,11 +47,12 @@ export function TrustSourcesSection() {
         <Reveal>
           <div className="section-header-centered">
             <p className="section-eyebrow">Your data, your rules</p>
-            <h2 className="section-heading">
-              We don&apos;t read everything you connect.
-              <br />
-              We read what you choose.
-            </h2>
+            <StaggerHeadline
+              as="h2"
+              trigger="inView"
+              className="section-heading"
+              text={"We don't read everything you connect.\nWe read what you choose."}
+            />
             <p className="section-body">
               Briefly only ingests content from sources you approve — newsletters, feeds, channels,
               and communities. Disconnect anytime; we revoke access and delete what we stored.
