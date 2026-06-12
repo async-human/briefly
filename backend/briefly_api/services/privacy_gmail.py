@@ -7,6 +7,7 @@ Briefly's Gmail posture:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -92,16 +93,13 @@ async def delete_gmail_derived_data(db: AsyncSession, user_id: str) -> dict[str,
     and any stored newsletter bodies fetched via Gmail (not forwarded mail).
     """
     deleted_sources = 0
-    deleted_content = 0
+    source_ids: list[str] = []
 
     gmail_sources = await db.execute(
         select(Source).where(Source.user_id == user_id, Source.source_type == "gmail")
     )
     for source in gmail_sources.scalars().all():
-        count = await db.scalar(
-            select(func.count()).select_from(RawContent).where(RawContent.source_id == source.id)
-        )
-        deleted_content += int(count or 0)
+        source_ids.append(source.id)
         await db.delete(source)
         deleted_sources += 1
 
@@ -111,12 +109,20 @@ async def delete_gmail_derived_data(db: AsyncSession, user_id: str) -> dict[str,
     for source in email_sources.scalars().all():
         if not _is_gmail_derived_email_source(source):
             continue
-        count = await db.scalar(
-            select(func.count()).select_from(RawContent).where(RawContent.source_id == source.id)
-        )
-        deleted_content += int(count or 0)
+        source_ids.append(source.id)
         await db.delete(source)
         deleted_sources += 1
+
+    deleted_content = 0
+    if source_ids:
+        deleted_content = int(
+            await db.scalar(
+                select(func.count())
+                .select_from(RawContent)
+                .where(RawContent.source_id.in_(source_ids))
+            )
+            or 0
+        )
 
     profile = await db.scalar(select(UserProfile).where(UserProfile.user_id == user_id))
     if profile:
@@ -161,10 +167,11 @@ async def disconnect_gmail_privacy(
         stored.insert(0, log_entry)
         connection.meta = {**(connection.meta or {}), "access_log": stored[:_MAX_ACCESS_LOG]}
         flag_modified(connection, "meta")
-        await revoke_google_token(refresh)
         await db.delete(connection)
 
     await db.flush()
+    if refresh:
+        asyncio.create_task(revoke_google_token(refresh))
     return stats
 
 

@@ -476,15 +476,15 @@ async def disconnect_youtube(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
+    from sqlalchemy import delete
+
     from briefly_api.services.connectors.types import YOUTUBE_ACCOUNT
     connection = await get_youtube_connection(db, user.id)
     if connection:
         await db.delete(connection)
-    sources = await db.execute(
-        select(Source).where(Source.user_id == user.id, Source.source_type == YOUTUBE_ACCOUNT)
+    await db.execute(
+        delete(Source).where(Source.user_id == user.id, Source.source_type == YOUTUBE_ACCOUNT)
     )
-    for source in sources.scalars().all():
-        await db.delete(source)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -561,14 +561,14 @@ async def disconnect_reddit(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
+    from sqlalchemy import delete
+
     from briefly_api.services.connectors.types import REDDIT_ACCOUNT
     connection = await get_reddit_connection(db, user.id)
     if connection:
         await db.delete(connection)
-    sources = await db.execute(
-        select(Source).where(Source.user_id == user.id, Source.source_type == REDDIT_ACCOUNT)
+    await db.execute(
+        delete(Source).where(Source.user_id == user.id, Source.source_type == REDDIT_ACCOUNT)
     )
-    for source in sources.scalars().all():
-        await db.delete(source)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

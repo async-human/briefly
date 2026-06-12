@@ -1,17 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
 import { api, type OnboardingStatus, type Source } from "@/lib/api";
+import {
+  disconnectDetail,
+  optimisticDisconnectStatus,
+  sourcesAfterOAuthDisconnect,
+  type ConnectorId,
+} from "@/lib/connectionDisconnect";
 import { SourceIcon } from "@/components/SourceIcon";
 import { AddSourceForm } from "@/components/dashboard/AddSourceForm";
 import { sourceDisplayName } from "@/components/dashboard/sourceLabels";
 import { GmailConsentModal } from "@/components/privacy/GmailConsentModal";
+import { ConnectionToast, type ConnectionToastState } from "@/components/settings/ConnectionToast";
 
 const OAUTH_TYPES = new Set(["gmail", "youtube", "youtube_account", "reddit", "reddit_account"]);
 const MANUAL_TYPES = new Set(["rss", "url", "email", "readwise"]);
-
-type ConnectorId = "gmail" | "youtube" | "reddit" | "calendar";
 
 type ConnectorDef = {
   id: ConnectorId;
@@ -116,9 +122,18 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState<ConnectorId | "remove" | null>(null);
+  const [busy, setBusy] = useState<ConnectorId | null>(null);
   const [gmailConsentOpen, setGmailConsentOpen] = useState(false);
   const [gmailDisconnectOpen, setGmailDisconnectOpen] = useState(false);
+  const [connectionToast, setConnectionToast] = useState<ConnectionToastState | null>(null);
+  const statusSnapshot = useRef<OnboardingStatus | null>(null);
+  const sourcesSnapshot = useRef<Source[]>([]);
+  const toastId = useRef(0);
+
+  const showConnectionToast = useCallback((title: string, detail?: string) => {
+    toastId.current += 1;
+    setConnectionToast({ id: toastId.current, title, detail });
+  }, []);
 
   const refresh = useCallback(async () => {
     const [nextStatus, nextSources] = await Promise.all([
@@ -237,42 +252,61 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
     void confirmDisconnect(id);
   }
 
-  async function confirmDisconnect(id: ConnectorId, deleteGmailContent = true) {
-    setBusy(id);
+  function applyOptimisticDisconnect(id: ConnectorId) {
+    statusSnapshot.current = status;
+    sourcesSnapshot.current = sources;
+    setStatus((prev) => (prev ? optimisticDisconnectStatus(id, prev) : prev));
+    setSources((prev) => sourcesAfterOAuthDisconnect(id, prev));
+    if (id === "gmail") setGmailDisconnectOpen(false);
+    const name = CONNECTORS.find((c) => c.id === id)?.name ?? "Account";
+    showConnectionToast(`${name} disconnected`, disconnectDetail(id));
     setError("");
+  }
+
+  function rollbackOptimisticDisconnect() {
+    if (statusSnapshot.current) setStatus(statusSnapshot.current);
+    if (sourcesSnapshot.current.length) setSources(sourcesSnapshot.current);
+    statusSnapshot.current = null;
+    sourcesSnapshot.current = [];
+    setConnectionToast(null);
+  }
+
+  async function confirmDisconnect(id: ConnectorId, deleteGmailContent = true) {
+    applyOptimisticDisconnect(id);
     try {
       if (id === "gmail") {
-        const res = await api.disconnectGmail(deleteGmailContent);
-        setBanner(
-          res.removed_content_items > 0
-            ? `Gmail disconnected. Removed ${res.removed_sources} source(s) and ${res.removed_content_items} stored newsletter(s).`
-            : "Gmail disconnected. Google access revoked.",
-        );
-        setGmailDisconnectOpen(false);
-      } else if (id === "youtube") await api.disconnectYouTube();
-      else if (id === "calendar") await api.disconnectCalendar();
-      else await api.disconnectReddit();
-      if (id !== "gmail") {
-        setBanner(`${CONNECTORS.find((c) => c.id === id)?.name ?? "Account"} disconnected.`);
+        await api.disconnectGmail(deleteGmailContent);
+      } else if (id === "youtube") {
+        await api.disconnectYouTube();
+      } else if (id === "calendar") {
+        await api.disconnectCalendar();
+      } else {
+        await api.disconnectReddit();
       }
-      await refresh();
+      statusSnapshot.current = null;
+      sourcesSnapshot.current = [];
+      void refresh();
     } catch (err) {
+      rollbackOptimisticDisconnect();
       setError(err instanceof Error ? err.message : "Could not disconnect");
-    } finally {
-      setBusy(null);
     }
   }
 
   async function handleRemoveSource(id: string) {
-    setBusy("remove");
+    const source = sources.find((s) => s.id === id);
+    const name = source ? sourceDisplayName(source) : "Feed";
+    const prevSources = sources;
+    setSources((prev) => prev.filter((s) => s.id !== id));
+    showConnectionToast(`${name} removed`, "It won't appear in future briefs.");
     setError("");
+
     try {
       await api.deleteSource(id);
-      setSources((prev) => prev.filter((s) => s.id !== id));
+      void refresh();
     } catch (err) {
+      setSources(prevSources);
+      setConnectionToast(null);
       setError(err instanceof Error ? err.message : "Could not remove source");
-    } finally {
-      setBusy(null);
     }
   }
 
@@ -325,15 +359,16 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
               <button
                 type="button"
                 className="privacy-modal-btn privacy-modal-btn-danger"
-                disabled={busy === "gmail"}
                 onClick={() => void confirmDisconnect("gmail", true)}
               >
-                {busy === "gmail" ? "Disconnecting…" : "Disconnect & delete content"}
+                Disconnect & delete content
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <ConnectionToast toast={connectionToast} onDismiss={() => setConnectionToast(null)} />
 
       {banner && <div className="settings-connections-banner">{banner}</div>}
       {error && <div className="settings-connections-error" role="alert">{error}</div>}
@@ -360,9 +395,11 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
               const isBusy = busy === connector.id;
 
               return (
-                <li
+                <motion.li
                   key={connector.id}
+                  layout
                   className={`settings-connector-card${connected ? " is-connected" : ""}`}
+                  transition={{ layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
                 >
                   <div className="settings-connector-icon">
                     {connector.id === "calendar" ? (
@@ -390,10 +427,9 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
                       <button
                         type="button"
                         className="settings-connector-btn settings-connector-btn-ghost"
-                        onClick={() => void handleDisconnect(connector.id)}
-                        disabled={isBusy}
+                        onClick={() => handleDisconnect(connector.id)}
                       >
-                        {isBusy ? "…" : "Disconnect"}
+                        Disconnect
                       </button>
                     ) : (
                       <button
@@ -406,7 +442,7 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
                       </button>
                     )}
                   </div>
-                </li>
+                </motion.li>
               );
             })}
           </ul>
@@ -421,33 +457,42 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
 
             {feeds.length > 0 ? (
               <ul className="settings-feed-list">
-                {feeds.map((source) => (
-                  <li key={source.id} className="settings-feed-item">
-                    <span className="settings-feed-icon">
-                      <SourceIcon
-                        type={source.source_type}
-                        name={source.name ?? undefined}
-                        url={source.identifier?.startsWith("http") ? source.identifier : undefined}
-                        size={18}
-                      />
-                    </span>
-                    <div className="settings-feed-info">
-                      <span className="settings-feed-name">{sourceDisplayName(source)}</span>
-                      {source.identifier?.startsWith("http") && (
-                        <span className="settings-feed-url">{source.identifier}</span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      className="settings-feed-remove"
-                      onClick={() => void handleRemoveSource(source.id)}
-                      disabled={busy === "remove"}
-                      aria-label={`Remove ${sourceDisplayName(source)}`}
+                <AnimatePresence initial={false}>
+                  {feeds.map((source) => (
+                    <motion.li
+                      key={source.id}
+                      layout
+                      className="settings-feed-item"
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, x: 8, height: 0, marginTop: 0, marginBottom: 0 }}
+                      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
                     >
-                      Remove
-                    </button>
-                  </li>
-                ))}
+                      <span className="settings-feed-icon">
+                        <SourceIcon
+                          type={source.source_type}
+                          name={source.name ?? undefined}
+                          url={source.identifier?.startsWith("http") ? source.identifier : undefined}
+                          size={18}
+                        />
+                      </span>
+                      <div className="settings-feed-info">
+                        <span className="settings-feed-name">{sourceDisplayName(source)}</span>
+                        {source.identifier?.startsWith("http") && (
+                          <span className="settings-feed-url">{source.identifier}</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        className="settings-feed-remove"
+                        onClick={() => void handleRemoveSource(source.id)}
+                        aria-label={`Remove ${sourceDisplayName(source)}`}
+                      >
+                        Remove
+                      </button>
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
               </ul>
             ) : (
               <p className="settings-feeds-empty">No custom feeds yet — add one below.</p>
