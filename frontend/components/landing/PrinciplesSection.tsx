@@ -10,39 +10,21 @@ const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 const principles = [
   {
     num: "01",
-    title: "Connect once. Never maintain.",
-    body: "Link Gmail, YouTube, Reddit, and RSS once. You approve which newsletters, channels, and feeds Briefly follows — no saving, tagging, or inbox zero required.",
-    tag: "Zero friction",
+    title: "Your sources, not the open web.",
+    body: "Briefly never crawls the internet for engagement bait. It reads only the newsletters, channels, and communities you chose — your taste is the algorithm.",
+    tag: "Curated by you",
   },
   {
     num: "02",
-    title: "We filter the firehose for you.",
-    body: "Newsletters pile up. Subreddits scroll by. Videos upload overnight. While you sleep, agents collect only from your approved sources, then clean and score what matters.",
-    tag: "Nightly pipeline",
-  },
-  {
-    num: "03",
-    title: "One story, one entry.",
-    body: "The same headline across five sources becomes a single cited summary. Cross-source deduplication — signal without the noise.",
-    tag: "Synthesis",
-  },
-  {
-    num: "04",
-    title: "Every item answers why you.",
-    body: "Not why it's generally important — why it matters to your role, your goals, and what you read last week. Personal relevance on every line.",
-    tag: "Why it matters",
-  },
-  {
-    num: "05",
     title: "Ten items, not fifty.",
-    body: "Briefly processes dozens of candidates and shows only what fits your morning. Every skip is logged with a reason — so you trust what you see and what you don't.",
+    body: "Confidence means leaving things out. Every briefing is capped, and every skip is logged with a reason — so you trust what you see and what you don't.",
     tag: "Confident curation",
   },
   {
-    num: "06",
-    title: "Smarter with every briefing.",
-    body: "Clicks, saves, and follow-ups shape what lands tomorrow. New sources are suggested as your interests evolve. Memory that compounds.",
-    tag: "Continuous learning",
+    num: "03",
+    title: "Cited, or it doesn't ship.",
+    body: "Every line links back to the original source, and claims are verified before delivery. A briefing you can act on is a briefing you can check.",
+    tag: "Verifiable",
   },
 ] as const;
 
@@ -115,12 +97,6 @@ export function PrinciplesSection() {
             <PrincipleRow key={p.num} principle={p} index={i} />
           ))}
         </ol>
-
-        <Reveal delay={0.12}>
-          <p className="principles-footnote">
-            Every item links to its original source. Claims are verified before delivery.
-          </p>
-        </Reveal>
       </div>
     </section>
   );

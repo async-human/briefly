@@ -11,35 +11,35 @@ const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 const VERDICTS = [
   {
-    title: "Briefly vs Meco",
+    title: "vs Meco",
     themLabel: "Meco",
     themBody:
-      "if you genuinely enjoy reading every newsletter and just want them out of your inbox, in a beautiful reading app.",
+      "if you enjoy reading every newsletter and just want them out of your inbox.",
     usBody:
-      "if 30 newsletters a day is the problem, not the format — you want the five things that matter, already connected to what you're working on.",
+      "if 30 newsletters a day is the problem — you want the five that matter, already connected to your work.",
   },
   {
-    title: "Briefly vs Readwise Reader",
+    title: "vs Readwise Reader",
     themLabel: "Reader",
     themBody:
-      "if you're a highlighter — you read deeply, annotate, and export to Obsidian or Notion. It's the best library there is.",
+      "if you read deeply, annotate, and export highlights. The best library there is.",
     usBody:
-      "if your saved-for-later list keeps growing and your goal is staying sharp, not archiving. Many of our users keep both: Briefly to filter, Reader to keep.",
+      "if your saved-for-later list keeps growing and the goal is staying sharp, not archiving.",
   },
   {
-    title: "Briefly vs Readless",
+    title: "vs Readless",
     themLabel: "Readless",
-    themBody: "if you want the cheapest way to compress newsletters and RSS into one summary email.",
+    themBody: "if you want the cheapest way to compress newsletters into one summary email.",
     usBody:
-      "if you want a brief that knows you — it learns from your behavior, tracks stories over weeks, flags what your sources disagree on, and answers questions about anything you've read.",
+      "if you want a brief that knows you — tracks stories over weeks and answers questions about what you've read.",
   },
   {
-    title: "Briefly vs ChatGPT Pulse",
+    title: "vs ChatGPT Pulse",
     themLabel: "Pulse",
     themBody:
-      "if you live in ChatGPT and want general daily suggestions drawn from your chats and the open web.",
+      "if you live in ChatGPT and want general suggestions from your chats and the open web.",
     usBody:
-      "if your edge comes from a curated diet — specific newsletters, channels and communities. Pulse briefs you on the world. Briefly briefs you on your world, with citations to your own sources.",
+      "if your edge is a curated diet. Pulse briefs you on the world — Briefly briefs you on your world.",
   },
 ] as const;
 
@@ -125,17 +125,8 @@ export function CompareSection() {
         </div>
 
         <Reveal delay={0.12}>
-          <div className="compare-cta-row">
-            <a href="#pricing" className="btn-light-primary compare-cta">
-              Get your first briefing tomorrow morning
-            </a>
-            <p className="compare-cta-sub">Free to start · Founding Pro $9/mo · Cancel anytime</p>
-          </div>
           <p className="compare-foot">
-            Comparisons based on each product&apos;s public documentation and pricing as of June 2026;
-            features and prices may change. Looking at Particle or a general AI agent like Vellum?
-            Particle is excellent for world news, and agents are great if you want to build your own
-            assistant — Briefly is for your personal sources, with zero setup. All product names and
+            Based on public documentation and pricing as of June 2026. All product names and
             trademarks belong to their respective owners.
           </p>
         </Reveal>

@@ -16,7 +16,6 @@ const stages = [
     num: "01",
     version: "V1",
     status: "now" as const,
-    icon: "⚡",
     name: "Self-Building Digest",
     tagline: "The core loop. Reads everything. Writes for you.",
     highlights: ["Gmail · YouTube · Reddit · RSS", "Dual-pool briefing", "Why-it-matters on every item", "Brain dump capture"],
@@ -32,7 +31,6 @@ const stages = [
     num: "02",
     version: "V1.5",
     status: "now" as const,
-    icon: "🌙",
     name: "Passive Ingestion",
     tagline: "Briefly reads overnight. Mornings are instant.",
     highlights: ["Nightly source fetch", "Pre-scored content pool", "Pool-first briefings", "Ingestion activity feed"],
@@ -48,7 +46,6 @@ const stages = [
     num: "03",
     version: "V2",
     status: "coming" as const,
-    icon: "✏",
     name: "Manual Capture Layer",
     tagline: "Add your own voice to the second brain.",
     highlights: ["Paste any link", "PDF & doc upload", "Browser extension", "Readwise sync"],
@@ -63,7 +60,6 @@ const stages = [
     num: "04",
     version: "V3",
     status: "coming" as const,
-    icon: "◎",
     name: "Ask Briefly",
     tagline: "Conversational search across everything it knows.",
     highlights: ["Ask your knowledge base", "Answers with citations", "Follow-up on any item", "Weekly memory digest"],
@@ -79,7 +75,6 @@ const stages = [
     num: "05",
     version: "V4",
     status: "vision" as const,
-    icon: "✦",
     name: "Knowledge Graph",
     tagline: "Proactive intelligence in the background.",
     highlights: ["Connected topics & entities", "Story threads over time", "Proactive resurfacing", "Mobile + X integration"],
@@ -103,11 +98,9 @@ const STATUS = {
 
 function useStageTimer(active: number, paused: boolean, inView: boolean) {
   const [progress, setProgress] = useState(0);
-  const [remainingSec, setRemainingSec] = useState(STAGE_DURATION_MS / 1000);
 
   useEffect(() => {
     setProgress(0);
-    setRemainingSec(Math.ceil(STAGE_DURATION_MS / 1000));
   }, [active]);
 
   useEffect(() => {
@@ -120,10 +113,8 @@ function useStageTimer(active: number, paused: boolean, inView: boolean) {
     let raf = 0;
 
     const tick = (now: number) => {
-      const elapsed = now - started;
-      const p = Math.min(elapsed / STAGE_DURATION_MS, 1);
+      const p = Math.min((now - started) / STAGE_DURATION_MS, 1);
       setProgress(p);
-      setRemainingSec(Math.max(0, Math.ceil((STAGE_DURATION_MS - elapsed) / 1000)));
       if (p < 1) raf = requestAnimationFrame(tick);
     };
 
@@ -131,85 +122,7 @@ function useStageTimer(active: number, paused: boolean, inView: boolean) {
     return () => cancelAnimationFrame(raf);
   }, [active, paused, inView]);
 
-  return { progress, remainingSec };
-}
-
-function TimerRing({
-  progress,
-  size = 28,
-  stroke = 2,
-  className = "",
-}: {
-  progress: number;
-  size?: number;
-  stroke?: number;
-  className?: string;
-}) {
-  const r = (size - stroke) / 2;
-  const cx = size / 2;
-  const circumference = 2 * Math.PI * r;
-  const offset = circumference * (1 - progress);
-
-  return (
-    <svg
-      className={`rm3-timer-ring-svg ${className}`}
-      width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      aria-hidden
-    >
-      <circle
-        className="rm3-timer-ring-track"
-        cx={cx}
-        cy={cx}
-        r={r}
-        fill="none"
-        strokeWidth={stroke}
-      />
-      <circle
-        className="rm3-timer-ring-progress"
-        cx={cx}
-        cy={cx}
-        r={r}
-        fill="none"
-        strokeWidth={stroke}
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        strokeLinecap="round"
-        transform={`rotate(-90 ${cx} ${cx})`}
-      />
-    </svg>
-  );
-}
-
-function InlineTimer({
-  progress,
-  remainingSec,
-  paused,
-  version,
-  compact,
-}: {
-  progress: number;
-  remainingSec: number;
-  paused: boolean;
-  version: string;
-  compact?: boolean;
-}) {
-  return (
-    <span
-      className={`rm3-inline-timer${compact ? " rm3-inline-timer-compact" : ""}${paused ? " is-paused" : ""}`}
-      role="timer"
-      aria-live="off"
-      aria-label={
-        paused
-          ? `Auto-advance paused on ${version}`
-          : `Advancing in ${remainingSec} seconds`
-      }
-    >
-      <TimerRing progress={progress} size={compact ? 14 : 16} stroke={1.75} />
-      <span className="rm3-inline-timer-val">{remainingSec}s</span>
-    </span>
-  );
+  return progress;
 }
 
 function CountdownBar({ progress }: { progress: number }) {
@@ -238,15 +151,11 @@ function JourneyTrack({
   onSelect,
   inView,
   progress,
-  remainingSec,
-  paused,
 }: {
   active: number;
   onSelect: (i: number) => void;
   inView: boolean;
   progress: number;
-  remainingSec: number;
-  paused: boolean;
 }) {
   const fillPercent = (active / (stages.length - 1)) * 100;
 
@@ -281,32 +190,11 @@ function JourneyTrack({
             className={`rm3-track-node${isActive ? " active" : ""}${isReached ? " reached" : ""}`}
             onClick={() => onSelect(i)}
           >
-            <motion.span
-              className={`rm3-track-dot rm3-track-dot-${stage.status}`}
-              animate={
-                isActive
-                  ? { scale: [1, 1.08, 1], boxShadow: ["0 0 0 0 rgba(201,184,150,0)", "0 0 0 10px rgba(201,184,150,0.12)", "0 0 0 0 rgba(201,184,150,0)"] }
-                  : { scale: 1 }
-              }
-              transition={{ duration: 2.2, repeat: isActive ? Infinity : 0, ease: "easeInOut" }}
-            >
+            <span className={`rm3-track-dot rm3-track-dot-${stage.status}${isActive ? " is-active" : ""}`}>
               {isActive && <DotProgressRing progress={progress} />}
-              <motion.span
-                className="rm3-track-icon"
-                animate={isActive ? { y: [0, -3, 0], rotate: [0, 8, -6, 0] } : { y: 0, rotate: 0 }}
-                transition={{ duration: 2.5, repeat: isActive ? Infinity : 0, ease: "easeInOut", repeatDelay: 0.5 }}
-              >
-                {stage.icon}
-              </motion.span>
-            </motion.span>
-            <span className="rm3-track-ver-row">
-              <span className="rm3-track-ver">{stage.version}</span>
-              {isActive && (
-                <span className="rm3-track-sec" aria-hidden>
-                  {paused ? "—" : `${remainingSec}s`}
-                </span>
-              )}
+              <span className="rm3-track-num">{stage.num}</span>
             </span>
+            <span className="rm3-track-ver">{stage.version}</span>
             <span className={`roadmap-badge ${cfg.cls} rm3-track-badge`}>{cfg.badge}</span>
           </button>
         );
@@ -318,13 +206,9 @@ function JourneyTrack({
 function SpotlightPanel({
   stage,
   progress,
-  remainingSec,
-  paused,
 }: {
   stage: (typeof stages)[0];
   progress: number;
-  remainingSec: number;
-  paused: boolean;
 }) {
   const cfg = STATUS[stage.status];
 
@@ -348,37 +232,21 @@ function SpotlightPanel({
 
       <CountdownBar progress={progress} />
 
-      <div className="rm3-spotlight-timer">
-        <InlineTimer
-          progress={progress}
-          remainingSec={remainingSec}
-          paused={paused}
-          version={stage.version}
-        />
-      </div>
-
       <span className="rm3-watermark" aria-hidden>{stage.num}</span>
 
       <div className="rm3-spotlight-grid">
         <div className="rm3-spotlight-left">
           <motion.div
             className={`rm3-icon-stage rm3-icon-stage-${stage.status}`}
-            initial={{ scale: 0.6, rotate: -12, opacity: 0 }}
-            animate={{ scale: 1, rotate: 0, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 320, damping: 18, delay: 0.05 }}
+            initial={{ scale: 0.7, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 320, damping: 20, delay: 0.05 }}
           >
-            <motion.span
-              className="rm3-icon-emoji"
-              animate={{ y: [0, -4, 0] }}
-              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-            >
-              {stage.icon}
-            </motion.span>
+            <span className="rm3-icon-ver">{stage.version}</span>
             {stage.status === "now" && <span className="rm3-icon-ring" aria-hidden />}
           </motion.div>
 
           <div className="rm3-spotlight-meta">
-            <span className="rm3-ver">{stage.version}</span>
             <span className={`roadmap-badge ${cfg.cls}`}>{cfg.badge}</span>
           </div>
 
@@ -429,65 +297,12 @@ function SpotlightPanel({
   );
 }
 
-function StageStrip({
-  active,
-  onSelect,
-  progress,
-  remainingSec,
-  paused,
-}: {
-  active: number;
-  onSelect: (i: number) => void;
-  progress: number;
-  remainingSec: number;
-  paused: boolean;
-}) {
-  return (
-    <div className="rm3-strip">
-      {stages.map((stage, i) => (
-        <motion.button
-          key={stage.version}
-          type="button"
-          className={`rm3-strip-card${i === active ? " active" : ""}`}
-          onClick={() => onSelect(i)}
-          whileHover={{ y: i === active ? 0 : -3 }}
-          whileTap={{ scale: 0.98 }}
-          layout
-        >
-          {i === active && (
-            <span className="rm3-strip-timer-corner">
-              <InlineTimer
-                progress={progress}
-                remainingSec={remainingSec}
-                paused={paused}
-                version={stage.version}
-                compact
-              />
-            </span>
-          )}
-          {i === active && (
-            <span className="rm3-strip-timer" aria-hidden>
-              <span
-                className="rm3-strip-timer-fill"
-                style={{ transform: `scaleX(${progress})` }}
-              />
-            </span>
-          )}
-          <span className="rm3-strip-icon">{stage.icon}</span>
-          <span className="rm3-strip-ver">{stage.version}</span>
-          <span className="rm3-strip-name">{stage.name}</span>
-        </motion.button>
-      ))}
-    </div>
-  );
-}
-
 export function Roadmap() {
   const sectionRef = useRef<HTMLElement>(null);
   const inView = useInView(sectionRef, { once: false, margin: "-8% 0px" });
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
-  const { progress, remainingSec } = useStageTimer(active, paused, inView);
+  const progress = useStageTimer(active, paused, inView);
 
   const selectStage = (i: number) => {
     setActive(i);
@@ -534,8 +349,6 @@ export function Roadmap() {
               onSelect={selectStage}
               inView={inView}
               progress={progress}
-              remainingSec={remainingSec}
-              paused={paused}
             />
           </div>
         </Reveal>
@@ -550,35 +363,9 @@ export function Roadmap() {
               key={stages[active].version}
               stage={stages[active]}
               progress={progress}
-              remainingSec={remainingSec}
-              paused={paused}
             />
           </AnimatePresence>
         </div>
-
-        <Reveal delay={0.15}>
-          <div className="rm3-strip-wrap">
-            <StageStrip
-              active={active}
-              onSelect={selectStage}
-              progress={progress}
-              remainingSec={remainingSec}
-              paused={paused}
-            />
-          </div>
-        </Reveal>
-
-        <Reveal delay={0.25}>
-          <motion.p
-            className="roadmap-footnote rm3-footnote"
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, ease: EASE }}
-          >
-            The first 200 founding members get V2, V3, and V4 as they ship — $9/month, price locked forever.
-          </motion.p>
-        </Reveal>
       </div>
     </section>
   );

@@ -750,6 +750,146 @@ body[data-landing-theme="light"].study-linear-body {
   z-index: -1;
 }
 
+/* ── Roadmap refinements — monograms instead of emoji ─────────────────── */
+
+.study-linear .rm3-track-num {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  transition: color 0.25s var(--ease-out);
+}
+
+.study-linear .rm3-track-node.active .rm3-track-num,
+.study-linear .rm3-track-node.reached .rm3-track-num {
+  color: var(--accent);
+}
+
+.study-linear .rm3-track-dot.is-active {
+  animation: rm3-dot-pulse 2.4s var(--ease-in-out) infinite;
+}
+
+@keyframes rm3-dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 6px var(--accent-dim), 0 0 0 0 color-mix(in oklch, var(--accent) 18%, transparent); }
+  50% { box-shadow: 0 0 0 6px var(--accent-dim), 0 0 0 12px color-mix(in oklch, var(--accent) 0%, transparent); }
+}
+
+.study-linear .rm3-icon-ver {
+  position: relative;
+  z-index: 1;
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+
+.study-linear .rm3-icon-stage-coming .rm3-icon-ver,
+.study-linear .rm3-icon-stage-vision .rm3-icon-ver {
+  color: var(--text-secondary);
+}
+
+.study-linear .rm3-icon-ring {
+  border-color: color-mix(in oklch, var(--accent) 30%, transparent);
+}
+
+/* ── Trust source cards — lift + accent ring on hover ─────────────────── */
+
+.study-linear .trust-source-card {
+  transition:
+    transform var(--dur-short) var(--ease-out),
+    border-color var(--dur-short) var(--ease-out),
+    box-shadow var(--dur-short) var(--ease-out);
+}
+
+.study-linear .trust-source-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in oklch, var(--accent) 30%, var(--liner-divider));
+  box-shadow: 0 16px 40px -24px color-mix(in oklch, var(--accent) 35%, transparent);
+}
+
+.study-linear .trust-source-icon {
+  transition: background-color var(--dur-short) var(--ease-out);
+}
+
+.study-linear .trust-source-card:hover .trust-source-icon {
+  background: color-mix(in oklch, var(--accent) 14%, transparent);
+}
+
+/* ── Source chips — lift on hover, pause marquee ──────────────────────── */
+
+.study-linear .source-chip {
+  transition:
+    transform var(--dur-short) var(--ease-out),
+    border-color var(--dur-short) var(--ease-out);
+}
+
+.study-linear .source-chip:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklch, var(--accent) 30%, var(--border-strong));
+}
+
+.study-linear .sources-marquee:hover .sources-marquee-track {
+  animation-play-state: paused;
+}
+
+/* ── Compare verdicts — quieter cards, accent rule on the "us" line ────── */
+
+.study-linear .compare-verdict {
+  transition:
+    transform var(--dur-short) var(--ease-out),
+    border-color var(--dur-short) var(--ease-out),
+    box-shadow var(--dur-short) var(--ease-out);
+}
+
+.study-linear .compare-verdict:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in oklch, var(--accent) 25%, var(--liner-divider));
+  box-shadow: 0 16px 40px -26px color-mix(in oklch, var(--accent) 30%, transparent);
+}
+
+.study-linear .compare-verdict-us {
+  padding-left: 12px;
+  border-left: 2px solid color-mix(in oklch, var(--accent) 45%, transparent);
+}
+
+/* ── Pricing cards — accent edge on Pro, soft lift shadows ─────────────── */
+
+.study-linear .pricing-v2-card {
+  transition: box-shadow var(--dur-short) var(--ease-out);
+}
+
+.study-linear .pricing-v2-card:hover {
+  box-shadow: 0 24px 56px -32px color-mix(in oklch, var(--text) 25%, transparent);
+}
+
+.study-linear .pricing-v2-card-pro {
+  position: relative;
+  border-color: color-mix(in oklch, var(--accent) 35%, var(--liner-divider));
+}
+
+.study-linear .pricing-v2-card-pro::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 50%,
+    transparent 100%
+  );
+  opacity: 0.8;
+}
+
+.study-linear .pricing-v2-card-pro:hover {
+  box-shadow: 0 24px 64px -28px color-mix(in oklch, var(--accent) 40%, transparent);
+}
+
 /* ── Pricing checkmarks — theme tokens, not hardcoded colors ──────────── */
 
 .study-linear .pricing-check-ring {
@@ -1029,7 +1169,9 @@ body[data-landing-theme="light"].study-linear-body {
   .study-linear .hero-eyebrow-pulse,
   .study-linear .status-dot.generating,
   .study-linear .headline-shimmer,
-  .study-linear .nav-fp-cta::after {
+  .study-linear .nav-fp-cta::after,
+  .study-linear .rm3-track-dot.is-active,
+  .study-linear .rm3-icon-ring {
     animation: none;
     transition: none;
   }
