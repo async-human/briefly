@@ -3,18 +3,27 @@
 import { Reveal } from "./Reveal";
 import { SourceIcon } from "@/components/SourceIcon";
 
-const SOURCES = [
-  { name: "Gmail",        type: "gmail"   },
-  { name: "YouTube",      type: "youtube" },
-  { name: "Reddit",       type: "reddit"  },
-  { name: "RSS",          type: "rss"     },
-  { name: "Substack",     type: "rss",    nameOverride: "Substack"      },
-  { name: "Readwise",     type: "readwise"                               },
-  { name: "Hacker News",  type: "rss",    nameOverride: "Hacker News"   },
-  { name: "Any URL",      type: "url"     },
+type Source = {
+  name: string;
+  type: string;
+  nameOverride?: string;
+};
+
+const SOURCES: Source[] = [
+  { name: "Gmail", type: "gmail" },
+  { name: "YouTube", type: "youtube" },
+  { name: "Reddit", type: "reddit" },
+  { name: "RSS", type: "rss" },
+  { name: "Substack", type: "rss", nameOverride: "Substack" },
+  { name: "Readwise", type: "readwise" },
+  { name: "Hacker News", type: "rss", nameOverride: "Hacker News" },
+  { name: "Any URL", type: "url" },
 ];
 
-function SourceChip({ name, type, nameOverride }: (typeof SOURCES)[number]) {
+/** Four identical groups → animate -25% for a seamless loop with no seam gap. */
+const MARQUEE_GROUP_COUNT = 4;
+
+function SourceChip({ name, type, nameOverride }: Source) {
   const label = nameOverride ?? name;
   return (
     <div className="source-chip">
@@ -26,19 +35,36 @@ function SourceChip({ name, type, nameOverride }: (typeof SOURCES)[number]) {
   );
 }
 
-export function SourcesStrip() {
-  const marqueeSources = [...SOURCES, ...SOURCES];
+function MarqueeGroup({ groupIndex }: { groupIndex: number }) {
+  return (
+    <div
+      className="sources-marquee-group"
+      aria-hidden={groupIndex > 0 ? true : undefined}
+    >
+      {SOURCES.map((s) => (
+        <SourceChip key={`${groupIndex}-${s.name}`} {...s} />
+      ))}
+    </div>
+  );
+}
 
+export function SourcesStrip() {
   return (
     <div className="sources-strip landing-band-base">
       <Reveal>
         <p className="sources-strip-label">Works with what you already follow</p>
+        <p className="sources-strip-sub">
+          You pick what Briefly ingests — not your whole inbox or account.{" "}
+          <a href="#trust" className="sources-strip-link">
+            See exactly what we access
+          </a>
+        </p>
       </Reveal>
 
       <div className="sources-marquee" aria-hidden>
         <div className="sources-marquee-track">
-          {marqueeSources.map((s, i) => (
-            <SourceChip key={`${s.name}-${i}`} {...s} />
+          {Array.from({ length: MARQUEE_GROUP_COUNT }, (_, i) => (
+            <MarqueeGroup key={i} groupIndex={i} />
           ))}
         </div>
       </div>

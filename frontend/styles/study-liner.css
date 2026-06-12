@@ -97,24 +97,27 @@
   text-decoration: underline;
 }
 
-/* ── Sources marquee (ambient motion) ─────────────────────────────────── */
+/* ── Sources marquee (seamless infinite loop) ───────────────────────────── */
 
 .study-linear .sources-marquee {
+  --marquee-gap: 10px;
+  --marquee-duration: 38s;
   position: relative;
   overflow: hidden;
+  width: 100%;
   margin-top: 28px;
   mask-image: linear-gradient(
     90deg,
     transparent 0%,
-    black 10%,
-    black 90%,
+    black 8%,
+    black 92%,
     transparent 100%
   );
   -webkit-mask-image: linear-gradient(
     90deg,
     transparent 0%,
-    black 10%,
-    black 90%,
+    black 8%,
+    black 92%,
     transparent 100%
   );
 }
@@ -122,19 +125,29 @@
 .study-linear .sources-marquee-track {
   display: flex;
   align-items: center;
-  gap: 10px;
   width: max-content;
   padding: 4px 0;
-  animation: sources-marquee 42s linear infinite;
+  will-change: transform;
+  animation: sources-marquee var(--marquee-duration) linear infinite;
+}
+
+.study-linear .sources-marquee-group {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--marquee-gap);
+  /* Match inter-chip gap at the loop seam */
+  padding-right: var(--marquee-gap);
 }
 
 .study-linear .sources-marquee .source-chip {
   flex-shrink: 0;
 }
 
+/* 4 identical groups → shift one group width per cycle */
 @keyframes sources-marquee {
   from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(-50%, 0, 0); }
+  to { transform: translate3d(-25%, 0, 0); }
 }
 
 .study-linear .sources-strip-icons-static {
@@ -143,16 +156,35 @@
 
 @media (max-width: 768px) {
   .study-linear .sources-marquee {
-    display: none;
+    --marquee-duration: 32s;
+    margin-top: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .study-linear .sources-marquee {
+    mask-image: none;
+    -webkit-mask-image: none;
   }
 
-  .study-linear .sources-strip-icons-static {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
+  .study-linear .sources-marquee-track {
+    animation: none;
     flex-wrap: wrap;
-    margin-top: 24px;
+    justify-content: center;
+    width: 100%;
+    max-width: 36rem;
+    margin: 0 auto;
+    gap: var(--marquee-gap);
+  }
+
+  .study-linear .sources-marquee-group {
+    padding-right: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .study-linear .sources-marquee-group:not(:first-child) {
+    display: none;
   }
 }
 
