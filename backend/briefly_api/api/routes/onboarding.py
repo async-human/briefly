@@ -252,7 +252,7 @@ async def gmail_callback(
 ) -> RedirectResponse:
     base = settings.frontend_url.rstrip("/")
 
-    # Calendar OAuth reuses this callback URI (see auth/calendar.py).
+    # Calendar + YouTube OAuth reuse this callback URI (see auth/calendar.py, auth/youtube.py).
     flow = "gmail"
     payload: dict | None = None
     if state:
@@ -261,13 +261,17 @@ async def gmail_callback(
             flow = "calendar"
         except Exception:
             try:
-                payload = decode_gmail_state(state, settings)
-                flow = "gmail"
+                payload = decode_youtube_state(state, settings)
+                flow = "youtube"
             except Exception:
-                payload = None
+                try:
+                    payload = decode_gmail_state(state, settings)
+                    flow = "gmail"
+                except Exception:
+                    payload = None
 
-    default_path = "/settings" if flow == "calendar" else "/onboarding"
-    param = "calendar" if flow == "calendar" else "gmail"
+    default_path = "/settings" if flow in ("calendar", "youtube") else "/onboarding"
+    param = flow
 
     if error:
         path = (payload or {}).get("redirect", default_path)
@@ -287,6 +291,21 @@ async def gmail_callback(
         await upsert_calendar_connection(db, user, tokens, user.email, settings=settings)
         await db.commit()
         return RedirectResponse(f"{base}{redirect_path}?calendar=connected")
+
+    if flow == "youtube":
+        tokens = await exchange_youtube_code(code, settings)
+        channel_count = 0
+        try:
+            channel_count = await count_subscriptions(
+                tokens["access_token"], settings.reddit_user_agent,
+            )
+        except Exception:
+            pass
+        await upsert_youtube_connection(db, user, tokens, user.email, channel_count)
+        await db.commit()
+        return RedirectResponse(
+            f"{base}{redirect_path}?youtube=connected&channels={channel_count}",
+        )
 
     tokens = await exchange_gmail_code(code, settings)
     connection = await upsert_gmail_connection(db, user, tokens, user.email, settings=settings)

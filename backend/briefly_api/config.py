@@ -173,7 +173,8 @@ class Settings(BaseSettings):
 
     @property
     def youtube_redirect_uri(self) -> str:
-        return f"{self.backend_url.rstrip('/')}/api/v1/auth/youtube/callback"
+        """YouTube OAuth completes via the Gmail callback (already in GCP)."""
+        return self.gmail_redirect_uri
 
     @property
     def reddit_redirect_uri(self) -> str:
