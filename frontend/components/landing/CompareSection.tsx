@@ -1,94 +1,12 @@
 "use client";
 
+import { useId, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Reveal } from "./Reveal";
+import { CompareQuadrant } from "./CompareQuadrant";
+import { CompareFullTable } from "./CompareFullTable";
 
-type CellValue = { kind: "yes" | "no" | "note" | "text"; value: string };
-
-type CompareRow = {
-  feature: string;
-  briefly: CellValue;
-  readless: CellValue;
-  meco: CellValue;
-  readwise: CellValue;
-  pulse: CellValue;
-};
-
-const COMPETITORS = ["Briefly", "Readless", "Meco", "Readwise Reader", "ChatGPT Pulse"] as const;
-
-const ROWS: CompareRow[] = [
-  {
-    feature: "What it is",
-    briefly: { kind: "text", value: "One synthesized daily brief from everything you follow" },
-    readless: { kind: "text", value: "Consolidated newsletter and RSS digest" },
-    meco: { kind: "text", value: "A cleaner inbox for reading newsletters" },
-    readwise: { kind: "text", value: "Read-later library with highlights" },
-    pulse: { kind: "text", value: "Daily AI cards inside ChatGPT" },
-  },
-  {
-    feature: "Built from your own sources — newsletters, YouTube, Reddit, RSS, web saves",
-    briefly: { kind: "yes", value: "Yes — all of them" },
-    readless: { kind: "note", value: "Newsletters + RSS" },
-    meco: { kind: "note", value: "Newsletters" },
-    readwise: { kind: "note", value: "What you save manually" },
-    pulse: { kind: "note", value: "Open web + your chats, Gmail, Calendar" },
-  },
-  {
-    feature: "One brief instead of thirty reads",
-    briefly: { kind: "yes", value: "Yes" },
-    readless: { kind: "yes", value: "Yes" },
-    meco: { kind: "no", value: "No — you read each one" },
-    readwise: { kind: "no", value: "No — you read each one" },
-    pulse: { kind: "yes", value: "Yes" },
-  },
-  {
-    feature: "Learns from what you click, save and skip",
-    briefly: { kind: "yes", value: "Yes — relevance adapts nightly" },
-    readless: { kind: "no", value: "—" },
-    meco: { kind: "no", value: "—" },
-    readwise: { kind: "no", value: "—" },
-    pulse: { kind: "note", value: "Thumbs up/down feedback" },
-  },
-  {
-    feature: "Follows stories across days and weeks",
-    briefly: { kind: "yes", value: "Yes — story threads" },
-    readless: { kind: "no", value: "—" },
-    meco: { kind: "no", value: "—" },
-    readwise: { kind: "no", value: "—" },
-    pulse: { kind: "no", value: "—" },
-  },
-  {
-    feature: "Flags contradictions and blind spots in your sources",
-    briefly: { kind: "yes", value: "Yes" },
-    readless: { kind: "no", value: "—" },
-    meco: { kind: "no", value: "—" },
-    readwise: { kind: "no", value: "—" },
-    pulse: { kind: "no", value: "—" },
-  },
-  {
-    feature: "Ask questions across everything you've read",
-    briefly: { kind: "yes", value: "Yes — with citations to your sources" },
-    readless: { kind: "no", value: "—" },
-    meco: { kind: "no", value: "—" },
-    readwise: { kind: "note", value: "Per-article AI assistant" },
-    pulse: { kind: "note", value: "Via ChatGPT, open web" },
-  },
-  {
-    feature: "Capture your own thinking — voice notes, web saves — into the brief",
-    briefly: { kind: "yes", value: "Yes" },
-    readless: { kind: "no", value: "—" },
-    meco: { kind: "note", value: "Bookmarks" },
-    readwise: { kind: "note", value: "Saves and highlights" },
-    pulse: { kind: "no", value: "—" },
-  },
-  {
-    feature: "Price",
-    briefly: { kind: "text", value: "$9/mo founding" },
-    readless: { kind: "text", value: "$4.90/mo" },
-    meco: { kind: "text", value: "$3.99/mo" },
-    readwise: { kind: "text", value: "$9.99/mo" },
-    pulse: { kind: "text", value: "Bundled with ChatGPT paid plans" },
-  },
-];
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 const VERDICTS = [
   {
@@ -124,22 +42,11 @@ const VERDICTS = [
   },
 ] as const;
 
-function CompareCell({ cell, highlight }: { cell: CellValue; highlight?: boolean }) {
-  const className = [
-    "compare-cell",
-    highlight ? "compare-cell-briefly" : "",
-    cell.kind === "yes" ? "compare-cell-yes" : "",
-    cell.kind === "no" ? "compare-cell-no" : "",
-    cell.kind === "note" ? "compare-cell-note" : "",
-    cell.kind === "text" && highlight ? "compare-cell-strong" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  return <td className={className}>{cell.value}</td>;
-}
-
 export function CompareSection() {
+  const [tableOpen, setTableOpen] = useState(false);
+  const panelId = useId();
+  const reducedMotion = useReducedMotion();
+
   return (
     <section className="compare-section landing-section landing-band-cool" id="compare">
       <div className="landing-section-inner compare-inner">
@@ -153,48 +60,51 @@ export function CompareSection() {
             </h2>
             <p className="section-body compare-lede">
               An honest comparison. Some of these tools are excellent at a different job —
-              here&apos;s exactly where each one fits, and where Briefly is the only option.
+              here&apos;s where each one fits on the map, and where Briefly is the only option.
             </p>
           </div>
         </Reveal>
 
-        <Reveal delay={0.08}>
-          <div className="compare-table-scroll" tabIndex={0} role="region" aria-label="Product comparison table">
-            <table className="compare-table">
-              <thead>
-                <tr>
-                  <th className="compare-feature-col" scope="col">
-                    &nbsp;
-                  </th>
-                  {COMPETITORS.map((name) => (
-                    <th
-                      key={name}
-                      scope="col"
-                      className={name === "Briefly" ? "compare-col-briefly" : undefined}
-                    >
-                      {name}
-                      {name === "Briefly" && <span className="compare-badge">your sources</span>}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {ROWS.map((row) => (
-                  <tr key={row.feature}>
-                    <th className="compare-feature-col" scope="row">
-                      {row.feature}
-                    </th>
-                    <CompareCell cell={row.briefly} highlight />
-                    <CompareCell cell={row.readless} />
-                    <CompareCell cell={row.meco} />
-                    <CompareCell cell={row.readwise} />
-                    <CompareCell cell={row.pulse} />
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <Reveal delay={0.06}>
+          <CompareQuadrant />
         </Reveal>
+
+        <div className="compare-table-disclosure">
+          <button
+            type="button"
+            className="compare-table-toggle"
+            aria-expanded={tableOpen}
+            aria-controls={panelId}
+            onClick={() => setTableOpen((open) => !open)}
+          >
+            <span>{tableOpen ? "Hide full comparison" : "See full comparison"}</span>
+            <motion.span
+              className="compare-table-toggle-icon"
+              aria-hidden
+              animate={{ rotate: tableOpen ? 180 : 0 }}
+              transition={{ duration: reducedMotion ? 0.01 : 0.28, ease: EASE }}
+            >
+              ▾
+            </motion.span>
+          </button>
+
+          <AnimatePresence initial={false}>
+            {tableOpen && (
+              <motion.div
+                id={panelId}
+                className="compare-table-panel"
+                initial={reducedMotion ? false : { height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={reducedMotion ? undefined : { height: 0, opacity: 0 }}
+                transition={{ duration: reducedMotion ? 0.01 : 0.38, ease: EASE }}
+              >
+                <div className="compare-table-panel-inner">
+                  <CompareFullTable />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         <div className="compare-verdicts">
           {VERDICTS.map((v, i) => (
