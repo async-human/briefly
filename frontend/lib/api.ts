@@ -394,16 +394,40 @@ export type BriefingGenerationStatus = {
   updated_at?: string | null;
 };
 
+export type YouTubeSyncStats = {
+  connected: boolean;
+  channel_count: number | null;
+  pool_videos_recent: number;
+  pool_with_transcript: number;
+  last_sync_items: number;
+  manual_channel_count: number;
+  manual_channels: { name: string; last_fetched_at: string | null }[];
+  recent_videos: { title: string; url: string }[];
+  last_fetch: {
+    at?: string;
+    items?: number;
+    subscriptions?: number;
+    liked?: number;
+    playlists?: number;
+    transcripts?: number;
+  } | null;
+};
+
 export type IngestionSummary = {
   last_ingestion_at: string | null;
   last_summary: {
     items_new?: number;
     items_updated?: number;
     sources_ok?: number;
+    sources_failed?: number;
+    items_fetched?: number;
+    errors?: string[];
+    by_source?: Record<string, number>;
     ingested_at?: string;
   };
   activity_feed: { type: string; message: string; at: string }[];
   pool_items_recent: number;
+  youtube?: YouTubeSyncStats | null;
 };
 
 export type DiscoveryCandidate = {

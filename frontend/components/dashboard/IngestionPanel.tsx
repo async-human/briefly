@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { api, type IngestionSummary } from "@/lib/api";
+import { YouTubeSyncStatus } from "@/components/dashboard/YouTubeSyncStatus";
+import { SourceIcon } from "@/components/SourceIcon";
 
 function formatRelativeTime(iso: string | null | undefined): string {
   if (!iso) return "Not yet";
@@ -59,6 +61,22 @@ export function IngestionPanel({ embedded = false }: { embedded?: boolean }) {
           <li><strong>{last.sources_ok ?? 0}</strong> sources</li>
         </ul>
       )}
+      {last?.by_source && Object.keys(last.by_source).length > 0 ? (
+        <ul className="ingestion-by-source">
+          {Object.entries(last.by_source)
+            .filter(([name]) => /youtube|youtu/i.test(name))
+            .slice(0, 4)
+            .map(([name, count]) => (
+              <li key={name}>
+                <SourceIcon type="youtube" size={14} />
+                <span>
+                  {name}: <strong>{count}</strong>
+                </span>
+              </li>
+            ))}
+        </ul>
+      ) : null}
+      <YouTubeSyncStatus stats={summary?.youtube} />
       <p className="ingestion-last-run">
         Last sync: {formatRelativeTime(summary?.last_ingestion_at ?? last?.ingested_at)}
       </p>

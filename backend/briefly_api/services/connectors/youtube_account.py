@@ -14,8 +14,12 @@ surfaces them preferentially over subscription content.
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from briefly_api.db.models import Source
 
 from briefly_api.config import Settings
 from briefly_api.services.articles import NormalizedContent
@@ -88,6 +92,27 @@ class YoutubeAccountConnector(BaseConnector):
 
         if not articles:
             raise ValueError(_EMPTY_HINT)
+
+        transcript_count = sum(
+            1 for a in articles if len((a.clean_text or a.summary or "")) >= 400
+        )
+        source_id = meta.get("source_id")
+        if source_id:
+            result = await db.execute(select(Source).where(Source.id == source_id))
+            source = result.scalar_one_or_none()
+            if source:
+                source.meta = {
+                    **(source.meta or {}),
+                    "channel_count": counts.get("subscriptions"),
+                    "youtube_last_fetch": {
+                        "at": datetime.now(UTC).isoformat(),
+                        "items": len(articles),
+                        "subscriptions": counts.get("subscriptions", 0),
+                        "liked": counts.get("liked", 0),
+                        "playlists": counts.get("playlists", 0),
+                        "transcripts": transcript_count,
+                    },
+                }
 
         log.info(
             "YouTubeAccountConnector: %d items — %d channels, %d liked, %d playlist(s)",

@@ -27,6 +27,7 @@ from briefly_api.api.schemas import (
     BriefingGenerationStatusOut,
     GenerateDigestOut,
     IngestionSummaryOut,
+    YouTubeSyncStatsOut,
     GmailDiscoverOut,
     GmailSenderOut,
     AutoSuggestionOut,
@@ -754,20 +755,22 @@ async def generate_digest_now(
     return GenerateDigestOut(status="running", digest=None, warnings=[])
 
 
-@router.get("/ingestion/summary", response_model=IngestionSummaryOut)
-async def get_ingestion_summary(
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-    settings: Settings = Depends(get_settings),
+async def _ingestion_summary_out(
+    db: AsyncSession,
+    user: User,
+    settings: Settings,
+    *,
+    last_summary: dict | None = None,
 ) -> IngestionSummaryOut:
     from datetime import datetime, timedelta, timezone
 
     from briefly_api.db.models import ContentStatus, RawContent
     from briefly_api.services.activity_feed import list_activity
+    from briefly_api.services.youtube_stats import build_youtube_sync_stats
 
     profile = user.profile
     meta = dict(profile.ingestion_meta or {}) if profile else {}
-    last_summary = meta.get("last_summary") or {}
+    summary = last_summary if last_summary is not None else meta.get("last_summary") or {}
     feed = await list_activity(db, user.id, limit=10) if profile else []
 
     pool_count = 0
@@ -783,12 +786,25 @@ async def get_ingestion_summary(
             )
         ) or 0
 
+    youtube_conn = await get_youtube_connection(db, user.id)
+    yt_stats = await build_youtube_sync_stats(db, user.id, settings, profile, youtube_conn)
+
     return IngestionSummaryOut(
         last_ingestion_at=profile.last_ingestion_at if profile else None,
-        last_summary=last_summary,
+        last_summary=summary,
         activity_feed=feed,
         pool_items_recent=pool_count,
+        youtube=YouTubeSyncStatsOut.model_validate(yt_stats),
     )
+
+
+@router.get("/ingestion/summary", response_model=IngestionSummaryOut)
+async def get_ingestion_summary(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> IngestionSummaryOut:
+    return await _ingestion_summary_out(db, user, settings)
 
 
 @router.post("/ingestion/run", response_model=IngestionSummaryOut)
@@ -797,19 +813,15 @@ async def run_ingestion_now(
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> IngestionSummaryOut:
-    from briefly_api.services.activity_feed import list_activity
     from briefly_api.services.content_ingestion import ingest_user_sources
 
     summary = await ingest_user_sources(db, user.id, settings=settings)
-    prof = await db.execute(
-        select(UserProfile).where(UserProfile.user_id == user.id)
-    )
-    profile = prof.scalar_one_or_none()
-    return IngestionSummaryOut(
-        last_ingestion_at=profile.last_ingestion_at if profile else None,
+    await db.refresh(user, attribute_names=["profile"])
+    return await _ingestion_summary_out(
+        db,
+        user,
+        settings,
         last_summary=summary.to_dict(),
-        activity_feed=await list_activity(db, user.id, limit=10),
-        pool_items_recent=summary.items_new + summary.items_updated,
     )
 
 

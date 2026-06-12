@@ -218,11 +218,24 @@ class BriefingGenerationStatusOut(BaseModel):
     updated_at: str | None = None
 
 
+class YouTubeSyncStatsOut(BaseModel):
+    connected: bool = False
+    channel_count: int | None = None
+    pool_videos_recent: int = 0
+    pool_with_transcript: int = 0
+    last_sync_items: int = 0
+    manual_channel_count: int = 0
+    manual_channels: list[dict] = Field(default_factory=list)
+    recent_videos: list[dict] = Field(default_factory=list)
+    last_fetch: dict | None = None
+
+
 class IngestionSummaryOut(BaseModel):
     last_ingestion_at: datetime | None = None
     last_summary: dict = Field(default_factory=dict)
     activity_feed: list[dict] = Field(default_factory=list)
     pool_items_recent: int = 0
+    youtube: YouTubeSyncStatsOut | None = None
 
 
 class DigestSummaryOut(BaseModel):

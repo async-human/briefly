@@ -30,7 +30,7 @@ const CONNECTORS: ConnectorDef[] = [
   {
     id: "youtube",
     name: "YouTube",
-    description: "Videos from channels you subscribe to",
+    description: "Subscriptions, liked videos, and captions — synced into your brief pool",
     iconType: "youtube",
   },
   {
@@ -55,7 +55,20 @@ function isConnected(id: ConnectorId, status: OnboardingStatus | null): boolean 
   return status.reddit_connected;
 }
 
-function connectorMeta(id: ConnectorId, status: OnboardingStatus | null): string | null {
+function formatFetchedAt(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const hours = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60));
+  if (hours < 1) return "synced just now";
+  if (hours < 24) return `synced ${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "synced yesterday" : `synced ${days}d ago`;
+}
+
+function connectorMeta(
+  id: ConnectorId,
+  status: OnboardingStatus | null,
+  sources: Source[],
+): string | null {
   if (!status) return null;
   if (id === "gmail") {
     if (!status.gmail_connected) return null;
@@ -66,9 +79,20 @@ function connectorMeta(id: ConnectorId, status: OnboardingStatus | null): string
   }
   if (id === "youtube") {
     if (!status.youtube_connected) return null;
+    const parts: string[] = [];
     if (status.youtube_channel_count != null && status.youtube_channel_count > 0) {
-      return `${status.youtube_channel_count} channel${status.youtube_channel_count === 1 ? "" : "s"}`;
+      parts.push(
+        `${status.youtube_channel_count} subscribed channel${status.youtube_channel_count === 1 ? "" : "s"}`,
+      );
     }
+    const manual = sources.filter((s) => s.source_type === "youtube");
+    if (manual.length > 0) {
+      parts.push(`${manual.length} manual channel${manual.length === 1 ? "" : "s"}`);
+    }
+    const account = sources.find((s) => s.source_type === "youtube_account");
+    const synced = formatFetchedAt(account?.last_fetched_at);
+    if (synced) parts.push(synced);
+    if (parts.length) return parts.join(" · ");
     return "Connected — subscriptions may be private";
   }
   if (id === "calendar") {
@@ -332,7 +356,7 @@ export function AccountConnections({ ingestionEmail }: { ingestionEmail?: string
           <ul className="settings-connector-list">
             {CONNECTORS.map((connector) => {
               const connected = isConnected(connector.id, status);
-              const meta = connectorMeta(connector.id, status);
+              const meta = connectorMeta(connector.id, status, sources);
               const isBusy = busy === connector.id;
 
               return (

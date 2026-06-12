@@ -7044,3 +7044,140 @@ a.saved-capture-title:hover {
 .app-shell .intel-settings-link:hover {
   text-decoration: underline;
 }
+
+/* YouTube sync visibility (ingestion panel) */
+.app-shell .ingestion-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin: 0.5rem 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+}
+
+.app-shell .ingestion-stats strong {
+  color: var(--app-ink);
+  font-weight: 600;
+}
+
+.app-shell .ingestion-by-source {
+  list-style: none;
+  margin: 0 0 0.65rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--app-ink-secondary);
+}
+
+.app-shell .ingestion-by-source li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.app-shell .yt-sync {
+  margin: 0.75rem 0 0.5rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--app-radius-sm);
+  border: 1px solid oklch(72% 0.08 25 / 0.28);
+  background: oklch(99% 0.012 25 / 0.45);
+}
+
+.app-shell .yt-sync--empty {
+  border-style: dashed;
+  border-color: var(--app-border);
+  background: var(--app-canvas);
+}
+
+.app-shell .yt-sync-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.app-shell .yt-sync-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.app-shell .yt-sync-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.app-shell .yt-sync-sub {
+  font-size: 0.6875rem;
+  color: var(--app-muted);
+}
+
+.app-shell .yt-sync-sub--warn {
+  color: oklch(48% 0.1 55);
+}
+
+.app-shell .yt-sync-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--app-muted);
+}
+
+.app-shell .yt-sync-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-shell .yt-sync-metrics li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  font-size: 0.6875rem;
+  color: var(--app-muted);
+}
+
+.app-shell .yt-sync-metrics strong {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--app-ink);
+  line-height: 1.1;
+}
+
+.app-shell .yt-sync-detail {
+  margin: 0.45rem 0 0;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: var(--app-ink-secondary);
+}
+
+.app-shell .yt-sync-recent {
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0.5rem 0 0;
+  border-top: 1px dashed oklch(72% 0.05 25 / 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.app-shell .yt-sync-recent a {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--app-accent);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.app-shell .yt-sync-recent a:hover {
+  text-decoration: underline;
+}
