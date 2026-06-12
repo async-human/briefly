@@ -11,17 +11,10 @@ import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton"
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { getToken } from "@/lib/auth";
+import { TopicsToTrackEditor } from "@/components/settings/TopicsToTrackEditor";
 
 const ROLES = ["Founder", "Product manager", "Engineer", "Investor", "Researcher", "Other"];
 
-const TOPIC_SUGGESTIONS: Record<string, string[]> = {
-  Founder:           ["product-market fit", "startup funding", "hiring", "growth metrics", "AI tools"],
-  "Product manager": ["product strategy", "user research", "roadmapping", "AI/ML", "growth"],
-  Engineer:          ["system design", "AI/ML", "developer tools", "open source", "security"],
-  Investor:          ["deal flow", "market trends", "valuations", "exits", "emerging tech"],
-  Researcher:        ["academic papers", "methodology", "data science", "policy", "emerging tech"],
-  Other:             ["technology", "business", "science", "design", "policy"],
-};
 const NEVER_SHOW_SUGGESTIONS = ["crypto prices", "celebrity news", "sports", "stock tips", "politics"];
 
 // ── Reusable tag editor ───────────────────────────────────────────────────────
@@ -149,6 +142,7 @@ export default function SettingsPage() {
   const [deliveryTime, setDeliveryTime] = useState("07:00");
   const [briefStyle, setBriefStyle] = useState<"analyst" | "scan" | "plain">("analyst");
   const [briefLanguage, setBriefLanguage] = useState<"en" | "hi">("en");
+  const [readingTopicSuggestions, setReadingTopicSuggestions] = useState<string[]>([]);
 
   // Per-section save state
   const [profileSaving, setProfileSaving] = useState(false);
@@ -171,8 +165,11 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!getToken()) { router.replace("/login"); return; }
-    api.getMe()
-      .then((meData) => {
+    Promise.all([
+      api.getMe(),
+      api.getProfileIntelligence().catch(() => null),
+    ])
+      .then(([meData, intel]) => {
         if (!meData.onboarding_completed) { router.replace("/onboarding"); return; }
         setMe({
           name: meData.user.name,
@@ -189,6 +186,18 @@ export default function SettingsPage() {
           setDeliveryTime(p.digest_time ?? "07:00");
           setBriefStyle(p.brief_style ?? "analyst");
           setBriefLanguage(p.brief_language ?? "en");
+        }
+        if (intel) {
+          const fromReading = [
+            ...intel.emerging_interests,
+            ...intel.strongest_interests,
+            ...Object.entries(intel.topic_strengths ?? {})
+              .filter(([, strength]) => strength >= 0.45)
+              .map(([topic]) => topic),
+          ];
+          setReadingTopicSuggestions(
+            Array.from(new Set(fromReading.map((t) => t.trim().toLowerCase()).filter(Boolean))),
+          );
         }
       })
       .catch(() => router.replace("/login"))
@@ -341,17 +350,17 @@ export default function SettingsPage() {
             {/* ── Interests ── */}
             <Section
               title="Topics to track"
-              description="Every article is scored against these. The more specific, the better the signal."
+              description="Every article is scored against these. Pick from suggestions or browse — specific topics give sharper briefs."
               onSave={saveInterests}
               saving={interestsSaving}
               saved={interestsSaved}
             >
               <div className="settings-field">
-                <TagEditor
-                  tags={topics}
+                <TopicsToTrackEditor
+                  topics={topics}
                   onChange={setTopics}
-                  placeholder="e.g. AI agents, startup funding, product design"
-                  suggestions={TOPIC_SUGGESTIONS[role] ?? ["AI agents", "startups", "technology"]}
+                  role={role}
+                  suggestedFromReading={readingTopicSuggestions}
                 />
               </div>
             </Section>
