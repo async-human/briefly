@@ -24,6 +24,8 @@ import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { askAboutContent } from "@/lib/askLinks";
 import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
 import { GeneratingProgressRing } from "@/components/loading/GeneratingProgressRing";
+import { YouTubeItemBadge } from "@/components/dashboard/YouTubeItemBadge";
+import { getYouTubeBadge } from "@/lib/youtubeBadge";
 
 const PREVIEW_LIMIT = 5;
 
@@ -452,12 +454,16 @@ function BriefingHeroItem({
   digestId: string;
 }) {
   const router = useRouter();
+  const youtubeBadge = getYouTubeBadge(item);
 
   return (
     <article className="briefing-hero-item">
       <div className="briefing-hero-meta">
         <span className="briefing-hero-badge">Top story</span>
-        {item.source_name && <span className="briefing-hero-source">{item.source_name}</span>}
+        <YouTubeItemBadge item={item} variant="compact" />
+        {item.source_name && !youtubeBadge && (
+          <span className="briefing-hero-source">{item.source_name}</span>
+        )}
       </div>
       <h3 className="briefing-hero-headline">{item.headline}</h3>
       {item.why_it_matters && (
@@ -520,13 +526,17 @@ function BriefingPreviewItem({
     : null;
 
   const hasMemory = Boolean(item.memory_reference || item.memory_connections?.length);
+  const youtubeBadge = getYouTubeBadge(item);
 
   const content = (
     <>
       <span className="briefing-preview-index">{String(index + 1).padStart(2, "0")}</span>
       <div className="briefing-preview-body">
         <div className="briefing-preview-meta-row">
-          <p className="briefing-preview-meta">{item.source_name}</p>
+          <YouTubeItemBadge item={item} variant="compact" />
+          {!youtubeBadge && item.source_name ? (
+            <p className="briefing-preview-meta">{item.source_name}</p>
+          ) : null}
           {hasMemory && (
             <span className="briefing-preview-memory-dot" title="Briefly remembers this story" aria-label="You've been following this story" />
           )}

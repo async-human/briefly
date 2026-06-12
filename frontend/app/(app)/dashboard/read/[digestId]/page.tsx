@@ -8,6 +8,8 @@ import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type Digest, type DigestItem } from "@/lib/api";
 import { SourceIcon } from "@/components/SourceIcon";
+import { YouTubeItemBadge } from "@/components/dashboard/YouTubeItemBadge";
+import { getYouTubeBadge } from "@/lib/youtubeBadge";
 import { isReadableArticleUrl } from "@/lib/articleUrls";
 import {
   SECTION_HIGHLY_RELEVANT,
@@ -142,6 +144,7 @@ function ReadingCard({
     : null;
   const hasDeepSummary = mode === "deep" && !!item.summary;
   const articleUrl = isReadableArticleUrl(item.source_url) ? item.source_url : null;
+  const youtubeBadge = getYouTubeBadge(item);
 
   return (
     <article className={`read-article${mode === "deep" ? " read-article--deep" : ""}`}>
@@ -154,11 +157,13 @@ function ReadingCard({
       >
         <div className="read-meta-source-row">
           <SourceIcon
+            type={youtubeBadge ? "youtube" : undefined}
             name={item.source_name ?? undefined}
             url={item.source_url ?? undefined}
             size={18}
           />
-          {item.source_name && (
+          <YouTubeItemBadge item={item} />
+          {item.source_name && !youtubeBadge && (
             <span className="read-meta-source">{item.source_name}</span>
           )}
           {item.section && (

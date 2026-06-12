@@ -228,6 +228,7 @@ def _fallback_drafts(items: list[RawItem], ctx: PipelineContext) -> list[DigestI
         if cached.get("contradiction_flag"):
             drafts[-1].contradiction_flag = True
             drafts[-1].contradiction_explanation = cached.get("contradiction_explanation") or ""
+    _attach_youtube_badges(drafts, items)
     return drafts
 
 
@@ -369,6 +370,41 @@ def _ensure_personalized_why(
     return drafts
 
 
+def _youtube_badge_from_item(item: RawItem) -> dict | None:
+    """Surface YouTube origin on digest items for the reader UI."""
+    is_youtube = item.source_type in ("youtube", "youtube_account")
+    url = (item.url or "").lower()
+    if not is_youtube and "youtube.com" not in url and "youtu.be" not in url:
+        return None
+
+    meta = item.meta or {}
+    signal = meta.get("youtube_signal") or "subscription"
+    has_transcript = meta.get("has_transcript")
+    if has_transcript is None:
+        has_transcript = len(item.clean_text or "") >= 400
+
+    channel = (item.source_name or "").strip()
+    if channel.lower().startswith("youtube subscriptions"):
+        channel = ""
+
+    return {
+        "signal": signal,
+        "has_transcript": bool(has_transcript),
+        "channel": channel or None,
+    }
+
+
+def _attach_youtube_badges(drafts: list[DigestItemDraft], items: list[RawItem]) -> None:
+    by_id = {item.id: item for item in items}
+    for draft in drafts:
+        source = by_id.get(draft.content_id or "")
+        if not source:
+            continue
+        badge = _youtube_badge_from_item(source)
+        if badge:
+            draft.score_breakdown = {**(draft.score_breakdown or {}), "youtube": badge}
+
+
 def _attach_score_breakdowns(
     drafts: list[DigestItemDraft],
     items: list[RawItem],
@@ -377,7 +413,8 @@ def _attach_score_breakdowns(
     for draft in drafts:
         source = by_id.get(draft.content_id or "")
         if source and source.score_breakdown:
-            draft.score_breakdown = dict(source.score_breakdown)
+            draft.score_breakdown = {**draft.score_breakdown, **dict(source.score_breakdown)}
+    _attach_youtube_badges(drafts, items)
 
 
 def _drafts_from_llm(

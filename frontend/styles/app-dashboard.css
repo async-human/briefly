@@ -7181,3 +7181,43 @@ a.saved-capture-title:hover {
 .app-shell .yt-sync-recent a:hover {
   text-decoration: underline;
 }
+
+.app-shell .yt-item-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 0, 0, 0.08);
+  border: 1px solid rgba(255, 0, 0, 0.16);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  max-width: 100%;
+}
+
+.app-shell .yt-item-badge--compact {
+  padding: 0.1rem 0.45rem;
+  font-size: 0.625rem;
+}
+
+.app-shell .yt-item-badge-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .yt-item-badge-transcript {
+  flex-shrink: 0;
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 0.5625rem;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.app-shell .briefing-preview-meta-row .yt-item-badge {
+  margin-right: 0.25rem;
+}

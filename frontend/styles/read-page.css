@@ -110,6 +110,37 @@
   color: var(--text-secondary);
 }
 
+.read-shell-v2 .yt-item-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 0, 0, 0.08);
+  border: 1px solid rgba(255, 0, 0, 0.18);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  max-width: 100%;
+}
+
+.read-shell-v2 .yt-item-badge-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.read-shell-v2 .yt-item-badge-transcript {
+  flex-shrink: 0;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 0.625rem;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
 .read-shell-v2 .read-meta-sep {
   opacity: 0.35;
 }

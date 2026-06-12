@@ -139,6 +139,10 @@ def _enrich_with_transcripts(articles: list[FetchedArticle], *, max_videos: int 
             transcript = future.result()
             if transcript:
                 articles[idx].clean_text = transcript
+                articles[idx].meta = {
+                    **(articles[idx].meta or {}),
+                    "has_transcript": True,
+                }
                 fetched += 1
         except Exception:
             pass
@@ -280,6 +284,8 @@ def _fetch_youtube_sync(
         article.section = "YouTube"
 
     _enrich_with_transcripts(articles)
+    for article in articles:
+        article.meta = {**(article.meta or {}), "youtube_signal": "channel"}
     return articles
 
 
@@ -672,6 +678,13 @@ async def fetch_youtube_content(
             playlist_articles.extend(items)
         except Exception:
             continue
+
+    for article in liked_articles:
+        article.meta = {**(article.meta or {}), "youtube_signal": "liked"}
+    for article in sub_articles:
+        article.meta = {**(article.meta or {}), "youtube_signal": "subscription"}
+    for article in playlist_articles:
+        article.meta = {**(article.meta or {}), "youtube_signal": "playlist"}
 
     # Enrich liked + playlist videos with transcripts (subscriptions already enriched)
     if liked_articles or playlist_articles:
