@@ -8296,6 +8296,29 @@ a.saved-capture-title:hover {
   color: var(--app-ink-secondary);
 }
 
+.data-controls-delete-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--app-ink-secondary);
+}
+
+.data-controls-delete-hint strong {
+  color: var(--app-ink);
+  font-weight: 600;
+}
+
+.data-controls-delete-input-invalid {
+  border-color: oklch(62% 0.14 25 / 0.65);
+}
+
+.data-controls-delete-error {
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--app-radius-sm);
+  background: oklch(96% 0.04 25);
+  color: oklch(42% 0.14 25);
+  font-size: 0.8125rem;
+}
+
 .data-controls-delete-actions {
   display: flex;
   gap: 0.5rem;

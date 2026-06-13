@@ -131,6 +131,7 @@ export default function SettingsPage() {
   const showLoading = useMinLoadTime(loading);
   const [me, setMe] = useState<{
     name: string | null;
+    email?: string;
     avatar_url?: string | null;
     ingestion_email?: string;
   } | null>(null);
@@ -174,6 +175,7 @@ export default function SettingsPage() {
         if (!meData.onboarding_completed) { router.replace("/onboarding"); return; }
         setMe({
           name: meData.user.name,
+          email: meData.user.email,
           avatar_url: meData.user.avatar_url,
           ingestion_email: meData.ingestion_email,
         });
@@ -285,6 +287,7 @@ export default function SettingsPage() {
                     void api.getMe().then((meData) => {
                       setMe({
                         name: meData.user.name,
+                        email: meData.user.email,
                         avatar_url: meData.user.avatar_url,
                         ingestion_email: meData.ingestion_email,
                       });
@@ -303,7 +306,10 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div className="dash-surface-body dash-surface-body-form">
-                <DataControls ingestionEmail={me?.ingestion_email} />
+                <DataControls
+                  ingestionEmail={me?.ingestion_email}
+                  accountEmail={me?.email}
+                />
               </div>
             </div>
 

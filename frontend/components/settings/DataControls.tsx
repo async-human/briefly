@@ -26,13 +26,20 @@ function formatEventTime(iso: string): string {
   }
 }
 
-export function DataControls({ ingestionEmail }: { ingestionEmail?: string }) {
+export function DataControls({
+  ingestionEmail,
+  accountEmail,
+}: {
+  ingestionEmail?: string;
+  accountEmail?: string;
+}) {
   const [log, setLog] = useState<GmailAccessLogEvent[]>([]);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailEmail, setGmailEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleteEmail, setDeleteEmail] = useState("");
+  const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -54,15 +61,25 @@ export function DataControls({ ingestionEmail }: { ingestionEmail?: string }) {
   }, [refresh]);
 
   async function handleDeleteAccount() {
-    if (!deleteEmail.trim()) return;
+    const trimmed = deleteEmail.trim();
+    if (!trimmed) return;
+
+    if (
+      accountEmail &&
+      trimmed.toLowerCase() !== accountEmail.trim().toLowerCase()
+    ) {
+      setDeleteError("Confirmation email does not match your account.");
+      return;
+    }
+
     setDeleting(true);
-    setError("");
+    setDeleteError("");
     try {
-      await api.deleteAccount(deleteEmail.trim());
+      await api.deleteAccount(trimmed);
       clearToken();
       window.location.href = "/login?deleted=1";
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete account");
+      setDeleteError(err instanceof Error ? err.message : "Could not delete account");
       setDeleting(false);
     }
   }
@@ -128,7 +145,11 @@ export function DataControls({ ingestionEmail }: { ingestionEmail?: string }) {
           <button
             type="button"
             className="data-controls-danger-btn"
-            onClick={() => setShowDeleteConfirm(true)}
+            onClick={() => {
+              setShowDeleteConfirm(true);
+              setDeleteError("");
+              setDeleteEmail("");
+            }}
           >
             Delete my account
           </button>
@@ -137,15 +158,34 @@ export function DataControls({ ingestionEmail }: { ingestionEmail?: string }) {
             <label className="data-controls-delete-label" htmlFor="delete-confirm-email">
               Type your email to confirm deletion
             </label>
+            {accountEmail ? (
+              <p className="data-controls-delete-hint">
+                Enter <strong>{accountEmail}</strong> exactly as shown.
+              </p>
+            ) : null}
             <input
               id="delete-confirm-email"
               type="email"
-              className="onboard-input"
+              className={`onboard-input${deleteError ? " data-controls-delete-input-invalid" : ""}`}
               value={deleteEmail}
-              onChange={(e) => setDeleteEmail(e.target.value)}
+              onChange={(e) => {
+                setDeleteEmail(e.target.value);
+                if (deleteError) setDeleteError("");
+              }}
               placeholder="you@example.com"
               autoComplete="email"
+              aria-invalid={deleteError ? true : undefined}
+              aria-describedby={deleteError ? "delete-confirm-email-error" : undefined}
             />
+            {deleteError ? (
+              <div
+                id="delete-confirm-email-error"
+                className="data-controls-delete-error"
+                role="alert"
+              >
+                {deleteError}
+              </div>
+            ) : null}
             <div className="data-controls-delete-actions">
               <button
                 type="button"
@@ -161,6 +201,7 @@ export function DataControls({ ingestionEmail }: { ingestionEmail?: string }) {
                 onClick={() => {
                   setShowDeleteConfirm(false);
                   setDeleteEmail("");
+                  setDeleteError("");
                 }}
               >
                 Cancel
