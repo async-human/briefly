@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { api, type BillingStatus } from "@/lib/api";
 import { PRO_FEATURES, UPGRADE_COPY, type UpgradeReason } from "@/lib/plans";
 
@@ -14,9 +15,14 @@ type Props = {
 };
 
 export function UpgradeModal({ open, reason, billing, onClose, onUpgraded }: Props) {
+  const [mounted, setMounted] = useState(false);
   const [busy, setBusy] = useState<"monthly" | "yearly" | null>(null);
   const [error, setError] = useState("");
   const copy = UPGRADE_COPY[reason];
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (open && billing?.is_pro) {
@@ -40,28 +46,7 @@ export function UpgradeModal({ open, reason, billing, onClose, onUpgraded }: Pro
     };
   }, [open, onClose]);
 
-  if (!open) return null;
-
-  if (billing?.is_pro) {
-    return (
-      <div className="upgrade-modal-backdrop" onClick={onClose} role="presentation">
-        <div
-          className="upgrade-modal"
-          role="dialog"
-          aria-labelledby="upgrade-modal-title"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <h2 id="upgrade-modal-title" className="upgrade-modal-title">
-            You&apos;re on Pro
-          </h2>
-          <p className="upgrade-modal-sub">Your subscription is active.</p>
-          <button type="button" className="btn-primary upgrade-modal-btn" onClick={onClose}>
-            Got it
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (!open || !mounted) return null;
 
   async function startCheckout(plan: "monthly" | "yearly") {
     setBusy(plan);
@@ -75,11 +60,30 @@ export function UpgradeModal({ open, reason, billing, onClose, onUpgraded }: Pro
     }
   }
 
-  return (
+  const modal = billing?.is_pro ? (
     <div className="upgrade-modal-backdrop" onClick={onClose} role="presentation">
       <div
         className="upgrade-modal"
         role="dialog"
+        aria-modal="true"
+        aria-labelledby="upgrade-modal-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="upgrade-modal-title" className="upgrade-modal-title">
+          You&apos;re on Pro
+        </h2>
+        <p className="upgrade-modal-sub">Your subscription is active.</p>
+        <button type="button" className="upgrade-modal-btn-primary" onClick={onClose}>
+          Got it
+        </button>
+      </div>
+    </div>
+  ) : (
+    <div className="upgrade-modal-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="upgrade-modal"
+        role="dialog"
+        aria-modal="true"
         aria-labelledby="upgrade-modal-title"
         aria-describedby="upgrade-modal-desc"
         onClick={(e) => e.stopPropagation()}
@@ -112,7 +116,12 @@ export function UpgradeModal({ open, reason, billing, onClose, onUpgraded }: Pro
 
         <ul className="upgrade-modal-features">
           {PRO_FEATURES.slice(0, 5).map((f) => (
-            <li key={f.text}>{f.text}</li>
+            <li key={f.text}>
+              <span className="upgrade-modal-feature-check" aria-hidden>
+                ✓
+              </span>
+              {f.text}
+            </li>
           ))}
         </ul>
 
@@ -125,7 +134,7 @@ export function UpgradeModal({ open, reason, billing, onClose, onUpgraded }: Pro
         <div className="upgrade-modal-actions">
           <button
             type="button"
-            className="btn-primary upgrade-modal-btn"
+            className="upgrade-modal-btn-primary"
             disabled={busy !== null}
             onClick={() => void startCheckout("monthly")}
           >
@@ -150,4 +159,6 @@ export function UpgradeModal({ open, reason, billing, onClose, onUpgraded }: Pro
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }

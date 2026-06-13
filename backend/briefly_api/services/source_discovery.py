@@ -17,14 +17,15 @@ from datetime import datetime, timezone
 
 import httpx
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from briefly_api.api.plan_limits import FREE_SOURCE_LIMIT, has_pro_access
 from briefly_api.auth.gmail import get_gmail_connection, refresh_gmail_access_token, user_message_for_gmail_error
 from briefly_api.auth.reddit import get_reddit_connection, refresh_reddit_access_token
 from briefly_api.auth.youtube import get_youtube_connection, refresh_youtube_access_token
 from briefly_api.config import Settings, get_settings
-from briefly_api.db.models import Source, UserProfile
+from briefly_api.db.models import Source, User, UserProfile
 from briefly_api.embeddings.adapter import get_embedding_adapter
 from briefly_api.services.external_feed_discovery import discover_all_external
 from briefly_api.services.gmail_discovery import discover_newsletter_senders
@@ -634,8 +635,23 @@ async def confirm_discoveries(
     pending = list(profile.pending_source_discoveries or [])
     selected = [c for c in pending if c.get("id") in candidate_ids]
 
+    user_row = await session.execute(select(User).where(User.id == user_id))
+    user = user_row.scalar_one_or_none()
+    if not user:
+        return {"success": False, "error": "User not found", "added": []}
+
+    count_result = await session.execute(
+        select(func.count()).select_from(Source).where(Source.user_id == user_id)
+    )
+    current_count = count_result.scalar() or 0
+    pro = has_pro_access(user)
+
     added: list[Source] = []
+    skipped_limit = 0
     for cand in selected:
+        if not pro and current_count >= FREE_SOURCE_LIMIT:
+            skipped_limit += 1
+            continue
         try:
             async with session.begin_nested():
                 source = Source(
@@ -654,6 +670,7 @@ async def confirm_discoveries(
                 session.add(source)
                 await session.flush()
                 added.append(source)
+                current_count += 1
         except Exception as exc:
             log.warning("confirm_discoveries: skip %s — %s", cand.get("identifier"), exc)
 
@@ -664,6 +681,7 @@ async def confirm_discoveries(
         **(profile.discovery_meta or {}),
         "confirmed_at": now.isoformat(),
         "confirmed_count": len(added),
+        "skipped_limit": skipped_limit,
     }
 
     await session.commit()

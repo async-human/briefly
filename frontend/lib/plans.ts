@@ -1,4 +1,4 @@
-import { ApiError } from "./api";
+import { ApiError, type BillingStatus } from "./api";
 
 export const FREE_SOURCE_LIMIT = 3;
 export const FREE_HISTORY_DAYS = 7;
@@ -56,6 +56,17 @@ export const PRO_FEATURES = [
   { text: "Interest learning", included: true },
   { text: "Audio brief for your commute", included: true },
 ];
+
+export function sourceSlotUsage(
+  billing: BillingStatus | null | undefined,
+  localSourceCount: number,
+) {
+  const isPro = billing?.is_pro ?? false;
+  const limit = billing?.usage.sources_limit ?? FREE_SOURCE_LIMIT;
+  const used = localSourceCount;
+  const atLimit = !isPro && used >= limit;
+  return { isPro, used, limit, atLimit };
+}
 
 export function isPlanLimitError(err: unknown): boolean {
   if (!(err instanceof ApiError) || err.status !== 403) return false;

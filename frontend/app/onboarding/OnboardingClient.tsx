@@ -8,6 +8,7 @@ import { api, type OnboardingStatus, type MeResponse } from "@/lib/api";
 import { clearToken } from "@/lib/auth";
 import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { AddSourceForm } from "@/components/dashboard/AddSourceForm";
+import { FREE_SOURCE_LIMIT } from "@/lib/plans";
 import { GmailConsentModal } from "@/components/privacy/GmailConsentModal";
 import "@/styles/onboarding.css";
 
@@ -507,11 +508,13 @@ export default function OnboardingPage() {
       return;
     }
     if (key === "youtube") {
+      if (!status?.youtube_connected && warnIfSourceLimit("connect YouTube")) return;
       if (status?.youtube_connected) setSourceDetail(sourceDetail === "youtube" ? null : "youtube");
       else handleConnectYouTube();
       return;
     }
     if (key === "reddit") {
+      if (!status?.reddit_connected && warnIfSourceLimit("connect Reddit")) return;
       if (status?.reddit_connected) setSourceDetail(sourceDetail === "reddit" ? null : "reddit");
       else handleConnectReddit();
       return;
@@ -522,6 +525,7 @@ export default function OnboardingPage() {
       return;
     }
     if (key === "hn") {
+      if (warnIfSourceLimit("add Hacker News")) return;
       handleAddHackerNews();
       return;
     }
@@ -533,6 +537,19 @@ export default function OnboardingPage() {
     status?.youtube_connected ||
     status?.reddit_connected ||
     (status?.sources_count ?? 0) > 0;
+
+  const isPro = me?.user.plan === "pro";
+  const sourcesUsed = status?.sources_count ?? 0;
+  const sourcesAtLimit = !isPro && sourcesUsed >= FREE_SOURCE_LIMIT;
+  const sourcesRemaining = isPro ? null : Math.max(0, FREE_SOURCE_LIMIT - sourcesUsed);
+
+  function warnIfSourceLimit(action: string): boolean {
+    if (!sourcesAtLimit) return false;
+    setError(
+      `Free plan allows ${FREE_SOURCE_LIMIT} sources — you've used all ${sourcesUsed}. Disconnect one or upgrade to Pro to ${action}.`,
+    );
+    return true;
+  }
 
   const firstName = me?.user.name?.split(" ")[0] ?? "there";
   const progressStep = Math.min(step, STEPS.length);
@@ -755,6 +772,30 @@ export default function OnboardingPage() {
               </header>
 
               {banner && <div className="onboard-banner onboard-banner-success">{banner}</div>}
+
+              {!isPro && (
+                <div className={`onboard-source-slots${sourcesAtLimit ? " onboard-source-slots-at-limit" : ""}`}>
+                  <div className="onboard-source-slots-head">
+                    <span>Free plan source slots</span>
+                    <strong>
+                      {sourcesUsed} / {FREE_SOURCE_LIMIT} used
+                    </strong>
+                  </div>
+                  <div className="onboard-source-slots-track" aria-hidden>
+                    <div
+                      className="onboard-source-slots-fill"
+                      style={{ width: `${Math.min(100, (sourcesUsed / FREE_SOURCE_LIMIT) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="onboard-source-slots-note">
+                    {sourcesAtLimit
+                      ? "All slots used — disconnect a source or upgrade to Pro for unlimited."
+                      : sourcesRemaining === 1
+                        ? "1 slot left. Gmail & Calendar are free integrations and don't use slots."
+                        : `${sourcesRemaining} slots left. Gmail & Calendar don't use slots — YouTube, Reddit, and each URL/RSS feed use one slot each.`}
+                  </p>
+                </div>
+              )}
 
               {(status?.sources_count ?? 0) > 0 || status?.calendar_connected ? (
                 <div className="onboard-source-status-row">

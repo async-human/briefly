@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type Source, type SourceDetection } from "@/lib/api";
 import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
-import { isPlanLimitError, upgradeReasonFromError } from "@/lib/plans";
+import { isPlanLimitError, sourceSlotUsage, upgradeReasonFromError } from "@/lib/plans";
 
 const TYPE_OVERRIDES = [
   { value: "", label: "Auto-detect" },
@@ -14,7 +14,13 @@ const TYPE_OVERRIDES = [
   { value: "email", label: "Email sender" },
 ];
 
-export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }) {
+export function AddSourceForm({
+  sourceCount = 0,
+  onAdded,
+}: {
+  sourceCount?: number;
+  onAdded: (source: Source) => void;
+}) {
   const upgrade = useUpgradeOptional();
   const [identifier, setIdentifier] = useState("");
   const [name, setName] = useState("");
@@ -24,9 +30,8 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const atSourceLimit = Boolean(
-    upgrade?.billing && !upgrade.billing.is_pro && upgrade.billing.usage.sources_at_limit,
-  );
+  const slots = sourceSlotUsage(upgrade?.billing, sourceCount);
+  const atSourceLimit = slots.atLimit;
 
   const runDetect = useCallback(async (value: string, override: string) => {
     const trimmed = value.trim();
@@ -98,8 +103,7 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
     <form className="source-form" onSubmit={handleSubmit}>
       {atSourceLimit && (
         <div className="source-form-limit" role="status">
-          Free plan limit reached ({upgrade?.billing?.usage.sources_used}/
-          {upgrade?.billing?.usage.sources_limit} sources).{" "}
+          Free plan limit reached ({slots.used}/{slots.limit} sources).{" "}
           <button
             type="button"
             className="source-form-limit-link"

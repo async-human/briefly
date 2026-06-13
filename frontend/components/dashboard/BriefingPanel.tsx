@@ -35,6 +35,7 @@ const PREVIEW_LIMIT = 5;
 type SourcesSidebarProps = {
   ingestionEmail: string;
   sources: Source[];
+  sourceSlotCount?: number;
   gmailConnected: boolean;
   autoSuggestions?: AutoSuggestion[];
   onSourceAdded: (source: Source) => void;
@@ -47,6 +48,7 @@ type SourcesSidebarProps = {
 export function SourcesSidebar({
   ingestionEmail,
   sources,
+  sourceSlotCount,
   gmailConnected,
   autoSuggestions = [],
   onSourceAdded,
@@ -54,6 +56,7 @@ export function SourcesSidebar({
   onSourceUpdated,
   onRediscover,
 }: SourcesSidebarProps) {
+  const upgrade = useUpgradeOptional();
   const [pendingRemoval, setPendingRemoval] = useState<Set<string>>(() => new Set());
   const [confirmingRemoval, setConfirmingRemoval] = useState(false);
   const [priorityId, setPriorityId] = useState<string | null>(null);
@@ -82,6 +85,7 @@ export function SourcesSidebar({
       });
       if (succeeded.length) {
         onSourcesRemoved(succeeded);
+        void upgrade?.refreshBilling();
       }
     } finally {
       setConfirmingRemoval(false);
@@ -212,7 +216,10 @@ export function SourcesSidebar({
         )}
 
         {/* Add source form — below the list, not above it */}
-        <AddSourceForm onAdded={onSourceAdded} />
+        <AddSourceForm
+          sourceCount={sourceSlotCount ?? sources.length}
+          onAdded={onSourceAdded}
+        />
 
         <p className="dash-sidebar-footnote">
           Interests & delivery in{" "}

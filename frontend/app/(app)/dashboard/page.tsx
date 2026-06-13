@@ -23,6 +23,8 @@ import { PageContentTransition } from "@/components/loading/PageContentTransitio
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { DashboardInsightsDrawer } from "@/components/dashboard/DashboardInsightsDrawer";
 import { ProactiveAlertsBanner } from "@/components/dashboard/ProactiveAlertsBanner";
+import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
+import { sourceSlotUsage } from "@/lib/plans";
 import type { ProfileIntelligence } from "@/lib/api";
 
 const FETCHABLE_SOURCE_TYPES = new Set([
@@ -54,6 +56,14 @@ function DashboardContent() {
   const [discoveryRunning, setDiscoveryRunning] = useState(false);
   const [intel, setIntel] = useState<ProfileIntelligence | null>(null);
   const autoGenerateChecked = useRef(false);
+  const upgrade = useUpgradeOptional();
+  const refreshBilling = upgrade?.refreshBilling;
+
+  useEffect(() => {
+    if (!loading && refreshBilling) {
+      void refreshBilling();
+    }
+  }, [loading, sources.length, refreshBilling]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -187,6 +197,7 @@ function DashboardContent() {
       if (prev.some((s) => s.id === source.id)) return prev;
       return [source, ...prev];
     });
+    void upgrade?.refreshBilling();
     if (showDiscovery) return;
     if (FETCHABLE_SOURCE_TYPES.has(source.source_type)) {
       ensureBriefing();
@@ -203,6 +214,7 @@ function DashboardContent() {
       );
       return prev.filter((s) => !removing.has(s.id));
     });
+    void upgrade?.refreshBilling();
     if (shouldRegenerate && !showDiscovery) {
       if (me) clearBriefingGeneratedToday(me.user.id);
       setDigest(null);
@@ -212,6 +224,13 @@ function DashboardContent() {
 
   const fetchableSources = sources.filter((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
   const sidebarSources = fetchableSources;
+  const sourceSlots = sourceSlotUsage(upgrade?.billing, sources.length);
+  const sourcesDesc =
+    fetchableSources.length > 0
+      ? sourceSlots.isPro
+        ? `${fetchableSources.length} connected`
+        : `${fetchableSources.length} connected · ${sourceSlots.used}/${sourceSlots.limit} slots`
+      : "Connect your feeds";
   const outcome = getDigestOutcome(digest);
   const greeting = me?.user.name?.split(" ")[0] ?? "there";
   const today = new Date().toLocaleDateString("en-US", {
@@ -301,16 +320,13 @@ function DashboardContent() {
             <h2 id="sources-surface-title" className="dash-surface-title">
               Sources
             </h2>
-            <p className="dash-surface-desc">
-              {fetchableSources.length > 0
-                ? `${fetchableSources.length} connected`
-                : "Connect your feeds"}
-            </p>
+            <p className="dash-surface-desc">{sourcesDesc}</p>
           </div>
           <div className="dash-surface-body dash-surface-body-sources">
             <SourcesSidebar
               ingestionEmail={me.ingestion_email}
               sources={sidebarSources}
+              sourceSlotCount={sources.length}
               gmailConnected={me.gmail_connected}
               autoSuggestions={me.auto_suggestions ?? []}
               onSourceAdded={handleSourceAdded}
