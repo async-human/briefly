@@ -263,14 +263,18 @@ function DashboardContent() {
 
   if (showDiscovery) {
     return (
-      <SourceDiscoveryWizard
-        existingSources={billableSources}
-        gmailConnected={me.gmail_connected}
-        connectBanner={connectBanner}
-        ingestionEmail={me.ingestion_email}
-        onConfirmed={handleDiscoveryConfirmed}
-        onSourceAdded={handleSourceAdded}
-      />
+      <PageContentTransition>
+        <div className="dash-page dash-page-discovery">
+          <SourceDiscoveryWizard
+            existingSources={billableSources}
+            gmailConnected={me.gmail_connected}
+            connectBanner={connectBanner}
+            ingestionEmail={me.ingestion_email}
+            onConfirmed={handleDiscoveryConfirmed}
+            onSourceAdded={handleSourceAdded}
+          />
+        </div>
+      </PageContentTransition>
     );
   }
 

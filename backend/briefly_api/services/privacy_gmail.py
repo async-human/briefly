@@ -176,13 +176,28 @@ async def disconnect_gmail_privacy(
     return stats
 
 
-async def delete_user_account(
+async def deactivate_user_account(db: AsyncSession, user: User) -> None:
+    """Lock the account immediately so the user cannot sign in again."""
+    user.is_active = False
+    await db.flush()
+
+
+async def finalize_user_account_deletion(
     db: AsyncSession,
-    user: User,
+    user_id: str,
     settings: Settings,
+    *,
+    subscription_id: str | None = None,
+    user_email: str | None = None,
 ) -> None:
-    """Hard-delete user and cascade all personal data. Revokes OAuth tokens first."""
-    sub_id = (user.ls_subscription_id or "").strip()
+    """Hard-delete user data and revoke external access. Runs in a background job."""
+    user = await db.get(User, user_id)
+    if not user:
+        return
+
+    sub_id = (subscription_id or user.ls_subscription_id or "").strip()
+    email = user_email or user.email
+
     if sub_id and settings.dodo_payments_api_key.strip():
         try:
             await dodo_payments.cancel_subscription_for_account_deletion(settings, sub_id)
@@ -196,31 +211,45 @@ async def delete_user_account(
                 )
             )
             await db.flush()
-            log.info("Cancelled Dodo subscription %s for deleted user %s", sub_id, user.email)
-        except Exception as exc:
+            log.info("Cancelled Dodo subscription %s for deleted user %s", sub_id, email)
+        except Exception:
             log.exception(
                 "Failed to cancel Dodo subscription %s for user %s",
                 sub_id,
-                user.email,
+                email,
             )
-            raise ValueError(
-                "Could not cancel your Pro subscription. Please cancel it in Settings first, "
-                "or try again in a moment."
-            ) from exc
+            raise
     elif sub_id:
         log.warning(
             "User %s has subscription %s but Dodo is not configured — skipping billing cancel",
-            user.email,
+            email,
             sub_id,
         )
 
     connections = await db.execute(
-        select(OAuthConnection).where(OAuthConnection.user_id == user.id)
+        select(OAuthConnection).where(OAuthConnection.user_id == user_id)
     )
     for conn in connections.scalars().all():
         if conn.provider in {"gmail", "google_calendar", "youtube"}:
-            await revoke_google_token(oauth_refresh_token(conn))
+            refresh = oauth_refresh_token(conn)
+            if refresh:
+                asyncio.create_task(revoke_google_token(refresh))
         await db.delete(conn)
 
     await db.delete(user)
     await db.flush()
+
+
+async def delete_user_account(
+    db: AsyncSession,
+    user: User,
+    settings: Settings,
+) -> None:
+    """Synchronous hard-delete — used in tests and background cleanup."""
+    await finalize_user_account_deletion(
+        db,
+        user.id,
+        settings,
+        subscription_id=user.ls_subscription_id,
+        user_email=user.email,
+    )

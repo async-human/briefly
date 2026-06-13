@@ -152,12 +152,12 @@ export function SourceDiscoveryWizard({
     }
   }
 
-  const canConfirm =
-    selected.size > 0 ||
-    existingSources.length > 0;
+  const totalSelected = selected.size + existingSources.length;
+  const canConfirm = selected.size > 0 || existingSources.length > 0;
+  const reviewReady = phase !== "scanning";
 
   return (
-    <div className="discovery-wizard">
+    <div className="discovery-wizard-page">
       <GmailConsentModal
         open={gmailConsentOpen}
         onCancel={() => setGmailConsentOpen(false)}
@@ -168,85 +168,108 @@ export function SourceDiscoveryWizard({
         confirming={gmailLoading}
         ingestionEmail={ingestionEmail}
       />
-      <div className="discovery-wizard-inner">
-        <header className="discovery-wizard-head">
-          <p className="dash-card-label">Get your first brief</p>
+
+      <div className="discovery-wizard-layout">
+        <header className="discovery-wizard-hero">
+          <ol className="discovery-wizard-steps" aria-label="Setup progress">
+            <li className={gmailConnected ? "discovery-wizard-step discovery-wizard-step--done" : "discovery-wizard-step discovery-wizard-step--active"}>
+              Connect
+            </li>
+            <li
+              className={
+                reviewReady
+                  ? "discovery-wizard-step discovery-wizard-step--active"
+                  : "discovery-wizard-step"
+              }
+            >
+              Review
+            </li>
+            <li className="discovery-wizard-step">First brief</li>
+          </ol>
+
+          <p className="discovery-wizard-eyebrow">Get your first brief</p>
           <h1 className="discovery-wizard-title">Connect your inbox</h1>
-          <p className="discovery-wizard-desc">
+          <p className="discovery-wizard-lead">
             {gmailConnected
-              ? "Briefly reads the newsletters you already receive — no feeds to manage. Confirm what to include and we'll deliver your first brief."
-              : "Connect Gmail so Briefly can learn what you follow and deliver your personalized brief — no manual source setup."}
+              ? "Briefly reads the newsletters you already receive — confirm what to include and we'll deliver your first brief."
+              : "Link Gmail so Briefly can learn what you follow, or add sources manually below."}
           </p>
+
           {scanMeta?.gmail_messages_scanned != null && gmailConnected && !scanMeta.gmail_scan_error && (
-            <p className="discovery-connected">
-              Scanned {scanMeta.gmail_messages_scanned} emails · found {scanMeta.gmail_senders_found ?? 0} newsletter senders
+            <p className="discovery-wizard-meta">
+              Scanned {scanMeta.gmail_messages_scanned} emails · found{" "}
+              {scanMeta.gmail_senders_found ?? 0} newsletter senders
             </p>
           )}
           {connectedAccounts.length > 0 && (
-            <p className="discovery-connected">
+            <p className="discovery-wizard-meta">
               Connected: {connectedAccounts.join(" · ")}
             </p>
           )}
         </header>
 
         {connectBanner && !scanMeta.gmail_scan_error && (
-          <div className="discovery-connect-banner">{connectBanner}</div>
-        )}
-
-        {gmailConnected && scanMeta.gmail_scan_error && (
-          <div className="discovery-gmail-error">
-            <div className="discovery-gmail-error-icon">
-              <SourceIcon type="gmail" size={22} />
-            </div>
-            <div className="discovery-gmail-error-body">
-              <p className="discovery-gmail-error-title">Couldn&apos;t read your Gmail inbox</p>
-              <p className="discovery-gmail-error-desc">
-                {scanMeta.gmail_scan_error_message ||
-                  "Google blocked inbox access. Reconnect and approve read access to scan newsletters."}
-              </p>
-              <button
-                type="button"
-                className="discovery-gmail-error-btn"
-                onClick={() => void handleConnectGmail()}
-                disabled={gmailLoading || phase === "confirming"}
-              >
-                {gmailLoading ? (
-                  <>
-                    <span className="btn-spinner btn-spinner-dark" />
-                    Redirecting to Google…
-                  </>
-                ) : (
-                  <>
-                    <SourceIcon type="gmail" size={16} />
-                    Reconnect Gmail
-                  </>
-                )}
-              </button>
-            </div>
+          <div className="discovery-wizard-banner" role="status">
+            {connectBanner}
           </div>
         )}
 
-        {!gmailConnected && (
-          <div className="discovery-gmail-callout">
-            <div className="discovery-gmail-callout-icon">
-              <SourceIcon type="gmail" size={22} />
-            </div>
-            <div className="discovery-gmail-callout-body">
-              <p className="discovery-gmail-callout-title">Connect Gmail for richer discovery</p>
-              <p className="discovery-gmail-callout-desc">
-                We scan newsletter senders from your inbox — Substack, Beehiiv, and more — so your
-                briefing reflects what you actually read, not just keyword guesses.
-              </p>
+        <div className="discovery-wizard-main">
+          {gmailConnected && scanMeta.gmail_scan_error && (
+            <div className="discovery-integration discovery-integration--error">
+              <div className="discovery-integration-icon" aria-hidden>
+                <SourceIcon type="gmail" size={22} />
+              </div>
+              <div className="discovery-integration-body">
+                <p className="discovery-integration-title">Couldn&apos;t read your Gmail inbox</p>
+                <p className="discovery-integration-desc">
+                  {scanMeta.gmail_scan_error_message ||
+                    "Google blocked inbox access. Reconnect and approve read access to scan newsletters."}
+                </p>
+              </div>
               <button
                 type="button"
-                className="discovery-gmail-callout-btn"
+                className="discovery-integration-action"
                 onClick={() => void handleConnectGmail()}
                 disabled={gmailLoading || phase === "confirming"}
               >
                 {gmailLoading ? (
                   <>
                     <span className="btn-spinner btn-spinner-dark" />
-                    Redirecting to Google…
+                    Redirecting…
+                  </>
+                ) : (
+                  "Reconnect Gmail"
+                )}
+              </button>
+            </div>
+          )}
+
+          {!gmailConnected && (
+            <div className="discovery-integration">
+              <div className="discovery-integration-icon" aria-hidden>
+                <SourceIcon type="gmail" size={22} />
+              </div>
+              <div className="discovery-integration-body">
+                <p className="discovery-integration-title">Connect Gmail for richer discovery</p>
+                <p className="discovery-integration-desc">
+                  We scan newsletter senders from your inbox — Substack, Beehiiv, and more — so your
+                  briefing reflects what you actually read.
+                </p>
+                <p className="discovery-integration-note">
+                  Read-only access to newsletter metadata — never your personal mail.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="discovery-integration-action discovery-integration-action--primary"
+                onClick={() => void handleConnectGmail()}
+                disabled={gmailLoading || phase === "confirming"}
+              >
+                {gmailLoading ? (
+                  <>
+                    <span className="btn-spinner btn-spinner-light" />
+                    Redirecting…
                   </>
                 ) : (
                   <>
@@ -255,113 +278,154 @@ export function SourceDiscoveryWizard({
                   </>
                 )}
               </button>
-              <p className="discovery-gmail-callout-hint">
-                Read-only access to newsletter metadata — never your personal mail.
-              </p>
             </div>
-          </div>
-        )}
+          )}
 
-        {phase === "scanning" && (
-          <DiscoveryScanning progress={scanProgress} gmailConnected={gmailConnected} />
-        )}
+          {phase === "scanning" && (
+            <DiscoveryScanning progress={scanProgress} gmailConnected={gmailConnected} />
+          )}
 
-        {phase !== "scanning" && (
-          <>
-            {existingSources.length > 0 && (
-              <section className="discovery-section">
-                <h2 className="discovery-section-title">Already connected</h2>
-                <ul className="discovery-existing-list">
-                  {existingSources.map((s) => (
-                    <li key={s.id} className="discovery-existing-item">
-                      <SourceIcon type={s.source_type} name={s.name ?? undefined} size={16} />
-                      <span>{s.name || s.identifier}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {LAYER_ORDER.map((layer) => {
-              const items = grouped.get(layer) ?? [];
-              if (items.length === 0) return null;
-              return (
-                <section key={layer} className="discovery-section">
-                  <h2 className="discovery-section-title">{LAYER_LABELS[layer]}</h2>
-                  <ul className="discovery-candidate-list">
-                    {items.map((c) => (
-                      <li key={c.id}>
-                        <label className="discovery-candidate-row">
-                          <input
-                            type="checkbox"
-                            checked={selected.has(c.id)}
-                            onChange={() => toggle(c.id)}
-                          />
-                          <div className="discovery-candidate-body">
-                            <div className="discovery-candidate-top">
-                              <span className="discovery-candidate-name">{c.name}</span>
-                              <span className="discovery-score">
-                                {Math.round(c.relevance_score * 100)}% match
-                              </span>
-                            </div>
-                            <p className="discovery-candidate-reason">{c.reason}</p>
-                            <p className="discovery-candidate-id">{c.identifier}</p>
-                          </div>
-                        </label>
+          {reviewReady && (
+            <div className="discovery-wizard-review">
+              {existingSources.length > 0 && (
+                <section className="discovery-block">
+                  <h2 className="discovery-block-title">Already connected</h2>
+                  <ul className="discovery-chip-list">
+                    {existingSources.map((s) => (
+                      <li key={s.id} className="discovery-chip">
+                        <SourceIcon type={s.source_type} name={s.name ?? undefined} size={16} />
+                        <span>{s.name || s.identifier}</span>
                       </li>
                     ))}
                   </ul>
                 </section>
-              );
-            })}
+              )}
 
-            {candidates.length === 0 && !error && (
-              <p className="discovery-empty">
-                {gmailConnected
-                  ? "No newsletters were detected in your Gmail yet. Try forwarding a few to your ingestion address, or add a feed manually below."
-                  : "No sources discovered automatically. Connect Gmail for the richest scan, or add feeds manually below."}
-              </p>
-            )}
+              {LAYER_ORDER.map((layer) => {
+                const items = grouped.get(layer) ?? [];
+                if (items.length === 0) return null;
+                return (
+                  <section key={layer} className="discovery-block">
+                    <h2 className="discovery-block-title">{LAYER_LABELS[layer]}</h2>
+                    <ul className="discovery-pick-list">
+                      {items.map((c) => {
+                        const checked = selected.has(c.id);
+                        return (
+                          <li key={c.id}>
+                            <label
+                              className={`discovery-pick${checked ? " discovery-pick--selected" : ""}`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="discovery-pick-input"
+                                checked={checked}
+                                onChange={() => toggle(c.id)}
+                              />
+                              <span className="discovery-pick-check" aria-hidden>
+                                {checked && (
+                                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                    <path
+                                      d="M2 6l2.5 2.5L10 3"
+                                      stroke="currentColor"
+                                      strokeWidth="1.5"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                  </svg>
+                                )}
+                              </span>
+                              <span className="discovery-pick-content">
+                                <span className="discovery-pick-top">
+                                  <span className="discovery-pick-name">{c.name}</span>
+                                  <span className="discovery-pick-score">
+                                    {Math.round(c.relevance_score * 100)}% match
+                                  </span>
+                                </span>
+                                <span className="discovery-pick-reason">{c.reason}</span>
+                                <span className="discovery-pick-id">{c.identifier}</span>
+                              </span>
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                );
+              })}
 
-            <section className="discovery-section">
-              <h2 className="discovery-section-title">Add anything we missed</h2>
-              <AddSourceForm onAdded={onSourceAdded} />
-            </section>
+              {candidates.length === 0 && !error && (
+                <div className="discovery-empty-state">
+                  <p className="discovery-empty-title">No sources found yet</p>
+                  <p className="discovery-empty-desc">
+                    {gmailConnected
+                      ? "Try forwarding a newsletter to your ingestion address, or add a feed manually below."
+                      : "Connect Gmail for the richest scan, or paste a URL below."}
+                  </p>
+                </div>
+              )}
 
-            {error && <p className="form-error">{error}</p>}
+              <section className="discovery-block discovery-block--manual">
+                <h2 className="discovery-block-title">Add manually</h2>
+                <p className="discovery-block-desc">
+                  Paste a URL, channel, subreddit, or email if we missed something.
+                </p>
+                <AddSourceForm variant="inline" onAdded={onSourceAdded} />
+              </section>
 
-            <div className="discovery-actions">
-              <button
-                type="button"
-                className="btn-primary discovery-confirm-btn"
-                disabled={!canConfirm || phase === "confirming"}
-                onClick={handleConfirm}
-              >
-                {phase === "confirming"
-                  ? "Setting up your briefing…"
-                  : `Confirm ${selected.size} source${selected.size === 1 ? "" : "s"} & generate briefing`}
-              </button>
-              <button
-                type="button"
-                className="onboard-ghost"
-                disabled={phase === "confirming"}
-                onClick={() => void runDiscovery()}
-              >
-                Re-scan
-              </button>
-              <button
-                type="button"
-                className="onboard-ghost"
-                disabled={phase === "confirming"}
-                onClick={async () => {
-                  await api.resetSourceDiscovery();
-                  await runDiscovery();
-                }}
-              >
-                Full refresh
-              </button>
+              {error && <p className="form-error discovery-wizard-error">{error}</p>}
             </div>
-          </>
+          )}
+        </div>
+
+        {reviewReady && (
+          <footer className="discovery-wizard-footer">
+            <div className="discovery-wizard-footer-inner">
+              <div className="discovery-wizard-footer-meta">
+                <span className="discovery-wizard-count">
+                  {totalSelected} source{totalSelected === 1 ? "" : "s"} selected
+                </span>
+                {!canConfirm && (
+                  <span className="discovery-wizard-footer-hint">
+                    Connect Gmail or add a source to continue
+                  </span>
+                )}
+              </div>
+              <div className="discovery-wizard-footer-actions">
+                <button
+                  type="button"
+                  className="discovery-wizard-confirm"
+                  disabled={!canConfirm || phase === "confirming"}
+                  onClick={handleConfirm}
+                >
+                  {phase === "confirming" ? "Setting up your briefing…" : "Generate my first brief"}
+                </button>
+                <div className="discovery-wizard-secondary">
+                  <button
+                    type="button"
+                    className="discovery-wizard-link-btn"
+                    disabled={phase === "confirming"}
+                    onClick={() => void runDiscovery()}
+                  >
+                    Re-scan
+                  </button>
+                  <span className="discovery-wizard-link-sep" aria-hidden>
+                    ·
+                  </span>
+                  <button
+                    type="button"
+                    className="discovery-wizard-link-btn"
+                    disabled={phase === "confirming"}
+                    onClick={async () => {
+                      await api.resetSourceDiscovery();
+                      await runDiscovery();
+                    }}
+                  >
+                    Full refresh
+                  </button>
+                </div>
+              </div>
+            </div>
+          </footer>
         )}
       </div>
     </div>

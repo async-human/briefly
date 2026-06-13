@@ -40,7 +40,6 @@ export function DataControls({
   const [error, setError] = useState("");
   const [deleteEmail, setDeleteEmail] = useState("");
   const [deleteError, setDeleteError] = useState("");
-  const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -60,7 +59,7 @@ export function DataControls({
     void refresh();
   }, [refresh]);
 
-  async function handleDeleteAccount() {
+  function handleDeleteAccount() {
     const trimmed = deleteEmail.trim();
     if (!trimmed) return;
 
@@ -72,16 +71,9 @@ export function DataControls({
       return;
     }
 
-    setDeleting(true);
-    setDeleteError("");
-    try {
-      await api.deleteAccount(trimmed);
-      clearToken();
-      window.location.href = "/login?deleted=1";
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Could not delete account");
-      setDeleting(false);
-    }
+    api.deleteAccountInBackground(trimmed);
+    clearToken();
+    window.location.href = "/login?deleted=1";
   }
 
   return (
@@ -190,10 +182,10 @@ export function DataControls({
               <button
                 type="button"
                 className="data-controls-danger-btn"
-                disabled={deleting || !deleteEmail.trim()}
-                onClick={() => void handleDeleteAccount()}
+                disabled={!deleteEmail.trim()}
+                onClick={handleDeleteAccount}
               >
-                {deleting ? "Deleting…" : "Permanently delete"}
+                Permanently delete
               </button>
               <button
                 type="button"

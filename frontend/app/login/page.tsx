@@ -203,6 +203,7 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const [checking, setChecking] = useState(true);
   const sessionExpired = searchParams.get("reason") === "session_expired";
+  const accountDeleted = searchParams.get("deleted") === "1";
 
   useEffect(() => {
     const next = searchParams.get("next");
@@ -317,6 +318,11 @@ function LoginPageContent() {
               {sessionExpired && (
                 <p className="login-session-note" role="status">
                   Your session expired — sign in again to pick up where you left off.
+                </p>
+              )}
+              {accountDeleted && (
+                <p className="login-session-note" role="status">
+                  Your Briefly account has been deleted. We&apos;re finishing cleanup in the background.
                 </p>
               )}
             </div>

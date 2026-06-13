@@ -972,6 +972,19 @@ export const api = {
       method: "DELETE",
       body: JSON.stringify({ confirm_email: confirmEmail }),
     }),
+  deleteAccountInBackground: (confirmEmail: string) => {
+    const token = getToken();
+    if (!token || typeof window === "undefined") return;
+    void fetch(`${API_URL}/api/v1/privacy/account`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ confirm_email: confirmEmail }),
+      keepalive: true,
+    });
+  },
 
   startYouTubeConnect: (redirectPath = "/onboarding") =>
     request<{ url: string }>(

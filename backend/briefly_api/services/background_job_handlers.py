@@ -45,6 +45,27 @@ async def _weekly_reports(payload: dict[str, Any]) -> None:
     await send_weekly_reports_for_due_users(now)
 
 
+async def _account_deletion_cleanup(payload: dict[str, Any]) -> None:
+    from briefly_api.config import get_settings
+    from briefly_api.db.engine import SessionLocal
+    from briefly_api.services.privacy_gmail import finalize_user_account_deletion
+
+    user_id = payload.get("user_id")
+    if not user_id:
+        return
+
+    settings = get_settings()
+    async with SessionLocal() as db:
+        await finalize_user_account_deletion(
+            db,
+            user_id,
+            settings,
+            subscription_id=payload.get("subscription_id"),
+            user_email=payload.get("user_email"),
+        )
+        await db.commit()
+
+
 def register_all_job_handlers() -> None:
     register_job_handler("post_pipeline_agents", _post_pipeline)
     register_job_handler("footprint_scan", _footprint)
@@ -52,3 +73,4 @@ def register_all_job_handlers() -> None:
     register_job_handler("story_thread_agent", _story_thread)
     register_job_handler("proactive_alerts", _proactive)
     register_job_handler("weekly_reports", _weekly_reports)
+    register_job_handler("account_deletion_cleanup", _account_deletion_cleanup)

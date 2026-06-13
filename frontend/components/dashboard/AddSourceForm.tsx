@@ -16,9 +16,11 @@ const TYPE_OVERRIDES = [
 
 export function AddSourceForm({
   sourceCount = 0,
+  variant = "default",
   onAdded,
 }: {
   sourceCount?: number;
+  variant?: "default" | "inline";
   onAdded: (source: Source) => void;
 }) {
   const upgrade = useUpgradeOptional();
@@ -100,20 +102,32 @@ export function AddSourceForm({
   }
 
   return (
-    <form className="source-form" onSubmit={handleSubmit}>
-      <p className="source-form-label">Add a connection</p>
+    <form className={`source-form${variant === "inline" ? " source-form--inline" : ""}`} onSubmit={handleSubmit}>
+      {variant === "default" && <p className="source-form-label">Add a connection</p>}
 
-      <label className="field-label">
-        Paste anything
-        <input
-          type="text"
-          placeholder="URL, @channel, subreddit, or email"
-          value={identifier}
-          onChange={(e) => setIdentifier(e.target.value)}
-          className="field-input"
-          disabled={atSourceLimit}
-        />
-      </label>
+      <div className={variant === "inline" ? "source-form-primary" : undefined}>
+        <label className="field-label">
+          {variant === "default" ? "Paste anything" : "Paste a link or address"}
+          <input
+            type="text"
+            placeholder="URL, @channel, subreddit, or email"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            className="field-input"
+            disabled={atSourceLimit}
+          />
+        </label>
+
+        {variant === "inline" && (
+          <button
+            type="submit"
+            className="btn-primary source-submit source-submit--inline"
+            disabled={loading || !identifier.trim() || atSourceLimit}
+          >
+            {atSourceLimit ? "Upgrade" : loading ? "Adding…" : "Add"}
+          </button>
+        )}
+      </div>
 
       {detecting && <p className="field-hint">Detecting source type…</p>}
       {!detecting && detection && (
@@ -124,7 +138,7 @@ export function AddSourceForm({
       )}
 
       <details className="source-advanced">
-        <summary>Override type</summary>
+        <summary>{variant === "inline" ? "More options" : "Override type"}</summary>
         <label className="field-label">
           Source type
           <select
@@ -138,26 +152,44 @@ export function AddSourceForm({
             ))}
           </select>
         </label>
+        {variant === "inline" && (
+          <label className="field-label">
+            <span>Display name <span className="field-optional">optional</span></span>
+            <input
+              type="text"
+              placeholder="My favourite newsletter"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="field-input"
+              disabled={atSourceLimit}
+            />
+          </label>
+        )}
       </details>
 
-      <label className="field-label">
-        <span>Display name <span className="field-optional">optional</span></span>
-        <input
-          type="text"
-          placeholder="My favourite newsletter"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="field-input"
-          disabled={atSourceLimit}
-        />
-      </label>
-      <button
-        type="submit"
-        className="btn-primary source-submit"
-        disabled={loading || !identifier.trim() || atSourceLimit}
-      >
-        {atSourceLimit ? "Upgrade to add more" : loading ? "Adding…" : "Add connection"}
-      </button>
+      {variant === "default" && (
+        <label className="field-label">
+          <span>Display name <span className="field-optional">optional</span></span>
+          <input
+            type="text"
+            placeholder="My favourite newsletter"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="field-input"
+            disabled={atSourceLimit}
+          />
+        </label>
+      )}
+
+      {variant === "default" && (
+        <button
+          type="submit"
+          className="btn-primary source-submit"
+          disabled={loading || !identifier.trim() || atSourceLimit}
+        >
+          {atSourceLimit ? "Upgrade to add more" : loading ? "Adding…" : "Add connection"}
+        </button>
+      )}
       {error && <p className="form-error">{error}</p>}
     </form>
   );
