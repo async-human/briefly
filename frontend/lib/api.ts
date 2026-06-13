@@ -131,11 +131,21 @@ export type User = {
   created_at: string;
 };
 
+export type PlanUsage = {
+  sources_used: number;
+  sources_limit: number | null;
+  sources_at_limit: boolean;
+  history_days_limit: number | null;
+  digest_items_limit: number | null;
+  free_limits_reached: boolean;
+};
+
 export type BillingStatus = {
   plan: string;
   is_founding_member: boolean;
   is_pro: boolean;
   subscribed_at: string | null;
+  usage: PlanUsage;
 };
 
 export type BriefStyle = "analyst" | "scan" | "plain";

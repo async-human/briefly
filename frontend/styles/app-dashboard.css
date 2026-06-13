@@ -1607,6 +1607,491 @@
   color: var(--app-muted);
 }
 
+.settings-billing-badge-free {
+  color: var(--app-ink-2);
+  background: color-mix(in srgb, var(--app-ink) 8%, transparent);
+  border-color: var(--app-border);
+}
+
+.settings-billing-current {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.settings-billing-current-label {
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+}
+
+.settings-billing-limit-alert {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--app-radius-sm);
+  margin: 0 0 1rem;
+  background: color-mix(in srgb, #c47070 10%, var(--app-canvas));
+  border: 1px solid color-mix(in srgb, #c47070 25%, var(--app-border));
+  color: #7a3535;
+}
+
+.settings-billing-free-summary {
+  margin: 0 0 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+  line-height: 1.5;
+}
+
+.settings-billing-link {
+  font-size: 0.8125rem;
+  color: var(--app-accent);
+  text-decoration: none;
+  align-self: center;
+}
+
+.settings-billing-link:hover {
+  text-decoration: underline;
+}
+
+.settings-billing-meta {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+}
+
+/* Plan comparison (settings + upgrade page) */
+.plan-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 720px) {
+  .plan-comparison {
+    grid-template-columns: 1fr;
+  }
+}
+
+.plan-comparison-card {
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius);
+  padding: 1rem;
+  background: var(--app-surface);
+}
+
+.plan-comparison-card-current {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--app-accent) 35%, transparent);
+}
+
+.plan-comparison-card-pro {
+  border-color: color-mix(in srgb, var(--app-accent) 30%, var(--app-border));
+  background: color-mix(in srgb, var(--app-accent) 4%, var(--app-surface));
+}
+
+.plan-comparison-name {
+  margin: 0;
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 1.05rem;
+}
+
+.plan-comparison-price {
+  margin: 0.35rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.plan-comparison-price span {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--app-muted);
+}
+
+.plan-comparison-annual {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--app-muted);
+}
+
+.plan-comparison-pro-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.plan-comparison-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  color: var(--app-accent);
+  background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+}
+
+.plan-comparison-features {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.plan-comparison-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--app-ink-2);
+}
+
+.plan-comparison-features li.dim {
+  opacity: 0.55;
+}
+
+.plan-check {
+  flex-shrink: 0;
+  width: 1rem;
+  text-align: center;
+  color: #3d7a5c;
+  font-weight: 700;
+}
+
+.plan-check-dim {
+  color: var(--app-muted);
+}
+
+.plan-comparison-page .plan-comparison-card {
+  padding: 1.25rem;
+}
+
+.plan-comparison-page .plan-comparison-features li {
+  font-size: 0.8125rem;
+}
+
+/* Usage meter */
+.plan-usage {
+  margin-bottom: 1rem;
+}
+
+.plan-usage-at-limit .plan-usage-fill {
+  background: #c47070;
+}
+
+.plan-usage-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  margin-bottom: 0.35rem;
+}
+
+.plan-usage-label {
+  color: var(--app-ink-2);
+}
+
+.plan-usage-count {
+  color: var(--app-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-usage-track {
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-ink) 8%, transparent);
+  overflow: hidden;
+}
+
+.plan-usage-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--app-accent);
+  transition: width 0.25s ease;
+}
+
+.plan-usage-limit-msg {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  color: #9a4040;
+}
+
+.plan-usage-link {
+  color: var(--app-accent);
+  text-decoration: underline;
+}
+
+/* Upgrade modal */
+.upgrade-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(12, 14, 18, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.upgrade-modal {
+  position: relative;
+  width: min(100%, 420px);
+  max-height: min(90vh, 640px);
+  overflow-y: auto;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: calc(var(--app-radius) + 2px);
+  padding: 1.5rem;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
+}
+
+.upgrade-modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  border: none;
+  background: transparent;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--app-muted);
+  cursor: pointer;
+}
+
+.upgrade-modal-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--app-accent);
+}
+
+.upgrade-modal-title {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.upgrade-modal-sub {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--app-ink-2);
+}
+
+.upgrade-modal-usage {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in srgb, var(--app-ink) 5%, transparent);
+  margin-bottom: 1rem;
+}
+
+.upgrade-modal-features {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--app-ink-2);
+}
+
+.upgrade-modal-features li::before {
+  content: "✓ ";
+  color: #3d7a5c;
+  font-weight: 700;
+}
+
+.upgrade-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.upgrade-modal-btn {
+  width: 100%;
+}
+
+.upgrade-modal-btn-secondary {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border-radius: var(--app-radius-sm);
+  border: 1px solid var(--app-border);
+  background: transparent;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.upgrade-modal-btn-secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--app-ink) 4%, transparent);
+}
+
+.upgrade-modal-error {
+  font-size: 0.8125rem;
+  color: #9a4040;
+  margin: 0 0 0.75rem;
+}
+
+.upgrade-modal-foot {
+  margin: 1rem 0 0;
+  font-size: 0.75rem;
+  color: var(--app-muted);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.upgrade-modal-link {
+  color: var(--app-accent);
+}
+
+/* Free tier banner */
+.free-tier-banner {
+  padding: 0.65rem 1rem;
+  background: color-mix(in srgb, #c47070 8%, var(--app-canvas));
+  border-bottom: 1px solid color-mix(in srgb, #c47070 20%, var(--app-border));
+}
+
+.free-tier-banner-inner {
+  max-width: var(--app-content-max, 1200px);
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.free-tier-banner-text {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: #7a3535;
+}
+
+.free-tier-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.free-tier-banner-btn {
+  font-size: 0.8125rem;
+  padding: 0.4rem 0.85rem;
+}
+
+.free-tier-banner-link {
+  font-size: 0.8125rem;
+  color: var(--app-accent);
+  text-decoration: none;
+}
+
+.free-tier-banner-link:hover {
+  text-decoration: underline;
+}
+
+/* Upgrade page */
+.dash-page-upgrade {
+  max-width: 880px;
+}
+
+.upgrade-page-banner {
+  font-size: 0.8125rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--app-radius-sm);
+  margin-bottom: 1rem;
+  background: color-mix(in srgb, #6aab8a 12%, var(--app-canvas));
+  border: 1px solid color-mix(in srgb, #6aab8a 28%, var(--app-border));
+  color: #3d7a5c;
+}
+
+.upgrade-page-error {
+  font-size: 0.8125rem;
+  color: #9a4040;
+  margin-bottom: 1rem;
+}
+
+.upgrade-page-cta {
+  padding: 1.25rem;
+  margin-top: 1rem;
+}
+
+.upgrade-page-cta-title {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 1.15rem;
+}
+
+.upgrade-page-cta-sub {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+}
+
+.upgrade-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.upgrade-page-btn {
+  min-width: 180px;
+}
+
+.upgrade-page-btn-secondary {
+  padding: 0.65rem 1rem;
+  border-radius: var(--app-radius-sm);
+  border: 1px solid var(--app-border);
+  background: transparent;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.upgrade-page-foot {
+  margin: 0.75rem 0 0;
+  font-size: 0.75rem;
+  color: var(--app-muted);
+}
+
+.upgrade-page-pro {
+  padding: 1.25rem;
+}
+
+.upgrade-page-pro-text {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+}
+
+.source-form-limit {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--app-radius-sm);
+  margin-bottom: 0.85rem;
+  background: color-mix(in srgb, #c47070 8%, var(--app-canvas));
+  border: 1px solid color-mix(in srgb, #c47070 22%, var(--app-border));
+  color: #7a3535;
+}
+
+.source-form-limit-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--app-accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.brain-dump-fab-pro {
+  opacity: 0.92;
+}
+
 .connection-toast {
   position: fixed;
   bottom: 1.75rem;

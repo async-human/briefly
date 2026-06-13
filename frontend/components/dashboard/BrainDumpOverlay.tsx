@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { api, ApiError, type BrainDump } from "@/lib/api";
 import { BrainDumpHistory } from "./BrainDumpHistory";
+import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
+import { isPlanLimitError, upgradeReasonFromError } from "@/lib/plans";
 import {
   buildRecordingBlob,
   canUseLiveSpeechWithRecorder,
@@ -40,6 +42,7 @@ type BrainDumpOverlayProps = {
 const RECORDER_TIMESLICE_MS = 1_000;
 
 export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
+  const upgrade = useUpgradeOptional();
   const [phase, setPhase] = useState<Phase>("capture");
   const [text, setText] = useState("");
   const [interimText, setInterimText] = useState("");
@@ -206,6 +209,11 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
       setHistoryRefresh((k) => k + 1);
       setPhase("success");
     } catch (e) {
+      if (isPlanLimitError(e)) {
+        onClose();
+        upgrade?.openUpgrade({ reason: upgradeReasonFromError(e) });
+        return;
+      }
       setError(e instanceof ApiError ? e.message : "Failed to save. Try again.");
       setPhase("capture");
     }
@@ -223,6 +231,11 @@ export function BrainDumpOverlay({ open, onClose }: BrainDumpOverlayProps) {
       setHistoryRefresh((k) => k + 1);
       setPhase("success");
     } catch (e) {
+      if (isPlanLimitError(e)) {
+        onClose();
+        upgrade?.openUpgrade({ reason: upgradeReasonFromError(e) });
+        return;
+      }
       const fallback = browserTranscriptFallback();
       if (fallback.length >= 3) {
         await submitTranscript(fallback, true);

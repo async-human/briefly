@@ -137,7 +137,7 @@ export function Pricing() {
                   </li>
                 ))}
               </ul>
-              <a href="/settings#plan" className="pricing-v2-btn pricing-v2-btn-pro">
+              <a href="/upgrade" className="pricing-v2-btn pricing-v2-btn-pro">
                 Get Pro — $9/month
               </a>
             </motion.div>

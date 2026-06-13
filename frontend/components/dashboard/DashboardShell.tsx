@@ -8,6 +8,7 @@ import { PageContentTransition } from "@/components/loading/PageContentTransitio
 import { AppSidebar } from "./AppSidebar";
 import { BrainDumpFab } from "./BrainDumpFab";
 import { LearnedToastProvider } from "./LearnedToast";
+import { FreeTierBanner } from "@/components/billing/FreeTierBanner";
 
 type DashboardShellProps = {
   children: React.ReactNode;
@@ -60,6 +61,7 @@ export function DashboardShell({ children, userName, avatarUrl }: DashboardShell
           </Link>
         </header>
         <div className="app-main-scroll">
+          <FreeTierBanner />
           <PageContentTransition key={pathname}>{children}</PageContentTransition>
         </div>
       </div>

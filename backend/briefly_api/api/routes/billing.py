@@ -9,7 +9,13 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from briefly_api.api.plan_limits import has_pro_access
+from briefly_api.api.plan_limits import (
+    FREE_DIGEST_ITEMS,
+    FREE_HISTORY_DAYS,
+    FREE_SOURCE_LIMIT,
+    has_pro_access,
+)
+from briefly_api.db.models import Source
 from briefly_api.api.schemas import BillingStatusOut, CheckoutIn, CheckoutOut
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
@@ -96,15 +102,45 @@ async def _downgrade_user_to_free(user: User, db: AsyncSession) -> None:
     logger.info("User %s downgraded to free", user.email)
 
 
+async def _plan_usage_for_user(db: AsyncSession, user: User) -> dict:
+    result = await db.execute(
+        select(func.count()).select_from(Source).where(Source.user_id == user.id)
+    )
+    sources_used = result.scalar() or 0
+    pro = has_pro_access(user)
+    if pro:
+        return {
+            "sources_used": sources_used,
+            "sources_limit": None,
+            "sources_at_limit": False,
+            "history_days_limit": None,
+            "digest_items_limit": None,
+            "free_limits_reached": False,
+        }
+
+    sources_at_limit = sources_used >= FREE_SOURCE_LIMIT
+    return {
+        "sources_used": sources_used,
+        "sources_limit": FREE_SOURCE_LIMIT,
+        "sources_at_limit": sources_at_limit,
+        "history_days_limit": FREE_HISTORY_DAYS,
+        "digest_items_limit": FREE_DIGEST_ITEMS,
+        "free_limits_reached": sources_at_limit,
+    }
+
+
 @router.get("/status", response_model=BillingStatusOut)
 async def billing_status(
     user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> BillingStatusOut:
+    usage = await _plan_usage_for_user(db, user)
     return BillingStatusOut(
         plan=user.plan,
         is_founding_member=bool(user.is_founding_member),
         is_pro=has_pro_access(user),
         subscribed_at=user.subscribed_at,
+        usage=usage,
     )
 
 

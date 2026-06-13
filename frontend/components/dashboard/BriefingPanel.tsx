@@ -12,6 +12,8 @@ import {
   sectionBadgeClass,
 } from "@/lib/digestSections";
 import { AddSourceForm, CopyEmailButton } from "./AddSourceForm";
+import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
+import { isPlanLimitError, upgradeReasonFromError } from "@/lib/plans";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { GmailDiscovery } from "./GmailDiscovery";
 import { IngestionPanel } from "./IngestionPanel";
@@ -299,6 +301,7 @@ function InlineSourceRecommendations({
   autoSuggestions: AutoSuggestion[];
   onAdded: (s: Source) => void;
 }) {
+  const upgrade = useUpgradeOptional();
   const [adding, setAdding] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
@@ -316,8 +319,11 @@ function InlineSourceRecommendations({
       const src = await api.addSource({ identifier: s.url, name: s.name });
       onAdded(src);
       setDismissed((prev) => new Set(Array.from(prev).concat(s.url)));
-    } catch {
-      // show nothing on error — user can try again
+      void upgrade?.refreshBilling();
+    } catch (err) {
+      if (isPlanLimitError(err)) {
+        upgrade?.openUpgrade({ reason: upgradeReasonFromError(err) });
+      }
     } finally {
       setAdding(null);
     }

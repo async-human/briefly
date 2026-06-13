@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api, type AutoSuggestion, type Source, type SourceSuggestion } from "@/lib/api";
+import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
+import { isPlanLimitError, upgradeReasonFromError } from "@/lib/plans";
 
 type SuggestionItem = SourceSuggestion | AutoSuggestion;
 
@@ -20,6 +22,7 @@ export function SourceSuggestions({
   autoSuggestions?: AutoSuggestion[];
   embedded?: boolean;
 }) {
+  const upgrade = useUpgradeOptional();
   const [catalogSuggestions, setCatalogSuggestions] = useState<SourceSuggestion[]>([]);
   const [adding, setAdding] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
@@ -61,8 +64,13 @@ export function SourceSuggestions({
       const src = await api.addSource({ identifier: suggestion.url, name: suggestion.name });
       onAdded(src);
       setDismissed((prev) => new Set(Array.from(prev).concat(suggestion.url)));
+      void upgrade?.refreshBilling();
     } catch (err) {
-      setAddError(err instanceof Error ? err.message : "Could not add source.");
+      if (isPlanLimitError(err)) {
+        upgrade?.openUpgrade({ reason: upgradeReasonFromError(err) });
+      } else {
+        setAddError(err instanceof Error ? err.message : "Could not add source.");
+      }
     } finally {
       setAdding(null);
     }

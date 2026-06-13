@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type Source, type SourceDetection } from "@/lib/api";
+import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
+import { isPlanLimitError, upgradeReasonFromError } from "@/lib/plans";
 
 const TYPE_OVERRIDES = [
   { value: "", label: "Auto-detect" },
@@ -13,6 +15,7 @@ const TYPE_OVERRIDES = [
 ];
 
 export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }) {
+  const upgrade = useUpgradeOptional();
   const [identifier, setIdentifier] = useState("");
   const [name, setName] = useState("");
   const [typeOverride, setTypeOverride] = useState("");
@@ -20,6 +23,10 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
   const [detecting, setDetecting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const atSourceLimit = Boolean(
+    upgrade?.billing && !upgrade.billing.is_pro && upgrade.billing.usage.sources_at_limit,
+  );
 
   const runDetect = useCallback(async (value: string, override: string) => {
     const trimmed = value.trim();
@@ -52,6 +59,12 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!identifier.trim()) return;
+
+    if (atSourceLimit) {
+      upgrade?.openUpgrade({ reason: "sources_limit" });
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
@@ -64,7 +77,12 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
       setName("");
       setDetection(null);
       onAdded(source);
+      void upgrade?.refreshBilling();
     } catch (err) {
+      if (isPlanLimitError(err)) {
+        upgrade?.openUpgrade({ reason: upgradeReasonFromError(err) });
+        return;
+      }
       const message = err instanceof Error ? err.message : "Failed to add source";
       setError(
         message.includes("already connected")
@@ -78,6 +96,21 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
 
   return (
     <form className="source-form" onSubmit={handleSubmit}>
+      {atSourceLimit && (
+        <div className="source-form-limit" role="status">
+          Free plan limit reached ({upgrade?.billing?.usage.sources_used}/
+          {upgrade?.billing?.usage.sources_limit} sources).{" "}
+          <button
+            type="button"
+            className="source-form-limit-link"
+            onClick={() => upgrade?.openUpgrade({ reason: "sources_limit" })}
+          >
+            Upgrade to Pro
+          </button>{" "}
+          to add more.
+        </div>
+      )}
+
       <label className="field-label">
         Paste anything
         <input
@@ -86,6 +119,7 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
           className="field-input"
+          disabled={atSourceLimit}
         />
       </label>
 
@@ -105,6 +139,7 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
             value={typeOverride}
             onChange={(e) => setTypeOverride(e.target.value)}
             className="field-input"
+            disabled={atSourceLimit}
           >
             {TYPE_OVERRIDES.map((t) => (
               <option key={t.value || "auto"} value={t.value}>{t.label}</option>
@@ -121,10 +156,15 @@ export function AddSourceForm({ onAdded }: { onAdded: (source: Source) => void }
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="field-input"
+          disabled={atSourceLimit}
         />
       </label>
-      <button type="submit" className="btn-primary source-submit" disabled={loading || !identifier.trim()}>
-        {loading ? "Adding…" : "Add source"}
+      <button
+        type="submit"
+        className="btn-primary source-submit"
+        disabled={loading || !identifier.trim() || atSourceLimit}
+      >
+        {atSourceLimit ? "Upgrade to add sources" : loading ? "Adding…" : "Add source"}
       </button>
       {error && <p className="form-error">{error}</p>}
     </form>

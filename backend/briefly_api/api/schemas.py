@@ -29,11 +29,21 @@ class CheckoutOut(BaseModel):
     session_id: str = ""
 
 
+class PlanUsageOut(BaseModel):
+    sources_used: int = 0
+    sources_limit: int | None = None
+    sources_at_limit: bool = False
+    history_days_limit: int | None = None
+    digest_items_limit: int | None = None
+    free_limits_reached: bool = False
+
+
 class BillingStatusOut(BaseModel):
     plan: str
     is_founding_member: bool
     is_pro: bool
     subscribed_at: datetime | None = None
+    usage: PlanUsageOut = Field(default_factory=PlanUsageOut)
 
 
 class ProfileOut(BaseModel):

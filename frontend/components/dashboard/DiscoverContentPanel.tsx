@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, type DiscoveredArticle, type Source } from "@/lib/api";
+import { api, ApiError, type DiscoveredArticle, type Source } from "@/lib/api";
 import { SourceIcon } from "@/components/SourceIcon";
 import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
+import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
+import { isPlanLimitError, upgradeReasonFromError } from "@/lib/plans";
 
 type DiscoverContentPanelProps = {
   onSourceAdded?: (source: Source) => void;
@@ -33,6 +35,7 @@ function discoveryLabel(meta?: Record<string, unknown>): string {
 }
 
 export function DiscoverContentPanel({ onSourceAdded }: DiscoverContentPanelProps) {
+  const upgrade = useUpgradeOptional();
   const [articles, setArticles] = useState<DiscoveredArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
@@ -126,8 +129,13 @@ export function DiscoverContentPanel({ onSourceAdded }: DiscoverContentPanelProp
       });
       onSourceAdded?.(src);
       setDismissed((prev) => new Set(prev).add(article.id));
-    } catch {
-      setError("Could not add this source.");
+      void upgrade?.refreshBilling();
+    } catch (err) {
+      if (isPlanLimitError(err)) {
+        upgrade?.openUpgrade({ reason: upgradeReasonFromError(err) });
+      } else {
+        setError("Could not add this source.");
+      }
     } finally {
       setAddingFeed(null);
     }
