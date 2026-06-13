@@ -268,6 +268,8 @@ function DashboardContent() {
           <SourceDiscoveryWizard
             existingSources={billableSources}
             gmailConnected={me.gmail_connected}
+            youtubeConnected={me.youtube_connected}
+            redditConnected={me.reddit_connected}
             connectBanner={connectBanner}
             ingestionEmail={me.ingestion_email}
             onConfirmed={handleDiscoveryConfirmed}

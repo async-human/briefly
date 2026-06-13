@@ -25,21 +25,40 @@ const LAYER_ORDER = [
 type SourceDiscoveryWizardProps = {
   existingSources: Source[];
   gmailConnected: boolean;
+  youtubeConnected?: boolean;
+  redditConnected?: boolean;
   connectBanner?: string | null;
   ingestionEmail?: string;
   onConfirmed: (sources: Source[]) => void;
   onSourceAdded: (source: Source) => void;
 };
 
+function shouldAutoDiscover(
+  gmailConnected: boolean,
+  youtubeConnected: boolean,
+  redditConnected: boolean,
+  existingSources: Source[],
+): boolean {
+  return (
+    gmailConnected ||
+    youtubeConnected ||
+    redditConnected ||
+    existingSources.length > 0
+  );
+}
+
 export function SourceDiscoveryWizard({
   existingSources,
   gmailConnected,
+  youtubeConnected = false,
+  redditConnected = false,
   connectBanner,
   ingestionEmail,
   onConfirmed,
   onSourceAdded,
 }: SourceDiscoveryWizardProps) {
-  const [phase, setPhase] = useState<"scanning" | "review" | "confirming">("scanning");
+  const [phase, setPhase] = useState<"scanning" | "review" | "confirming">("review");
+  const [hasScanned, setHasScanned] = useState(false);
   const [candidates, setCandidates] = useState<DiscoveryCandidate[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [connectedAccounts, setConnectedAccounts] = useState<string[]>([]);
@@ -49,6 +68,7 @@ export function SourceDiscoveryWizard({
   const [gmailConsentOpen, setGmailConsentOpen] = useState(false);
   const [scanProgress, setScanProgress] = useState<DiscoveryProgress | null>(null);
   const prevGmailRef = useRef(gmailConnected);
+  const initialScanStarted = useRef(false);
 
   const pollDiscovery = useCallback(async () => {
     for (let i = 0; i < 180; i++) {
@@ -88,12 +108,17 @@ export function SourceDiscoveryWizard({
       setPhase("review");
     } finally {
       setScanProgress(null);
+      setHasScanned(true);
     }
   }, [pollDiscovery]);
 
   useEffect(() => {
-    void runDiscovery();
-  }, [runDiscovery]);
+    if (initialScanStarted.current) return;
+    initialScanStarted.current = true;
+    if (shouldAutoDiscover(gmailConnected, youtubeConnected, redditConnected, existingSources)) {
+      void runDiscovery();
+    }
+  }, [gmailConnected, youtubeConnected, redditConnected, existingSources, runDiscovery]);
 
   useEffect(() => {
     if (gmailConnected && !prevGmailRef.current) {
@@ -155,6 +180,8 @@ export function SourceDiscoveryWizard({
   const totalSelected = selected.size + existingSources.length;
   const canConfirm = selected.size > 0 || existingSources.length > 0;
   const reviewReady = phase !== "scanning";
+  const onReviewStep = hasScanned || existingSources.length > 0 || candidates.length > 0;
+  const showEmptyResults = hasScanned && candidates.length === 0 && !error;
 
   return (
     <div className="discovery-wizard-page">
@@ -177,7 +204,7 @@ export function SourceDiscoveryWizard({
             </li>
             <li
               className={
-                reviewReady
+                onReviewStep
                   ? "discovery-wizard-step discovery-wizard-step--active"
                   : "discovery-wizard-step"
               }
@@ -353,7 +380,7 @@ export function SourceDiscoveryWizard({
                 );
               })}
 
-              {candidates.length === 0 && !error && (
+              {showEmptyResults && (
                 <div className="discovery-empty-state">
                   <p className="discovery-empty-title">No sources found yet</p>
                   <p className="discovery-empty-desc">
@@ -365,9 +392,11 @@ export function SourceDiscoveryWizard({
               )}
 
               <section className="discovery-block discovery-block--manual">
-                <h2 className="discovery-block-title">Add manually</h2>
+                <h2 className="discovery-block-title">
+                  {hasScanned ? "Add manually" : "Or add a source by hand"}
+                </h2>
                 <p className="discovery-block-desc">
-                  Paste a URL, channel, subreddit, or email if we missed something.
+                  Paste a URL, YouTube channel, subreddit, or email address.
                 </p>
                 <AddSourceForm variant="inline" onAdded={onSourceAdded} />
               </section>
@@ -380,25 +409,24 @@ export function SourceDiscoveryWizard({
         {reviewReady && (
           <footer className="discovery-wizard-footer">
             <div className="discovery-wizard-footer-inner">
-              <div className="discovery-wizard-footer-meta">
-                <span className="discovery-wizard-count">
-                  {totalSelected} source{totalSelected === 1 ? "" : "s"} selected
-                </span>
-                {!canConfirm && (
-                  <span className="discovery-wizard-footer-hint">
-                    Connect Gmail or add a source to continue
-                  </span>
+              <button
+                type="button"
+                className="discovery-wizard-confirm"
+                disabled={!canConfirm || phase === "confirming"}
+                onClick={handleConfirm}
+              >
+                {phase === "confirming" ? "Setting up your briefing…" : "Generate my first brief"}
+              </button>
+              <p className="discovery-wizard-footer-status">
+                {canConfirm ? (
+                  <>
+                    <strong>{totalSelected}</strong> source{totalSelected === 1 ? "" : "s"} ready
+                  </>
+                ) : (
+                  "Connect Gmail or add a source to continue"
                 )}
-              </div>
-              <div className="discovery-wizard-footer-actions">
-                <button
-                  type="button"
-                  className="discovery-wizard-confirm"
-                  disabled={!canConfirm || phase === "confirming"}
-                  onClick={handleConfirm}
-                >
-                  {phase === "confirming" ? "Setting up your briefing…" : "Generate my first brief"}
-                </button>
+              </p>
+              {hasScanned && (
                 <div className="discovery-wizard-secondary">
                   <button
                     type="button"
@@ -423,7 +451,7 @@ export function SourceDiscoveryWizard({
                     Full refresh
                   </button>
                 </div>
-              </div>
+              )}
             </div>
           </footer>
         )}

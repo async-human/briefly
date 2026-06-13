@@ -8541,7 +8541,7 @@ a.saved-capture-title:hover {
 .app-shell .dash-page-discovery {
   max-width: 42rem;
   padding-top: clamp(1.25rem, 3vw, 2rem);
-  padding-bottom: 7rem;
+  padding-bottom: clamp(2.5rem, 7vw, 4rem);
 }
 
 .app-shell .discovery-wizard-page {
@@ -8918,32 +8918,33 @@ a.saved-capture-title:hover {
 }
 
 .app-shell .discovery-wizard-footer {
-  position: fixed;
-  left: var(--app-sidebar-w);
-  right: 0;
-  bottom: 0;
-  z-index: 20;
-  padding: 0.85rem clamp(1.5rem, 4vw, 2.25rem);
-  background: oklch(99.5% 0.003 85 / 0.92);
-  backdrop-filter: blur(12px);
+  margin-top: 0.25rem;
+  padding-top: 1.5rem;
   border-top: 1px solid var(--app-border);
 }
 
 .app-shell .discovery-wizard-footer-inner {
-  max-width: 42rem;
-  margin: 0 auto;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem 1.25rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem;
+}
+
+.app-shell .discovery-wizard-footer-status {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--app-muted);
+  text-align: center;
+}
+
+.app-shell .discovery-wizard-footer-status strong {
+  color: var(--app-ink);
+  font-weight: 600;
 }
 
 .app-shell .discovery-wizard-footer-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  min-width: 0;
+  display: none;
 }
 
 .app-shell .discovery-wizard-count {
@@ -8958,14 +8959,12 @@ a.saved-capture-title:hover {
 }
 
 .app-shell .discovery-wizard-footer-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1rem;
+  display: none;
 }
 
 .app-shell .discovery-wizard-confirm {
-  padding: 0.65rem 1.25rem;
+  width: 100%;
+  padding: 0.75rem 1.25rem;
   border: none;
   border-radius: 999px;
   background: var(--app-ink);
@@ -8989,8 +8988,9 @@ a.saved-capture-title:hover {
 }
 
 .app-shell .discovery-wizard-secondary {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
 }
 
@@ -9064,12 +9064,6 @@ a.saved-capture-title:hover {
   cursor: pointer;
 }
 
-@media (max-width: 900px) {
-  .app-shell .discovery-wizard-footer {
-    left: 0;
-  }
-}
-
 @media (max-width: 640px) {
   .app-shell .discovery-integration {
     grid-template-columns: auto 1fr;
@@ -9078,25 +9072,6 @@ a.saved-capture-title:hover {
   .app-shell .discovery-integration-action {
     grid-column: 1 / -1;
     width: 100%;
-  }
-
-  .app-shell .discovery-wizard-footer-inner {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .app-shell .discovery-wizard-footer-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .app-shell .discovery-wizard-confirm {
-    width: 100%;
-    text-align: center;
-  }
-
-  .app-shell .discovery-wizard-secondary {
-    justify-content: center;
   }
 
   .app-shell .source-form--inline .source-form-primary {
