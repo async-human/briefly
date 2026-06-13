@@ -19,6 +19,7 @@ import { sourceDisplayName } from "./sourceLabels";
 import { SourceIcon } from "@/components/SourceIcon";
 import { OutcomeBriefHeader, SafeToIgnorePanel } from "./OutcomeBriefHeader";
 import { getDigestOutcome, splitTopPriorityItems } from "@/lib/digestOutcome";
+import { formatHeroHeadline, formatHeroWhy, formatPreviewHeadline } from "@/lib/formatHeadline";
 import { graphItemUrl } from "@/lib/graphLinks";
 import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { askAboutContent } from "@/lib/askLinks";
@@ -455,6 +456,8 @@ function BriefingHeroItem({
 }) {
   const router = useRouter();
   const youtubeBadge = getYouTubeBadge(item);
+  const headline = formatHeroHeadline(item.headline);
+  const why = item.why_it_matters ? formatHeroWhy(item.why_it_matters) : null;
 
   return (
     <article className="briefing-hero-item">
@@ -465,9 +468,14 @@ function BriefingHeroItem({
           <span className="briefing-hero-source">{item.source_name}</span>
         )}
       </div>
-      <h3 className="briefing-hero-headline">{item.headline}</h3>
-      {item.why_it_matters && (
-        <p className="briefing-hero-why">{item.why_it_matters}</p>
+      <h3
+        className="briefing-hero-headline"
+        title={headline.truncated ? headline.full : undefined}
+      >
+        {headline.display}
+      </h3>
+      {why && (
+        <p className="briefing-hero-why">{why}</p>
       )}
       {item.confidence_signal && (
         <p className="briefing-hero-confidence">◈ {item.confidence_signal}</p>
@@ -518,12 +526,12 @@ function BriefingPreviewItem({
   digestId?: string;
 }) {
   const router = useRouter();
-  // Truncate why_it_matters to a single compact line
   const why = item.why_it_matters
     ? item.why_it_matters.length > 100
       ? item.why_it_matters.slice(0, 97).trimEnd() + "…"
       : item.why_it_matters
     : null;
+  const previewHeadline = formatPreviewHeadline(item.headline);
 
   const hasMemory = Boolean(item.memory_reference || item.memory_connections?.length);
   const youtubeBadge = getYouTubeBadge(item);
@@ -554,7 +562,12 @@ function BriefingPreviewItem({
             </button>
           ) : null}
         </div>
-        <h3 className="briefing-preview-headline">{item.headline}</h3>
+        <h3
+          className="briefing-preview-headline"
+          title={previewHeadline !== item.headline ? item.headline : undefined}
+        >
+          {previewHeadline}
+        </h3>
         {why && <p className="briefing-preview-why">{why}</p>}
         {item.contradiction_flag && item.contradiction_explanation && (
           <p className="briefing-preview-contradiction">⚠ {item.contradiction_explanation}</p>

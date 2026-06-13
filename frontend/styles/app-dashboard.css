@@ -691,6 +691,10 @@
   font-weight: 600;
   letter-spacing: -0.015em;
   line-height: 1.35;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .app-shell .briefing-preview-why {
@@ -6711,10 +6715,18 @@ a.saved-capture-title:hover {
 
 .app-shell .briefing-hero-item {
   margin: 0 0 1.25rem;
-  padding: 1.25rem 1.35rem;
-  border: 1px solid oklch(52% 0.14 278 / 0.2);
+  padding: 1.25rem 1.35rem 1.15rem;
+  border: 1px solid oklch(52% 0.14 278 / 0.18);
   border-radius: var(--app-radius);
-  background: linear-gradient(145deg, oklch(99% 0.01 278), var(--app-surface));
+  background: linear-gradient(155deg, oklch(99.2% 0.008 278) 0%, var(--app-surface) 55%);
+  box-shadow: 0 1px 0 oklch(100% 0 0 / 0.6) inset;
+}
+
+.app-shell .briefing-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.55rem;
 }
 
 .app-shell .briefing-hero-badge {
@@ -6725,21 +6737,44 @@ a.saved-capture-title:hover {
   color: var(--app-accent);
 }
 
+.app-shell .briefing-hero-source {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--app-muted);
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-border) 45%, transparent);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .app-shell .briefing-hero-headline {
-  margin: 0.5rem 0 0.75rem;
+  margin: 0.65rem 0 0.55rem;
   font-family: var(--font-serif), serif;
-  font-size: 1.35rem;
+  font-size: clamp(1.0625rem, 2.2vw, 1.25rem);
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.38;
+  letter-spacing: -0.02em;
   color: var(--app-ink);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 
 .app-shell .briefing-hero-why {
   margin: 0;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   line-height: 1.55;
   color: var(--app-ink-2);
   font-style: italic;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .app-shell .briefing-hero-confidence {
