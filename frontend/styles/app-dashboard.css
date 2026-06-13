@@ -7469,25 +7469,93 @@ a.saved-capture-title:hover {
   display: grid;
   place-items: center;
   padding: 1.25rem;
-  background: rgba(18, 16, 14, 0.52);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  background: rgba(12, 10, 8, 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  /* Self-contained light theme — modal portals to body outside .app-shell */
+  --pm-bg: #faf9f6;
+  --pm-surface: #ffffff;
+  --pm-ink: #1c1814;
+  --pm-ink-2: #5c5650;
+  --pm-muted: #8c8680;
+  --pm-border: rgba(28, 24, 18, 0.1);
+  --pm-border-strong: rgba(28, 24, 18, 0.16);
+  --pm-accent: #9e7b3f;
+  --pm-accent-soft: rgba(158, 123, 63, 0.1);
+  --pm-radius: 16px;
+  --pm-radius-sm: 10px;
 }
 
 .privacy-modal {
-  width: min(100%, 32rem);
-  max-height: min(90vh, 40rem);
+  width: min(100%, 28rem);
+  max-height: min(92vh, 44rem);
   overflow-y: auto;
-  padding: 1.35rem 1.5rem 1.25rem;
-  border-radius: var(--app-radius, 14px);
-  border: 1px solid var(--app-border, var(--border, rgba(28, 24, 18, 0.12)));
-  background: var(--app-surface, var(--bg-elevated, #ffffff));
-  color: var(--app-ink, var(--text, #1c1814));
+  padding: 1.5rem 1.5rem 1.35rem;
+  border-radius: var(--pm-radius);
+  border: 1px solid var(--pm-border);
+  background: var(--pm-surface);
+  color: var(--pm-ink);
   box-shadow:
-    0 24px 48px rgba(18, 16, 14, 0.18),
-    0 0 0 1px rgba(28, 24, 18, 0.04);
+    0 32px 64px rgba(12, 10, 8, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.6) inset;
   position: relative;
   z-index: 1;
+}
+
+.privacy-modal-gmail {
+  width: min(100%, 30rem);
+  padding: 1.65rem 1.65rem 1.45rem;
+}
+
+.privacy-modal-close {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--pm-muted);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.privacy-modal-close:hover {
+  background: var(--pm-accent-soft);
+  color: var(--pm-ink);
+}
+
+.privacy-modal-gmail-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+  padding-right: 1.75rem;
+}
+
+.privacy-modal-gmail-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 12px;
+  background: var(--pm-accent-soft);
+  color: var(--pm-accent);
+}
+
+.privacy-modal-eyebrow {
+  margin: 0 0 0.2rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pm-accent);
 }
 
 .privacy-modal-sm {
@@ -7495,17 +7563,25 @@ a.saved-capture-title:hover {
 }
 
 .privacy-modal-title {
-  margin: 0 0 0.65rem;
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--app-ink, var(--text, #1c1814));
+  margin: 0;
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--pm-ink);
+  letter-spacing: -0.01em;
 }
 
 .privacy-modal-lead {
-  margin: 0 0 0.85rem;
+  margin: 0 0 1rem;
   font-size: 0.875rem;
-  line-height: 1.55;
-  color: var(--app-ink-2, var(--text-secondary, #6e6860));
+  line-height: 1.6;
+  color: var(--pm-ink-2);
+}
+
+.privacy-modal-lead strong {
+  color: var(--pm-ink);
+  font-weight: 600;
 }
 
 .privacy-modal-list {
@@ -7513,29 +7589,120 @@ a.saved-capture-title:hover {
   padding-left: 1.15rem;
   font-size: 0.8125rem;
   line-height: 1.55;
-  color: var(--app-ink-2, var(--text-secondary, #6e6860));
+  color: var(--pm-ink-2);
 }
 
 .privacy-modal-list li + li {
   margin-top: 0.45rem;
 }
 
+.privacy-modal-points {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.privacy-modal-point {
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--pm-radius-sm);
+  background: var(--pm-bg);
+  border: 1px solid var(--pm-border);
+}
+
+.privacy-modal-point-check {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.1rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #3d7a5c;
+  background: rgba(106, 171, 138, 0.14);
+}
+
+.privacy-modal-point-body {
+  min-width: 0;
+}
+
+.privacy-modal-point-body p {
+  margin: 0.2rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--pm-ink-2);
+}
+
+.privacy-modal-point-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.privacy-modal-point-head strong {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--pm-ink);
+}
+
+.privacy-modal-point-tag {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  color: var(--pm-muted);
+  background: rgba(28, 24, 18, 0.05);
+}
+
+.privacy-modal-alt-box {
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 0.85rem;
+  border-radius: var(--pm-radius-sm);
+  border: 1px dashed var(--pm-border-strong);
+  background: var(--pm-bg);
+}
+
 .privacy-modal-alt,
 .privacy-modal-foot {
-  margin: 0 0 0.75rem;
+  margin: 0;
   font-size: 0.75rem;
-  line-height: 1.5;
-  color: var(--app-muted, var(--text-muted, #a8a098));
+  line-height: 1.55;
+  color: var(--pm-muted);
+}
+
+.privacy-modal-foot {
+  margin-bottom: 1.15rem;
 }
 
 .privacy-modal-code {
+  font-family: var(--font-mono, monospace);
   font-size: 0.6875rem;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-  background: var(--app-paper-2, var(--surface, #f4f2ed));
+  padding: 0.15rem 0.4rem;
+  border-radius: 5px;
+  background: rgba(28, 24, 18, 0.06);
+  color: var(--pm-ink);
+  word-break: break-all;
 }
 
-.privacy-modal-link,
+.privacy-modal-link {
+  color: var(--pm-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.privacy-modal-link:hover {
+  text-decoration: underline;
+}
+
 .settings-connections-link,
 .data-controls-link {
   color: var(--app-accent, var(--accent, #9e7b3f));
@@ -7543,7 +7710,6 @@ a.saved-capture-title:hover {
   font-weight: 600;
 }
 
-.privacy-modal-link:hover,
 .settings-connections-link:hover,
 .data-controls-link:hover {
   text-decoration: underline;
@@ -7553,36 +7719,52 @@ a.saved-capture-title:hover {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
-  margin-top: 1rem;
+  margin-top: 0.25rem;
+}
+
+.privacy-modal-actions-stack {
+  flex-direction: column-reverse;
+  align-items: stretch;
 }
 
 .privacy-modal-btn {
-  padding: 0.5rem 0.9rem;
-  border-radius: var(--app-radius-sm, 9px);
-  font-size: 0.8125rem;
+  padding: 0.7rem 1rem;
+  border-radius: var(--pm-radius-sm);
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
+  transition: opacity 0.15s, transform 0.15s, background 0.15s;
 }
 
 .privacy-modal-btn-ghost {
   background: transparent;
-  border-color: var(--app-border, var(--border, rgba(28, 24, 18, 0.12)));
-  color: var(--app-ink-2, var(--text-secondary, #6e6860));
+  border-color: var(--pm-border-strong);
+  color: var(--pm-ink-2);
+}
+
+.privacy-modal-btn-ghost:hover:not(:disabled) {
+  background: var(--pm-bg);
+  color: var(--pm-ink);
 }
 
 .privacy-modal-btn-primary {
-  background: var(--app-ink, var(--text, #1c1814));
-  color: var(--app-surface, #ffffff);
+  background: var(--pm-ink);
+  color: #ffffff;
+  border-color: var(--pm-ink);
+}
+
+.privacy-modal-btn-primary:hover:not(:disabled) {
+  opacity: 0.92;
 }
 
 .privacy-modal-btn-danger {
   background: oklch(52% 0.16 25);
-  color: white;
+  color: #ffffff;
 }
 
 .privacy-modal-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
