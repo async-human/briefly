@@ -19,6 +19,12 @@ export function UpgradeModal({ open, reason, billing, onClose, onUpgraded }: Pro
   const copy = UPGRADE_COPY[reason];
 
   useEffect(() => {
+    if (open && billing?.is_pro) {
+      onUpgraded?.();
+    }
+  }, [open, billing?.is_pro, onUpgraded]);
+
+  useEffect(() => {
     if (!open) return;
     setError("");
     setBusy(null);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, type DiscoveredArticle, type Source } from "@/lib/api";
+import { api, type DiscoveredArticle, type Source } from "@/lib/api";
 import { SourceIcon } from "@/components/SourceIcon";
 import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
 import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
