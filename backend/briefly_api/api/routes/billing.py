@@ -16,12 +16,18 @@ from briefly_api.api.plan_limits import (
     count_billable_sources,
     has_pro_access,
 )
-from briefly_api.api.schemas import BillingStatusOut, CheckoutIn, CheckoutOut
+from briefly_api.api.schemas import (
+    BillingStatusOut,
+    CancelSubscriptionIn,
+    CancelSubscriptionOut,
+    CheckoutIn,
+    CheckoutOut,
+)
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
-from briefly_api.db.models import User
-from briefly_api.services import dodo_payments
+from briefly_api.db.models import BillingEvent, User
+from briefly_api.services import billing_emails, dodo_payments
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +66,8 @@ async def _upgrade_user_to_pro(
     customer_id: str | None = None,
     subscription_id: str | None = None,
 ) -> None:
-    if user.plan == "pro":
+    was_pro = user.plan == "pro"
+    if was_pro:
         if customer_id:
             user.ls_customer_id = customer_id
         if subscription_id:
@@ -81,7 +88,21 @@ async def _upgrade_user_to_pro(
     if not user.subscribed_at:
         user.subscribed_at = datetime.now(timezone.utc)
 
+    db.add(
+        BillingEvent(
+            user_id=user.id,
+            event_type="upgrade",
+            meta={"is_founding_member": is_founding},
+        )
+    )
     await db.commit()
+
+    await billing_emails.send_pro_welcome_email(
+        user.email,
+        user.name,
+        is_founding_member=is_founding,
+        settings=settings,
+    )
 
     if is_founding:
         logger.info(
@@ -137,6 +158,7 @@ async def billing_status(
         is_founding_member=bool(user.is_founding_member),
         is_pro=has_pro_access(user),
         subscribed_at=user.subscribed_at,
+        can_cancel=user.plan == "pro" and bool((user.ls_subscription_id or "").strip()),
         usage=usage,
     )
 
@@ -169,6 +191,75 @@ async def create_checkout(
             detail="Could not start checkout. Try again in a moment.",
         ) from exc
     return CheckoutOut(**result)
+
+
+@router.post("/cancel", response_model=CancelSubscriptionOut)
+async def cancel_subscription(
+    body: CancelSubscriptionIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> CancelSubscriptionOut:
+    if user.plan != "pro":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You don't have an active Pro subscription.",
+        )
+
+    sub_id = (user.ls_subscription_id or "").strip()
+    if not sub_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No subscription on file. Contact support@sendbriefly.app for help.",
+        )
+
+    try:
+        result = await dodo_payments.cancel_subscription(
+            settings,
+            sub_id,
+            feedback=body.reason,
+            comment=body.comment,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Dodo cancel failed for user %s", user.id)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not cancel subscription. Try again or contact support.",
+        ) from exc
+
+    ends_immediately = bool(result.get("ends_immediately"))
+    db.add(
+        BillingEvent(
+            user_id=user.id,
+            event_type="cancel",
+            reason=body.reason,
+            comment=(body.comment or "").strip() or None,
+            meta={"ends_immediately": ends_immediately, "subscription_id": sub_id},
+        )
+    )
+    await db.commit()
+
+    if ends_immediately:
+        await _downgrade_user_to_free(user, db)
+
+    await billing_emails.send_cancellation_email(
+        user.email,
+        user.name,
+        ends_immediately=ends_immediately,
+        settings=settings,
+    )
+
+    if ends_immediately:
+        message = "Your Pro subscription has been cancelled. You're back on the Free plan."
+    else:
+        message = (
+            "Cancellation scheduled. You'll keep Pro until the end of your billing period, "
+            "then return to the Free plan."
+        )
+
+    return CancelSubscriptionOut(ends_immediately=ends_immediately, message=message)
 
 
 @router.post("/dodo/webhook", status_code=status.HTTP_200_OK)

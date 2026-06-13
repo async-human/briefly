@@ -1730,6 +1730,26 @@
   color: var(--app-muted);
 }
 
+.settings-billing-pro-actions {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.settings-billing-cancel {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.settings-billing-cancel:hover {
+  color: #9a4040;
+}
+
 .settings-billing-badge-free {
   color: var(--app-ink-2);
   background: color-mix(in srgb, var(--app-ink) 8%, transparent);
@@ -2161,6 +2181,171 @@
 
 .upgrade-modal-link {
   color: var(--pm-accent);
+}
+
+/* Cancel subscription modal */
+.cancel-sub-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(12, 10, 8, 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  --pm-bg: #faf9f6;
+  --pm-surface: #ffffff;
+  --pm-ink: #1c1814;
+  --pm-ink-2: #5c5650;
+  --pm-muted: #8c8680;
+  --pm-border: rgba(28, 24, 18, 0.1);
+  --pm-radius: 16px;
+  --pm-radius-sm: 10px;
+}
+
+.cancel-sub-modal {
+  position: relative;
+  width: min(100%, 26rem);
+  max-height: min(92vh, 40rem);
+  overflow-y: auto;
+  padding: 1.65rem 1.65rem 1.35rem;
+  border-radius: var(--pm-radius);
+  border: 1px solid var(--pm-border);
+  background: var(--pm-surface);
+  color: var(--pm-ink);
+  box-shadow: 0 32px 64px rgba(12, 10, 8, 0.2);
+}
+
+.cancel-sub-close {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--pm-muted);
+  font-size: 1.35rem;
+  cursor: pointer;
+}
+
+.cancel-sub-eyebrow {
+  margin: 0 0 0.2rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9a4040;
+}
+
+.cancel-sub-title {
+  margin: 0 0 0.5rem;
+  padding-right: 1.75rem;
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.cancel-sub-lead {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--pm-ink-2);
+}
+
+.cancel-sub-reasons {
+  margin: 0 0 1rem;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cancel-sub-reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--pm-radius-sm);
+  border: 1px solid var(--pm-border);
+  background: var(--pm-bg);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--pm-ink-2);
+  cursor: pointer;
+}
+
+.cancel-sub-reason:has(input:checked) {
+  border-color: color-mix(in srgb, #9a4040 35%, var(--pm-border));
+  background: color-mix(in srgb, #9a4040 6%, var(--pm-bg));
+  color: var(--pm-ink);
+}
+
+.cancel-sub-comment-label {
+  display: block;
+  margin-bottom: 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--pm-ink);
+}
+
+.cancel-sub-comment {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--pm-radius-sm);
+  border: 1px solid var(--pm-border);
+  font: inherit;
+  font-size: 0.8125rem;
+  resize: vertical;
+  min-height: 4.5rem;
+}
+
+.cancel-sub-actions {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.cancel-sub-keep {
+  flex: 1;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--pm-border);
+  background: transparent;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.cancel-sub-confirm {
+  flex: 1;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  border: none;
+  background: #7a3535;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cancel-sub-confirm:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cancel-sub-foot {
+  margin: 0.85rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--pm-muted);
+  text-align: center;
 }
 
 /* Free tier banner */

@@ -43,7 +43,28 @@ class BillingStatusOut(BaseModel):
     is_founding_member: bool
     is_pro: bool
     subscribed_at: datetime | None = None
+    can_cancel: bool = False
     usage: PlanUsageOut = Field(default_factory=PlanUsageOut)
+
+
+class CancelSubscriptionIn(BaseModel):
+    reason: Literal[
+        "too_expensive",
+        "missing_features",
+        "switched_service",
+        "unused",
+        "customer_service",
+        "low_quality",
+        "too_complex",
+        "other",
+    ]
+    comment: str | None = Field(default=None, max_length=2000)
+
+
+class CancelSubscriptionOut(BaseModel):
+    ok: bool = True
+    ends_immediately: bool = False
+    message: str
 
 
 class ProfileOut(BaseModel):

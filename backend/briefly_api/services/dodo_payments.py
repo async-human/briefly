@@ -89,6 +89,64 @@ async def create_checkout_session(
     }
 
 
+# Dodo CancellationFeedback enum values
+CANCELLATION_FEEDBACK_VALUES = frozenset({
+    "too_expensive",
+    "missing_features",
+    "switched_service",
+    "unused",
+    "customer_service",
+    "low_quality",
+    "too_complex",
+    "other",
+})
+
+
+async def cancel_subscription(
+    settings: Settings,
+    subscription_id: str,
+    *,
+    feedback: str | None = None,
+    comment: str | None = None,
+    immediate: bool = False,
+) -> dict[str, Any]:
+    if not settings.dodo_payments_api_key.strip():
+        raise ValueError("Dodo Payments is not configured.")
+
+    payload: dict[str, Any] = {"cancel_reason": "cancelled_by_customer"}
+    if feedback and feedback in CANCELLATION_FEEDBACK_VALUES:
+        payload["cancellation_feedback"] = feedback
+    if comment and comment.strip():
+        payload["cancellation_comment"] = comment.strip()[:2000]
+
+    if immediate or settings.dodo_payments_env == "test_mode":
+        payload["status"] = "cancelled"
+    else:
+        payload["cancel_at_next_billing_date"] = True
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.patch(
+            f"{dodo_api_base(settings)}/subscriptions/{subscription_id}",
+            headers={
+                "Authorization": f"Bearer {settings.dodo_payments_api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        )
+        if resp.status_code >= 400:
+            log.warning(
+                "Dodo cancel failed (%s) sub=%s: %s",
+                resp.status_code,
+                subscription_id,
+                resp.text[:500],
+            )
+            resp.raise_for_status()
+        data = resp.json()
+
+    ends_immediately = bool(immediate or settings.dodo_payments_env == "test_mode")
+    return {"subscription": data, "ends_immediately": ends_immediately}
+
+
 def verify_webhook_signature(
     settings: Settings,
     body: bytes,

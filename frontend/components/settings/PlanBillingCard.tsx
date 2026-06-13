@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type BillingStatus } from "@/lib/api";
 import { PlanComparison, PlanUsageBar } from "@/components/billing/PlanComparison";
+import { CancelSubscriptionModal } from "@/components/billing/CancelSubscriptionModal";
 import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
 import { FREE_DIGEST_ITEMS, FREE_HISTORY_DAYS } from "@/lib/plans";
+import type { CancellationReason } from "@/lib/cancellationReasons";
 
 type Props = {
   onUpgraded?: () => void;
@@ -18,6 +20,8 @@ export function PlanBillingCard({ onUpgraded }: Props) {
   );
   const [loading, setLoading] = useState(!upgradeCtx?.billing);
   const [busy, setBusy] = useState<"monthly" | "yearly" | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -75,6 +79,25 @@ export function PlanBillingCard({ onUpgraded }: Props) {
     }
   }
 
+  async function handleCancelConfirm(payload: { reason: CancellationReason; comment: string }) {
+    setCancelling(true);
+    setError("");
+    try {
+      const result = await api.cancelSubscription({
+        reason: payload.reason,
+        comment: payload.comment || undefined,
+      });
+      setCancelOpen(false);
+      setMessage(result.message);
+      await refresh();
+      void upgradeCtx?.refreshBilling();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not cancel subscription");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   if (loading) {
     return <p className="settings-billing-loading">Loading plan…</p>;
   }
@@ -104,6 +127,17 @@ export function PlanBillingCard({ onUpgraded }: Props) {
             <p className="settings-billing-meta">
               {usage.sources_used} connection{usage.sources_used === 1 ? "" : "s"} active
             </p>
+          )}
+          {status?.can_cancel && (
+            <div className="settings-billing-pro-actions">
+              <button
+                type="button"
+                className="settings-billing-cancel"
+                onClick={() => setCancelOpen(true)}
+              >
+                Cancel subscription
+              </button>
+            </div>
           )}
         </div>
       ) : (
@@ -162,6 +196,13 @@ export function PlanBillingCard({ onUpgraded }: Props) {
           </p>
         </div>
       )}
+
+      <CancelSubscriptionModal
+        open={cancelOpen}
+        busy={cancelling}
+        onClose={() => !cancelling && setCancelOpen(false)}
+        onConfirm={(payload) => void handleCancelConfirm(payload)}
+      />
     </div>
   );
 }

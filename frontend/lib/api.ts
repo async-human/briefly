@@ -145,6 +145,7 @@ export type BillingStatus = {
   is_founding_member: boolean;
   is_pro: boolean;
   subscribed_at: string | null;
+  can_cancel: boolean;
   usage: PlanUsage;
 };
 
@@ -856,6 +857,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ plan }),
     }),
+  cancelSubscription: (payload: { reason: string; comment?: string }) =>
+    request<{ ok: boolean; ends_immediately: boolean; message: string }>(
+      "/api/v1/billing/cancel",
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
   getLatestDigest: () => request<Digest | null>("/api/v1/digests/latest"),
   getTodayDigest: () => request<Digest | null>("/api/v1/digests/today"),
   getDigests: () => request<DigestSummary[]>("/api/v1/digests"),
