@@ -1731,23 +1731,49 @@
 }
 
 .settings-billing-pro-actions {
-  margin-top: 1rem;
-  padding-top: 1rem;
+  margin-top: 1.25rem;
+  padding-top: 1.15rem;
   border-top: 1px solid var(--app-border);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
 }
 
-.settings-billing-cancel {
-  border: none;
-  background: none;
-  padding: 0;
-  font-size: 0.8125rem;
+.settings-billing-manage-label {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--app-muted);
-  text-decoration: underline;
-  cursor: pointer;
 }
 
-.settings-billing-cancel:hover {
+.settings-billing-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 1.25rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #9a4040 28%, var(--app-border));
+  background: color-mix(in srgb, #9a4040 6%, var(--app-surface));
+  color: #7a3535;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.settings-billing-cancel-btn:hover {
+  background: color-mix(in srgb, #9a4040 12%, var(--app-surface));
+  border-color: color-mix(in srgb, #9a4040 45%, var(--app-border));
   color: #9a4040;
+}
+
+.settings-billing-cancel-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, #9a4040 40%, transparent);
+  outline-offset: 2px;
 }
 
 .settings-billing-badge-free {

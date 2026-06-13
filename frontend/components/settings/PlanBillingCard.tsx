@@ -130,9 +130,10 @@ export function PlanBillingCard({ onUpgraded }: Props) {
           )}
           {status?.can_cancel && (
             <div className="settings-billing-pro-actions">
+              <p className="settings-billing-manage-label">Manage subscription</p>
               <button
                 type="button"
-                className="settings-billing-cancel"
+                className="settings-billing-cancel-btn"
                 onClick={() => setCancelOpen(true)}
               >
                 Cancel subscription
