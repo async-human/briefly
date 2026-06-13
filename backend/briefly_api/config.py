@@ -244,12 +244,25 @@ class Settings(BaseSettings):
     # ── Writer model tiering ──────────────────────────────────────────────────
     pro_writer_model: str = "gpt-4o"
 
-    # ── Lemon Squeezy ─────────────────────────────────────────────────────────
+    # ── Lemon Squeezy (legacy) ────────────────────────────────────────────────
     lemon_squeezy_webhook_secret: str = ""
-    # Variant IDs — set these after creating products in Lemon Squeezy dashboard
-    ls_founding_variant_id: str = ""   # "Founding Pro" variant ($9/mo)
-    ls_pro_variant_id: str = ""        # "Pro" variant (future price)
+    ls_founding_variant_id: str = ""
+    ls_pro_variant_id: str = ""
     founding_member_cap: int = 200
+
+    # ── Dodo Payments ─────────────────────────────────────────────────────────
+    dodo_payments_api_key: str = ""
+    dodo_payments_webhook_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "dodo_payments_webhook_key",
+            "dodo_webhook_secret",
+            "DODO_WEBHOOK_SECRET",
+        ),
+    )
+    dodo_payments_env: Literal["test_mode", "live_mode"] = "test_mode"
+    dodo_pro_monthly_product_id: str = ""
+    dodo_pro_yearly_product_id: str = ""
 
     # ── Audio (TTS) ───────────────────────────────────────────────────────────
     audio_enabled: bool = False

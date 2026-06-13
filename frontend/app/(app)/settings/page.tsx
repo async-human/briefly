@@ -7,6 +7,7 @@ import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccountConnections } from "@/components/settings/AccountConnections";
 import { DataControls } from "@/components/settings/DataControls";
+import { PlanBillingCard } from "@/components/settings/PlanBillingCard";
 import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton";
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
@@ -270,6 +271,29 @@ export default function SettingsPage() {
         ) : (
           <PageContentTransition>
           <div className="dash-page-stack">
+            {/* ── Plan & billing ── */}
+            <div className="dash-surface dash-surface-settings dash-surface-billing">
+              <div className="dash-surface-head">
+                <h2 className="dash-surface-title">Plan & billing</h2>
+                <p className="dash-surface-desc">
+                  Manage your Briefly Pro subscription.
+                </p>
+              </div>
+              <div className="dash-surface-body dash-surface-body-form">
+                <PlanBillingCard
+                  onUpgraded={() => {
+                    void api.getMe().then((meData) => {
+                      setMe({
+                        name: meData.user.name,
+                        avatar_url: meData.user.avatar_url,
+                        ingestion_email: meData.ingestion_email,
+                      });
+                    });
+                  }}
+                />
+              </div>
+            </div>
+
             {/* ── Data & privacy ── */}
             <div className="dash-surface dash-surface-settings dash-surface-privacy">
               <div className="dash-surface-head">

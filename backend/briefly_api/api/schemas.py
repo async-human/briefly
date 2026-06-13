@@ -13,9 +13,27 @@ class UserOut(BaseModel):
     avatar_url: str | None
     email_token: str
     is_verified: bool
+    plan: str = "free"
+    is_founding_member: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CheckoutIn(BaseModel):
+    plan: Literal["monthly", "yearly"] = "monthly"
+
+
+class CheckoutOut(BaseModel):
+    checkout_url: str
+    session_id: str = ""
+
+
+class BillingStatusOut(BaseModel):
+    plan: str
+    is_founding_member: bool
+    is_pro: bool
+    subscribed_at: datetime | None = None
 
 
 class ProfileOut(BaseModel):

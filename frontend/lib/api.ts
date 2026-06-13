@@ -126,7 +126,16 @@ export type User = {
   avatar_url: string | null;
   email_token: string;
   is_verified: boolean;
+  plan?: string;
+  is_founding_member?: boolean;
   created_at: string;
+};
+
+export type BillingStatus = {
+  plan: string;
+  is_founding_member: boolean;
+  is_pro: boolean;
+  subscribed_at: string | null;
 };
 
 export type BriefStyle = "analyst" | "scan" | "plain";
@@ -830,6 +839,13 @@ export type KnowledgeGraphResponse = {
 
 export const api = {
   getMe: () => request<MeResponse>("/api/v1/me"),
+
+  getBillingStatus: () => request<BillingStatus>("/api/v1/billing/status"),
+  createCheckout: (plan: "monthly" | "yearly" = "monthly") =>
+    request<{ checkout_url: string; session_id: string }>("/api/v1/billing/checkout", {
+      method: "POST",
+      body: JSON.stringify({ plan }),
+    }),
   getLatestDigest: () => request<Digest | null>("/api/v1/digests/latest"),
   getTodayDigest: () => request<Digest | null>("/api/v1/digests/today"),
   getDigests: () => request<DigestSummary[]>("/api/v1/digests"),

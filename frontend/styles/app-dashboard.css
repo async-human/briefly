@@ -1522,6 +1522,91 @@
   color: #9a4040;
 }
 
+.settings-billing-loading {
+  font-size: 0.875rem;
+  color: var(--app-muted);
+  margin: 0;
+}
+
+.settings-billing-banner {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--app-radius-sm);
+  margin: 0 0 1rem;
+  background: color-mix(in srgb, #6aab8a 12%, var(--app-canvas));
+  border: 1px solid color-mix(in srgb, #6aab8a 28%, var(--app-border));
+  color: #3d7a5c;
+}
+
+.settings-billing-error {
+  font-size: 0.8125rem;
+  color: #9a4040;
+  margin: 0 0 1rem;
+}
+
+.settings-billing-desc {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--app-ink-2);
+}
+
+.settings-billing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  margin-bottom: 0.75rem;
+}
+
+.settings-billing-btn {
+  font-size: 0.8125rem;
+}
+
+.settings-billing-btn-secondary {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-ink);
+  cursor: pointer;
+}
+
+.settings-billing-btn-secondary:hover:not(:disabled) {
+  border-color: var(--app-border-strong);
+}
+
+.settings-billing-footnote {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--app-muted);
+}
+
+.settings-billing-pro-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.settings-billing-badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  color: var(--app-accent);
+  background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--app-accent) 25%, transparent);
+}
+
+.settings-billing-founding {
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+}
+
 .connection-toast {
   position: fixed;
   bottom: 1.75rem;
