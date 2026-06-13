@@ -88,7 +88,7 @@ const TOPIC_SUGGESTIONS: Record<string, string[]> = {
 };
 const DEFAULT_TOPICS = ["AI agents", "startups", "technology", "design", "science"];
 
-type SourceKey = "gmail" | "youtube" | "reddit" | "url" | "hn";
+type SourceKey = "gmail" | "youtube" | "reddit" | "calendar" | "url" | "hn";
 
 function BackIcon() {
   return (
@@ -208,6 +208,20 @@ function RedditIcon() {
   );
 }
 
+function CalendarIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden>
+      <rect x="3" y="4" width="18" height="17" rx="2.5" fill="#fff" stroke="#4285F4" strokeWidth="1.2" />
+      <path d="M3 9h18" stroke="#4285F4" strokeWidth="1.2" />
+      <path d="M8 3v3M16 3v3" stroke="#4285F4" strokeWidth="1.2" strokeLinecap="round" />
+      <rect x="7" y="12" width="3.5" height="3.5" rx="0.5" fill="#4285F4" />
+      <rect x="13.5" y="12" width="3.5" height="3.5" rx="0.5" fill="#34A853" />
+      <rect x="7" y="16.5" width="3.5" height="3.5" rx="0.5" fill="#FBBC04" />
+      <rect x="13.5" y="16.5" width="3.5" height="3.5" rx="0.5" fill="#EA4335" />
+    </svg>
+  );
+}
+
 function CheckIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
@@ -232,6 +246,7 @@ export default function OnboardingPage() {
   const [gmailConsentOpen, setGmailConsentOpen] = useState(false);
   const [youtubeLoading, setYoutubeLoading] = useState(false);
   const [redditLoading, setRedditLoading] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState("");
   const [banner, setBanner] = useState("");
@@ -287,7 +302,8 @@ export default function OnboardingPage() {
     const gmail = searchParams.get("gmail");
     const youtube = searchParams.get("youtube");
     const reddit = searchParams.get("reddit");
-    const oauthReturn = gmail || youtube || reddit;
+    const calendar = searchParams.get("calendar");
+    const oauthReturn = gmail || youtube || reddit || calendar;
 
     if (oauthReturn) goToStep(3);
 
@@ -318,6 +334,15 @@ export default function OnboardingPage() {
       setError("Reddit access was denied. Please try again.");
     } else if (reddit === "error") {
       setError("Reddit connection failed. Please try again.");
+    }
+
+    if (calendar === "connected") {
+      setBanner("Google Calendar connected — meeting-aware briefings enabled.");
+      api.getOnboardingStatus().then(setStatus);
+    } else if (calendar === "denied") {
+      setError("Calendar access was denied. Please try again.");
+    } else if (calendar === "error") {
+      setError("Calendar connection failed. Please try again.");
     }
   }, [searchParams]);
 
@@ -394,6 +419,27 @@ export default function OnboardingPage() {
       setError(err instanceof Error ? err.message : "Could not disconnect Reddit");
     }
   }
+  async function handleConnectCalendar() {
+    setCalendarLoading(true);
+    setError("");
+    try {
+      const { url } = await api.startCalendarConnect("/onboarding");
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start Calendar connection");
+      setCalendarLoading(false);
+    }
+  }
+  async function handleDisconnectCalendar() {
+    setError("");
+    try {
+      await api.disconnectCalendar();
+      setStatus(await api.getOnboardingStatus());
+      setBanner("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not disconnect Calendar");
+    }
+  }
 
   async function handleSaveProfile() {
     setSaving(true);
@@ -468,6 +514,11 @@ export default function OnboardingPage() {
     if (key === "reddit") {
       if (status?.reddit_connected) setSourceDetail(sourceDetail === "reddit" ? null : "reddit");
       else handleConnectReddit();
+      return;
+    }
+    if (key === "calendar") {
+      if (status?.calendar_connected) setSourceDetail(sourceDetail === "calendar" ? null : "calendar");
+      else handleConnectCalendar();
       return;
     }
     if (key === "hn") {
@@ -696,7 +747,7 @@ export default function OnboardingPage() {
               <header className="onboard-panel-head">
                 <h1 className="onboard-title">What do you read?</h1>
                 <p className="onboard-desc">
-                  No connections needed yet — tap a source to link it. Briefly pulls from what you already follow.
+                  Connect what you read — and optionally link Google Calendar for meeting-aware briefings.
                 </p>
                 <p className="onboard-editable-note">
                   You can add or remove sources later in <Link href="/settings">Settings</Link>.
@@ -705,12 +756,22 @@ export default function OnboardingPage() {
 
               {banner && <div className="onboard-banner onboard-banner-success">{banner}</div>}
 
-              {(status?.sources_count ?? 0) > 0 && (
-                <p className="onboard-source-count-pill">
-                  {status?.sources_count} source{(status?.sources_count ?? 0) === 1 ? "" : "s"} connected
-                </p>
-              )}
+              {(status?.sources_count ?? 0) > 0 || status?.calendar_connected ? (
+                <div className="onboard-source-status-row">
+                  {(status?.sources_count ?? 0) > 0 && (
+                    <p className="onboard-source-count-pill">
+                      {status?.sources_count} source{(status?.sources_count ?? 0) === 1 ? "" : "s"} connected
+                    </p>
+                  )}
+                  {status?.calendar_connected && (
+                    <p className="onboard-source-count-pill onboard-source-count-pill--calendar">
+                      Calendar linked
+                    </p>
+                  )}
+                </div>
+              ) : null}
 
+              <p className="onboard-source-section-label">What you read</p>
               <div className="onboard-source-grid">
                 <button
                   type="button"
@@ -775,6 +836,23 @@ export default function OnboardingPage() {
                 </button>
               </div>
 
+              <p className="onboard-source-section-label">Optional</p>
+              <div className="onboard-source-grid onboard-source-grid--optional">
+                <button
+                  type="button"
+                  className={`onboard-source-tile ${status?.calendar_connected ? "connected" : ""}`}
+                  onClick={() => handleSourceTileClick("calendar")}
+                  disabled={calendarLoading}
+                >
+                  {status?.calendar_connected && <span className="onboard-source-tile-check">✓</span>}
+                  <span className="onboard-source-tile-tag">Meetings</span>
+                  <span className="onboard-source-tile-icon">
+                    <CalendarIcon />
+                  </span>
+                  <span className="onboard-source-tile-label">Google Calendar</span>
+                </button>
+              </div>
+
               {sourceDetail === "gmail" && status?.gmail_connected && (
                 <div className="onboard-source-detail">
                   <div className="onboard-source-detail-head">
@@ -836,6 +914,26 @@ export default function OnboardingPage() {
                 </div>
               )}
 
+              {sourceDetail === "calendar" && status?.calendar_connected && (
+                <div className="onboard-source-detail">
+                  <div className="onboard-source-detail-head">
+                    <div>
+                      <p className="onboard-source-detail-title">Google Calendar connected</p>
+                      <p className="onboard-source-detail-sub">
+                        {status.calendar_email ? `${status.calendar_email} · ` : ""}
+                        Read-only — Briefly surfaces relevant stories before your meetings.
+                      </p>
+                    </div>
+                    <CheckIcon />
+                  </div>
+                  <div className="onboard-source-detail-actions">
+                    <button type="button" className="onboard-disconnect-btn" onClick={handleDisconnectCalendar}>
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {sourceDetail === "url" && (
                 <div className="onboard-source-detail onboard-source-url-panel">
                   <p className="onboard-source-detail-title">Add any URL</p>
@@ -885,7 +983,8 @@ export default function OnboardingPage() {
                 ytCount > 0 && { n: ytCount, label: "YouTube channels" },
                 redditCount > 0 && { n: redditCount, label: "subreddits" },
                 rssCount > 0 && { n: rssCount, label: "RSS feeds" },
-              ].filter(Boolean) as { n: number; label: string }[];
+                status?.calendar_connected && { n: null, label: "Calendar linked" },
+              ].filter(Boolean) as { n: number | null; label: string }[];
 
               return (
                 <section className="onboard-panel onboard-confirm">
@@ -902,7 +1001,13 @@ export default function OnboardingPage() {
                     <div className="onboard-ready-stats">
                       {stats.map(({ n, label }) => (
                         <span key={label} className="onboard-ready-stat">
-                          <strong>{n}</strong> {label}
+                          {n != null ? (
+                            <>
+                              <strong>{n}</strong> {label}
+                            </>
+                          ) : (
+                            label
+                          )}
                         </span>
                       ))}
                     </div>
