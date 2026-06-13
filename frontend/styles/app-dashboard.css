@@ -1073,6 +1073,129 @@
   color: var(--app-linear);
 }
 
+/* Connection slot meter + billable source list */
+.source-slot-meter {
+  margin-bottom: 1rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in srgb, var(--app-ink) 4%, var(--app-canvas));
+  border: 1px solid var(--app-border);
+}
+
+.source-slot-meter.is-at-limit {
+  background: color-mix(in srgb, #c47070 6%, var(--app-canvas));
+  border-color: color-mix(in srgb, #c47070 20%, var(--app-border));
+}
+
+.source-slot-meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.source-slot-meter-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+.source-slot-meter-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--app-ink);
+  white-space: nowrap;
+}
+
+.source-slot-meter-bar {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-ink) 8%, transparent);
+  overflow: hidden;
+}
+
+.source-slot-meter-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--app-accent);
+  transition: width 0.25s ease;
+}
+
+.source-slot-meter.is-at-limit .source-slot-meter-fill {
+  background: #b85c5c;
+}
+
+.source-slot-meter-hint,
+.source-slot-meter-note {
+  margin: 0.55rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--app-ink-2);
+}
+
+.source-slot-meter-note {
+  margin-top: 0.35rem;
+  color: var(--app-muted);
+}
+
+.source-slot-meter-upgrade {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: inherit;
+  color: var(--app-accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.source-connections-empty {
+  margin: 0.5rem 0 1rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--app-radius-sm);
+  border: 1px dashed var(--app-border);
+  background: color-mix(in srgb, var(--app-ink) 2%, transparent);
+}
+
+.source-connections-empty-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.source-connections-empty-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--app-ink-2);
+}
+
+.app-shell .dash-surface-sources .source-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.app-shell .dash-surface-sources .source-type-badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+.source-form-label {
+  margin: 0 0 0.65rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
 .app-shell .dash-surface-sources .source-add-divider {
   margin: 0.75rem 0;
   border-top-color: var(--app-border);

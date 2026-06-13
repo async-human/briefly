@@ -6,8 +6,12 @@ export const SOURCE_TYPE_LABELS: Record<string, string> = {
   reddit_account: "Reddit",
   email: "Email",
   url: "Web",
-  gmail: "Gmail",
+  readwise: "Readwise",
 };
+
+export function sourceTypeLabel(sourceType: string): string {
+  return SOURCE_TYPE_LABELS[sourceType] ?? sourceType;
+}
 
 export function sourceDisplayName(source: { name: string | null; identifier: string }) {
   return source.name ?? source.identifier;

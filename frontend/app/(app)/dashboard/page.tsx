@@ -24,7 +24,7 @@ import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { DashboardInsightsDrawer } from "@/components/dashboard/DashboardInsightsDrawer";
 import { ProactiveAlertsBanner } from "@/components/dashboard/ProactiveAlertsBanner";
 import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
-import { countBillableSources, sourceSlotUsage } from "@/lib/plans";
+import { filterBillableSources, sourceSlotUsage } from "@/lib/plans";
 import type { ProfileIntelligence } from "@/lib/api";
 
 const FETCHABLE_SOURCE_TYPES = new Set([
@@ -223,15 +223,16 @@ function DashboardContent() {
   }
 
   const fetchableSources = sources.filter((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
-  const sidebarSources = fetchableSources;
-  const billableSourceCount = countBillableSources(sources);
+  const billableSources = filterBillableSources(sources);
+  const billableSourceCount = billableSources.length;
   const sourceSlots = sourceSlotUsage(upgrade?.billing, billableSourceCount);
-  const sourcesDesc =
-    fetchableSources.length > 0
-      ? sourceSlots.isPro
-        ? `${fetchableSources.length} connected`
-        : `${fetchableSources.length} connected · ${sourceSlots.used}/${sourceSlots.limit} slots`
-      : "Connect your feeds";
+  const sourcesDesc = sourceSlots.isPro
+    ? billableSourceCount === 0
+      ? "Add feeds to your brief"
+      : `${billableSourceCount} connection${billableSourceCount === 1 ? "" : "s"}`
+    : billableSourceCount === 0
+      ? "Up to 3 connections on Free"
+      : `${sourceSlots.used} of ${sourceSlots.limit} connections used`;
   const outcome = getDigestOutcome(digest);
   const greeting = me?.user.name?.split(" ")[0] ?? "there";
   const today = new Date().toLocaleDateString("en-US", {
@@ -263,7 +264,7 @@ function DashboardContent() {
   if (showDiscovery) {
     return (
       <SourceDiscoveryWizard
-        existingSources={fetchableSources}
+        existingSources={billableSources}
         gmailConnected={me.gmail_connected}
         connectBanner={connectBanner}
         ingestionEmail={me.ingestion_email}
@@ -281,7 +282,7 @@ function DashboardContent() {
         dateLabel={today}
         itemCount={digest?.total_items_shown ?? null}
         savedMinutes={outcome?.saved_minutes ?? null}
-        sourceCount={fetchableSources.length}
+        sourceCount={billableSourceCount}
         streak={me.reading_streak ?? 0}
         digestId={digest?.id ?? null}
         generating={generating}
@@ -319,15 +320,14 @@ function DashboardContent() {
         <aside className="dash-surface dash-surface-sources" aria-labelledby="sources-surface-title">
           <div className="dash-surface-head dash-surface-head-rail">
             <h2 id="sources-surface-title" className="dash-surface-title">
-              Sources
+              Connections
             </h2>
             <p className="dash-surface-desc">{sourcesDesc}</p>
           </div>
           <div className="dash-surface-body dash-surface-body-sources">
             <SourcesSidebar
               ingestionEmail={me.ingestion_email}
-              sources={sidebarSources}
-              sourceSlotCount={billableSourceCount}
+              sources={sources}
               gmailConnected={me.gmail_connected}
               autoSuggestions={me.auto_suggestions ?? []}
               onSourceAdded={handleSourceAdded}

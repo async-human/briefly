@@ -101,19 +101,7 @@ export function AddSourceForm({
 
   return (
     <form className="source-form" onSubmit={handleSubmit}>
-      {atSourceLimit && (
-        <div className="source-form-limit" role="status">
-          Free plan limit reached ({slots.used}/{slots.limit} sources).{" "}
-          <button
-            type="button"
-            className="source-form-limit-link"
-            onClick={() => upgrade?.openUpgrade({ reason: "sources_limit" })}
-          >
-            Upgrade to Pro
-          </button>{" "}
-          to add more.
-        </div>
-      )}
+      <p className="source-form-label">Add a connection</p>
 
       <label className="field-label">
         Paste anything
@@ -168,7 +156,7 @@ export function AddSourceForm({
         className="btn-primary source-submit"
         disabled={loading || !identifier.trim() || atSourceLimit}
       >
-        {atSourceLimit ? "Upgrade to add sources" : loading ? "Adding…" : "Add source"}
+        {atSourceLimit ? "Upgrade to add more" : loading ? "Adding…" : "Add connection"}
       </button>
       {error && <p className="form-error">{error}</p>}
     </form>

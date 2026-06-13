@@ -12,12 +12,18 @@ import {
   sectionBadgeClass,
 } from "@/lib/digestSections";
 import { AddSourceForm, CopyEmailButton } from "./AddSourceForm";
+import { SourceSlotMeter } from "./SourceSlotMeter";
 import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
-import { isPlanLimitError, upgradeReasonFromError } from "@/lib/plans";
+import {
+  filterBillableSources,
+  isPlanLimitError,
+  sourceSlotUsage,
+  upgradeReasonFromError,
+} from "@/lib/plans";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { GmailDiscovery } from "./GmailDiscovery";
 import { IngestionPanel } from "./IngestionPanel";
-import { sourceDisplayName } from "./sourceLabels";
+import { sourceDisplayName, sourceTypeLabel } from "./sourceLabels";
 import { SourceIcon } from "@/components/SourceIcon";
 import { OutcomeBriefHeader, SafeToIgnorePanel } from "./OutcomeBriefHeader";
 import { getDigestOutcome, splitTopPriorityItems } from "@/lib/digestOutcome";
@@ -34,8 +40,8 @@ const PREVIEW_LIMIT = 5;
 
 type SourcesSidebarProps = {
   ingestionEmail: string;
+  /** All source rows from the API — internal types are filtered for display. */
   sources: Source[];
-  sourceSlotCount?: number;
   gmailConnected: boolean;
   autoSuggestions?: AutoSuggestion[];
   onSourceAdded: (source: Source) => void;
@@ -48,7 +54,6 @@ type SourcesSidebarProps = {
 export function SourcesSidebar({
   ingestionEmail,
   sources,
-  sourceSlotCount,
   gmailConnected,
   autoSuggestions = [],
   onSourceAdded,
@@ -106,21 +111,39 @@ export function SourcesSidebar({
     }
   }
 
-  const emailSources = sources.filter((s) => s.source_type === "email");
+  const billableSources = filterBillableSources(sources);
+  const emailSources = billableSources.filter((s) => s.source_type === "email");
   const SOURCE_PREVIEW = 8;
-  const visibleSources = showAllSources ? sources : sources.slice(0, SOURCE_PREVIEW);
-  const hiddenCount = sources.length - SOURCE_PREVIEW;
+  const visibleSources = showAllSources ? billableSources : billableSources.slice(0, SOURCE_PREVIEW);
+  const hiddenCount = billableSources.length - SOURCE_PREVIEW;
+  const slots = sourceSlotUsage(upgrade?.billing, billableSources.length);
 
   return (
     <aside className="dash-sidebar dash-sidebar-embedded">
       <div className="dash-card dash-card-embedded">
-        {sources.length > 0 && (
+        <SourceSlotMeter
+          used={billableSources.length}
+          limit={slots.limit}
+          isPro={slots.isPro}
+          onUpgrade={() => upgrade?.openUpgrade({ reason: "sources_limit" })}
+        />
+
+        {billableSources.length > 0 && (
           <p className="dash-sidebar-hint">
-            Star any source to prioritise it in your briefings.
+            Star a connection to prioritise it in your briefings. Remove any connection to free a
+            slot.
           </p>
         )}
 
-        {sources.length > 0 && (
+        {billableSources.length === 0 ? (
+          <div className="source-connections-empty">
+            <p className="source-connections-empty-title">No connections yet</p>
+            <p className="source-connections-empty-hint">
+              Add an RSS feed, YouTube channel, newsletter, or subreddit below. Each one counts
+              toward your plan limit.
+            </p>
+          </div>
+        ) : (
           <>
             <ul className="source-list source-list-connected source-list-compact">
               {visibleSources.map((source) => {
@@ -140,6 +163,7 @@ export function SourcesSidebar({
                   </span>
                   <div className="source-info">
                     <span className="source-name">{sourceDisplayName(source)}</span>
+                    <span className="source-type-badge">{sourceTypeLabel(source.source_type)}</span>
                   </div>
                   <button
                     type="button"
@@ -208,18 +232,14 @@ export function SourcesSidebar({
                 className="source-list-expand"
                 onClick={() => setShowAllSources(true)}
               >
-                Show all {sources.length} sources
+                Show all {billableSources.length} connections
               </button>
             )}
             <div className="source-add-divider" />
           </>
         )}
 
-        {/* Add source form — below the list, not above it */}
-        <AddSourceForm
-          sourceCount={sourceSlotCount ?? sources.length}
-          onAdded={onSourceAdded}
-        />
+        <AddSourceForm sourceCount={billableSources.length} onAdded={onSourceAdded} />
 
         <p className="dash-sidebar-footnote">
           Interests & delivery in{" "}
@@ -237,7 +257,7 @@ export function SourcesSidebar({
 
       {/* ── Inline source recommendations — 3 max, reason visible, no collapse ── */}
       <InlineSourceRecommendations
-        existingSources={sources}
+        existingSources={billableSources}
         autoSuggestions={autoSuggestions}
         onAdded={onSourceAdded}
       />
@@ -282,11 +302,11 @@ export function SourcesSidebar({
         )}
       </CollapsibleCard>
 
-      {(gmailConnected || !sources.some((s) => s.source_type === "readwise")) && (
+      {(gmailConnected || !billableSources.some((s) => s.source_type === "readwise")) && (
         <CollapsibleCard label="Optional" title="More integrations">
           {gmailConnected && <GmailDiscovery onAdded={onSourceAdded} compact />}
           <ReadwiseCard
-            sources={sources}
+            sources={billableSources}
             onAdded={onSourceAdded}
             onRemoved={(id) => onSourcesRemoved([id])}
             compact

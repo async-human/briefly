@@ -15,8 +15,8 @@ export function FreeTierBanner() {
         <p className="free-tier-banner-text">
           <strong>Free plan limit reached</strong>
           {" — "}
-          you&apos;ve used all {billing.usage.sources_limit} source slots. Upgrade to Pro for
-          unlimited sources, brain dump, and full briefings.
+          you&apos;ve used all {billing.usage.sources_limit} connections. Remove one above or
+          upgrade to Pro for unlimited connections, brain dump, and full briefings.
         </p>
         <div className="free-tier-banner-actions">
           <button

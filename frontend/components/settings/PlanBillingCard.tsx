@@ -102,7 +102,7 @@ export function PlanBillingCard({ onUpgraded }: Props) {
           </p>
           {usage && usage.sources_used > 0 && (
             <p className="settings-billing-meta">
-              {usage.sources_used} source{usage.sources_used === 1 ? "" : "s"} connected
+              {usage.sources_used} connection{usage.sources_used === 1 ? "" : "s"} active
             </p>
           )}
         </div>
@@ -117,20 +117,20 @@ export function PlanBillingCard({ onUpgraded }: Props) {
             <PlanUsageBar
               used={usage.sources_used}
               limit={usage.sources_limit}
-              label="Source connections"
+              label="Connections"
             />
           )}
 
           {usage?.free_limits_reached && (
             <div className="settings-billing-limit-alert" role="alert">
               <strong>Free tier limit reached.</strong> You&apos;ve used all{" "}
-              {usage.sources_limit} source slots. Upgrade to Pro to add more sources and unlock
-              brain dump, full briefings, and Ask Briefly.
+              {usage.sources_limit} connections. Remove one on the dashboard or upgrade to Pro
+              for unlimited connections, brain dump, and full briefings.
             </div>
           )}
 
           <p className="settings-billing-free-summary">
-            Your free plan includes {usage?.sources_limit ?? 3} sources, {FREE_DIGEST_ITEMS}{" "}
+            Your free plan includes {usage?.sources_limit ?? 3} connections, {FREE_DIGEST_ITEMS}{" "}
             items per briefing, and {FREE_HISTORY_DAYS}-day history.
           </p>
 

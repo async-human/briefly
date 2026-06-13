@@ -8,7 +8,11 @@ export const FREE_DIGEST_ITEMS = 5;
 export const INTERNAL_SOURCE_TYPES = new Set(["brain_dump", "browser_capture"]);
 
 export function countBillableSources(sources: { source_type: string }[]): number {
-  return sources.filter((s) => !INTERNAL_SOURCE_TYPES.has(s.source_type)).length;
+  return filterBillableSources(sources).length;
+}
+
+export function filterBillableSources<T extends { source_type: string }>(sources: T[]): T[] {
+  return sources.filter((s) => !INTERNAL_SOURCE_TYPES.has(s.source_type));
 }
 
 export type UpgradeReason =

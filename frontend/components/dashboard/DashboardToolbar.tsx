@@ -45,7 +45,7 @@ export function DashboardToolbar({
           ? [{ value: `~${savedMinutes}m`, label: "Saved" }]
           : []),
         ...(sourceCount > 0
-          ? [{ value: sourceCount, label: "Sources" }]
+          ? [{ value: sourceCount, label: "Connections" }]
           : []),
         ...(streak > 0
           ? [{ value: streak, label: "Day streak", accent: true }]
