@@ -44,6 +44,12 @@ async def delete_account(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Confirmation email does not match your account.",
         )
-    await delete_user_account(db, user, settings)
+    try:
+        await delete_user_account(db, user, settings)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

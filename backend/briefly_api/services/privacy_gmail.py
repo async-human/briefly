@@ -19,8 +19,9 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from briefly_api.auth.gmail import get_gmail_connection
 from briefly_api.config import Settings
-from briefly_api.db.models import OAuthConnection, RawContent, Source, User, UserProfile
+from briefly_api.db.models import BillingEvent, OAuthConnection, RawContent, Source, User, UserProfile
 from briefly_api.security.oauth_tokens import oauth_refresh_token
+from briefly_api.services import dodo_payments
 
 log = logging.getLogger(__name__)
 
@@ -181,6 +182,38 @@ async def delete_user_account(
     settings: Settings,
 ) -> None:
     """Hard-delete user and cascade all personal data. Revokes OAuth tokens first."""
+    sub_id = (user.ls_subscription_id or "").strip()
+    if sub_id and settings.dodo_payments_api_key.strip():
+        try:
+            await dodo_payments.cancel_subscription_for_account_deletion(settings, sub_id)
+            db.add(
+                BillingEvent(
+                    user_id=user.id,
+                    event_type="cancel",
+                    reason="account_deleted",
+                    comment="Subscription cancelled because account was deleted",
+                    meta={"subscription_id": sub_id},
+                )
+            )
+            await db.flush()
+            log.info("Cancelled Dodo subscription %s for deleted user %s", sub_id, user.email)
+        except Exception as exc:
+            log.exception(
+                "Failed to cancel Dodo subscription %s for user %s",
+                sub_id,
+                user.email,
+            )
+            raise ValueError(
+                "Could not cancel your Pro subscription. Please cancel it in Settings first, "
+                "or try again in a moment."
+            ) from exc
+    elif sub_id:
+        log.warning(
+            "User %s has subscription %s but Dodo is not configured — skipping billing cancel",
+            user.email,
+            sub_id,
+        )
+
     connections = await db.execute(
         select(OAuthConnection).where(OAuthConnection.user_id == user.id)
     )

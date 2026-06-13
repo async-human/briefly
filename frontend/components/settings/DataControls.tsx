@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, type GmailAccessLogEvent } from "@/lib/api";
+import { clearToken } from "@/lib/auth";
 
 const ACTION_LABELS: Record<string, string> = {
   connect: "Connected",
@@ -58,6 +59,7 @@ export function DataControls({ ingestionEmail }: { ingestionEmail?: string }) {
     setError("");
     try {
       await api.deleteAccount(deleteEmail.trim());
+      clearToken();
       window.location.href = "/login?deleted=1";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete account");
@@ -119,7 +121,8 @@ export function DataControls({ ingestionEmail }: { ingestionEmail?: string }) {
         <h3 className="data-controls-title">Delete account</h3>
         <p className="data-controls-desc">
           Permanently delete your Briefly account and all associated data — briefings, saved content,
-          brain dumps, connections, and OAuth tokens. This cannot be undone.
+          brain dumps, connections, and OAuth tokens. If you have Pro, your subscription will be
+          cancelled immediately so you are not charged again. This cannot be undone.
         </p>
         {!showDeleteConfirm ? (
           <button

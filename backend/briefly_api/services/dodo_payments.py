@@ -133,6 +133,9 @@ async def cancel_subscription(
             },
             json=payload,
         )
+        if resp.status_code == 404:
+            log.info("Dodo subscription %s not found (already cancelled)", subscription_id)
+            return {"subscription": {}, "ends_immediately": True}
         if resp.status_code >= 400:
             log.warning(
                 "Dodo cancel failed (%s) sub=%s: %s",
@@ -145,6 +148,20 @@ async def cancel_subscription(
 
     ends_immediately = bool(immediate or settings.dodo_payments_env == "test_mode")
     return {"subscription": data, "ends_immediately": ends_immediately}
+
+
+async def cancel_subscription_for_account_deletion(
+    settings: Settings,
+    subscription_id: str,
+) -> None:
+    """Immediately cancel a Dodo subscription when the user deletes their account."""
+    await cancel_subscription(
+        settings,
+        subscription_id,
+        feedback="other",
+        comment="Briefly account deleted",
+        immediate=True,
+    )
 
 
 def verify_webhook_signature(
