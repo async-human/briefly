@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { BrieflyLogo } from "@/components/BrieflyLogo";
+import { SidebarPlanBadge } from "@/components/billing/SidebarPlanBadge";
 import { clearToken } from "@/lib/auth";
 import { useBriefingGeneration } from "./BriefingGenerationProvider";
 
@@ -175,6 +176,7 @@ export function AppSidebar({ userName, avatarUrl, open, onClose }: AppSidebarPro
         </nav>
 
         <div className="app-sidebar-foot">
+          <SidebarPlanBadge />
           {userName && (
             <div className="app-sidebar-user">
               {avatarUrl ? (

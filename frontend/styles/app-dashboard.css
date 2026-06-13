@@ -2376,7 +2376,8 @@
 
 /* Free tier banner */
 .free-tier-banner {
-  padding: 0.65rem 1rem;
+  position: relative;
+  padding: 0.65rem 2.5rem 0.65rem 1rem;
   background: color-mix(in srgb, #c47070 8%, var(--app-canvas));
   border-bottom: 1px solid color-mix(in srgb, #c47070 20%, var(--app-border));
 }
@@ -2417,6 +2418,108 @@
 }
 
 .free-tier-banner-link:hover {
+  text-decoration: underline;
+}
+
+.free-tier-banner-dismiss {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--app-radius-sm);
+  background: transparent;
+  color: #7a3535;
+  opacity: 0.65;
+  cursor: pointer;
+  transition: opacity var(--app-dur) var(--app-ease), background var(--app-dur) var(--app-ease);
+}
+
+.free-tier-banner-dismiss:hover {
+  opacity: 1;
+  background: color-mix(in srgb, #c47070 12%, transparent);
+}
+
+.free-tier-banner-dismiss:focus-visible {
+  outline: 2px solid color-mix(in srgb, #c47070 45%, transparent);
+  outline-offset: 2px;
+  opacity: 1;
+}
+
+/* Sidebar plan badge */
+.app-sidebar-plan {
+  margin-bottom: 0.75rem;
+  padding: 0.55rem 0.5rem;
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-muted);
+  border: 1px solid var(--app-border);
+}
+
+.app-sidebar-plan--loading {
+  opacity: 0.5;
+}
+
+.app-sidebar-plan-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.app-sidebar-plan-badge {
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+}
+
+.app-sidebar-plan-badge--pro {
+  color: var(--app-accent);
+  background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--app-accent) 25%, transparent);
+}
+
+.app-sidebar-plan-badge--free {
+  color: var(--app-ink-secondary);
+  background: color-mix(in srgb, var(--app-ink) 6%, transparent);
+  border: 1px solid var(--app-border);
+}
+
+.app-sidebar-plan-detail {
+  font-size: 0.6875rem;
+  color: var(--app-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-sidebar-plan-detail--limit {
+  color: #9a4040;
+  font-weight: 600;
+}
+
+.app-sidebar-plan-link {
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--app-accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.app-sidebar-plan-link:hover {
   text-decoration: underline;
 }
 
