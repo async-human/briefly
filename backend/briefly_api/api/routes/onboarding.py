@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from briefly_api.api.plan_limits import count_billable_sources
 from briefly_api.api.schemas import (
     GmailConnectOut,
     GmailStatusOut,
@@ -85,9 +86,7 @@ async def _build_onboarding_status(
     youtube = await get_youtube_connection(db, user.id)
     reddit = await get_reddit_connection(db, user.id)
     calendar = await get_calendar_connection(db, user.id)
-    sources_count = await db.scalar(
-        select(func.count()).select_from(Source).where(Source.user_id == user.id)
-    )
+    sources_count = await count_billable_sources(db, user.id)
     profile = user.profile
     return OnboardingStatusOut(
         onboarding_completed=bool(profile and profile.onboarding_completed),

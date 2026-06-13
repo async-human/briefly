@@ -20,7 +20,7 @@ import numpy as np
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from briefly_api.api.plan_limits import FREE_SOURCE_LIMIT, has_pro_access
+from briefly_api.api.plan_limits import FREE_SOURCE_LIMIT, billable_source_filter, has_pro_access
 from briefly_api.auth.gmail import get_gmail_connection, refresh_gmail_access_token, user_message_for_gmail_error
 from briefly_api.auth.reddit import get_reddit_connection, refresh_reddit_access_token
 from briefly_api.auth.youtube import get_youtube_connection, refresh_youtube_access_token
@@ -641,7 +641,9 @@ async def confirm_discoveries(
         return {"success": False, "error": "User not found", "added": []}
 
     count_result = await session.execute(
-        select(func.count()).select_from(Source).where(Source.user_id == user_id)
+        select(func.count())
+        .select_from(Source)
+        .where(Source.user_id == user_id, billable_source_filter())
     )
     current_count = count_result.scalar() or 0
     pro = has_pro_access(user)

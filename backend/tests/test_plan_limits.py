@@ -34,3 +34,11 @@ def test_pro_plan_always_allowed():
     with patch("briefly_api.api.plan_limits.get_settings") as gs:
         gs.return_value.pro_bypass_email_set = frozenset()
         assert has_pro_access(_user("anyone@example.com", plan="pro")) is True
+
+
+def test_internal_sources_excluded_from_billable_count():
+    from briefly_api.services.connectors.types import INTERNAL_SOURCE_TYPES
+
+    assert "brain_dump" in INTERNAL_SOURCE_TYPES
+    assert "browser_capture" in INTERNAL_SOURCE_TYPES
+    assert "rss" not in INTERNAL_SOURCE_TYPES

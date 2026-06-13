@@ -24,7 +24,7 @@ import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { DashboardInsightsDrawer } from "@/components/dashboard/DashboardInsightsDrawer";
 import { ProactiveAlertsBanner } from "@/components/dashboard/ProactiveAlertsBanner";
 import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
-import { sourceSlotUsage } from "@/lib/plans";
+import { countBillableSources, sourceSlotUsage } from "@/lib/plans";
 import type { ProfileIntelligence } from "@/lib/api";
 
 const FETCHABLE_SOURCE_TYPES = new Set([
@@ -224,7 +224,8 @@ function DashboardContent() {
 
   const fetchableSources = sources.filter((s) => FETCHABLE_SOURCE_TYPES.has(s.source_type));
   const sidebarSources = fetchableSources;
-  const sourceSlots = sourceSlotUsage(upgrade?.billing, sources.length);
+  const billableSourceCount = countBillableSources(sources);
+  const sourceSlots = sourceSlotUsage(upgrade?.billing, billableSourceCount);
   const sourcesDesc =
     fetchableSources.length > 0
       ? sourceSlots.isPro
@@ -326,7 +327,7 @@ function DashboardContent() {
             <SourcesSidebar
               ingestionEmail={me.ingestion_email}
               sources={sidebarSources}
-              sourceSlotCount={sources.length}
+              sourceSlotCount={billableSourceCount}
               gmailConnected={me.gmail_connected}
               autoSuggestions={me.auto_suggestions ?? []}
               onSourceAdded={handleSourceAdded}

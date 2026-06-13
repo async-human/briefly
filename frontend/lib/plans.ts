@@ -4,6 +4,13 @@ export const FREE_SOURCE_LIMIT = 3;
 export const FREE_HISTORY_DAYS = 7;
 export const FREE_DIGEST_ITEMS = 5;
 
+/** System placeholders — not user feeds; must not consume free source slots. */
+export const INTERNAL_SOURCE_TYPES = new Set(["brain_dump", "browser_capture"]);
+
+export function countBillableSources(sources: { source_type: string }[]): number {
+  return sources.filter((s) => !INTERNAL_SOURCE_TYPES.has(s.source_type)).length;
+}
+
 export type UpgradeReason =
   | "sources_limit"
   | "brain_dump"

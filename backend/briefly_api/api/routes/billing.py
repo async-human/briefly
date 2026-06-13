@@ -13,9 +13,9 @@ from briefly_api.api.plan_limits import (
     FREE_DIGEST_ITEMS,
     FREE_HISTORY_DAYS,
     FREE_SOURCE_LIMIT,
+    count_billable_sources,
     has_pro_access,
 )
-from briefly_api.db.models import Source
 from briefly_api.api.schemas import BillingStatusOut, CheckoutIn, CheckoutOut
 from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
@@ -103,10 +103,7 @@ async def _downgrade_user_to_free(user: User, db: AsyncSession) -> None:
 
 
 async def _plan_usage_for_user(db: AsyncSession, user: User) -> dict:
-    result = await db.execute(
-        select(func.count()).select_from(Source).where(Source.user_id == user.id)
-    )
-    sources_used = result.scalar() or 0
+    sources_used = await count_billable_sources(db, user.id)
     pro = has_pro_access(user)
     if pro:
         return {

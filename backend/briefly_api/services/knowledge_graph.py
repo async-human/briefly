@@ -28,7 +28,7 @@ from briefly_api.db.models import (
 )
 from briefly_api.services.profile_utils import cluster_label, iter_topic_clusters
 
-INTERNAL_SOURCE_TYPES = frozenset({"brain_dump", "browser_capture"})
+from briefly_api.services.connectors.types import INTERNAL_SOURCE_TYPES
 SIMILARITY_THRESHOLD = 0.72
 MAX_TOPICS = 12
 MAX_THREADS = 10

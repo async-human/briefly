@@ -8,10 +8,25 @@ from briefly_api.auth.deps import get_current_user
 from briefly_api.config import get_settings
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import Source, User
+from briefly_api.services.connectors.types import INTERNAL_SOURCE_TYPES
 
 FREE_SOURCE_LIMIT = 3
 FREE_HISTORY_DAYS = 7
 FREE_DIGEST_ITEMS = 5
+
+
+def billable_source_filter():
+    """SQLAlchemy filter: sources that count toward the free-plan slot limit."""
+    return Source.source_type.not_in(INTERNAL_SOURCE_TYPES)
+
+
+async def count_billable_sources(db: AsyncSession, user_id: str) -> int:
+    result = await db.execute(
+        select(func.count())
+        .select_from(Source)
+        .where(Source.user_id == user_id, billable_source_filter())
+    )
+    return result.scalar() or 0
 
 
 def has_pro_access(user: User) -> bool:
@@ -36,10 +51,7 @@ async def check_source_limit(
 ) -> User:
     if has_pro_access(user):
         return user
-    result = await db.execute(
-        select(func.count()).select_from(Source).where(Source.user_id == user.id)
-    )
-    count = result.scalar() or 0
+    count = await count_billable_sources(db, user.id)
     if count >= FREE_SOURCE_LIMIT:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
