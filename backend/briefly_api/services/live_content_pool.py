@@ -67,11 +67,17 @@ async def persist_live_raw_items(
         return
 
     persisted = 0
+    pending_keys: set[tuple[str, str]] = set()
     for item in live:
         item.meta["live_fetch"] = True
         if not item.source_id:
             log.debug("Skipping live persist — no source_id for %r", (item.title or "")[:60])
             continue
+
+        batch_key = (item.source_id, item.content_hash or "")
+        if batch_key in pending_keys:
+            continue
+        pending_keys.add(batch_key)
 
         existing = await _find_existing_row(session, item)
         if existing:

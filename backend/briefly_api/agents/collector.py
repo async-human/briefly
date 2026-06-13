@@ -5,7 +5,6 @@ SourceCollectorAgent: loads pre-ingested content pool, supplements with live fet
 """
 from __future__ import annotations
 
-import hashlib
 import logging
 import uuid
 from collections import defaultdict
@@ -14,7 +13,7 @@ from datetime import datetime, timezone
 from briefly_api.agents.context import PipelineContext, RawItem
 from briefly_api.config import get_settings
 from briefly_api.services.collector import collect_from_sources
-from briefly_api.services.content_ingestion import ingest_user_sources
+from briefly_api.services.content_ingestion import _content_hash, ingest_user_sources
 from briefly_api.services.content_pool import load_pool_as_raw_items
 
 log = logging.getLogger(__name__)
@@ -22,7 +21,7 @@ log = logging.getLogger(__name__)
 
 def _article_to_raw_item(article, source_rank: dict[str, int]) -> RawItem:
     text = article.clean_text or article.summary or article.title or ""
-    content_hash = hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
+    content_hash = _content_hash(text, article.url)
     sid = article.source_id or ""
     rank = source_rank[sid]
     source_rank[sid] += 1
@@ -78,7 +77,7 @@ async def _refresh_priority_source_items(
 
     for article in articles:
         text = article.clean_text or article.summary or article.title or ""
-        content_hash = hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
+        content_hash = _content_hash(text, article.url)
         if content_hash in existing_hashes:
             continue
         if content_hash in replaced_by_hash:
@@ -137,6 +136,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
                     session, ctx.user.user_id, sources, settings=s,
                 )
             except Exception as exc:
+                await session.rollback()
                 log.warning("Inline ingestion failed: %s", exc)
 
         if ctx.force_refresh or len(raw_items) < min_needed:
@@ -155,7 +155,7 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             source_rank: dict[str, int] = defaultdict(int)
             for article in articles:
                 text = article.clean_text or article.summary or article.title or ""
-                content_hash = hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
+                content_hash = _content_hash(text, article.url)
                 if content_hash in existing_ids:
                     continue
                 existing_ids.add(content_hash)

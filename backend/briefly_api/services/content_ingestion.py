@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 import numpy as np
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -78,8 +79,58 @@ def _passes_quality(article: NormalizedContent) -> bool:
     return bool(title and len(title) >= 12)
 
 
-def _content_hash(text: str) -> str:
+def _content_hash(text: str, url: str | None = None) -> str:
+    """Stable per-article hash; URL avoids Medium RSS snippet collisions."""
+    normalized_url = (url or "").strip().lower()
+    payload = f"{normalized_url}\n{text}" if normalized_url else text
+    return hashlib.sha256(payload.encode("utf-8", errors="replace")).hexdigest()
+
+
+def _legacy_content_hash(text: str) -> str:
+    """Pre-URL hash — used to match rows ingested before URL-aware hashing."""
     return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
+
+
+async def _find_existing_content(
+    session: AsyncSession,
+    *,
+    source_id: str,
+    content_hash: str,
+    url: str | None,
+    legacy_text: str,
+) -> RawContent | None:
+    stmt = (
+        select(RawContent)
+        .options(selectinload(RawContent.embedding))
+    )
+    if url:
+        by_url = await session.execute(
+            stmt.where(RawContent.source_id == source_id, RawContent.url == url)
+        )
+        row = by_url.scalar_one_or_none()
+        if row:
+            return row
+
+    by_hash = await session.execute(
+        stmt.where(
+            RawContent.source_id == source_id,
+            RawContent.content_hash == content_hash,
+        )
+    )
+    row = by_hash.scalar_one_or_none()
+    if row:
+        return row
+
+    legacy_hash = _legacy_content_hash(legacy_text)
+    if legacy_hash == content_hash:
+        return None
+    by_legacy = await session.execute(
+        stmt.where(
+            RawContent.source_id == source_id,
+            RawContent.content_hash == legacy_hash,
+        )
+    )
+    return by_legacy.scalar_one_or_none()
 
 
 def _keyword_set(profile: dict) -> set[str]:
@@ -195,6 +246,7 @@ async def ingest_user_sources(
     # Previously: 1 embed API call per article (N calls total).
     # Now: 1 batch call for all articles combined — 10-80x faster.
     valid: list[tuple] = []  # (article, text, content_hash, existing_row)
+    seen_batch: set[tuple[str, str]] = set()
     for article in articles:
         if not _passes_quality(article):
             summary.items_skipped_quality += 1
@@ -203,16 +255,18 @@ async def ingest_user_sources(
         if len(text) < MIN_CLEAN_TEXT and not article.title:
             summary.items_skipped_quality += 1
             continue
-        content_hash = _content_hash(text or article.title or "")
-        existing = await session.execute(
-            select(RawContent)
-            .options(selectinload(RawContent.embedding))
-            .where(
-                RawContent.source_id == article.source_id,
-                RawContent.content_hash == content_hash,
-            )
+        content_hash = _content_hash(text or article.title or "", article.url)
+        batch_key = (article.source_id or "", content_hash)
+        if batch_key in seen_batch:
+            continue
+        seen_batch.add(batch_key)
+        row = await _find_existing_content(
+            session,
+            source_id=article.source_id or "",
+            content_hash=content_hash,
+            url=article.url,
+            legacy_text=text or article.title or "",
         )
-        row = existing.scalar_one_or_none()
         valid.append((article, text, content_hash, row))
 
     # Single batch embedding call for all valid articles
@@ -224,65 +278,55 @@ async def ingest_user_sources(
         embeddings = [None] * len(valid)
 
     # ── Pass 2: upsert each article using pre-computed embeddings ─────────────
-    for (article, text, content_hash, row), item_embedding in zip(valid, embeddings):
-        relevance = 0.5
-        if item_embedding:
-            relevance = await _score_relevance(
-                title=article.title or "",
-                text=text,
-                profile=profile_dict,
-                profile_embedding=profile_embedding,
-                item_embedding=item_embedding,
-            )
-
-        if row:
-            row.title = article.title
-            row.url = article.url
-            row.author = article.author
-            row.published_at = article.published_at
-            row.clean_text = text
-            row.summary = article.summary or text[:400]
-            row.relevance_score = relevance
-            row.status = ContentStatus.pending
-            row.meta = {**(row.meta or {}), "ingested_via": "worker", **(article.meta or {})}
-            summary.items_updated += 1
-            content_id = row.id
-        else:
-            content_id = str(uuid.uuid4())
-            row = RawContent(
-                id=content_id,
-                source_id=article.source_id,
-                user_id=user_id,
-                status=ContentStatus.pending,
-                title=article.title,
-                url=article.url,
-                author=article.author,
-                published_at=article.published_at,
-                clean_text=text,
-                raw_text=text,
-                summary=article.summary or text[:400],
-                content_hash=content_hash,
-                relevance_score=relevance,
-                meta={"ingested_via": "worker", **(article.meta or {})},
-            )
-            session.add(row)
-            summary.items_new += 1
-
-        if item_embedding:
-            if row.embedding:
-                row.embedding.embedding = item_embedding
-            else:
-                session.add(
-                    ContentEmbedding(
-                        content_id=content_id,
-                        embedding=item_embedding,
-                        model=s.embedding_model,
-                    )
-                )
-
-        src_name = article.source_name or article.source_id
-        summary.by_source[src_name] = summary.by_source.get(src_name, 0) + 1
-        source_ok.add(article.source_id)
+    try:
+        await _apply_ingestion_upserts(
+            session,
+            user_id=user_id,
+            valid=valid,
+            embeddings=embeddings,
+            summary=summary,
+            profile_dict=profile_dict,
+            profile_embedding=profile_embedding,
+            settings=s,
+            source_ok=source_ok,
+        )
+    except IntegrityError as exc:
+        await session.rollback()
+        log.warning(
+            "Ingestion batch upsert conflict for user %s — retrying row-by-row: %s",
+            user_id,
+            exc.orig if hasattr(exc, "orig") else exc,
+        )
+        profile_row = await session.scalar(
+            select(UserProfile).where(UserProfile.user_id == user_id)
+        )
+        if not profile_row:
+            summary.errors.append("User profile not found after rollback")
+            return summary
+        profile = profile_row
+        profile_dict = {
+            "interests": profile.interests or [],
+            "topic_clusters": profile.topic_clusters or [],
+            "never_show": profile.never_show or [],
+        }
+        profile_embedding = (
+            list(profile.profile_embedding) if profile.profile_embedding is not None else None
+        )
+        source_ok = set()
+        summary.items_new = 0
+        summary.items_updated = 0
+        summary.by_source = {}
+        await _apply_ingestion_upserts_safe(
+            session,
+            user_id=user_id,
+            valid=valid,
+            embeddings=embeddings,
+            summary=summary,
+            profile_dict=profile_dict,
+            profile_embedding=profile_embedding,
+            settings=s,
+            source_ok=source_ok,
+        )
 
     now = datetime.now(timezone.utc)
     for src in sources:
@@ -323,6 +367,181 @@ async def ingest_user_sources(
         summary.items_skipped_quality, summary.duration_ms,
     )
     return summary
+
+
+async def _score_item_relevance(
+    *,
+    article: NormalizedContent,
+    text: str,
+    profile_dict: dict,
+    profile_embedding: list[float] | None,
+    item_embedding: list[float] | None,
+) -> float:
+    if not item_embedding:
+        return 0.5
+    return await _score_relevance(
+        title=article.title or "",
+        text=text,
+        profile=profile_dict,
+        profile_embedding=profile_embedding,
+        item_embedding=item_embedding,
+    )
+
+
+def _upsert_raw_content_row(
+    *,
+    session: AsyncSession,
+    user_id: str,
+    article: NormalizedContent,
+    text: str,
+    content_hash: str,
+    relevance: float,
+    row: RawContent | None,
+    settings: Settings,
+    item_embedding: list[float] | None,
+    summary: IngestionSummary,
+) -> RawContent:
+    if row:
+        row.title = article.title
+        row.url = article.url
+        row.author = article.author
+        row.published_at = article.published_at
+        row.clean_text = text
+        row.summary = article.summary or text[:400]
+        row.content_hash = content_hash
+        row.relevance_score = relevance
+        row.status = ContentStatus.pending
+        row.meta = {**(row.meta or {}), "ingested_via": "worker", **(article.meta or {})}
+        summary.items_updated += 1
+        content_id = row.id
+    else:
+        content_id = str(uuid.uuid4())
+        row = RawContent(
+            id=content_id,
+            source_id=article.source_id,
+            user_id=user_id,
+            status=ContentStatus.pending,
+            title=article.title,
+            url=article.url,
+            author=article.author,
+            published_at=article.published_at,
+            clean_text=text,
+            raw_text=text,
+            summary=article.summary or text[:400],
+            content_hash=content_hash,
+            relevance_score=relevance,
+            meta={"ingested_via": "worker", **(article.meta or {})},
+        )
+        session.add(row)
+        summary.items_new += 1
+
+    if item_embedding:
+        if row.embedding:
+            row.embedding.embedding = item_embedding
+        else:
+            session.add(
+                ContentEmbedding(
+                    content_id=content_id,
+                    embedding=item_embedding,
+                    model=settings.embedding_model,
+                )
+            )
+    return row
+
+
+async def _apply_ingestion_upserts(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    valid: list[tuple],
+    embeddings: list[list[float] | None],
+    summary: IngestionSummary,
+    profile_dict: dict,
+    profile_embedding: list[float] | None,
+    settings: Settings,
+    source_ok: set[str],
+) -> None:
+    for (article, text, content_hash, row), item_embedding in zip(valid, embeddings):
+        relevance = await _score_item_relevance(
+            article=article,
+            text=text,
+            profile_dict=profile_dict,
+            profile_embedding=profile_embedding,
+            item_embedding=item_embedding,
+        )
+        _upsert_raw_content_row(
+            session=session,
+            user_id=user_id,
+            article=article,
+            text=text,
+            content_hash=content_hash,
+            relevance=relevance,
+            row=row,
+            settings=settings,
+            item_embedding=item_embedding,
+            summary=summary,
+        )
+        src_name = article.source_name or article.source_id
+        summary.by_source[src_name] = summary.by_source.get(src_name, 0) + 1
+        if article.source_id:
+            source_ok.add(article.source_id)
+    await session.flush()
+
+
+async def _apply_ingestion_upserts_safe(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    valid: list[tuple],
+    embeddings: list[list[float] | None],
+    summary: IngestionSummary,
+    profile_dict: dict,
+    profile_embedding: list[float] | None,
+    settings: Settings,
+    source_ok: set[str],
+) -> None:
+    """Row-by-row upsert when a batch flush hits uq_content (race or legacy rows)."""
+    for (article, text, content_hash, _row), item_embedding in zip(valid, embeddings):
+        if not article.source_id:
+            continue
+        try:
+            row = await _find_existing_content(
+                session,
+                source_id=article.source_id,
+                content_hash=content_hash,
+                url=article.url,
+                legacy_text=text or article.title or "",
+            )
+            relevance = await _score_item_relevance(
+                article=article,
+                text=text,
+                profile_dict=profile_dict,
+                profile_embedding=profile_embedding,
+                item_embedding=item_embedding,
+            )
+            _upsert_raw_content_row(
+                session=session,
+                user_id=user_id,
+                article=article,
+                text=text,
+                content_hash=content_hash,
+                relevance=relevance,
+                row=row,
+                settings=settings,
+                item_embedding=item_embedding,
+                summary=summary,
+            )
+            await session.flush()
+            src_name = article.source_name or article.source_id
+            summary.by_source[src_name] = summary.by_source.get(src_name, 0) + 1
+            source_ok.add(article.source_id)
+        except IntegrityError:
+            await session.rollback()
+            log.debug(
+                "Skipping duplicate ingest for source=%s hash=%s",
+                article.source_id,
+                content_hash[:12],
+            )
 
 
 async def mark_contents_processed(session: AsyncSession, content_ids: list[str]) -> None:
