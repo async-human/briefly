@@ -1,0 +1,15 @@
+{
+  "name": "briefly-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Briefly desktop orb — an always-on floating assistant that speaks your morning briefing",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icons": "tauri icon ../extension/icons/icon128.png"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
