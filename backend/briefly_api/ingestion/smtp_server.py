@@ -9,12 +9,18 @@ from __future__ import annotations
 
 import email as email_lib
 import logging
-
-from aiosmtpd.controller import Controller
-from aiosmtpd.smtp import SMTP as SMTPServer, Envelope, Session
+from typing import TYPE_CHECKING
 
 from briefly_api.config import Settings, get_settings
 from briefly_api.ingestion.inbound_email import store_inbound_email
+
+# aiosmtpd is a dev-only dependency (production uses Resend inbound webhooks).
+# Import it lazily so a missing/broken aiosmtpd can never crash the whole API
+# at boot — annotations are strings via `from __future__ import annotations`,
+# so these names are only needed for type checking.
+if TYPE_CHECKING:
+    from aiosmtpd.controller import Controller
+    from aiosmtpd.smtp import SMTP as SMTPServer, Envelope, Session
 
 log = logging.getLogger(__name__)
 
@@ -107,6 +113,15 @@ def start_smtp_server(settings: Settings | None = None) -> Controller | None:
     settings = settings or get_settings()
     if not settings.smtp_ingestion_active:
         log.info("SMTP ingestion disabled (use Resend webhook in production)")
+        return None
+
+    try:
+        from aiosmtpd.controller import Controller
+    except ImportError:
+        log.error(
+            "SMTP ingestion is enabled but aiosmtpd is not installed — "
+            "newsletter-by-SMTP unavailable. Install aiosmtpd or use webhook mode."
+        )
         return None
 
     handler = BrieflyMailHandler(settings)

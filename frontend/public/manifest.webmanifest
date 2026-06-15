@@ -1,12 +1,13 @@
 {
-  "name": "Briefly",
+  "id": "/",
+  "name": "Briefly — your morning briefing",
   "short_name": "Briefly",
-  "description": "Save articles to your personal AI briefing",
-  "start_url": "/saved",
+  "description": "Your personal AI briefing, read aloud. Open Briefly and hear what matters today.",
+  "start_url": "/listen",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#0f0e13",
   "theme_color": "#5e6ad2",
-  "orientation": "portrait-primary",
+  "categories": ["productivity", "news"],
   "icons": [
     {
       "src": "/icons/icon192.png",
@@ -19,6 +20,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/icons/icon512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "share_target": {
@@ -32,6 +39,16 @@
     }
   },
   "shortcuts": [
+    {
+      "name": "Listen to today's briefing",
+      "url": "/listen",
+      "description": "Hear your briefing read aloud"
+    },
+    {
+      "name": "Open dashboard",
+      "url": "/dashboard",
+      "description": "See your full briefing"
+    },
     {
       "name": "Save a link",
       "url": "/saved",

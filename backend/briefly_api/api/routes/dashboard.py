@@ -498,8 +498,9 @@ async def _briefing_worker(user_id: str) -> None:
             item_count = (digest.total_items_shown or 0) or len(digest.items or [])
             if item_count <= 0:
                 raise ValueError(
-                    "No relevant stories found in your sources right now. "
-                    "Try refreshing sources, then generate again."
+                    "Briefly read your sources but nothing cleared the relevance bar yet. "
+                    "This sharpens within a day or two as it learns what matters to you — "
+                    "add another source or check back tomorrow morning."
                 )
             await report_briefing_progress(
                 user_id,

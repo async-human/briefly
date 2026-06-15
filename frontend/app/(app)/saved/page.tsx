@@ -7,6 +7,7 @@ import { api, type BrowserCapture } from "@/lib/api";
 import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { SaveLinkPanel } from "@/components/saved/SaveLinkPanel";
+import { ExtensionInstallCard } from "@/components/saved/ExtensionInstallCard";
 import { MobileShareSetup } from "@/components/saved/MobileShareSetup";
 import { SavedCapturesList } from "@/components/saved/SavedCapturesList";
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
@@ -14,8 +15,6 @@ import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { SavedPageSkeleton } from "@/components/saved/SavedPageSkeleton";
 import { getToken } from "@/lib/auth";
 import { urlFromShareParams } from "@/lib/shareUrl";
-
-const CHROME_STORE_URL = process.env.NEXT_PUBLIC_CHROME_STORE_URL ?? "";
 
 function SavedPageContent() {
   const router = useRouter();
@@ -84,31 +83,7 @@ function SavedPageContent() {
 
           <div className="dash-surface dash-surface-install-hint">
             <div className="dash-surface-body install-hint-body">
-              <div>
-                <h2 className="install-hint-title">Desktop — Chrome extension</h2>
-                <p className="install-hint-desc">
-                  One click on any article. Connect once from the extension popup — it stays linked
-                  with a device token.
-                </p>
-                {!CHROME_STORE_URL ? (
-                  <p className="install-hint-desc install-hint-dev">
-                    Dev: Chrome → Extensions → Load unpacked → select the <code>extension/</code> folder
-                    in this repo, then click Connect in the popup.
-                  </p>
-                ) : null}
-              </div>
-              {CHROME_STORE_URL ? (
-                <a
-                  href={CHROME_STORE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="dash-btn dash-btn-primary"
-                >
-                  Get extension
-                </a>
-              ) : (
-                <span className="install-hint-badge">Store listing coming soon</span>
-              )}
+              <ExtensionInstallCard />
             </div>
             <div className="install-hint-divider" />
             <div className="dash-surface-body install-hint-body">

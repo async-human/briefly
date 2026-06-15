@@ -3567,8 +3567,45 @@ a.saved-capture-title:hover {
   margin-top: 0.75rem;
 }
 
+.extension-install {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+}
+
+.extension-install-copy {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.extension-install-cta {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.extension-install-unavailable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.install-hint-desc--muted {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
 .capture-devices-intro {
   margin-bottom: 1rem;
+}
+
+.capture-devices-divider {
+  height: 1px;
+  background: var(--app-border);
+  margin: 1.5rem 0;
 }
 
 .capture-devices-local {
