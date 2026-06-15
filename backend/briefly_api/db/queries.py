@@ -64,6 +64,7 @@ async def get_user_with_profile(session: AsyncSession, user_id: str) -> dict | N
             "total_digests_received": p.total_digests_received,
             "suggested_sources": p.suggested_sources or [],
             "source_weights": dict(p.source_weights or {}),
+            "source_topic_weights": dict(p.source_topic_weights or {}),
             "ingestion_meta": dict(p.ingestion_meta or {}),
             "last_ingestion_at": p.last_ingestion_at.isoformat() if p.last_ingestion_at else None,
             "activity_feed": await list_activity(session, user.id, limit=10),

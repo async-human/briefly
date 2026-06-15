@@ -23,7 +23,7 @@ from sqlalchemy import select, update
 from briefly_api.agents.context import PipelineContext
 from briefly_api.db.models import BehavioralSignal, DigestItem, SignalType, UserProfile
 from briefly_api.services.profile_utils import cluster_label
-from briefly_api.services.external_feed_discovery import discover_interest_suggestions_light
+from briefly_api.services.source_recommendation import recommend_sources
 
 log = logging.getLogger(__name__)
 
@@ -64,6 +64,10 @@ async def run(ctx: PipelineContext) -> PipelineContext:
             "role": ctx.user.profile.get("role"),
             "goal": ctx.user.profile.get("goal"),
             "topic_clusters": ctx.user.profile.get("topic_clusters") or [],
+            # Carry engagement signals so recommendations rank by what the user
+            # actually reads, not just keyword matches.
+            "source_weights": ctx.user.profile.get("source_weights") or {},
+            "profile_embedding": ctx.user.profile.get("profile_embedding"),
         }
         # Merge inferred topics into interests for richer external search
         for topic in inferred:
@@ -74,16 +78,19 @@ async def run(ctx: PipelineContext) -> PipelineContext:
                 profile_for_discovery["interests"].append({"topic": topic, "weight": 0.7, "source": "inferred"})
 
         gmail = await get_gmail_connection(session, ctx.user.user_id)
-        raw_suggestions = await discover_interest_suggestions_light(
-            profile_for_discovery,
+        skip_urls = already_added | {x["url"].lower() for x in existing_suggestions}
+        raw_suggestions = await recommend_sources(
+            session,
+            ctx.user.user_id,
             get_settings(),
+            profile_for_discovery,
             limit=_SUGGEST_PER_RUN + 2,
             gmail_connected=gmail is not None,
+            already_added=skip_urls,
         )
         new_suggestions = [
             s for s in raw_suggestions
-            if s["url"].lower() not in already_added
-            and s["url"].lower() not in {x["url"].lower() for x in existing_suggestions}
+            if s["url"].lower() not in skip_urls
         ][: _SUGGEST_PER_RUN]
 
         if not new_suggestions:

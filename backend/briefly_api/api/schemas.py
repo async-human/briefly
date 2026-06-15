@@ -383,6 +383,11 @@ class SourceSuggestionOut(BaseModel):
     source_type: str
     topic: str
     description: str
+    # How this source surfaced: "similar" (content match to what you read),
+    # "readers_like_you" (collaborative), or "interest" (keyword discovery).
+    method: str = "interest"
+    reason: str = ""
+    score: float = 0.0
 
 
 class AutoSuggestionOut(BaseModel):

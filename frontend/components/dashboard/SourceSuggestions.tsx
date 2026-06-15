@@ -11,6 +11,16 @@ function isAuto(s: SuggestionItem): s is AutoSuggestion {
   return "reason" in s && Boolean((s as AutoSuggestion).reason);
 }
 
+const METHOD_LABELS: Record<string, string> = {
+  readers_like_you: "Readers like you",
+  similar: "Similar to what you read",
+};
+
+function methodLabel(s: SuggestionItem): string | null {
+  const method = (s as { method?: string }).method;
+  return method ? METHOD_LABELS[method] ?? null : null;
+}
+
 export function SourceSuggestions({
   existingSources,
   onAdded,
@@ -86,6 +96,9 @@ export function SourceSuggestions({
         <div className="suggestion-row-body">
           <div className="suggestion-row-head">
             <p className="suggestion-row-name">{s.name}</p>
+            {methodLabel(s) && (
+              <span className="suggestion-badge suggestion-badge-method">{methodLabel(s)}</span>
+            )}
             {isAuto(s) && s.source === "medium" && (
               <span className="suggestion-badge suggestion-badge-medium">Medium</span>
             )}

@@ -99,6 +99,10 @@ async def run(ctx: PipelineContext) -> PipelineContext:
         # ── 3. Source weight update from recent engagement ────────────────────
         await _update_source_weights(ctx, session)
 
+        # ── 3b. Per-source × per-topic quality (a source can be great for one
+        #        topic and noise for another) ─────────────────────────────────
+        await _update_source_topic_weights(ctx, session)
+
         await session.flush()
 
         # ── 4. Evolve the Personal Relevance Vector ───────────────────────────
@@ -311,6 +315,83 @@ async def _update_source_weights(ctx: PipelineContext, session) -> None:
 
     profile.source_weights = weights
     flag_modified(profile, "source_weights")
+    await session.flush()
+
+
+def _topic_key(section: str | None) -> str:
+    return (section or "").strip().lower()
+
+
+async def _update_source_topic_weights(ctx: PipelineContext, session) -> None:
+    """
+    Update per-(source, topic) engagement weights. The brief's section is used
+    as the topic dimension — it's the topic label already attached to each
+    delivered item. Lets the relevance agent trust a source *for a given topic*
+    rather than globally.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+
+    result = await session.execute(
+        select(
+            DigestItem.source_name,
+            DigestItem.section,
+            BehavioralSignal.signal_type,
+        )
+        .join(DigestItem, BehavioralSignal.digest_item_id == DigestItem.id)
+        .where(
+            BehavioralSignal.user_id == ctx.user.user_id,
+            BehavioralSignal.signal_type.in_([
+                SignalType.clicked, SignalType.saved,
+                SignalType.followed_up, SignalType.skipped,
+                SignalType.disliked,
+            ]),
+            BehavioralSignal.created_at >= cutoff,
+        )
+        .limit(400)
+    )
+    rows = result.all()
+
+    pos: dict[str, int] = {}
+    neg: dict[str, int] = {}
+    for source_name, section, sig_type in rows:
+        topic = _topic_key(section)
+        if not source_name or not topic:
+            continue
+        key = f"{source_name.lower()}::{topic}"
+        if sig_type in (SignalType.clicked, SignalType.saved, SignalType.followed_up):
+            pos[key] = pos.get(key, 0) + 1
+        else:
+            neg[key] = neg.get(key, 0) + 1
+
+    if not pos and not neg:
+        return
+
+    result2 = await session.execute(
+        select(UserProfile).where(UserProfile.user_id == ctx.user.user_id)
+    )
+    profile = result2.scalar_one_or_none()
+    if not profile:
+        return
+
+    weights: dict = dict(profile.source_topic_weights or {})
+    for key in set(pos) | set(neg):
+        p = pos.get(key, 0)
+        n = neg.get(key, 0)
+        total = p + n
+        if total == 0:
+            continue
+        entry = weights.get(key) or {}
+        current = float(entry.get("weight", 0.5))
+        target = max(0.1, min(1.0, p / total))
+        weights[key] = {
+            "weight": round(current + 0.08 * (target - current), 3),
+            "pos": int(entry.get("pos", 0)) + p,
+            "neg": int(entry.get("neg", 0)) + n,
+            "updated_at": _now_iso(),
+        }
+
+    profile.source_topic_weights = weights
+    flag_modified(profile, "source_topic_weights")
     await session.flush()
 
 
