@@ -14,40 +14,104 @@ function greeting(): string {
   return "Good evening";
 }
 
-function buildLines(digest: Digest | null, name: string): string[] {
+type Segment = { text: string; caption: string };
+
+/** Make text flow when spoken: dashes → pauses, strip citation/source-count noise. */
+function cleanForSpeech(text: string): string {
+  return text
+    .replace(/\[S\d+\]/g, "")
+    .replace(/[×x]\s*\d+\s*sources?/gi, "")
+    .replace(/\s*[—–]\s*/g, ", ")
+    .replace(/\s+-\s+/g, ", ")
+    .replace(/[•·|]/g, " ")
+    .replace(/\s*\(\s*\)/g, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,!?;:])/g, "$1")
+    .trim();
+}
+
+const GENERIC_WHY = [
+  /semantic match/i,
+  /match(?:es|ed|ing)?\s+(?:to\s+)?your\s+(?:profile|interests)/i,
+  /matches?\s+your\s+profile/i,
+  /relevance\s+score/i,
+  /strong(?:ly)?\s+(?:relevant|match)/i,
+  /high(?:ly)?\s+relevant/i,
+  /based on your (?:profile|interests|reading)/i,
+  /aligns? with your/i,
+];
+
+/** Skip robotic, system-generated relevance labels so the brief sounds human. */
+function isGenericWhy(text: string): boolean {
+  const t = text.trim();
+  if (t.length < 16) return true;
+  return GENERIC_WHY.some((re) => re.test(t));
+}
+
+function buildSegments(digest: Digest | null, name: string): Segment[] {
   const hi = greeting() + (name ? `, ${name}` : "") + ".";
   const items = digest?.items ?? [];
 
   if (items.length === 0) {
     return [
-      hi,
-      "Your briefing isn't ready just yet. Open Briefly to finish connecting your sources, and I'll have it for you soon.",
+      { text: hi, caption: hi },
+      {
+        text: "Your briefing isn't ready just yet. Once your sources are connected, I'll have it ready for you each morning.",
+        caption: "Your briefing isn't ready just yet.",
+      },
     ];
   }
 
   const top = items.slice(0, 3);
   const count = digest?.total_items_shown || items.length;
-  const lines = [hi, `Here's your briefing. ${count} ${count === 1 ? "thing" : "things"} matter today.`];
+  const segments: Segment[] = [
+    { text: hi, caption: hi },
+    {
+      text: `I've been through your sources. Here ${
+        count === 1 ? "is the one thing" : `are the ${count} things`
+      } worth your attention today.`,
+      caption: `${count} ${count === 1 ? "thing" : "things"} worth your attention`,
+    },
+  ];
 
-  const ordinals = ["First", "Second", "Third"];
+  const connectors = ["Let's start here.", "Next,", "And finally,"];
   top.forEach((it, i) => {
-    lines.push(`${ordinals[i] ?? ""}. ${it.headline}.`.trim());
-    const why = it.why_this_summary || it.why_it_matters;
-    if (why) lines.push(why);
+    const headline = cleanForSpeech(it.headline);
+    const whyRaw = it.why_it_matters || it.why_this_summary || "";
+    const why = cleanForSpeech(whyRaw);
+    const useWhy = why.length > 0 && !isGenericWhy(why);
+    const connector = connectors[i] ?? "Also,";
+    segments.push({
+      text: useWhy ? `${connector} ${headline}. ${why}` : `${connector} ${headline}.`,
+      caption: headline,
+    });
   });
 
-  lines.push("That's the headline view. Open Briefly for the full briefing.");
-  return lines;
+  segments.push({
+    text: "That's the short version. Open Briefly whenever you want the full picture.",
+    caption: "That's the short version.",
+  });
+
+  return segments;
 }
 
 function pickVoice(): SpeechSynthesisVoice | undefined {
   if (!("speechSynthesis" in window)) return undefined;
   const vs = speechSynthesis.getVoices();
-  return (
-    vs.find((v) => /en(-|_)?(US|GB)/i.test(v.lang) && /natural|google|samantha|aria|jenny|libby/i.test(v.name)) ||
-    vs.find((v) => /^en/i.test(v.lang)) ||
-    vs[0]
-  );
+  if (!vs.length) return undefined;
+  // Score voices toward the most human-sounding ones available on the system.
+  const score = (v: SpeechSynthesisVoice): number => {
+    let s = 0;
+    if (/^en/i.test(v.lang)) s += 5;
+    if (/en[-_]?US/i.test(v.lang)) s += 1;
+    if (/natural|neural|online/i.test(v.name)) s += 7; // MS Natural / neural — most human
+    if (/google/i.test(v.name)) s += 4; // Google voices (Chrome)
+    if (/samantha|aria|jenny|libby|emma|ava|guy|nova/i.test(v.name)) s += 3;
+    if (v.localService === false) s += 2; // cloud voices are usually higher quality
+    if (/zira|david|mark|hazel|desktop/i.test(v.name)) s -= 2; // legacy robotic MS voices
+    return s;
+  };
+  return [...vs].sort((a, b) => score(b) - score(a))[0];
 }
 
 type Ripple = { r: number; alpha: number };
@@ -279,16 +343,16 @@ export function VoiceOrb({ digest, userName = "", autoSpeak = false }: VoiceOrbP
     targetRef.current = 0.55;
     setSpeaking(true);
 
-    const lines = buildLines(digest, userName);
-    for (const line of lines) {
+    const segments = buildSegments(digest, userName);
+    for (const seg of segments) {
       if (!speakingRef.current) break;
       await new Promise<void>((resolve) => {
-        const u = new SpeechSynthesisUtterance(line);
+        const u = new SpeechSynthesisUtterance(seg.text);
         const v = pickVoice();
         if (v) u.voice = v;
-        u.rate = 1.0;
+        u.rate = 0.98;
         u.pitch = 1.0;
-        u.onstart = () => setCaption(line);
+        u.onstart = () => setCaption(seg.caption);
         u.onboundary = () => {
           energyRef.current = Math.min(1, energyRef.current + 0.24);
           if (!reducedRef.current) {
