@@ -342,12 +342,19 @@ class SourceCreate(BaseModel):
     meta: dict = Field(default_factory=dict)
 
 
+class SourceDetectAlternative(BaseModel):
+    source_type: str
+    label: str
+    hint: str
+
+
 class SourceDetectOut(BaseModel):
     source_type: str
     identifier: str
     label: str
     hint: str
     confidence: str
+    alternatives: list[SourceDetectAlternative] = Field(default_factory=list)
 
 
 class GmailSenderOut(BaseModel):

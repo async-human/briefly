@@ -353,6 +353,14 @@ async def detect_source_type(
             label=detected.label,
             hint=detected.hint,
             confidence=detected.confidence,
+            alternatives=[
+                {
+                    "source_type": alt.source_type,
+                    "label": alt.label,
+                    "hint": alt.hint,
+                }
+                for alt in detected.alternatives
+            ],
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

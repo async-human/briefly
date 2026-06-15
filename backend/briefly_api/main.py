@@ -4,12 +4,9 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from briefly_api.api.router import api_router
 from briefly_api.config import get_settings
@@ -17,11 +14,22 @@ from briefly_api.db.engine import init_db
 from briefly_api.ingestion.smtp_server import start_smtp_server
 from briefly_api.services.embedding_guard import validate_embedding_configuration
 
+# Observability is optional — a missing/broken Sentry SDK must never stop the
+# API from booting. It's pinned in requirements, so production still gets it.
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+    _SENTRY_AVAILABLE = True
+except ImportError:
+    _SENTRY_AVAILABLE = False
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 _settings = get_settings()
-if _settings.sentry_dsn:
+if _settings.sentry_dsn and _SENTRY_AVAILABLE:
     sentry_sdk.init(
         dsn=_settings.sentry_dsn,
         integrations=[FastApiIntegration(), SqlalchemyIntegration()],
@@ -30,6 +38,8 @@ if _settings.sentry_dsn:
         send_default_pii=False,
     )
     logger.info("Sentry initialised (env=%s)", _settings.app_env)
+elif _settings.sentry_dsn and not _SENTRY_AVAILABLE:
+    logger.warning("SENTRY_DSN is set but sentry-sdk is not installed — error tracking disabled")
 
 
 @asynccontextmanager
