@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Briefly — Feed your second brain",
+  "short_name": "Briefly",
   "version": "1.0.0",
-  "description": "Save any article to Briefly. See what it connects to in your reading threads instantly.",
+  "description": "Save any article to Briefly in one click. See what it connects to in your reading threads and get it in tomorrow's briefing.",
   "permissions": ["activeTab", "storage"],
   "host_permissions": [
     "https://api.sendbriefly.app/*",

@@ -7,6 +7,16 @@ const panels = {
   error: $("state-error"),
 };
 
+const NON_PAGE_PREFIXES = [
+  "chrome:",
+  "chrome-extension:",
+  "edge:",
+  "about:",
+  "devtools:",
+  "view-source:",
+  "chrome-devtools:",
+];
+
 let settings = {
   apiUrl: BRIEFLY_CONFIG.apiUrl,
   frontendUrl: BRIEFLY_CONFIG.frontendUrl,
@@ -32,8 +42,25 @@ async function getActiveTab() {
   return tab;
 }
 
+function isSaveableUrl(url) {
+  if (!url) return false;
+  if (NON_PAGE_PREFIXES.some((prefix) => url.startsWith(prefix))) return false;
+  return url.startsWith("http://") || url.startsWith("https://");
+}
+
+function pageErrorMessage() {
+  const url = lastTab?.url ?? "";
+  if (!url) return "No page URL found.";
+  if (!isSaveableUrl(url)) {
+    return "Open a normal web page (article, blog, or news story) and try again.";
+  }
+  return "Something went wrong.";
+}
+
 async function captureCurrentTab(note) {
-  if (!lastTab?.url) throw new Error("No page URL found.");
+  if (!isSaveableUrl(lastTab?.url)) {
+    throw new Error(pageErrorMessage());
+  }
   if (!settings.token) throw new Error("Not connected to Briefly.");
 
   const body = {
@@ -53,6 +80,11 @@ async function captureCurrentTab(note) {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    if (res.status === 401) {
+      const err = new Error("AUTH_EXPIRED");
+      err.code = "AUTH_EXPIRED";
+      throw err;
+    }
     const detail = typeof data.detail === "string" ? data.detail : "Capture failed.";
     throw new Error(detail);
   }
@@ -61,7 +93,8 @@ async function captureCurrentTab(note) {
 
 function renderSuccess(data) {
   lastCapture = data;
-  $("result-title").textContent = `"${data.title}"`;
+  $("success-label").textContent = data.already_saved ? "Already in Briefly" : "Added to Briefly";
+  $("result-title").textContent = data.title ? `"${data.title}"` : "Saved";
 
   const enrichment = data.enrichment || {};
   const connectionEl = $("result-connection");
@@ -83,9 +116,26 @@ function renderSuccess(data) {
   $("result-briefing").textContent =
     enrichment.briefing_message || "Will appear in tomorrow's briefing.";
 
-  $("btn-view").href = `${settings.frontendUrl}/dashboard`;
+  $("btn-view").href = `${settings.frontendUrl}/saved`;
   $("note-input").value = data.user_note || "";
+  $("note-section").classList.add("hidden");
+  $("btn-add-thought").classList.remove("hidden");
   showPanel("success");
+}
+
+function showConnect(message) {
+  $("connect-lead").textContent = message;
+  showPanel("connect");
+}
+
+function showError(err, { allowReconnect = false } = {}) {
+  const isAuth = err?.code === "AUTH_EXPIRED" || err?.message === "AUTH_EXPIRED";
+  $("error-message").textContent = isAuth
+    ? "Your connection expired. Reconnect to keep saving articles."
+    : err?.message || pageErrorMessage();
+  $("btn-reconnect").classList.toggle("hidden", !isAuth && !allowReconnect);
+  $("btn-retry").classList.toggle("hidden", isAuth);
+  showPanel("error");
 }
 
 async function runCapture(note) {
@@ -96,8 +146,11 @@ async function runCapture(note) {
     const data = await captureCurrentTab(note);
     renderSuccess(data);
   } catch (err) {
-    $("error-message").textContent = err.message || "Something went wrong.";
-    showPanel("error");
+    if (err?.code === "AUTH_EXPIRED") {
+      showError(err);
+      return;
+    }
+    showError(err);
   }
 }
 
@@ -106,7 +159,13 @@ async function init() {
   lastTab = await getActiveTab();
 
   if (!settings.token) {
-    showPanel("connect");
+    showConnect("Connect your account once — then save any article with one click.");
+    return;
+  }
+
+  if (!isSaveableUrl(lastTab?.url)) {
+    showError(new Error(pageErrorMessage()));
+    $("btn-retry").classList.add("hidden");
     return;
   }
 
@@ -118,6 +177,12 @@ $("btn-connect").addEventListener("click", () => {
   const url = `${settings.frontendUrl}/extension/connect?ext=${encodeURIComponent(extId)}`;
   chrome.tabs.create({ url });
   window.close();
+});
+
+$("btn-reconnect").addEventListener("click", () => {
+  $("btn-reconnect").classList.add("hidden");
+  $("btn-retry").classList.remove("hidden");
+  showConnect("Your connection expired. Sign in and connect again.");
 });
 
 $("btn-retry").addEventListener("click", () => {
@@ -140,10 +205,8 @@ $("btn-save-note").addEventListener("click", async () => {
   try {
     const data = await captureCurrentTab(note);
     renderSuccess(data);
-    $("note-section").classList.add("hidden");
   } catch (err) {
-    $("error-message").textContent = err.message || "Could not save note.";
-    showPanel("error");
+    showError(err);
   } finally {
     $("btn-save-note").disabled = false;
     $("btn-save-note").textContent = "Save note";
