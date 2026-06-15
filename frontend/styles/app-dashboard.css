@@ -7811,6 +7811,53 @@ a.saved-capture-title:hover {
   border-top: 1px solid var(--app-border);
 }
 
+.app-shell .weekly-report-card--embedded .weekly-report-body {
+  margin-top: 0.75rem;
+  padding-top: 0;
+  border-top: none;
+}
+
+.app-shell .weekly-report-placeholder {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+}
+
+.app-shell .weekly-report-empty {
+  padding: 0.85rem 1rem;
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-muted);
+  border: 1px dashed var(--app-border-strong);
+}
+
+.app-shell .weekly-report-empty-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.app-shell .weekly-report-empty-desc {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--app-muted);
+}
+
+.app-shell .weekly-report-lead {
+  margin: 0 0 0.85rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--app-ink-secondary);
+}
+
+.app-shell .weekly-report-stats {
+  margin: 0.85rem 0 0;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6875rem;
+  color: var(--app-muted);
+}
+
 .app-shell .briefing-hero-item {
   margin: 0 0 1.25rem;
   padding: 1.25rem 1.35rem 1.15rem;

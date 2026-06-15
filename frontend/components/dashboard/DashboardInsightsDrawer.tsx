@@ -201,7 +201,7 @@ export function DashboardInsightsDrawer({
           )}
 
           <DashboardAccordion id="weekly-report" title="Weekly intelligence report" description="Sunday-style recap">
-            <WeeklyReportCard />
+            <WeeklyReportCard embedded />
           </DashboardAccordion>
 
           <p className="dash-insights-drawer-foot">

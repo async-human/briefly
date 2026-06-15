@@ -19,7 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from briefly_api.db.models import (
-    BehavioralSignal, Digest, DigestItem, SignalType,
+    BehavioralFingerprint,
+    BehavioralSignal, Digest, DigestItem, DigestStatus, SignalType,
     User, UserMemory, UserProfile,
 )
 from briefly_api.llm.adapter import Message, get_llm_adapter
@@ -99,29 +100,36 @@ async def generate_weekly_report(
         return None
 
     profile = user.profile
-    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    digests, all_items, lookback_days = await _load_recent_digest_items(session, user_id)
 
-    # Fetch this week's digests + items
-    digest_result = await session.execute(
-        select(Digest)
-        .options(selectinload(Digest.items))
-        .where(
-            Digest.user_id == user_id,
-            Digest.created_at >= cutoff,
-        )
-        .order_by(Digest.digest_date.desc())
+    fp_result = await session.execute(
+        select(BehavioralFingerprint).where(BehavioralFingerprint.user_id == user_id)
     )
-    digests = list(digest_result.scalars().all())
+    fingerprint = fp_result.scalar_one_or_none()
 
-    if not digests:
-        log.info("WeeklyReport: no digests this week for user %s — skipping", user_id)
+    if not all_items:
+        if fingerprint and _fingerprint_has_report_data(fingerprint):
+            return _enrich_report(
+                _report_from_fingerprint(fingerprint, profile, user, stories_read=0),
+                profile,
+                user,
+            )
+        log.info("WeeklyReport: no digest items in lookback for user %s — skipping", user_id)
         return None
 
-    all_items = [item for d in digests for item in d.items]
-    if len(all_items) < 3:
-        return None
+    if fingerprint and _fingerprint_has_report_data(fingerprint):
+        report = _report_from_fingerprint(
+            fingerprint,
+            profile,
+            user,
+            stories_read=len(all_items),
+            items=all_items,
+        )
+        return _enrich_report(report, profile, user)
 
-    # Fetch behavioral signals this week
+    cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+
+    # Fetch behavioral signals in the same window
     signal_result = await session.execute(
         select(BehavioralSignal.signal_type, DigestItem.headline, DigestItem.source_name)
         .join(DigestItem, BehavioralSignal.digest_item_id == DigestItem.id)
@@ -182,15 +190,147 @@ async def generate_weekly_report(
     if not report:
         return None
 
-    # Enrich with metadata
+    return _enrich_report(report, profile, user, fallback_stories_read=len(all_items))
+
+
+async def _load_recent_digest_items(
+    session: AsyncSession,
+    user_id: str,
+) -> tuple[list[Digest], list[DigestItem], int]:
+    """Load digest items from the last 7/14/30 days (by digest_date)."""
+    for days in (7, 14, 30):
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+        digest_result = await session.execute(
+            select(Digest)
+            .options(selectinload(Digest.items))
+            .where(
+                Digest.user_id == user_id,
+                Digest.digest_date >= cutoff_date,
+                Digest.status.in_((DigestStatus.ready, DigestStatus.sent)),
+            )
+            .order_by(Digest.digest_date.desc())
+        )
+        digests = list(digest_result.scalars().all())
+        all_items = [item for digest in digests for item in digest.items]
+        if all_items:
+            return digests, all_items, days
+    return [], [], 7
+
+
+def _fingerprint_has_report_data(fp: BehavioralFingerprint) -> bool:
+    snap = fp.weekly_snapshot or {}
+    return bool(
+        snap.get("weekly_synthesis")
+        or snap.get("mind_shifts")
+        or snap.get("emerging_threads")
+        or fp.current_focus
+        or fp.mind_shifts
+        or fp.high_engagement_topics
+    )
+
+
+def _report_from_fingerprint(
+    fp: BehavioralFingerprint,
+    profile: UserProfile,
+    user: User,
+    *,
+    stories_read: int,
+    items: list[DigestItem] | None = None,
+) -> dict:
+    snap = fp.weekly_snapshot or {}
+    mind_shifts = snap.get("mind_shifts") or fp.mind_shifts or []
+    emerging = snap.get("emerging_threads") or []
+    coverage_gaps = snap.get("coverage_gaps") or fp.coverage_gaps or []
+
+    thinking_shift = (snap.get("weekly_synthesis") or fp.current_focus or "").strip()
+    if not thinking_shift and mind_shifts:
+        first = mind_shifts[0] if isinstance(mind_shifts[0], dict) else {}
+        thinking_shift = (
+            first.get("evidence")
+            or first.get("summary")
+            or first.get("topic")
+            or ""
+        ).strip()
+
+    building_thread = ""
+    if emerging:
+        first_thread = emerging[0] if isinstance(emerging[0], dict) else {}
+        building_thread = (
+            first_thread.get("summary")
+            or first_thread.get("thread")
+            or first_thread.get("topic")
+            or ""
+        ).strip()
+    if not building_thread and mind_shifts:
+        first = mind_shifts[0] if isinstance(mind_shifts[0], dict) else {}
+        building_thread = (first.get("topic") or "").strip()
+
+    blind_spot = ""
+    if coverage_gaps:
+        gap = coverage_gaps[0]
+        blind_spot = gap if isinstance(gap, str) else str(gap.get("topic") or gap.get("label") or "")
+
+    top_topics: list[dict[str, str]] = []
+    for topic in (fp.high_engagement_topics or [])[:4]:
+        if not isinstance(topic, dict):
+            continue
+        name = (topic.get("topic") or "").strip()
+        if not name:
+            continue
+        follow_ups = int(topic.get("follow_up_count") or 0)
+        observation = (
+            f"{follow_ups} deep dives this month" if follow_ups else "Consistently engaged"
+        )
+        top_topics.append({"topic": name, "observation": observation})
+
+    if not top_topics and fp.current_focus:
+        top_topics.append(
+            {
+                "topic": fp.current_focus[:80],
+                "observation": "Your strongest focus area this week.",
+            }
+        )
+
+    top_sources: dict[str, int] = {}
+    for item in items or []:
+        if item.source_name:
+            top_sources[item.source_name] = top_sources.get(item.source_name, 0) + 1
+    top_source = max(top_sources, key=top_sources.get) if top_sources else ""
+
+    digest_day = profile.total_digests_received or 1
+    week_number = max(1, digest_day // 7)
+
+    return {
+        "top_topics": top_topics,
+        "thinking_shift": thinking_shift or "Your reading patterns are still taking shape.",
+        "building_thread": building_thread,
+        "blind_spot": blind_spot,
+        "week_number": week_number,
+        "stories_read": stories_read or len(items or []),
+        "top_source": top_source,
+    }
+
+
+def _enrich_report(
+    report: dict,
+    profile: UserProfile,
+    user: User,
+    *,
+    fallback_stories_read: int = 0,
+) -> dict:
+    digest_day = profile.total_digests_received or 1
+    week_number = max(1, digest_day // 7)
     report["digest_day"] = digest_day
     report["user_name"] = user.name
     report["digest_date"] = datetime.now(timezone.utc).strftime("%B %d, %Y")
-    if "week_number" not in report or not report["week_number"]:
+    if not report.get("week_number"):
         report["week_number"] = week_number
-    if "stories_read" not in report or not report["stories_read"]:
-        report["stories_read"] = len(all_items)
-
+    if not report.get("stories_read"):
+        report["stories_read"] = fallback_stories_read
+    if not report.get("top_topics"):
+        report["top_topics"] = []
+    for key in ("thinking_shift", "building_thread", "blind_spot", "top_source"):
+        report.setdefault(key, "")
     return report
 
 
