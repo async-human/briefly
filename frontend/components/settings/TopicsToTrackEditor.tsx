@@ -66,14 +66,15 @@ function CategoryBlock({
   category,
   topics,
   onAdd,
-  defaultOpen = false,
+  open,
+  onToggle,
 }: {
   category: TopicCategory;
   topics: string[];
   onAdd: (t: string) => void;
-  defaultOpen?: boolean;
+  open: boolean;
+  onToggle: () => void;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   const available = category.topics.filter((t) => !topics.includes(normalizeTopic(t)));
 
   if (!available.length) return null;
@@ -83,12 +84,19 @@ function CategoryBlock({
       <button
         type="button"
         className="topics-category-trigger"
-        onClick={() => setOpen((v) => !v)}
+        onClick={onToggle}
         aria-expanded={open}
       >
-        <span className="topics-category-label">{category.label}</span>
-        <span className="topics-category-hint">{category.hint}</span>
-        <span className="topics-category-count">{available.length} available</span>
+        <span className="topics-category-trigger-main">
+          <span className="topics-category-label">{category.label}</span>
+          <span className="topics-category-hint">{category.hint}</span>
+        </span>
+        <span className="topics-category-trigger-meta">
+          <span className="topics-category-count">{available.length} available</span>
+          <span className="topics-category-chevron" aria-hidden>
+            {open ? "−" : "+"}
+          </span>
+        </span>
       </button>
       {open ? (
         <div className="topics-category-body">
@@ -115,6 +123,7 @@ export function TopicsToTrackEditor({
   const [val, setVal] = useState("");
   const [search, setSearch] = useState("");
   const [browseOpen, setBrowseOpen] = useState(false);
+  const [openCategoryId, setOpenCategoryId] = useState<string | null>(null);
 
   const rolePack = ROLE_STARTER_PACKS[role ?? "Other"] ?? ROLE_STARTER_PACKS.Other;
 
@@ -131,6 +140,8 @@ export function TopicsToTrackEditor({
   }, [rolePack.topics, topics]);
 
   const filteredCatalog = useMemo(() => filterCatalog(search), [search]);
+
+  const searching = Boolean(search.trim());
 
   const atLimit = topics.length >= MAX_TRACKED_TOPICS;
 
@@ -237,7 +248,15 @@ export function TopicsToTrackEditor({
         <button
           type="button"
           className="topics-browse-toggle"
-          onClick={() => setBrowseOpen((v) => !v)}
+          onClick={() => {
+            setBrowseOpen((v) => {
+              const next = !v;
+              if (next && !openCategoryId && filteredCatalog[0]) {
+                setOpenCategoryId(filteredCatalog[0].id);
+              }
+              return next;
+            });
+          }}
           aria-expanded={browseOpen}
         >
           Browse all topics
@@ -260,13 +279,16 @@ export function TopicsToTrackEditor({
               {filteredCatalog.length === 0 ? (
                 <p className="topics-browse-empty">No topics match &ldquo;{search}&rdquo;</p>
               ) : (
-                filteredCatalog.map((cat, i) => (
+                filteredCatalog.map((cat) => (
                   <CategoryBlock
                     key={cat.id}
                     category={cat}
                     topics={topics}
                     onAdd={add}
-                    defaultOpen={Boolean(search.trim()) || i === 0}
+                    open={searching || openCategoryId === cat.id}
+                    onToggle={() =>
+                      setOpenCategoryId((current) => (current === cat.id ? null : cat.id))
+                    }
                   />
                 ))
               )}
