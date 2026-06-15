@@ -29,6 +29,7 @@ export function AddSourceForm({
   const [name, setName] = useState("");
   const [typeOverride, setTypeOverride] = useState("");
   const [detection, setDetection] = useState<SourceDetection | null>(null);
+  const [selectedMode, setSelectedMode] = useState("");
   const [detecting, setDetecting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -64,6 +65,12 @@ export function AddSourceForm({
     return () => clearTimeout(timer);
   }, [identifier, typeOverride, runDetect]);
 
+  useEffect(() => {
+    if (detection) {
+      setSelectedMode(detection.source_type);
+    }
+  }, [detection]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!identifier.trim()) return;
@@ -76,9 +83,10 @@ export function AddSourceForm({
     setLoading(true);
     setError("");
     try {
+      const hasModeChoice = !typeOverride && (detection?.alternatives?.length ?? 0) > 0;
       const source = await api.addSource({
         identifier: identifier.trim(),
-        source_type: typeOverride || undefined,
+        source_type: typeOverride || (hasModeChoice ? selectedMode : undefined),
         name: name.trim() || undefined,
       });
       setIdentifier("");
@@ -131,7 +139,34 @@ export function AddSourceForm({
       </div>
 
       {detecting && <p className="field-hint">Detecting source type…</p>}
-      {!detecting && detection && (
+      {!detecting && detection && (detection.alternatives?.length ?? 0) > 0 && !typeOverride && (
+        <div className="source-mode-picker" role="radiogroup" aria-label="How to follow this source">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={selectedMode === detection.source_type}
+            className={`source-mode-option${selectedMode === detection.source_type ? " source-mode-option--active" : ""}`}
+            onClick={() => setSelectedMode(detection.source_type)}
+          >
+            <span className="source-mode-option-label">{detection.label}</span>
+            <span className="source-mode-option-hint">{detection.hint}</span>
+          </button>
+          {detection.alternatives!.map((alt) => (
+            <button
+              key={alt.source_type}
+              type="button"
+              role="radio"
+              aria-checked={selectedMode === alt.source_type}
+              className={`source-mode-option${selectedMode === alt.source_type ? " source-mode-option--active" : ""}`}
+              onClick={() => setSelectedMode(alt.source_type)}
+            >
+              <span className="source-mode-option-label">{alt.label}</span>
+              <span className="source-mode-option-hint">{alt.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {!detecting && detection && !(detection.alternatives?.length && !typeOverride) && (
         <div className="source-detect-pill">
           <span className="source-detect-type">{detection.label}</span>
           <span className="source-detect-hint">{detection.hint}</span>

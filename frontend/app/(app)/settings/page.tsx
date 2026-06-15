@@ -12,6 +12,7 @@ import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton"
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { getToken } from "@/lib/auth";
+import { CaptureDevicesCard } from "@/components/settings/CaptureDevicesCard";
 import { TopicsToTrackEditor } from "@/components/settings/TopicsToTrackEditor";
 
 const ROLES = ["Founder", "Product manager", "Engineer", "Investor", "Researcher", "Other"];
@@ -310,6 +311,20 @@ export default function SettingsPage() {
                   ingestionEmail={me?.ingestion_email}
                   accountEmail={me?.email}
                 />
+              </div>
+            </div>
+
+            {/* ── Save devices (extension + mobile share) ── */}
+            <div className="dash-surface dash-surface-settings" id="capture-devices-section">
+              <div className="dash-surface-head">
+                <h2 className="dash-surface-title">Save devices</h2>
+                <p className="dash-surface-desc">
+                  Connect the Chrome extension or your phone&apos;s share sheet. Each device gets a
+                  long-lived token so saves work without re-logging in.
+                </p>
+              </div>
+              <div className="dash-surface-body dash-surface-body-form">
+                <CaptureDevicesCard />
               </div>
             </div>
 

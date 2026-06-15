@@ -168,6 +168,7 @@ const TYPE_MAP: Record<string, IconFn> = {
   rss:             (s) => <RssSvg size={s} />,
   email:           (s) => <EmailSvg size={s} />,
   url:             (s) => <WebSvg size={s} />,
+  watched_page:    (s) => <WebSvg size={s} />,
   readwise:        (s) => <ReadwiseSvg size={s} />,
   twitter:         (s) => <TwitterSvg size={s} />,
 };

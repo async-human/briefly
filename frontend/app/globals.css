@@ -10311,6 +10311,40 @@ a.outcome-more-today-title:hover { color: var(--accent); text-decoration: underl
   color: var(--text-muted);
   line-height: 1.45;
 }
+.source-mode-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.source-mode-option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.source-mode-option:hover {
+  border-color: var(--text-muted);
+}
+.source-mode-option--active {
+  border-color: var(--accent, #5b8def);
+  background: color-mix(in srgb, var(--accent, #5b8def) 8%, var(--surface));
+}
+.source-mode-option-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+.source-mode-option-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
 .source-advanced {
   font-size: 11px;
   color: var(--text-muted);

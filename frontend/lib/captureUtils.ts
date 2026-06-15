@@ -9,9 +9,9 @@ export function captureResponseToBrowserCapture(res: UrlCaptureResponse): Browse
     user_note: res.user_note,
     created_at: res.created_at,
     in_briefing: false,
-    connection_sentence: res.enrichment.connection_sentence,
-    thread_label: res.enrichment.thread_label,
-    why_relevant: res.enrichment.why_relevant,
+    connection_sentence: res.enrichment.connection_sentence ?? null,
+    thread_label: res.enrichment.thread_label ?? null,
+    why_relevant: res.enrichment.why_relevant ?? null,
   };
 }
 

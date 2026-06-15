@@ -40,7 +40,9 @@ chrome.storage.local.remove(["apiUrl", "frontendUrl"]);
 ## API
 
 - `POST /api/v1/capture/url` — `{ url, title?, note? }` → scrape + enrich + connection feedback
-- Auth: `Authorization: Bearer <jwt>` (synced from the web app connect flow)
+- Auth: `Authorization: Bearer <bcap_ device token>` (minted on connect) or session JWT
+
+Connect flow creates a long-lived **device token** (`bcap_…`) so the extension keeps working without re-login.
 
 ## Icons
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Playfair_Display, DM_Sans, DM_Mono } from "next/font/google";
+import { PwaRegistrar } from "@/components/PwaRegistrar";
 import "./globals.css";
 import "../styles/app-dashboard.css";
 
@@ -50,6 +51,7 @@ export default function RootLayout({
       <body
         className={`${playfair.variable} ${dmSans.variable} ${dmMono.variable}`}
       >
+        <PwaRegistrar />
         {children}
       </body>
     </html>

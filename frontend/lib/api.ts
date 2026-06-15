@@ -1,4 +1,5 @@
 import { API_URL, clearToken, getToken, setAuthNext } from "./auth";
+import { getCaptureToken } from "./captureAuth";
 
 export class ApiError extends Error {
   constructor(
@@ -78,6 +79,66 @@ async function request<T>(
         "Could not reach the server — your brief may still be generating. Try Refresh brief in a moment.",
         0,
       );
+    }
+    throw err;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+/** Capture endpoints accept session JWT or a long-lived bcap_ device token. */
+async function captureRequest<T>(
+  path: string,
+  options: RequestInit = {},
+  timeoutMs?: number,
+): Promise<T> {
+  const token = getToken() || getCaptureToken();
+  if (!token) {
+    throw new ApiError("Not authenticated", 401);
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+    Authorization: `Bearer ${token}`,
+  };
+
+  const controller = timeoutMs ? new AbortController() : null;
+  const timeoutId = controller
+    ? setTimeout(() => controller.abort(), timeoutMs)
+    : null;
+
+  try {
+    const res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+      signal: controller?.signal ?? options.signal,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const detail = body.detail;
+      const message =
+        typeof detail === "string"
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join(", ")
+            : res.statusText;
+      throw new ApiError(message || res.statusText, res.status);
+    }
+
+    if (res.status === 204) return undefined as T;
+    return res.json() as Promise<T>;
+  } catch (err) {
+    if (controller?.signal.aborted) {
+      throw new ApiError(
+        "Request timed out — saving may still complete. Check Saved in a moment.",
+        408,
+      );
+    }
+    if (err instanceof ApiError) throw err;
+    if (err instanceof Error && err.message === "Failed to fetch") {
+      throw new ApiError("Could not reach the server. Check your connection and try again.", 0);
     }
     throw err;
   } finally {
@@ -539,12 +600,19 @@ export type DigestSummary = {
   created_at: string;
 };
 
+export type SourceDetectAlternative = {
+  source_type: string;
+  label: string;
+  hint: string;
+};
+
 export type SourceDetection = {
   source_type: string;
   identifier: string;
   label: string;
   hint: string;
   confidence: string;
+  alternatives?: SourceDetectAlternative[];
 };
 
 export type GmailSender = {
@@ -706,13 +774,25 @@ export type UrlCaptureResponse = {
   already_saved: boolean;
   enrichment_status: "complete" | "partial" | "pending";
   enrichment: {
-    connection_sentence: string | null;
-    thread_key: string | null;
-    thread_label: string | null;
-    thread_item_count: number | null;
-    why_relevant: string | null;
-    briefing_message: string | null;
+    connection_sentence?: string | null;
+    thread_label?: string | null;
+    thread_item_count?: number | null;
+    why_relevant?: string | null;
+    briefing_message?: string | null;
   };
+};
+
+export type CaptureToken = {
+  id: string;
+  name: string;
+  token_prefix: string;
+  platform: string | null;
+  created_at: string;
+  last_used_at: string | null;
+};
+
+export type CaptureTokenCreated = CaptureToken & {
+  token: string;
 };
 
 export type KnowledgeGraphNodeType = "topic" | "source" | "item" | "thought" | "thread";
@@ -1080,11 +1160,19 @@ export const api = {
   // Browser captures (extension + mobile share)
   listCaptures: () => request<BrowserCapture[]>("/api/v1/captures"),
   captureUrl: (body: { url: string; title?: string; note?: string }) =>
-    request<UrlCaptureResponse>(
+    captureRequest<UrlCaptureResponse>(
       "/api/v1/capture/url",
       { method: "POST", body: JSON.stringify(body) },
       20_000,
     ),
+  listCaptureTokens: () => request<CaptureToken[]>("/api/v1/capture/tokens"),
+  createCaptureToken: (body: { name: string; platform?: string }) =>
+    request<CaptureTokenCreated>("/api/v1/capture/tokens", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  revokeCaptureToken: (tokenId: string) =>
+    request<void>(`/api/v1/capture/tokens/${tokenId}`, { method: "DELETE" }),
 
   getKnowledgeGraph: (days?: number) => {
     const qs = days ? `?days=${days}` : "";

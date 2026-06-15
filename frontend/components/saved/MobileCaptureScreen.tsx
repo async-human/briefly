@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, type UrlCaptureResponse } from "@/lib/api";
 import { getToken, setAuthNext } from "@/lib/auth";
+import { getCaptureToken } from "@/lib/captureAuth";
 import { enrichmentConnectionText } from "@/lib/captureUtils";
 import { formatCaptureTitle } from "@/lib/formatCaptureTitle";
 import { graphItemUrl } from "@/lib/graphLinks";
@@ -12,6 +13,10 @@ import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { titleFromShareParams, urlFromShareParams } from "@/lib/shareUrl";
 
 type Phase = "auth" | "capturing" | "success" | "error" | "no-url";
+
+function hasCaptureAuth(): boolean {
+  return !!(getToken() || getCaptureToken());
+}
 
 export function MobileCaptureScreen() {
   const router = useRouter();
@@ -36,7 +41,13 @@ export function MobileCaptureScreen() {
       setPhase("success");
     } catch (err) {
       capturedRef.current = false;
-      setError(err instanceof Error ? err.message : "Could not save this link.");
+      const apiErr = err instanceof Error ? err : new Error("Could not save this link.");
+      if (apiErr.message.includes("401") || apiErr.message.toLowerCase().includes("authenticated")) {
+        setPhase("auth");
+        setError("Session expired. Open Briefly to sign in, or set up a device token in Settings.");
+        return;
+      }
+      setError(apiErr.message);
       setPhase("error");
     }
   }, [shareUrl, shareTitle]);
@@ -44,14 +55,14 @@ export function MobileCaptureScreen() {
   useEffect(() => {
     const fullPath = `${window.location.pathname}${window.location.search}`;
 
-    if (!getToken()) {
-      setAuthNext(fullPath);
-      router.replace(`/login?next=${encodeURIComponent(fullPath)}`);
+    if (!shareUrl) {
+      setPhase("no-url");
       return;
     }
 
-    if (!shareUrl) {
-      setPhase("no-url");
+    if (!hasCaptureAuth()) {
+      setAuthNext(fullPath);
+      router.replace(`/login?next=${encodeURIComponent(fullPath)}`);
       return;
     }
 
@@ -78,10 +89,24 @@ export function MobileCaptureScreen() {
         {phase === "auth" || phase === "capturing" ? (
           <div className="mobile-capture-state" role="status" aria-live="polite">
             <span className="mobile-capture-spinner" aria-hidden />
-            <p className="mobile-capture-heading">Saving to Briefly…</p>
-            <p className="mobile-capture-sub">
-              Scraping and connecting to your threads — same as the extension.
+            <p className="mobile-capture-heading">
+              {phase === "auth" && error ? "Sign in required" : "Saving to Briefly…"}
             </p>
+            <p className="mobile-capture-sub">
+              {phase === "auth" && error
+                ? error
+                : "Scraping and connecting to your threads — same as the extension."}
+            </p>
+            {phase === "auth" && error ? (
+              <div className="mobile-capture-actions">
+                <Link href={`/login?next=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`} className="mobile-capture-btn-primary">
+                  Sign in
+                </Link>
+                <Link href="/settings#capture-devices" className="mobile-capture-btn-secondary">
+                  Device setup
+                </Link>
+              </div>
+            ) : null}
           </div>
         ) : null}
 

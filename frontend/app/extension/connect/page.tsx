@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { api } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 
 declare global {
@@ -22,12 +23,16 @@ declare global {
 
 function ConnectHandler() {
   const searchParams = useSearchParams();
+  const started = useRef(false);
   const [status, setStatus] = useState<"pending" | "success" | "error">("pending");
   const [message, setMessage] = useState("Connecting extension to your Briefly account…");
 
   useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+
     const extId = searchParams.get("ext");
-    const token = getToken();
+    const session = getToken();
 
     if (!extId) {
       setStatus("error");
@@ -35,7 +40,7 @@ function ConnectHandler() {
       return;
     }
 
-    if (!token) {
+    if (!session) {
       setStatus("error");
       setMessage("You're not signed in. Log in to Briefly first, then try again.");
       return;
@@ -49,25 +54,39 @@ function ConnectHandler() {
       return;
     }
 
-    window.chrome.runtime.sendMessage(
-      extId,
-      { type: "BRIEFLY_AUTH", token },
-      (response) => {
-        if (window.chrome?.runtime?.lastError) {
-          setStatus("error");
-          setMessage(window.chrome.runtime.lastError.message ?? "Extension connection failed.");
-          return;
-        }
-        const ok = response && typeof response === "object" && "ok" in response && response.ok;
-        if (ok) {
-          setStatus("success");
-          setMessage("Extension connected. You can close this tab and start saving articles.");
-        } else {
-          setStatus("error");
-          setMessage("Extension did not confirm the connection. Try again from the extension popup.");
-        }
-      },
-    );
+    void (async () => {
+      try {
+        const created = await api.createCaptureToken({
+          name: "Chrome extension",
+          platform: "extension",
+        });
+
+        window.chrome!.runtime!.sendMessage!(
+          extId,
+          { type: "BRIEFLY_AUTH", token: created.token },
+          (response) => {
+            if (window.chrome?.runtime?.lastError) {
+              setStatus("error");
+              setMessage(window.chrome.runtime.lastError.message ?? "Extension connection failed.");
+              return;
+            }
+            const ok = response && typeof response === "object" && "ok" in response && response.ok;
+            if (ok) {
+              setStatus("success");
+              setMessage(
+                "Extension connected. You can close this tab and start saving articles with one click.",
+              );
+            } else {
+              setStatus("error");
+              setMessage("Extension did not confirm the connection. Try again from the extension popup.");
+            }
+          },
+        );
+      } catch (err) {
+        setStatus("error");
+        setMessage(err instanceof Error ? err.message : "Could not create device token.");
+      }
+    })();
   }, [searchParams]);
 
   return (

@@ -7,6 +7,7 @@ import { api, type BrowserCapture } from "@/lib/api";
 import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { SaveLinkPanel } from "@/components/saved/SaveLinkPanel";
+import { MobileShareSetup } from "@/components/saved/MobileShareSetup";
 import { SavedCapturesList } from "@/components/saved/SavedCapturesList";
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
@@ -86,8 +87,15 @@ function SavedPageContent() {
               <div>
                 <h2 className="install-hint-title">Desktop — Chrome extension</h2>
                 <p className="install-hint-desc">
-                  One click on any article. Available from the Chrome Web Store once published.
+                  One click on any article. Connect once from the extension popup — it stays linked
+                  with a device token.
                 </p>
+                {!CHROME_STORE_URL ? (
+                  <p className="install-hint-desc install-hint-dev">
+                    Dev: Chrome → Extensions → Load unpacked → select the <code>extension/</code> folder
+                    in this repo, then click Connect in the popup.
+                  </p>
+                ) : null}
               </div>
               {CHROME_STORE_URL ? (
                 <a
@@ -107,18 +115,9 @@ function SavedPageContent() {
               <div>
                 <h2 className="install-hint-title">Mobile — Share to Briefly</h2>
                 <p className="install-hint-desc">
-                  Add Briefly to your home screen once. On any article, tap Share → Briefly — it
-                  saves instantly and returns you to the page. Or paste a URL above.
+                  Add Briefly to your home screen, then share any article from Chrome or other apps.
                 </p>
-                <ol className="install-hint-steps">
-                  <li>
-                    <strong>iPhone:</strong> Safari → Share → Add to Home Screen
-                  </li>
-                  <li>
-                    <strong>Android:</strong> Chrome menu → Install app / Add to Home screen
-                  </li>
-                  <li>On any article: Share → Briefly</li>
-                </ol>
+                <MobileShareSetup />
               </div>
             </div>
           </div>
