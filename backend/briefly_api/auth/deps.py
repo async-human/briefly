@@ -39,5 +39,46 @@ async def get_current_user(
     return user
 
 
+async def get_capture_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> User:
+    """
+    Auth for capture endpoints: accepts either a normal session JWT (web app,
+    browser extension) or a long-lived capture device token (mobile share
+    extension, iOS Shortcut, PWA). Lets every client hit /capture/* the same way.
+    """
+    if credentials is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    from briefly_api.services import capture_tokens
+
+    token = credentials.credentials
+    if capture_tokens.looks_like_capture_token(token):
+        user = await capture_tokens.resolve_user(db, token)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or revoked capture token",
+            )
+        return user
+
+    # Fall back to the standard session-JWT path.
+    user_id = decode_access_token(token, settings)
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.profile))
+        .where(User.id == user_id, User.is_active.is_(True))
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return user
+
+
 def generate_email_token() -> str:
     return secrets.token_hex(16)

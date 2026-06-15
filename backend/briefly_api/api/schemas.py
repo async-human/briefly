@@ -520,3 +520,21 @@ class BrowserCaptureListOut(BaseModel):
     thread_label: str | None = None
     why_relevant: str | None = None
 
+
+class CaptureTokenCreateIn(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)   # device label
+    platform: str | None = Field(None, max_length=32)       # ios | android | extension | shortcut | web
+
+
+class CaptureTokenOut(BaseModel):
+    id: str
+    name: str
+    token_prefix: str
+    platform: str | None = None
+    created_at: datetime
+    last_used_at: datetime | None = None
+
+
+class CaptureTokenCreatedOut(CaptureTokenOut):
+    token: str   # full plaintext secret — returned only once, at creation
+

@@ -853,3 +853,27 @@ class MagicLink(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ── Capture device tokens ───────────────────────────────────────────────────────
+
+class CaptureToken(Base):
+    """
+    Long-lived, revocable, capture-scoped token for a single device/client
+    (browser extension, mobile share extension, iOS Shortcut, PWA).
+
+    Only a SHA-256 hash of the secret is stored — the plaintext is shown once
+    at creation. Unlike the 7-day JWT, these don't expire, so sporadic mobile
+    capture never silently breaks; users revoke per-device from settings.
+    """
+    __tablename__ = "capture_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)   # device label
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    token_prefix: Mapped[str] = mapped_column(String(16), nullable=False)  # for display, e.g. "bcap_a1b2"
+    platform: Mapped[str | None] = mapped_column(String(32))  # ios | android | extension | shortcut | web
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
