@@ -9,13 +9,24 @@
   <body>
     <div id="app">
       <header class="header">
-        <span class="mark" aria-hidden="true"></span>
-        <span class="brand">Briefly</span>
+        <img src="icons/icon48.png" alt="" class="header-logo" width="22" height="22" />
+        <div class="header-text">
+          <span class="brand">Briefly</span>
+          <span class="tagline">Feed your second brain</span>
+        </div>
       </header>
 
       <div id="state-connect" class="panel hidden">
-        <p class="lead">Connect your Briefly account to start feeding your second brain.</p>
-        <button type="button" id="btn-connect" class="btn btn-primary">Connect to Briefly</button>
+        <p id="connect-lead" class="lead">
+          Connect your account once — then save any article with one click.
+        </p>
+        <ol class="steps">
+          <li>Sign in at sendbriefly.app</li>
+          <li>Return here and click Connect</li>
+        </ol>
+        <button type="button" id="btn-connect" class="btn btn-primary btn-block">
+          Connect to Briefly
+        </button>
       </div>
 
       <div id="state-loading" class="panel">
@@ -25,7 +36,7 @@
       </div>
 
       <div id="state-success" class="panel hidden">
-        <p class="success-label">✓ Added to Briefly</p>
+        <p id="success-label" class="success-label">Added to Briefly</p>
         <h1 id="result-title" class="title"></h1>
         <p id="result-connection" class="connection hidden"></p>
         <p id="result-briefing" class="briefing"></p>
@@ -38,19 +49,28 @@
             placeholder="Why this caught your eye…"
             maxlength="2000"
           ></textarea>
-          <button type="button" id="btn-save-note" class="btn btn-secondary">Save note</button>
+          <button type="button" id="btn-save-note" class="btn btn-secondary btn-block">
+            Save note
+          </button>
         </div>
 
         <div class="actions">
           <button type="button" id="btn-add-thought" class="btn btn-ghost">Add a thought</button>
-          <a id="btn-view" class="btn btn-primary" href="#" target="_blank" rel="noopener">View in Briefly</a>
+          <a id="btn-view" class="btn btn-primary" href="#" target="_blank" rel="noopener">
+            View in Briefly
+          </a>
         </div>
       </div>
 
       <div id="state-error" class="panel hidden">
         <p class="error-label">Couldn&apos;t save</p>
         <p id="error-message" class="lead"></p>
-        <button type="button" id="btn-retry" class="btn btn-primary">Try again</button>
+        <div class="actions">
+          <button type="button" id="btn-retry" class="btn btn-primary">Try again</button>
+          <button type="button" id="btn-reconnect" class="btn btn-secondary hidden">
+            Reconnect
+          </button>
+        </div>
       </div>
     </div>
     <script src="config.js"></script>

@@ -1,5 +1,19 @@
 # Publish Briefly to the Chrome Web Store
 
+## Pre-flight (do this first)
+
+1. **Regenerate icons** from the brand mark:
+   ```powershell
+   cd extension
+   python scripts/generate_icons.py
+   ```
+2. **Load unpacked** once in Chrome and verify:
+   - Popup branding (logo + tagline)
+   - Connect → save article → connection feedback
+   - “Already in Briefly” on duplicate URL
+   - Error on `chrome://` pages (friendly message)
+3. **Screenshots** — see `store-assets/README.md` (1280×800)
+
 ## Prerequisites
 
 - [Chrome Web Store Developer account](https://chrome.google.com/webstore/devconsole) ($5 one-time)
@@ -53,14 +67,13 @@ Requires a free Briefly account at sendbriefly.app.
 | Permission | Why |
 |------------|-----|
 | `activeTab` | Read the current tab URL and title when you click Save |
-| `storage` | Store your Briefly login token locally after you connect |
+| `storage` | Store your Briefly device token locally after you connect |
 | `host_permissions` (api.sendbriefly.app) | Send captured URLs to your Briefly account |
 
-## 4. Screenshots
+## 4. Screenshots & store icon
 
-Capture 1280×800 screenshots showing:
-1. Extension popup after save with connection feedback
-2. Saved page on sendbriefly.app with the article listed
+- **Store icon:** upload `store-assets/store-icon-128.png` (128×128)
+- **Screenshots:** 1280×800 — popup after save, connect screen, Saved page (see `store-assets/README.md`)
 
 ## 5. Upload & submit
 
@@ -71,13 +84,19 @@ Capture 1280×800 screenshots showing:
 
 ## 6. After approval
 
-Set in Vercel environment variables:
+Set **one** of these in Vercel (frontend) environment variables:
 
 ```
-NEXT_PUBLIC_CHROME_STORE_URL=https://chrome.google.com/webstore/detail/YOUR_EXTENSION_ID
+NEXT_PUBLIC_CHROME_EXTENSION_ID=abcdefghijklmnopqrstuvwxyzabcdef
 ```
 
-The **Get extension** button on the Saved page will appear automatically.
+or the full store URL:
+
+```
+NEXT_PUBLIC_CHROME_STORE_URL=https://chromewebstore.google.com/detail/briefly/abcdefghijklmnopqrstuvwxyzabcdef
+```
+
+The **Add to Chrome** button on the Saved page appears automatically. Users install from the store in one click — no “Load unpacked” or local files.
 
 ## Mobile note
 

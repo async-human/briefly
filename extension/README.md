@@ -46,6 +46,10 @@ Connect flow creates a long-lived **device token** (`bcap_…`) so the extension
 
 ## Icons
 
+Regenerate from the brand mark (`frontend/public/briefly-mark.svg`):
+
 ```bash
 python extension/scripts/generate_icons.py
 ```
+
+Produces `extension/icons/icon{16,48,128}.png` and `extension/store-assets/store-icon-128.png` for the Chrome Web Store listing.
