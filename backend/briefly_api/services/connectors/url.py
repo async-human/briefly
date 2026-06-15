@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-
 from briefly_api.config import Settings
 from briefly_api.services.articles import NormalizedContent
 from briefly_api.services.connectors.base import BaseConnector, ConnectorValidation
@@ -21,10 +19,8 @@ class UrlConnector(BaseConnector):
         return value.rstrip("/")
 
     def can_handle(self, identifier: str) -> bool:
-        value = identifier.strip().lower()
-        return value.startswith(("http://", "https://")) or bool(
-            re.fullmatch(r"[\w.-]+\.\w{2,}(/.*)?", value)
-        )
+        # Generic URLs are classified in registry.detect_source (RSS, article, watched page).
+        return False
 
     async def fetch(
         self,

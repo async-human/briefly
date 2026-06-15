@@ -110,6 +110,7 @@ async def init_db() -> None:
             "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_ingestion_at TIMESTAMPTZ",
             "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS ingestion_meta JSONB DEFAULT '{}'::jsonb",
             "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS source_weights JSONB DEFAULT '{}'::jsonb",
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS source_topic_weights JSONB DEFAULT '{}'::jsonb",
             "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS activity_feed JSONB DEFAULT '[]'::jsonb",
             "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS pending_source_discoveries JSONB DEFAULT '[]'::jsonb",
             "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sources_discovery_confirmed_at TIMESTAMPTZ",
@@ -122,6 +123,17 @@ async def init_db() -> None:
                 await conn.execute(text(stmt))
             except Exception as exc:
                 logger.warning("profile migration: %s", exc)
+        # Columns added to pre-existing tables by migrations 006/007 that the
+        # legacy create_all() + alembic-stamp path can skip (see ensure_migrations).
+        for stmt in (
+            "ALTER TABLE behavioral_fingerprints ADD COLUMN IF NOT EXISTS weekly_snapshot JSONB DEFAULT '{}'::jsonb",
+            "ALTER TABLE follow_up_threads ADD COLUMN IF NOT EXISTS content_id VARCHAR(36)",
+            "CREATE INDEX IF NOT EXISTS ix_follow_up_threads_content_id ON follow_up_threads (content_id)",
+        ):
+            try:
+                await conn.execute(text(stmt))
+            except Exception as exc:
+                logger.warning("cross-table migration: %s", exc)
         try:
             await conn.execute(text("""
                 UPDATE user_profiles
@@ -135,6 +147,53 @@ async def init_db() -> None:
         except Exception as exc:
             logger.warning("discovery backfill: %s", exc)
     logger.info("Database initialized (run `alembic upgrade head` for versioned migrations)")
+    await verify_schema_columns()
+
+
+async def verify_schema_columns() -> None:
+    """
+    Compare every ORM-mapped column against the live database and log any drift.
+
+    Non-fatal by design: a missing column is logged at ERROR (so it surfaces in
+    Sentry/Railway logs at boot) rather than 500-ing every request that touches
+    the table. This is the early-warning twin of the ADD COLUMN IF NOT EXISTS
+    block above — if a future migration adds a column to an existing table and
+    nobody updates that block, this turns a silent production outage into a loud
+    startup log line.
+    """
+    from sqlalchemy import inspect as sa_inspect
+
+    def _collect(sync_conn) -> list[str]:
+        insp = sa_inspect(sync_conn)
+        existing_tables = set(insp.get_table_names())
+        drift: list[str] = []
+        for table_name, table in Base.metadata.tables.items():
+            if table_name not in existing_tables:
+                drift.append(f"table '{table_name}' missing entirely")
+                continue
+            db_cols = {c["name"] for c in insp.get_columns(table_name)}
+            for col in table.columns:
+                if col.name not in db_cols:
+                    drift.append(f"{table_name}.{col.name}")
+        return drift
+
+    try:
+        async with engine.connect() as conn:
+            drift = await conn.run_sync(_collect)
+    except Exception as exc:
+        logger.warning("Schema verification skipped (%s)", exc)
+        return
+
+    if drift:
+        logger.error(
+            "SCHEMA DRIFT DETECTED — %d ORM column(s)/table(s) missing from the database: %s. "
+            "Add them to the init_db() ADD COLUMN IF NOT EXISTS block (db/engine.py) "
+            "or run the pending migrations.",
+            len(drift),
+            ", ".join(sorted(drift)),
+        )
+    else:
+        logger.info("Schema check OK — all ORM columns present in the database")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
