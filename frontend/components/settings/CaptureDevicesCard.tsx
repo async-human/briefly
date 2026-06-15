@@ -128,8 +128,9 @@ export function CaptureDevicesCard() {
         <div className="capture-devices-fresh">
           <p className="capture-devices-fresh-title">Copy your device token now</p>
           <p className="settings-field-hint">
-            This is the only time we show the full token. Paste it into the extension if needed,
-            or tap &ldquo;Use on this device&rdquo; for mobile share.
+            This is the only time we show the full token. For mobile share, tap
+            &ldquo;Use on this device&rdquo;. The Chrome extension connects automatically from
+            its popup.
           </p>
           <code className="capture-devices-token">{freshToken.token}</code>
           <div className="capture-devices-fresh-actions">

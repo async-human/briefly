@@ -787,9 +787,11 @@ export function BriefingPanel({
         </div>
         <h2 className="briefing-empty-title">Briefly is preparing your outcome</h2>
         <p className="briefing-empty-desc">
-          {sourcesCount > 0
-            ? "We read your sources overnight — your personalized brief will arrive shortly."
-            : "Connect Gmail and Briefly will deliver your first brief — no source management needed."}
+          {generateError
+            ? generateError
+            : sourcesCount > 0
+              ? "We read your sources overnight — your personalized brief will arrive shortly."
+              : "Connect Gmail and Briefly will deliver your first brief — no source management needed."}
         </p>
         {sourcesCount > 0 && onRegenerate && (
           <button
@@ -800,7 +802,6 @@ export function BriefingPanel({
             Refresh today&apos;s brief
           </button>
         )}
-        {generateError && <p className="form-error" style={{ marginTop: 16 }}>{generateError}</p>}
       </div>
     );
   }

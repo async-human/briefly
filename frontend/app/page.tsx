@@ -2,10 +2,12 @@ import { LandingPageShell } from "@/components/landing/LandingPageShell";
 import { Nav } from "@/components/landing/Nav";
 import { Hero } from "@/components/landing/Hero";
 import { LiveDemo } from "@/components/landing/LiveDemo";
+import { MemoryDemo } from "@/components/landing/MemoryDemo";
 import { SourcesStrip } from "@/components/landing/SourcesStrip";
 import { TrustSourcesSection } from "@/components/landing/TrustSourcesSection";
 import { PrinciplesSection } from "@/components/landing/PrinciplesSection";
 import { Features } from "@/components/landing/Features";
+import { Capabilities } from "@/components/landing/Capabilities";
 import { Roadmap } from "@/components/landing/Roadmap";
 import { CompareSection } from "@/components/landing/CompareSection";
 import { Pricing } from "@/components/landing/Pricing";
@@ -18,10 +20,12 @@ export default function Home() {
       <Nav />
       <Hero />
       <LiveDemo />
+      <MemoryDemo />
       <SourcesStrip />
       <TrustSourcesSection />
       <PrinciplesSection />
       <Features />
+      <Capabilities />
       <Roadmap />
       <CompareSection />
       <Pricing />

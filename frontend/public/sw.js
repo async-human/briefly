@@ -7,3 +7,9 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
+
+/* A fetch handler must exist for the app to be installable on desktop Chrome/Edge.
+ * Pure network passthrough — we deliberately don't cache app pages or API calls. */
+self.addEventListener("fetch", () => {
+  /* default browser handling */
+});

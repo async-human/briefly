@@ -150,7 +150,16 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
         ctx = await _run_agent("SourceCollectorAgent", collector.run, ctx)
         if not ctx.raw_items:
             log.warning("Pipeline: no content ingested for user %s", user_id)
-            return {"success": False, "error": "No content ingested", "items": 0}
+            return {
+                "success": False,
+                "error": (
+                    "Your sources didn't have new content to pull just yet — totally "
+                    "normal right after connecting. Briefly keeps gathering in the "
+                    "background; check back in a few minutes and your first briefing "
+                    "will be ready."
+                ),
+                "items": 0,
+            }
 
         ctx = await _run_agent("ContentCleanerAgent",    cleaner.run,          ctx)
         ctx = await _run_agent("DeduplicationAgent",     deduplication.run,    ctx)

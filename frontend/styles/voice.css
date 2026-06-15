@@ -1,0 +1,190 @@
+.vo-page {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 30%, oklch(58% 0.18 275 / 0.12), transparent 60%),
+    var(--bg, #0f0e13);
+  color: var(--text, #e9e7ef);
+  padding: 20px;
+  overflow: hidden;
+}
+
+.vo-page-head {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vo-greeting {
+  font-family: var(--font-serif, Georgia, serif);
+  font-size: clamp(1.1rem, 3vw, 1.5rem);
+  font-weight: 600;
+  color: var(--text, #e9e7ef);
+}
+
+.vo-open {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #a8a5b3);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.18s ease;
+}
+
+.vo-open:hover {
+  color: var(--accent, #8a7cff);
+}
+
+/* ── Orb stage ───────────────────────────────────────────────────────────── */
+
+.vo-stage {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+
+.vo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.vo-orb {
+  width: 220px;
+  height: 220px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vo-orb:hover {
+  transform: scale(1.03);
+}
+
+.vo-orb:active {
+  transform: scale(0.99);
+}
+
+.vo-canvas {
+  width: 220px;
+  height: 220px;
+  display: block;
+}
+
+.vo-caption {
+  max-width: 440px;
+  min-height: 44px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-secondary, #a8a5b3);
+  padding: 0 12px;
+}
+
+.vo-btn {
+  padding: 11px 22px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.14));
+  background: color-mix(in srgb, var(--accent, #6b5cff) 12%, transparent);
+  color: var(--text, #e9e7ef);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.vo-btn:hover {
+  border-color: color-mix(in srgb, var(--accent, #6b5cff) 45%, transparent);
+  background: color-mix(in srgb, var(--accent, #6b5cff) 20%, transparent);
+}
+
+.vo-unsupported {
+  font-size: 12.5px;
+  color: var(--text-muted, #7c7986);
+}
+
+/* ── Loading ─────────────────────────────────────────────────────────────── */
+
+.vo-loading {
+  display: flex;
+  gap: 8px;
+}
+
+.vo-loading-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent, #8a7cff);
+  opacity: 0.4;
+  animation: vo-bounce 1.2s ease-in-out infinite;
+}
+
+.vo-loading-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.vo-loading-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes vo-bounce {
+  0%, 100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-6px);
+  }
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+
+.vo-page-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 8px;
+  text-align: center;
+}
+
+.vo-install {
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent, #6b5cff);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vo-foot-hint {
+  max-width: 360px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-muted, #7c7986);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vo-loading-dot {
+    animation: none;
+  }
+  .vo-orb {
+    transition: none;
+  }
+}

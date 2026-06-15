@@ -13,6 +13,7 @@ import { PageContentTransition } from "@/components/loading/PageContentTransitio
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { getToken } from "@/lib/auth";
 import { CaptureDevicesCard } from "@/components/settings/CaptureDevicesCard";
+import { ExtensionInstallCard } from "@/components/saved/ExtensionInstallCard";
 import { TopicsToTrackEditor } from "@/components/settings/TopicsToTrackEditor";
 
 const ROLES = ["Founder", "Product manager", "Engineer", "Investor", "Researcher", "Other"];
@@ -324,6 +325,8 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div className="dash-surface-body dash-surface-body-form">
+                <ExtensionInstallCard />
+                <div className="capture-devices-divider" />
                 <CaptureDevicesCard />
               </div>
             </div>
