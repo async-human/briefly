@@ -38,6 +38,7 @@ class SourceType:
     youtube = "youtube"
     reddit = "reddit"
     url = "url"
+    watched_page = "watched_page"
     brain_dump = "brain_dump"
     browser_capture = "browser_capture"
 
@@ -166,6 +167,11 @@ class UserProfile(Base):
     last_ingestion_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ingestion_meta: Mapped[dict] = mapped_column(JSONB, default=dict)
     source_weights: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Per-source × per-topic engagement quality. A source is often great for
+    # one topic and noise for another, so a single source_weight is too coarse.
+    # Structure: {"<source_key>::<topic_key>": {"weight": float, "pos": int,
+    #              "neg": int, "updated_at": iso}}
+    source_topic_weights: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     activity_feed: Mapped[list[dict]] = mapped_column(JSONB, default=list)
 
     # Dynamic source discovery — confirm-before-add

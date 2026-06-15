@@ -11,6 +11,7 @@ from briefly_api.services.connectors.reddit import RedditConnector
 from briefly_api.services.connectors.reddit_account import RedditAccountConnector
 from briefly_api.services.connectors.rss import RssConnector
 from briefly_api.services.connectors.url import UrlConnector
+from briefly_api.services.connectors.watched_page import WatchedPageConnector
 from briefly_api.services.connectors.youtube import YoutubeConnector
 from briefly_api.services.connectors.youtube_account import YoutubeAccountConnector
 from briefly_api.services.url_scraper import discover_rss_feed
@@ -26,6 +27,7 @@ CONNECTORS: list[BaseConnector] = [
     RedditConnector(),
     RssConnector(),
     UrlConnector(),
+    WatchedPageConnector(),   # explicit "follow this page" — never auto-detected
 ]
 
 CONNECTOR_MAP: dict[str, BaseConnector] = {c.source_type: c for c in CONNECTORS}

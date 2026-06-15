@@ -325,8 +325,46 @@ def _source_score(item: RawItem, ctx: PipelineContext) -> float:
     weight = source_weights.get(item.source_id)
     if weight is None:
         weight = source_weights.get(item.source_name.lower(), 0.5)
+    weight = float(weight)
 
-    return apply_priority_to_source_score(float(weight), item.source_id, priority_map)
+    # Blend in the per-topic weight for this source, when the item's topic
+    # matches one we've learned about. A source trusted globally but noisy for
+    # this particular topic gets pulled down (and vice versa).
+    topic_weight = _source_topic_weight(item, ctx)
+    if topic_weight is not None:
+        weight = 0.55 * weight + 0.45 * topic_weight
+
+    return apply_priority_to_source_score(weight, item.source_id, priority_map)
+
+
+def _source_topic_weight(item: RawItem, ctx: PipelineContext) -> float | None:
+    """
+    Look up the learned per-(source, topic) weight that best matches this item.
+    Topics were recorded as brief section labels; we match a topic when its
+    phrase appears in the item's title/summary. Returns None when this source
+    has no per-topic history matching the item.
+    """
+    table: dict = ctx.user.profile.get("source_topic_weights") or {}
+    if not table:
+        return None
+
+    source_key = (item.source_name or "").lower()
+    prefix = f"{source_key}::"
+    text = f"{item.title or ''} {item.summary or ''} {(item.clean_text or '')[:400]}".lower()
+
+    best: float | None = None
+    best_signal = -1
+    for key, entry in table.items():
+        if not key.startswith(prefix) or not isinstance(entry, dict):
+            continue
+        topic = key[len(prefix):].strip()
+        if not topic or topic not in text:
+            continue
+        signal = int(entry.get("pos", 0)) + int(entry.get("neg", 0))
+        if signal > best_signal:
+            best_signal = signal
+            best = float(entry.get("weight", 0.5))
+    return best
 
 
 # ── Helper functions ──────────────────────────────────────────────────────────

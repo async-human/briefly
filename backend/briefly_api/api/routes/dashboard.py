@@ -1487,7 +1487,7 @@ async def get_source_suggestions(
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> list[SourceSuggestionOut]:
-    from briefly_api.services.external_feed_discovery import discover_interest_suggestions_light
+    from briefly_api.services.source_recommendation import recommend_sources
 
     existing = await db.execute(
         select(Source).where(Source.user_id == user.id)
@@ -1501,14 +1501,32 @@ async def get_source_suggestions(
             "role": user.profile.role,
             "goal": user.profile.goal,
             "topic_clusters": user.profile.topic_clusters or [],
+            "source_weights": dict(user.profile.source_weights or {}),
+            "profile_embedding": (
+                list(user.profile.profile_embedding)
+                if user.profile.profile_embedding is not None
+                else None
+            ),
         }
 
     gmail = await get_gmail_connection(db, user.id)
-    suggestions = await discover_interest_suggestions_light(
-        profile_dict, settings, limit=8, gmail_connected=gmail is not None,
+    suggestions = await recommend_sources(
+        db, user.id, settings, profile_dict,
+        limit=8, gmail_connected=gmail is not None, already_added=already_added,
     )
-    filtered = [s for s in suggestions if s["url"].lower() not in already_added]
-    return [SourceSuggestionOut(**s) for s in filtered[:8]]
+    out: list[SourceSuggestionOut] = []
+    for s in suggestions[:8]:
+        out.append(SourceSuggestionOut(
+            name=s.get("name", ""),
+            url=s.get("url", ""),
+            source_type=s.get("source_type", "rss"),
+            topic=s.get("topic", ""),
+            description=s.get("description", ""),
+            method=s.get("method", "interest"),
+            reason=s.get("reason", ""),
+            score=float(s.get("score", 0.0)),
+        ))
+    return out
 
 
 # ── Readwise integration ──────────────────────────────────────────────────────

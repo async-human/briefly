@@ -178,3 +178,84 @@ async def discover_rss_feed(url: str) -> str | None:
     except UrlFetchError:
         return None
     return await asyncio.to_thread(_discover_rss_sync, final_url, html)
+
+
+# ── Link harvesting (for the watched-page connector) ────────────────────────────
+
+# Path fragments that almost never point at a readable article.
+_LINK_DENY = (
+    "/tag/", "/tags/", "/category/", "/categories/", "/author/", "/authors/",
+    "/page/", "/about", "/contact", "/privacy", "/terms", "/login", "/signin",
+    "/signup", "/subscribe", "/feed", "/rss", "/search", "/cdn-cgi/",
+    "/wp-login", "/wp-admin", "/comments", "/cart", "/account",
+)
+_LINK_DENY_EXT = (".xml", ".json", ".rss", ".atom", ".jpg", ".jpeg", ".png",
+                  ".gif", ".svg", ".pdf", ".zip", ".mp3", ".mp4", ".css", ".js")
+
+
+def _looks_like_article_path(path: str) -> bool:
+    """Heuristic: article URLs are deeper and wordier than nav/section links."""
+    clean = path.rstrip("/")
+    if not clean or clean == "":
+        return False
+    segments = [s for s in clean.split("/") if s]
+    if not segments:
+        return False
+    last = segments[-1].lower()
+    # A date in the path or a multi-word slug is a strong article signal.
+    has_slug = ("-" in last and len(last) > 8) or any(seg.isdigit() and len(seg) == 4 for seg in segments)
+    return has_slug and len(segments) >= 1
+
+
+def _extract_links_sync(page_url: str, html: str, *, max_links: int = 40) -> list[str]:
+    """Pull candidate article links from an index/listing page, same-host only."""
+    base_host = urlparse(page_url).netloc.removeprefix("www.")
+    found: list[str] = []
+    seen: set[str] = set()
+    for match in re.finditer(r'<a\b[^>]*\bhref=["\']([^"\'#]+)["\']', html, re.IGNORECASE):
+        href = match.group(1).strip()
+        if not href or href.startswith(("mailto:", "javascript:", "tel:")):
+            continue
+        absolute = urljoin(page_url, href)
+        parsed = urlparse(absolute)
+        if parsed.scheme not in ("http", "https"):
+            continue
+        if parsed.netloc.removeprefix("www.") != base_host:
+            continue
+        lower = absolute.lower()
+        if any(token in lower for token in _LINK_DENY):
+            continue
+        if lower.rsplit("?", 1)[0].endswith(_LINK_DENY_EXT):
+            continue
+        if not _looks_like_article_path(parsed.path):
+            continue
+        normalized = absolute.split("#", 1)[0].rstrip("/")
+        if normalized in seen or normalized.rstrip("/") == page_url.rstrip("/"):
+            continue
+        seen.add(normalized)
+        found.append(normalized)
+        if len(found) >= max_links:
+            break
+    return found
+
+
+async def harvest_links(url: str, *, max_links: int = 40) -> list[str]:
+    """Fetch a page and return candidate article URLs linked from it."""
+    final_url, html = await asyncio.to_thread(_fetch_page_sync, url)
+    return await asyncio.to_thread(_extract_links_sync, final_url, html, max_links=max_links)
+
+
+async def scrape_many(urls: list[str], *, concurrency: int = 5) -> list[NormalizedContent]:
+    """Scrape multiple article URLs concurrently, skipping ones that fail."""
+    sem = asyncio.Semaphore(concurrency)
+
+    async def _one(u: str) -> NormalizedContent | None:
+        async with sem:
+            try:
+                final_url, html = await asyncio.to_thread(_fetch_page_sync, u)
+                return await asyncio.to_thread(_extract_article_sync, final_url, html)
+            except Exception:
+                return None
+
+    results = await asyncio.gather(*[_one(u) for u in urls])
+    return [r for r in results if r is not None]
