@@ -5,7 +5,7 @@
   "description": "Your personal AI briefing, read aloud. Open Briefly and hear what matters today.",
   "start_url": "/listen",
   "display": "standalone",
-  "background_color": "#0f0e13",
+  "background_color": "#07070b",
   "theme_color": "#5e6ad2",
   "categories": ["productivity", "news"],
   "icons": [

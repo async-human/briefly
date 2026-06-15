@@ -19,7 +19,6 @@ export function InstallPrompt() {
   useEffect(() => {
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
-      // iOS Safari
       (window.navigator as unknown as { standalone?: boolean }).standalone === true;
     if (standalone) {
       setInstalled(true);
