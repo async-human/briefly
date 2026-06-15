@@ -15,18 +15,22 @@ from briefly_api.api.schemas import (
     BrainDumpOut,
     BrainDumpTextIn,
     BrainDumpTranscribeOut,
+    CaptureTokenCreatedOut,
+    CaptureTokenCreateIn,
+    CaptureTokenOut,
     UrlCaptureFeedbackOut,
     UrlCaptureIn,
     UrlCaptureOut,
     BrowserCaptureListOut,
 )
 from briefly_api.api.deps.rate_limit import rate_limit_transcribe_preview_dep
-from briefly_api.auth.deps import get_current_user
+from briefly_api.auth.deps import get_capture_user, get_current_user
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import User
 from briefly_api.services import brain_dump as brain_dump_service
 from briefly_api.services import browser_capture as browser_capture_service
+from briefly_api.services import capture_tokens as capture_tokens_service
 
 log = logging.getLogger(__name__)
 
@@ -116,10 +120,67 @@ async def list_browser_captures(
     ]
 
 
+# ── Capture device tokens ──────────────────────────────────────────────────────
+# Managed from the logged-in web app (session JWT required), so capture clients
+# on other devices can authenticate without the 7-day JWT expiry.
+
+@router.get("/capture/tokens", response_model=list[CaptureTokenOut])
+async def list_capture_tokens(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[CaptureTokenOut]:
+    rows = await capture_tokens_service.list_tokens(db, user.id)
+    return [
+        CaptureTokenOut(
+            id=r.id,
+            name=r.name,
+            token_prefix=r.token_prefix,
+            platform=r.platform,
+            created_at=r.created_at,
+            last_used_at=r.last_used_at,
+        )
+        for r in rows
+    ]
+
+
+@router.post("/capture/tokens", response_model=CaptureTokenCreatedOut, status_code=status.HTTP_201_CREATED)
+async def create_capture_token(
+    body: CaptureTokenCreateIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> CaptureTokenCreatedOut:
+    created = await capture_tokens_service.create_token(
+        db, user.id, body.name, platform=body.platform,
+    )
+    await db.commit()
+    r = created.record
+    return CaptureTokenCreatedOut(
+        id=r.id,
+        name=r.name,
+        token_prefix=r.token_prefix,
+        platform=r.platform,
+        created_at=r.created_at,
+        last_used_at=r.last_used_at,
+        token=created.plaintext,  # shown exactly once
+    )
+
+
+@router.delete("/capture/tokens/{token_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_capture_token(
+    token_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    revoked = await capture_tokens_service.revoke_token(db, user.id, token_id)
+    if not revoked:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+    await db.commit()
+
+
 @router.post("/capture/url", response_model=UrlCaptureOut, status_code=status.HTTP_201_CREATED)
 async def capture_page_url(
     body: UrlCaptureIn,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_capture_user),
     db: AsyncSession = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> UrlCaptureOut:

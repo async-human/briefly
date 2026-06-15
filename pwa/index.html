@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0b0f" />
+  <title>Save to Briefly</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="config.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header class="brand">
+      <div class="logo">B</div>
+      <span>Save to Briefly</span>
+    </header>
+
+    <!-- Capture result (shown when a share arrives) -->
+    <section id="capture" class="card hidden">
+      <p id="capture-status" class="status">Saving…</p>
+      <p id="capture-title" class="title"></p>
+      <p id="capture-note" class="muted"></p>
+      <p id="capture-connection" class="connection hidden"></p>
+      <a id="capture-open" class="btn-secondary hidden" target="_blank" rel="noreferrer">Open Briefly</a>
+    </section>
+
+    <!-- Not connected: paste a device token -->
+    <section id="connect" class="card hidden">
+      <h1>Connect this device</h1>
+      <p class="muted">
+        In Briefly, open <strong>Settings → Connected devices</strong>, create a device token,
+        and paste it here. Stored only on this device.
+      </p>
+      <input id="token-input" type="password" inputmode="text" autocomplete="off"
+             placeholder="bcap_…" />
+      <button id="token-save" class="btn">Connect</button>
+      <p id="connect-error" class="error hidden"></p>
+      <a id="get-token-link" class="link" target="_blank" rel="noreferrer">Get a device token →</a>
+    </section>
+
+    <!-- Connected idle state (opened directly, not via share) -->
+    <section id="idle" class="card hidden">
+      <h1>You're connected</h1>
+      <p class="muted">
+        Share any link to <strong>Save to Briefly</strong> from your browser or apps —
+        it lands in tomorrow's briefing.
+      </p>
+      <label class="field">
+        <span>Or paste a link to save now</span>
+        <input id="manual-url" type="url" inputmode="url" placeholder="https://…" />
+      </label>
+      <button id="manual-save" class="btn">Save link</button>
+      <button id="disconnect" class="btn-ghost">Disconnect this device</button>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

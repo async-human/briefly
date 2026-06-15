@@ -11,6 +11,7 @@ const TYPE_OVERRIDES = [
   { value: "youtube", label: "YouTube channel" },
   { value: "reddit", label: "Subreddit" },
   { value: "url", label: "Website" },
+  { value: "watched_page", label: "Follow a page (no RSS needed)" },
   { value: "email", label: "Email sender" },
 ];
 
