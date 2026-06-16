@@ -58,6 +58,19 @@ function buildWordTimeline(words: string[]): number[] {
   });
 }
 
+/** Split an answer into sentence-ish chunks for pipelined TTS, merging tiny tails. */
+function splitSentences(text: string): string[] {
+  const raw = text.match(/[^.!?]+[.!?]+["')\]]*\s*|[^.!?]+$/g) || [text];
+  const out: string[] = [];
+  for (const piece of raw) {
+    const t = piece.trim();
+    if (!t) continue;
+    if (out.length && t.length < 18) out[out.length - 1] = `${out[out.length - 1]} ${t}`;
+    else out.push(t);
+  }
+  return out.length ? out : [text.trim()];
+}
+
 export function MobileOrbOverlay() {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -195,6 +208,55 @@ export function MobileOrbOverlay() {
     }
   }
 
+  async function playSentence(
+    blob: Blob,
+    words: string[],
+    wordOffset: number,
+    signal?: AbortSignal,
+  ) {
+    const url = URL.createObjectURL(blob);
+    const timeline = buildWordTimeline(words);
+    try {
+      await new Promise<void>((resolve) => {
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        let ticker = 0;
+        const updateWordSync = () => {
+          if (!words.length) return;
+          const duration =
+            Number.isFinite(audio.duration) && audio.duration > 0
+              ? audio.duration
+              : Math.max(words.length * 0.42, 1.2);
+          const progress = Math.max(0, Math.min(1, audio.currentTime / duration));
+          let next = words.length - 1;
+          for (let i = 0; i < timeline.length; i += 1) {
+            if (progress <= timeline[i]) {
+              next = i;
+              break;
+            }
+          }
+          setSpokenWordIndex(wordOffset + next);
+        };
+        const finish = () => {
+          if (ticker) window.clearInterval(ticker);
+          resolve();
+        };
+        audio.onloadedmetadata = updateWordSync;
+        audio.ontimeupdate = updateWordSync;
+        audio.onended = finish;
+        audio.onerror = finish;
+        if (signal?.aborted) {
+          finish();
+          return;
+        }
+        ticker = window.setInterval(updateWordSync, 90);
+        void audio.play().catch(() => resolve());
+      });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
   async function handleTurnResponse(turn: Awaited<ReturnType<typeof api.orbTurn>>, signal?: AbortSignal) {
     if (!turn.answer?.trim()) {
       setMode("idle");
@@ -204,46 +266,39 @@ export function MobileOrbOverlay() {
     const trace = Array.isArray(turn.tool_trace) ? turn.tool_trace : [];
     const tools = trace.map((t) => String(t.tool || "")).filter(Boolean);
     setToolMode(tools.length ? tools.join(" · ") : "");
-    setCaption(turn.answer);
-    const words = turn.answer.trim().split(/\s+/).filter(Boolean);
-    const timeline = buildWordTimeline(words);
-    setSpokenWordIndex(words.length ? 0 : -1);
+
+    const fullAnswer = turn.answer.trim();
+    setCaption(fullAnswer);
+    const allWords = fullAnswer.split(/\s+/).filter(Boolean);
+    setSpokenWordIndex(allWords.length ? 0 : -1);
     setMode("speaking");
-    const tts = await api.orbSpeak(turn.answer, undefined, signal);
-    const url = URL.createObjectURL(tts);
-    await new Promise<void>((resolve) => {
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      let ticker = 0;
-      const updateWordSync = () => {
-        if (!words.length) return;
-        const duration =
-          Number.isFinite(audio.duration) && audio.duration > 0
-            ? audio.duration
-            : Math.max(words.length * 0.42, 1.8);
-        const progress = Math.max(0, Math.min(1, audio.currentTime / duration));
-        let next = words.length - 1;
-        for (let i = 0; i < timeline.length; i += 1) {
-          if (progress <= timeline[i]) {
-            next = i;
-            break;
-          }
-        }
-        setSpokenWordIndex(next);
-      };
-      const finish = () => {
-        if (ticker) window.clearInterval(ticker);
-        setSpokenWordIndex(-1);
-        resolve();
-      };
-      audio.onloadedmetadata = updateWordSync;
-      audio.ontimeupdate = updateWordSync;
-      audio.onended = finish;
-      audio.onerror = finish;
-      ticker = window.setInterval(updateWordSync, 90);
-      void audio.play().catch(() => resolve());
-    });
-    URL.revokeObjectURL(url);
+
+    // Pipeline TTS: synthesize sentence-by-sentence, start playing the first as
+    // soon as it's ready, and prefetch the next couple so playback never waits.
+    // Time-to-first-audio drops from "whole clip" to "first sentence."
+    const sentences = splitSentences(fullAnswer);
+    const sentenceWords = sentences.map((s) => s.split(/\s+/).filter(Boolean));
+    const jobs: (Promise<Blob | null> | null)[] = new Array(sentences.length).fill(null);
+    const ensure = (i: number) => {
+      if (i >= 0 && i < sentences.length && jobs[i] === null) {
+        jobs[i] = api.orbSpeak(sentences[i], undefined, signal).catch(() => null);
+      }
+    };
+    const PREFETCH = 2;
+    for (let i = 0; i < Math.min(PREFETCH, sentences.length); i += 1) ensure(i);
+
+    let wordOffset = 0;
+    for (let i = 0; i < sentences.length; i += 1) {
+      if (signal?.aborted) break;
+      ensure(i);
+      const job = jobs[i];
+      const blob = job ? await job : null;
+      ensure(i + 1); // keep the pipeline full while this clip plays
+      if (blob && !signal?.aborted) {
+        await playSentence(blob, sentenceWords[i], wordOffset, signal);
+      }
+      wordOffset += sentenceWords[i].length;
+    }
     audioRef.current = null;
     setSpokenWordIndex(-1);
   }
