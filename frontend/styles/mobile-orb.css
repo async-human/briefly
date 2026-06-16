@@ -352,11 +352,16 @@
 .jarvis-response {
   margin: 0;
   max-width: 26rem;
-  font-size: clamp(0.96875rem, 2.35vw, 1.1rem);
-  line-height: 1.68;
-  color: oklch(95% 0.02 220 / 0.94);
+  font-size: clamp(1rem, 2.4vw, 1.15rem);
+  line-height: 1.66;
+  color: oklch(96% 0.015 220 / 0.95);
   letter-spacing: 0.006em;
-  text-wrap: pretty;
+  text-wrap: balance;
+}
+
+/* Idle / non-speaking text reads as one clean line, not per-word fragments. */
+.jarvis-response:not(.is-karaoke) {
+  font-weight: 380;
 }
 
 .jarvis-response-shell {
@@ -401,9 +406,9 @@
 .jarvis-response-word {
   color: oklch(95% 0.02 220 / 0.74);
   display: inline-block;
-  margin-right: 0.28em;
-  transform: translateY(0.24em);
-  opacity: 0.34;
+  margin-right: 0.32em;
+  transform: translateY(0.16em);
+  opacity: 0.5;
   transition:
     color 120ms ease,
     text-shadow 120ms ease,
@@ -416,7 +421,7 @@
 }
 
 .jarvis-response-shell.is-speaking .jarvis-response-word {
-  color: oklch(95% 0.02 220 / 0.54);
+  color: oklch(95% 0.02 220 / 0.6);
 }
 
 .jarvis-response-word.is-spoken {

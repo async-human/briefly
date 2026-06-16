@@ -446,15 +446,18 @@ export function MobileOrbOverlay() {
 
           <p className="jarvis-hint">{orbHint}</p>
           <div className={`jarvis-response-shell${mode === "speaking" ? " is-speaking" : ""}`}>
-            <p className="jarvis-response" aria-live="polite">
-              {captionWords.length
+            <p
+              className={`jarvis-response${mode === "speaking" ? " is-karaoke" : ""}`}
+              aria-live="polite"
+            >
+              {mode === "speaking" && captionWords.length
                 ? captionWords.map((word, i) => (
                     <span
                       key={`${word}-${i}`}
                       className={[
                         "jarvis-response-word",
-                        mode === "speaking" && i <= spokenWordIndex ? "is-spoken" : "",
-                        mode === "speaking" && i === spokenWordIndex ? "is-active" : "",
+                        i <= spokenWordIndex ? "is-spoken" : "",
+                        i === spokenWordIndex ? "is-active" : "",
                         isEmphasisWord(word) ? "is-emphasis" : "",
                       ]
                         .filter(Boolean)
