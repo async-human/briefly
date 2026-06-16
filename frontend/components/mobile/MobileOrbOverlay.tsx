@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "@/lib/api";
 import {
@@ -65,6 +65,7 @@ export function MobileOrbOverlay() {
   const [caption, setCaption] = useState("How can I help you today?");
   const [enabled, setEnabled] = useState(true);
   const [toolMode, setToolMode] = useState("");
+  const [heardText, setHeardText] = useState("");
   const [query, setQuery] = useState("");
   const [composeOpen, setComposeOpen] = useState(false);
   const [spokenWordIndex, setSpokenWordIndex] = useState(-1);
@@ -98,18 +99,6 @@ export function MobileOrbOverlay() {
       document.body.style.overflow = prev;
     };
   }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (mode !== "idle") interrupt();
-        else setOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, mode]);
 
   function stopStream() {
     if (streamRef.current) {
@@ -189,6 +178,7 @@ export function MobileOrbOverlay() {
     abortRef.current = ctl;
     try {
       const turn = await api.orbTurn(blob, "mobile-orb.webm", undefined, ctl.signal);
+      setHeardText((turn.transcript || "").trim());
       if (!turn.answer?.trim()) {
         setMode("idle");
         setCaption("I couldn't form a response. Try again.");
@@ -261,6 +251,7 @@ export function MobileOrbOverlay() {
   async function sendTextQuery() {
     const text = query.trim();
     if (!text) return;
+    setHeardText(text);
     setQuery("");
     setMode("thinking");
     setCaption("One moment.");
@@ -268,6 +259,7 @@ export function MobileOrbOverlay() {
     abortRef.current = ctl;
     try {
       const turn = await api.orbTurnText(text, undefined, ctl.signal);
+      setHeardText((turn.transcript || text).trim());
       if (!turn.answer?.trim()) {
         setMode("idle");
         setCaption("I couldn't form a response. Try again.");
@@ -284,7 +276,7 @@ export function MobileOrbOverlay() {
     }
   }
 
-  function interrupt() {
+  const interrupt = useCallback(() => {
     abortRef.current?.abort();
     stopPlayback();
     if (recorderRef.current && recorderRef.current.state === "recording") {
@@ -300,7 +292,19 @@ export function MobileOrbOverlay() {
     setCaption("Standing by.");
     setToolMode("");
     setSpokenWordIndex(-1);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (mode !== "idle") interrupt();
+        else setOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, mode, interrupt]);
 
   function onCoreAction() {
     if (!enabled && mode === "idle") return;
@@ -373,6 +377,7 @@ export function MobileOrbOverlay() {
             <span className={`jarvis-status-dot mode-${mode}`} aria-hidden />
             {STATUS_LABEL[mode]}
           </p>
+          {heardText ? <p className="jarvis-heard">Heard: {heardText}</p> : null}
 
           <button
             type="button"
@@ -401,7 +406,6 @@ export function MobileOrbOverlay() {
                         .join(" ")}
                     >
                       {word}
-                      {i < captionWords.length - 1 ? " " : ""}
                     </span>
                   ))
                 : caption}

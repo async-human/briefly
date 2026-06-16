@@ -351,16 +351,6 @@ async def run_orb_turn(
     if not transcript:
         raise ValueError("No speech detected — try again.")
 
-    tool_result = await _run_orb_tools(db, user.id, transcript) if getattr(user, "id", None) else None
-    if tool_result is not None:
-        return {
-            "transcript": transcript,
-            "thread_id": thread_id,
-            "answer": tool_result.get("answer", ""),
-            "citations": tool_result.get("citations", []),
-            "tool_trace": [{"tool": "regex_router", "matched": True}],
-        }
-
     llm_tool_result = await _llm_plan_and_execute(
         db,
         user,
@@ -375,6 +365,17 @@ async def run_orb_turn(
             "answer": llm_tool_result.get("answer", ""),
             "citations": llm_tool_result.get("citations", []),
             "tool_trace": llm_tool_result.get("tool_trace", []),
+        }
+
+    # Fallback shortcut router for simple explicit intents if LLM planning is unavailable.
+    tool_result = await _run_orb_tools(db, user.id, transcript) if getattr(user, "id", None) else None
+    if tool_result is not None:
+        return {
+            "transcript": transcript,
+            "thread_id": thread_id,
+            "answer": tool_result.get("answer", ""),
+            "citations": tool_result.get("citations", []),
+            "tool_trace": [{"tool": "regex_router_fallback", "matched": True}],
         }
 
     result = await ask_briefly(

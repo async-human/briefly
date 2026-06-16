@@ -82,8 +82,9 @@
 .jarvis-shell {
   position: relative;
   z-index: 1;
-  width: min(34rem, 100%);
-  min-height: min(34rem, calc(100dvh - 2rem));
+  width: min(34rem, calc(100vw - 2rem));
+  height: min(42rem, calc(100dvh - 2rem));
+  max-height: calc(100dvh - 2rem);
   display: flex;
   flex-direction: column;
   border-radius: 1.25rem;
@@ -254,10 +255,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.75rem;
-  padding: 1rem 1.5rem 1.25rem;
+  padding: 0.9rem 1.25rem 1.1rem;
   text-align: center;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .jarvis-status {
@@ -270,6 +274,20 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: oklch(76% 0.08 215 / 0.9);
+}
+
+.jarvis-heard {
+  margin: -0.2rem auto 0.15rem;
+  max-width: min(100%, 28rem);
+  font-size: 0.73rem;
+  line-height: 1.45;
+  color: oklch(82% 0.05 220 / 0.86);
+  border: 1px solid oklch(78% 0.08 210 / 0.2);
+  border-radius: 0.55rem;
+  background: oklch(16% 0.03 248 / 0.48);
+  padding: 0.45rem 0.58rem;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
 
 .jarvis-status-dot {
@@ -383,6 +401,7 @@
 .jarvis-response-word {
   color: oklch(95% 0.02 220 / 0.74);
   display: inline-block;
+  margin-right: 0.28em;
   transform: translateY(0.24em);
   opacity: 0.34;
   transition:
@@ -390,6 +409,10 @@
     text-shadow 120ms ease,
     transform 180ms ease,
     opacity 180ms ease;
+}
+
+.jarvis-response-word:last-child {
+  margin-right: 0;
 }
 
 .jarvis-response-shell.is-speaking .jarvis-response-word {
@@ -466,6 +489,7 @@
 .jarvis-footer {
   padding: 0.75rem 1.25rem 1.25rem;
   border-top: 1px solid oklch(78% 0.08 210 / 0.1);
+  flex-shrink: 0;
 }
 
 .jarvis-compose-toggle {
@@ -609,5 +633,32 @@
   .jarvis-overlay,
   .jarvis-shell {
     animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .jarvis-overlay {
+    padding: max(0.5rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right))
+      max(0.5rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
+  }
+
+  .jarvis-shell {
+    width: calc(100vw - 1rem);
+    height: calc(100dvh - 1rem);
+    max-height: calc(100dvh - 1rem);
+    border-radius: 1rem;
+  }
+
+  .jarvis-core {
+    width: min(14.25rem, 68vw);
+    height: min(14.25rem, 68vw);
+  }
+
+  .jarvis-response-shell {
+    max-height: 8.2rem;
+  }
+
+  .jarvis-footer {
+    padding: 0.65rem 0.95rem 0.95rem;
   }
 }
