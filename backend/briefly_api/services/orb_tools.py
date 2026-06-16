@@ -1,0 +1,199 @@
+"""
+briefly_api/services/orb_tools.py
+
+Declarative tool registry for the voice orb.
+
+Each tool is one `OrbTool`: the planner prompt, the fast-path router, and the
+executor are all generated from this list — so adding a capability means
+appending one entry here instead of editing four separate call sites.
+
+Conventions:
+  - `fast_patterns`  → regexes that confidently route to this tool WITHOUT an
+                       LLM planner round-trip (the latency win).
+  - `side_effect`    → "read" (safe) or "write". WRITE tools must be gated
+                       behind explicit user confirmation in the client before
+                       they're allowed to execute. Every tool today is read-only.
+  - `handler`        → async (db, user, *, transcript, thread_id, content_id,
+                       args) -> {"answer": str, "citations": list, "thread_id"?}.
+  - `args_schema`    → optional JSON-schema for structured arguments the planner
+                       can extract (foundation for richer tools; unused today).
+"""
+from __future__ import annotations
+
+import re
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from briefly_api.db.models import Digest, DigestItem, User
+from briefly_api.services.browser_capture import list_recent_captures
+
+ToolHandler = Callable[..., Awaitable[dict]]
+
+
+@dataclass(frozen=True)
+class OrbTool:
+    name: str
+    description: str
+    handler: ToolHandler
+    side_effect: str = "read"  # "read" | "write"
+    fast_patterns: tuple[re.Pattern[str], ...] = ()
+    args_schema: dict[str, Any] | None = None
+
+    def matches(self, text: str) -> bool:
+        return any(p.search(text) for p in self.fast_patterns)
+
+
+# ── Read-only data-tool handlers ─────────────────────────────────────────────
+
+
+async def today_brief_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    today = datetime.now(timezone.utc).date().isoformat()
+    digest = (
+        await db.execute(
+            select(Digest).where(Digest.user_id == user.id, Digest.digest_date == today)
+        )
+    ).scalar_one_or_none()
+    if not digest:
+        return {
+            "answer": "Your briefing for today is not ready yet. Ask me again in a few minutes.",
+            "citations": [],
+        }
+    items = (
+        await db.execute(
+            select(DigestItem)
+            .where(DigestItem.digest_id == digest.id)
+            .order_by(DigestItem.position.asc())
+            .limit(5)
+        )
+    ).scalars().all()
+    if not items:
+        return {
+            "answer": "Your briefing exists but has no items yet. It may still be generating.",
+            "citations": [],
+        }
+    lines = ["Here are the top items in your briefing today:"]
+    cites: list[dict] = []
+    for i, it in enumerate(items, start=1):
+        lines.append(f"{i}. {it.headline}")
+        cites.append(
+            {
+                "ref": f"S{i}",
+                "content_id": it.content_id or f"digest-item:{it.id}",
+                "title": it.headline,
+                "url": it.source_url,
+                "source_name": it.source_name,
+                "snippet": (it.summary or "")[:280],
+                "kind": "today_brief",
+            }
+        )
+    return {"answer": " ".join(lines), "citations": cites}
+
+
+async def saved_queue_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    captures = await list_recent_captures(db, user.id, limit=5)
+    if not captures:
+        return {"answer": "Your saved queue is clear — there are no unread items right now.", "citations": []}
+    lines = ["You have saved items waiting:"]
+    cites: list[dict] = []
+    for i, cap in enumerate(captures, start=1):
+        lines.append(f"{i}. {cap.title}")
+        cites.append(
+            {
+                "ref": f"S{i}",
+                "content_id": cap.id,
+                "title": cap.title,
+                "url": cap.url,
+                "source_name": "Saved",
+                "snippet": (cap.summary or "")[:280],
+                "kind": "saved_item",
+            }
+        )
+    return {"answer": " ".join(lines), "citations": cites}
+
+
+async def proactive_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    from briefly_api.agents.proactive.proactive_surfacing import get_for_api
+
+    events = await get_for_api(db, user.id)
+    if not events:
+        return {
+            "answer": "No urgent proactive updates right now. I'll surface important changes when they appear.",
+            "citations": [],
+        }
+    top = sorted(events, key=lambda e: int(e.get("priority") or 0), reverse=True)[:3]
+    lines = ["Here are the most important updates right now:"]
+    cites: list[dict] = []
+    for i, ev in enumerate(top, start=1):
+        lines.append(f"{i}. {ev.get('title')}: {ev.get('body')}")
+        cites.append(
+            {
+                "ref": f"S{i}",
+                "content_id": ev.get("id", ""),
+                "title": ev.get("title", "Proactive event"),
+                "url": None,
+                "source_name": "Proactive",
+                "snippet": str(ev.get("body") or "")[:280],
+                "kind": "proactive_event",
+            }
+        )
+    return {"answer": " ".join(lines), "citations": cites}
+
+
+# ── Registry of read-only data tools ─────────────────────────────────────────
+# (ask_briefly is registered in services/orb.py, where the patchable brain lives.)
+
+DATA_TOOLS: list[OrbTool] = [
+    OrbTool(
+        name="today_brief",
+        description="Fetch today's briefing items and summarize key headlines.",
+        handler=today_brief_handler,
+        fast_patterns=(
+            re.compile(r"(?:today(?:'s)?\s+(?:brief|briefing|briefs)|brief(?:ing)?\s+today)", re.IGNORECASE),
+        ),
+    ),
+    OrbTool(
+        name="saved_queue",
+        description="Fetch saved/unread queue items the user has not read.",
+        handler=saved_queue_handler,
+        fast_patterns=(
+            re.compile(r"(?:saved|unread|reading\s+list|backlog|queue)", re.IGNORECASE),
+        ),
+    ),
+    OrbTool(
+        name="proactive_events",
+        description="Fetch high-priority proactive events to surface now.",
+        handler=proactive_handler,
+        fast_patterns=(
+            re.compile(r"(?:anything\s+important|proactive|alerts?|urgent|what\s+should\s+i\s+know)", re.IGNORECASE),
+        ),
+    ),
+]
