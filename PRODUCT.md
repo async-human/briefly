@@ -42,9 +42,16 @@ serves the spine. Nothing should feel like a separate product.
 | Voice orb (dashboard FAB) — **canonical** | Core | "talk to your briefing" |
 | Ask Briefly (`/ask`) — the orb's full conversation view | Core | same brain, expanded; shares the thread |
 | Tool routing (today_brief, saved, proactive, ask) | Core | answers grounded in *your* corpus |
+| Web search — explicit, attributed **fallback** | Bounded | backstops the corpus; off by default |
 
 > One assistant, two views of one continuous conversation. The orb hands off to
 > `/ask` on the same thread. There is **no** other assistant surface.
+>
+> **Web search exception (deliberate):** the assistant can search the open web,
+> but only on *explicit* request ("search the web for…"), results clearly labeled
+> "from the web," and off unless configured. The default remains corpus-first —
+> the spine ("your sources, not the open web") still governs the everyday
+> experience; web is a backstop, not the front door.
 
 ### 3 · Your Knowledge — the corpus that powers the brief
 | Surface / capability | Status | Serves the spine by… |

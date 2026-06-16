@@ -142,7 +142,8 @@ async def _llm_plan_and_execute(
         "You are OrbPlanner. Select tools for a spoken assistant turn.\n"
         'Return strict JSON: {"steps":[{"tool":"...","why":"..."}]}.\n'
         f"Allowed tools: {', '.join(t.name for t in REGISTRY)}.\n"
-        "Use ask_briefly for open-ended questions.\n"
+        "Use ask_briefly (the user's own sources) for open-ended questions — it is the default.\n"
+        "Use web_search ONLY for explicit open-web requests or current external facts the corpus can't cover.\n"
         f"Max {_MAX_TOOL_STEPS} steps."
     )
     planner_user = f"User transcript: {transcript}\n\nTools:\n{tool_lines}"

@@ -184,7 +184,47 @@ async def proactive_handler(
     return {"answer": " ".join(lines), "citations": cites}
 
 
-# ── Registry of read-only data tools ─────────────────────────────────────────
+async def web_search_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    from briefly_api.services.web_search import web_search
+
+    query = ((args or {}).get("query") or transcript or "").strip()
+    if not query:
+        return {"answer": "What would you like me to look up on the web?", "citations": []}
+
+    results = await web_search(query)
+    if not results:
+        return {
+            "answer": "Web search isn't enabled, so I can only answer from your own sources right now.",
+            "citations": [],
+        }
+
+    lines = ["Here's what I found on the web — note this is the open web, not your own sources:"]
+    cites: list[dict] = []
+    for i, r in enumerate(results, start=1):
+        lines.append(f"{i}. {r['title']}")
+        cites.append(
+            {
+                "ref": f"S{i}",
+                "content_id": "",
+                "title": r["title"],
+                "url": r.get("url"),
+                "source_name": "Web",
+                "snippet": (r.get("snippet") or "")[:280],
+                "kind": "web_search",
+            }
+        )
+    return {"answer": " ".join(lines), "citations": cites}
+
+
+# ── Registry of orb tools ─────────────────────────────────────────────────────
 # (ask_briefly is registered in services/orb.py, where the patchable brain lives.)
 
 DATA_TOOLS: list[OrbTool] = [
@@ -211,5 +251,21 @@ DATA_TOOLS: list[OrbTool] = [
         fast_patterns=(
             re.compile(r"(?:anything\s+important|proactive|alerts?|urgent|what\s+should\s+i\s+know)", re.IGNORECASE),
         ),
+    ),
+    OrbTool(
+        name="web_search",
+        description=(
+            "Search the public web for current facts or info NOT in the user's own "
+            "sources. Use ONLY for explicit web/internet requests, or when the user's "
+            "corpus clearly cannot answer — prefer the user's own sources otherwise."
+        ),
+        handler=web_search_handler,
+        fast_patterns=(
+            re.compile(r"\b(search|look\s*up|find|pull|fetch)\b.{0,40}\b(web|internet|online|google)\b", re.IGNORECASE),
+            re.compile(r"\b(on|from|across|over)\s+the\s+(web|internet)\b", re.IGNORECASE),
+            re.compile(r"\bweb\s*search\b", re.IGNORECASE),
+            re.compile(r"\bgoogle\s+(it|this|that|for)\b", re.IGNORECASE),
+        ),
+        args_schema={"query": "what to search the web for"},
     ),
 ]

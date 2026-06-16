@@ -120,6 +120,14 @@ class Settings(BaseSettings):
     digest_from_email: str = "digest@briefly.app"
     digest_from_name: str = "Briefly"
 
+    # ── Web search (optional, explicit fallback — see PRODUCT.md) ─────────────
+    # The assistant answers from the user's own sources by default; this backstops
+    # explicit "search the web" requests only. Off unless enabled + key are set.
+    web_search_enabled: bool = False
+    web_search_provider: Literal["tavily", "brave"] = "tavily"
+    web_search_api_key: str = ""
+    web_search_max_results: int = 5
+
     # ── YouTube ───────────────────────────────────────────────────────────────
     youtube_api_key: str = ""
 
