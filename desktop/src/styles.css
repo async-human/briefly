@@ -37,6 +37,19 @@ body {
   padding-top: 6px;
 }
 
+.mode-chip {
+  margin-top: -2px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: oklch(84% 0.03 276 / 0.85);
+  border: 1px solid oklch(100% 0 0 / 0.12);
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: oklch(16% 0.02 275 / 0.7);
+  backdrop-filter: blur(12px);
+}
+
 /* ── Orb ─────────────────────────────────────────────────────────────── */
 
 .orb-wrap {
@@ -70,10 +83,12 @@ body {
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 body[data-mode="listening"] .orb-hit {
   box-shadow: inset 0 0 0 2px oklch(86% 0.16 150 / 0.55);
+  transform: translate(-50%, -50%) scale(1.03);
 }
 
 /* ── Caption ─────────────────────────────────────────────────────────── */
@@ -124,7 +139,7 @@ body[data-mode="thinking"] .caption {
   margin-top: 6px;
   opacity: 0;
   transform: translateY(4px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.22s ease, transform 0.22s ease;
 }
 
 #app:hover .controls {

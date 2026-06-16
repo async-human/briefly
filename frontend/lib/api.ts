@@ -249,6 +249,7 @@ export type OrbTurnResult = {
   thread_id: string | null;
   answer: string;
   citations: Array<Record<string, unknown>>;
+  tool_trace?: Array<Record<string, unknown>>;
 };
 
 export type Profile = {

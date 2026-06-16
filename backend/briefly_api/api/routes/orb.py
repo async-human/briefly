@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import logging
 
+import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.api.schemas import OrbSpeakIn, OrbTurnOut, ProactiveEventOut
@@ -19,7 +20,7 @@ from briefly_api.auth.deps import get_capture_user
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import User
 from briefly_api.services import orb as orb_service
-from briefly_api.tts.adapter import get_tts_adapter
+from briefly_api.tts.adapter import TTSError, get_tts_adapter
 
 log = logging.getLogger(__name__)
 
@@ -57,17 +58,25 @@ async def orb_speak(
     body: OrbSpeakIn,
     user: User = Depends(get_capture_user),
     db: AsyncSession = Depends(get_db),  # noqa: ARG001 — auth dep needs a session
-) -> StreamingResponse:
+) -> Response:
     tts = get_tts_adapter()
     if not tts.enabled:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="TTS is disabled (set TTS_PROVIDER).",
         )
-    return StreamingResponse(
-        tts.synthesize_stream(body.text, voice=body.voice),
-        media_type=tts.content_type(),
-    )
+    try:
+        # Use full synthesis here so transport/provider failures are raised before
+        # response streaming begins; that avoids ASGI task-group crashes and
+        # returns a clean HTTP error to mobile/desktop clients.
+        audio = await tts.synthesize(body.text, voice=body.voice)
+    except (TTSError, httpx.HTTPError) as exc:
+        log.warning("orb_speak failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="TTS backend unavailable. Check TTS_PROVIDER/TTS_BASE_URL settings.",
+        ) from exc
+    return Response(content=audio, media_type=tts.content_type())
 
 
 @router.get("/orb/proactive", response_model=list[ProactiveEventOut])

@@ -107,6 +107,14 @@ function setMode(mode) {
   state.mode = mode;
   document.body.dataset.mode = mode;
   document.body.classList.toggle("is-speaking", mode === "speaking");
+  const chip = document.getElementById("modeChip");
+  if (chip) {
+    chip.textContent =
+      mode === "listening" ? "Listening" :
+      mode === "thinking" ? "Thinking" :
+      mode === "speaking" ? "Speaking" :
+      "Idle";
+  }
   energyTarget =
     mode === "listening" ? 0.86 :
     mode === "thinking" ? 0.46 :
@@ -269,6 +277,12 @@ async function stopListeningAndSend() {
     state.turnAbort = null;
     const answer = (turn && turn.answer ? String(turn.answer) : "").trim();
     if (!answer) throw new Error("No answer");
+    const trace = Array.isArray(turn?.tool_trace) ? turn.tool_trace : [];
+    if (trace.length) {
+      const names = trace.map((t) => String(t.tool || "")).filter(Boolean).join(" + ");
+      const ws = wakeStatusEl();
+      if (ws && names) ws.textContent = `Mode: ${names}`;
+    }
     setCaption(answer);
     await playTts(answer);
   } catch (err) {

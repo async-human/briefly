@@ -556,4 +556,5 @@ class OrbTurnOut(BaseModel):
     thread_id: str | None = None
     answer: str
     citations: list[dict] = Field(default_factory=list)
+    tool_trace: list[dict] = Field(default_factory=list)
 

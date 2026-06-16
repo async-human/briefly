@@ -21,6 +21,7 @@ export function MobileOrbOverlay() {
   const [mode, setMode] = useState<Mode>("idle");
   const [caption, setCaption] = useState("Tap orb to start talking");
   const [enabled, setEnabled] = useState(true);
+  const [toolMode, setToolMode] = useState("");
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -110,6 +111,9 @@ export function MobileOrbOverlay() {
         setCaption("No answer returned. Try again.");
         return;
       }
+      const trace = Array.isArray(turn.tool_trace) ? turn.tool_trace : [];
+      const tools = trace.map((t) => String(t.tool || "")).filter(Boolean);
+      setToolMode(tools.length ? tools.join(" + ") : "");
       setCaption(turn.answer);
       setMode("speaking");
       const tts = await api.orbSpeak(turn.answer, undefined, ctl.signal);
@@ -127,6 +131,7 @@ export function MobileOrbOverlay() {
     } catch {
       setMode("idle");
       setCaption("Could not complete voice turn.");
+      setToolMode("");
     } finally {
       abortRef.current = null;
     }
@@ -168,7 +173,11 @@ export function MobileOrbOverlay() {
       {open ? (
         <div className="mob-orb-panel" role="dialog" aria-label="Briefly mobile orb">
           <div className={`mob-orb-core mode-${mode}`} />
+          <p className="mob-orb-mode">
+            {mode === "idle" ? "Ready" : mode === "listening" ? "Listening" : mode === "thinking" ? "Thinking" : "Speaking"}
+          </p>
           <p className="mob-orb-caption">{caption}</p>
+          {toolMode ? <p className="mob-orb-tool">Tools: {toolMode}</p> : null}
           <button className="mob-orb-action" onClick={onMainAction} disabled={mode === "thinking"}>
             {buttonLabel}
           </button>

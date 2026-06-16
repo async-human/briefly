@@ -49,6 +49,14 @@ _SAVED_UNREAD_QUERY = re.compile(
     r")",
     re.IGNORECASE,
 )
+_TODAY_BRIEF_QUERY = re.compile(
+    r"(?:"
+    r"today(?:'s|\s+is)?\s+(?:brief|briefing|briefs)|"
+    r"(?:my\s+)?(?:brief|briefing)\s+(?:for\s+)?today|"
+    r"what(?:'s|\s+is)?\s+(?:in|on)\s+(?:my\s+)?(?:today'?s?\s+)?brief"
+    r")",
+    re.IGNORECASE,
+)
 _MAX_HISTORY = 8
 _MAX_RETRIEVAL_POOL = 250
 _MAX_CHUNKS = 8
@@ -161,7 +169,53 @@ def _never_show_block(text: str, never_show: list[str]) -> bool:
 
 def is_saved_unread_query(message: str) -> bool:
     """True when the user is asking about their saved / unread backlog."""
-    return bool(_SAVED_UNREAD_QUERY.search(message.strip()))
+    text = message.strip()
+    if _TODAY_BRIEF_QUERY.search(text):
+        return False
+    return bool(_SAVED_UNREAD_QUERY.search(text))
+
+
+def is_today_brief_query(message: str) -> bool:
+    return bool(_TODAY_BRIEF_QUERY.search(message.strip()))
+
+
+async def _retrieve_today_brief(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    never_show: list[str],
+    limit: int = 12,
+) -> list[ContextChunk]:
+    today = datetime.now(timezone.utc).date().isoformat()
+    digest_result = await db.execute(
+        select(Digest).where(Digest.user_id == user_id, Digest.digest_date == today)
+    )
+    digest = digest_result.scalar_one_or_none()
+    if not digest:
+        return []
+    items_result = await db.execute(
+        select(DigestItem)
+        .where(DigestItem.digest_id == digest.id)
+        .order_by(DigestItem.position.asc())
+        .limit(limit)
+    )
+    chunks: list[ContextChunk] = []
+    for item in items_result.scalars().all():
+        blob = f"{item.headline} {item.summary} {item.why_it_matters}"
+        if _never_show_block(blob, never_show):
+            continue
+        chunks.append(
+            ContextChunk(
+                ref="",
+                content_id=item.content_id or f"digest-item:{item.id}",
+                title=item.headline,
+                url=item.source_url,
+                source_name=item.source_name or "Briefing",
+                snippet=(f"{item.summary}\n\nWhy it matters: {item.why_it_matters}")[:1200],
+                kind="today_brief",
+            )
+        )
+    return chunks
 
 
 async def _retrieve_saved_unread(
@@ -692,7 +746,8 @@ You answer using ONLY the sources in the context pack, labeled [S1], [S2], etc.
 - Connect dots across sources when relevant.
 - Never mention that you are an AI or language model.
 - Never tell the user to check external apps (Reader, email, etc.) — Briefly IS their reading system.
-- When the pack is a SAVED/UNREAD INDEX, list each item by title with a short note on why it's unread. If the index is empty, say their saved queue is clear."""
+- When the pack is a SAVED/UNREAD INDEX, list each item by title with a short note on why it's unread. If the index is empty, say their saved queue is clear.
+- When the pack is a TODAY BRIEF INDEX, summarize today's briefing items first. If empty, clearly say today's briefing is not ready yet."""
 
 
 def _is_referential_followup(message: str) -> bool:
@@ -792,9 +847,20 @@ async def _prepare_ask(
     focused = bool(content_id or digest_item_id)
     focus_title: str | None = None
 
+    today_brief_mode = is_today_brief_query(message) and not content_id and not digest_item_id
     saved_unread_mode = is_saved_unread_query(message) and not content_id and not digest_item_id
 
-    if saved_unread_mode:
+    if today_brief_mode:
+        today_chunks = await _retrieve_today_brief(db, user.id, never_show=never_show)
+        all_chunks = _assign_refs(today_chunks, start_index=1)
+        if all_chunks:
+            context_pack = "TODAY BRIEF INDEX:\n" + _format_context_pack(all_chunks)
+        else:
+            context_pack = (
+                "TODAY BRIEF INDEX: No briefing is ready for today yet. "
+                "Tell the user the brief may still be generating."
+            )
+    elif saved_unread_mode:
         saved_chunks = await _retrieve_saved_unread(db, user.id, never_show=never_show)
         all_chunks = _assign_refs(saved_chunks, start_index=1)
         if all_chunks:

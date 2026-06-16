@@ -10,6 +10,7 @@
   background: radial-gradient(circle at 30% 30%, #b8a7ff, #6d53ff);
   color: #fff;
   font-size: 20px;
+  box-shadow: 0 12px 28px rgba(40, 27, 120, 0.45);
 }
 
 .mob-orb-panel {
@@ -27,6 +28,7 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  box-shadow: 0 18px 44px rgba(5, 3, 20, 0.45);
 }
 
 .mob-orb-core {
@@ -35,6 +37,7 @@
   border-radius: 50%;
   background: radial-gradient(circle at 30% 30%, #cfc5ff, #6d53ff);
   box-shadow: 0 0 32px rgba(109, 83, 255, 0.55);
+  animation: mob-orb-breathe 2.8s ease-in-out infinite;
 }
 
 .mob-orb-core.mode-listening {
@@ -54,6 +57,21 @@
   margin: 0;
 }
 
+.mob-orb-mode {
+  margin: -4px 0 0;
+  color: #bcb3ea;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mob-orb-tool {
+  margin: -2px 0 2px;
+  color: #9e93d9;
+  font-size: 11px;
+  text-align: center;
+}
+
 .mob-orb-action,
 .mob-orb-sub {
   width: 100%;
@@ -65,11 +83,17 @@
 .mob-orb-action {
   background: #6d53ff;
   color: white;
+  font-weight: 600;
 }
 
 .mob-orb-sub {
   background: transparent;
   color: #c7bfef;
+}
+
+@keyframes mob-orb-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
 }
 
 @media (min-width: 768px) {
