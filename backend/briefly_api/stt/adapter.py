@@ -72,6 +72,17 @@ class STTAdapter:
             return await self._groq(audio_bytes, filename, content_type, model, language, prompt)
         if provider == "openai":
             return await self._openai(audio_bytes, filename, content_type, model, language, prompt)
+        if provider == "openai_compatible":
+            # Self-hosted SOTA open models (faster-whisper-server / Speaches / Parakeet)
+            # exposing OpenAI's /v1/audio/transcriptions API.
+            base = (self._s.stt_base_url or "").rstrip("/")
+            if not base:
+                raise RuntimeError("STT_BASE_URL not set (required for provider=openai_compatible)")
+            return await self._openai(
+                audio_bytes, filename, content_type, model, language, prompt,
+                base_url=base,
+                api_key=self._s.stt_api_key or "no-key",
+            )
         if provider == "deepgram":
             return await self._deepgram(audio_bytes, filename, content_type, model, language, prompt)
         raise ValueError(f"Unknown STT provider: {provider}")
@@ -164,9 +175,15 @@ class STTAdapter:
         model: str,
         language: str | None,
         prompt: str,
+        *,
+        base_url: str | None = None,
+        api_key: str | None = None,
     ) -> str:
-        if not self._s.openai_api_key:
+        # base_url=None → OpenAI cloud; otherwise an OpenAI-compatible self-hosted server.
+        key = api_key if api_key is not None else self._s.openai_api_key
+        if base_url is None and not key:
             raise RuntimeError("OPENAI_API_KEY not set (required for STT provider=openai)")
+        endpoint = f"{base_url}/audio/transcriptions" if base_url else "https://api.openai.com/v1/audio/transcriptions"
 
         data: dict[str, str] = {
             "model": model,
@@ -193,8 +210,8 @@ class STTAdapter:
                 upload_type = "audio/wav"
 
         return await self._post_transcription(
-            "https://api.openai.com/v1/audio/transcriptions",
-            self._s.openai_api_key,
+            endpoint,
+            key,
             data,
             upload_bytes,
             upload_name,

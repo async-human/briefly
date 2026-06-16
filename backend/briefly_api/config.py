@@ -75,15 +75,22 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
 
     # ── Speech-to-text — fully agnostic ───────────────────────────────────────
-    # SPEECH_TO_TEXT_PROVIDER (alias: STT_PROVIDER): openai | deepgram | groq
-    # openai   → STT_MODEL=gpt-4o-transcribe (OPENAI_API_KEY)
-    # deepgram → STT_MODEL=nova-2 or nova-3 (DEEPGRAM_API_KEY)
-    # groq     → STT_MODEL=whisper-large-v3 (GROQ_API_KEY)
-    speech_to_text_provider: Literal["openai", "deepgram", "groq"] = Field(
+    # SPEECH_TO_TEXT_PROVIDER (alias: STT_PROVIDER): openai | deepgram | groq | openai_compatible
+    # openai            → STT_MODEL=gpt-4o-transcribe (OPENAI_API_KEY)
+    # deepgram          → STT_MODEL=nova-2 or nova-3 (DEEPGRAM_API_KEY)
+    # groq              → STT_MODEL=whisper-large-v3 (GROQ_API_KEY)
+    # openai_compatible → self-hosted SOTA open models via an OpenAI-compatible
+    #                     /v1/audio/transcriptions server (faster-whisper-server,
+    #                     Speaches, Parakeet). Set STT_BASE_URL; STT_MODEL is the
+    #                     server's model id (e.g. "Systran/faster-whisper-large-v3").
+    speech_to_text_provider: Literal["openai", "deepgram", "groq", "openai_compatible"] = Field(
         default="openai",
         validation_alias=AliasChoices("speech_to_text_provider", "stt_provider"),
     )
     stt_model: str = "gpt-4o-transcribe"
+    # Base URL for openai_compatible STT (e.g. http://localhost:8000/v1). Empty = OpenAI cloud.
+    stt_base_url: str = ""
+    stt_api_key: str = ""  # optional; many self-hosted servers accept any/none
     deepgram_api_key: str = ""
 
     # ── Embeddings — fully agnostic ───────────────────────────────────────────
@@ -268,6 +275,20 @@ class Settings(BaseSettings):
     audio_enabled: bool = False
     audio_storage_path: str = "/tmp/briefly_audio"
     audio_voice_name: str = "M1"
+
+    # ── Text-to-speech — fully agnostic (for /listen + the voice orb) ──────────
+    # TTS_PROVIDER:
+    #   openai_compatible → self-hosted SOTA open models via an OpenAI-compatible
+    #                       /v1/audio/speech server. Default targets Kokoro-FastAPI
+    #                       (Apache-2.0, fast, CPU-friendly). Set TTS_BASE_URL.
+    #   openai            → OpenAI cloud TTS (OPENAI_API_KEY).
+    #   disabled          → no streaming TTS (falls back to the AudioAgent path).
+    tts_provider: Literal["openai_compatible", "openai", "disabled"] = "openai_compatible"
+    tts_model: str = "kokoro"               # server-side model id (Kokoro-FastAPI: "kokoro")
+    tts_voice: str = "af_heart"             # Kokoro default voice
+    tts_format: str = "mp3"                 # mp3 | wav | opus | pcm
+    tts_base_url: str = "http://localhost:8880/v1"  # Kokoro-FastAPI default; empty = OpenAI cloud
+    tts_api_key: str = ""                   # optional; self-hosted servers often need none
 
     @field_validator("audio_voice_name", mode="before")
     @classmethod
