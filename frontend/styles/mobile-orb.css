@@ -497,8 +497,32 @@
   flex-shrink: 0;
 }
 
+.jarvis-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.jarvis-expand-link {
+  border: none;
+  background: transparent;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: oklch(76% 0.12 278 / 0.92);
+  cursor: pointer;
+  padding: 0.5rem 0;
+  white-space: nowrap;
+  transition: color 180ms ease;
+}
+
+.jarvis-expand-link:hover {
+  color: oklch(86% 0.14 278);
+}
+
 .jarvis-compose-toggle {
-  width: 100%;
   border: none;
   background: transparent;
   font-family: var(--font-mono), ui-monospace, monospace;

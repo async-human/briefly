@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { askUrl } from "@/lib/askLinks";
 import {
   buildRecordingBlob,
   createMediaRecorder,
@@ -87,6 +89,9 @@ export function MobileOrbOverlay() {
   const chunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const threadIdRef = useRef<string | null>(null);
+  const router = useRouter();
+  const [hasConversation, setHasConversation] = useState(false);
 
   const orbHint = useMemo(() => {
     if (!enabled) return "Microphone disabled";
@@ -137,6 +142,16 @@ export function MobileOrbOverlay() {
     if (mode !== "idle") interrupt();
     setOpen(false);
     setComposeOpen(false);
+  }
+
+  // Hand off to the full conversation view, continuing the same thread so the
+  // orb and /ask are two views of one assistant — not two separate ones.
+  function openFullConversation() {
+    const id = threadIdRef.current;
+    if (mode !== "idle") interrupt();
+    setOpen(false);
+    setComposeOpen(false);
+    router.push(askUrl(id ? { threadId: id } : undefined));
   }
 
   async function beginListening() {
@@ -190,7 +205,12 @@ export function MobileOrbOverlay() {
     const ctl = new AbortController();
     abortRef.current = ctl;
     try {
-      const turn = await api.orbTurn(blob, "mobile-orb.webm", undefined, ctl.signal);
+      const turn = await api.orbTurn(
+        blob,
+        "mobile-orb.webm",
+        threadIdRef.current ? { thread_id: threadIdRef.current } : undefined,
+        ctl.signal,
+      );
       setHeardText((turn.transcript || "").trim());
       if (!turn.answer?.trim()) {
         setMode("idle");
@@ -263,6 +283,10 @@ export function MobileOrbOverlay() {
       setCaption("I couldn't form a response. Try again.");
       return;
     }
+    if (turn.thread_id) {
+      threadIdRef.current = turn.thread_id;
+      setHasConversation(true);
+    }
     const trace = Array.isArray(turn.tool_trace) ? turn.tool_trace : [];
     const tools = trace.map((t) => String(t.tool || "")).filter(Boolean);
     setToolMode(tools.length ? tools.join(" · ") : "");
@@ -313,7 +337,11 @@ export function MobileOrbOverlay() {
     const ctl = new AbortController();
     abortRef.current = ctl;
     try {
-      const turn = await api.orbTurnText(text, undefined, ctl.signal);
+      const turn = await api.orbTurnText(
+        text,
+        threadIdRef.current ? { thread_id: threadIdRef.current } : undefined,
+        ctl.signal,
+      );
       setHeardText((turn.transcript || text).trim());
       if (!turn.answer?.trim()) {
         setMode("idle");
@@ -515,9 +543,16 @@ export function MobileOrbOverlay() {
               </button>
             </form>
           ) : (
-            <button type="button" className="jarvis-compose-toggle" onClick={() => setComposeOpen(true)}>
-              Type instead
-            </button>
+            <div className="jarvis-footer-actions">
+              <button type="button" className="jarvis-compose-toggle" onClick={() => setComposeOpen(true)}>
+                Type instead
+              </button>
+              {hasConversation && (
+                <button type="button" className="jarvis-expand-link" onClick={openFullConversation}>
+                  Open full conversation →
+                </button>
+              )}
+            </div>
           )}
         </footer>
       </div>
