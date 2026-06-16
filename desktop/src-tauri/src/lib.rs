@@ -1,3 +1,9 @@
+use std::{
+    io::{BufRead, BufReader},
+    process::{Child, Command, Stdio},
+    sync::Mutex,
+    thread,
+};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -6,6 +12,59 @@ use tauri::{
 use tauri_plugin_autostart::{ManagerExt, MacosLauncher};
 
 const DASHBOARD_URL: &str = "https://app.sendbriefly.app/dashboard";
+
+#[derive(serde::Serialize)]
+struct DesktopAuthPayload {
+    token: String,
+    api_base: Option<String>,
+}
+
+#[derive(Default)]
+struct WakewordState {
+    child: Mutex<Option<Child>>,
+}
+
+#[derive(serde::Serialize)]
+struct WakewordStartOut {
+    active: bool,
+    mode: String,
+}
+
+fn decode_query_component(v: &str) -> String {
+    v.replace('+', " ")
+        .replace("%3A", ":")
+        .replace("%3a", ":")
+        .replace("%2F", "/")
+        .replace("%2f", "/")
+        .replace("%3F", "?")
+        .replace("%3f", "?")
+        .replace("%3D", "=")
+        .replace("%3d", "=")
+        .replace("%26", "&")
+        .replace("%25", "%")
+}
+
+fn parse_auth_deep_link(arg: &str) -> Option<DesktopAuthPayload> {
+    if !arg.starts_with("briefly://auth?") {
+        return None;
+    }
+    let query = arg.split_once('?')?.1;
+    let mut token: Option<String> = None;
+    let mut api_base: Option<String> = None;
+    for pair in query.split('&') {
+        let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
+        let v = decode_query_component(v);
+        match k {
+            "token" if !v.is_empty() => token = Some(v),
+            "api_base" if !v.is_empty() => api_base = Some(v),
+            _ => {}
+        }
+    }
+    Some(DesktopAuthPayload {
+        token: token?,
+        api_base,
+    })
+}
 
 /// Toggle the floating orb window visibility.
 fn toggle_orb(app: &tauri::AppHandle) {
@@ -19,7 +78,7 @@ fn toggle_orb(app: &tauri::AppHandle) {
     }
 }
 
-/// Show the orb and ask the frontend to speak the briefing.
+/// Show the orb and ask the frontend to trigger push-to-talk.
 fn trigger_speak(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -42,11 +101,84 @@ fn position_bottom_right(window: &tauri::WebviewWindow) {
     }
 }
 
+fn wakeword_exe_and_args() -> Option<(String, Vec<String>)> {
+    let exe = std::env::var("BRIEFLY_WAKEWORD_EXE").ok()?;
+    let args = std::env::var("BRIEFLY_WAKEWORD_ARGS")
+        .ok()
+        .map(|v| v.split_whitespace().map(|s| s.to_string()).collect())
+        .unwrap_or_default();
+    Some((exe, args))
+}
+
+#[tauri::command]
+fn wakeword_start(app: tauri::AppHandle, state: tauri::State<'_, WakewordState>) -> WakewordStartOut {
+    if state
+        .child
+        .lock()
+        .ok()
+        .and_then(|guard| guard.as_ref().map(|_| true))
+        .unwrap_or(false)
+    {
+        return WakewordStartOut {
+            active: true,
+            mode: "native".into(),
+        };
+    }
+    let Some((exe, args)) = wakeword_exe_and_args() else {
+        return WakewordStartOut {
+            active: false,
+            mode: "fallback".into(),
+        };
+    };
+
+    let mut cmd = Command::new(exe);
+    cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::null());
+    let Ok(mut child) = cmd.spawn() else {
+        return WakewordStartOut {
+            active: false,
+            mode: "fallback".into(),
+        };
+    };
+    if let Some(stdout) = child.stdout.take() {
+        let app_handle = app.clone();
+        thread::spawn(move || {
+            let reader = BufReader::new(stdout);
+            for line in reader.lines().map_while(Result::ok) {
+                if line.trim() == "WAKE" {
+                    let _ = app_handle.emit("wake-detected", ());
+                }
+            }
+        });
+    }
+    if let Ok(mut guard) = state.child.lock() {
+        *guard = Some(child);
+    }
+    WakewordStartOut {
+        active: true,
+        mode: "native".into(),
+    }
+}
+
+#[tauri::command]
+fn wakeword_stop(state: tauri::State<'_, WakewordState>) -> bool {
+    let Ok(mut guard) = state.child.lock() else {
+        return false;
+    };
+    let Some(mut child) = guard.take() else {
+        return false;
+    };
+    let _ = child.kill();
+    true
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(WakewordState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![wakeword_start, wakeword_stop])
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             None,
@@ -58,7 +190,7 @@ pub fn run() {
 
             // ── System-tray icon + menu ───────────────────────────────────────
             let speak_i =
-                MenuItem::with_id(app, "speak", "Speak my briefing", true, None::<&str>)?;
+                MenuItem::with_id(app, "speak", "Push to talk", true, None::<&str>)?;
             let show_i =
                 MenuItem::with_id(app, "show", "Show / hide orb", true, None::<&str>)?;
             let open_i =
@@ -96,6 +228,16 @@ pub fn run() {
 
             if let Some(window) = app.get_webview_window("main") {
                 position_bottom_right(&window);
+                // Handle deep-link bootstrap: briefly://auth?token=bcap_...&api_base=...
+                let args: Vec<String> = std::env::args().collect();
+                for arg in args {
+                    if let Some(payload) = parse_auth_deep_link(&arg) {
+                        let _ = window.emit("desktop-auth", payload);
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                        break;
+                    }
+                }
             }
 
             Ok(())

@@ -9,6 +9,7 @@ import { AppSidebar } from "./AppSidebar";
 import { BrainDumpFab } from "./BrainDumpFab";
 import { LearnedToastProvider } from "./LearnedToast";
 import { FreeTierBanner } from "@/components/billing/FreeTierBanner";
+import { ensureDesktopOrbLinked } from "@/lib/orbDesktopLink";
 
 type DashboardShellProps = {
   children: React.ReactNode;
@@ -28,6 +29,10 @@ export function DashboardShell({ children, userName, avatarUrl }: DashboardShell
       document.body.style.overflow = prev;
     };
   }, [sidebarOpen]);
+
+  useEffect(() => {
+    void ensureDesktopOrbLinked();
+  }, []);
 
   return (
     <LearnedToastProvider>

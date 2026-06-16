@@ -112,8 +112,8 @@ export function CaptureDevicesCard() {
   return (
     <div className="capture-devices" id="capture-devices">
       <p className="settings-field-hint capture-devices-intro">
-        Device tokens let the browser extension and mobile share sheet save articles without
-        re-logging in. Create one per device — the secret is shown only once.
+        Device tokens let the extension, mobile share sheet, and desktop orb call capture/orb APIs
+        without re-logging in. Create one per device — the secret is shown only once.
       </p>
 
       {localTokenPrefix ? (

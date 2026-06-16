@@ -1,21 +1,29 @@
 # Briefly Desktop — the floating voice orb
 
 An always-on desktop companion: a small floating orb that lives in the corner of
-your screen, launches on login, and **speaks your briefing** the first time you
-open your computer each day. Built with [Tauri v2](https://v2.tauri.app) — a
+your screen, launches on login, and supports **push-to-talk voice turns** against
+the orb backend. Built with [Tauri v2](https://v2.tauri.app) — a
 ~5 MB native app with a tiny memory footprint (it sits idle all day, so that
 matters).
 
-It **speaks** (output only). There's no microphone, no wake word, no
-always-listening — by design. It reads your brief aloud with an elegant animated
-orb, and that's it.
+Wake-word support is available with a native-worker-first design:
+- preferred: local wake worker process (emits wake events to the app)
+- fallback: web speech recognition beta
+- always available: click-to-talk
+
+To run the native worker in local dev, set:
+
+```bash
+BRIEFLY_WAKEWORD_EXE=python
+BRIEFLY_WAKEWORD_ARGS="desktop/wake/openwakeword_worker.py"
+```
 
 ```
 desktop/
 ├── src/                 # the orb UI (static HTML/CSS/JS — no build step)
 │   ├── index.html
 │   ├── styles.css
-│   └── orb.js           # canvas animation + Web Speech + briefing fetch
+│   └── orb.js           # orb animation + PTT capture + /orb/turn + /orb/speak
 └── src-tauri/           # the native shell (Rust)
     ├── src/lib.rs       # tray menu, autostart, window positioning
     ├── tauri.conf.json  # frameless, transparent, always-on-top window
@@ -58,31 +66,30 @@ The orb talks to your Briefly backend with the same token the web app uses.
 
 1. Click the **gear** on the orb (hover to reveal the controls).
 2. **API base** — `https://api.sendbriefly.app` (or `http://localhost:8000` for local dev).
-3. **Access token** — in the Briefly web app, open the browser DevTools console and run:
-   ```js
-   copy(localStorage.briefly_token)
-   ```
-   Paste it into the token field and **Save**.
+3. **Device token** — create one in Briefly web app: **Settings → Connected devices**.
+   Use a `desktop` token (`bcap_...`) and paste it into the orb settings.
 
 > A cleaner one-click handoff (a `/desktop` page in the web app that deep-links
 > the token straight into the orb) is the natural next step — noted in the
 > roadmap below.
 
-Click the orb (or tray → **Speak my briefing**) and it reads your brief.
+Hold the orb core to talk, then release to send. The orb transcribes with
+`/orb/turn` and plays back with `/orb/speak`.
 
 ## How it behaves
 
 | Action | Result |
 |--------|--------|
-| Open your computer (first time that day) | Orb appears and speaks your briefing automatically |
 | Left-click tray icon | Show / hide the orb |
-| Right-click tray icon | Menu: Speak · Show/hide · Open Briefly · Quit |
-| Click the orb | Speak (or stop, if already speaking) |
-| Hover the orb | Reveals play / settings / hide controls |
+| Right-click tray icon | Menu: Push-to-talk · Show/hide · Open Briefly · Quit |
+| Hold orb core | Start listening |
+| Release orb core | Send audio to `/orb/turn` |
+| Press while speaking | Interrupt (barge-in) |
+| Hover the orb | Reveals PTT / settings / hide controls |
 | Drag the orb | Reposition it anywhere |
 
-The orb speaks via the OS's built-in speech synthesis (the Web Speech API), so
-there's **no TTS cost** and it works offline once the brief is fetched.
+Audio synthesis now comes from backend `/orb/speak`, so desktop behavior matches
+backend-selected TTS provider.
 
 ## Build a distributable
 

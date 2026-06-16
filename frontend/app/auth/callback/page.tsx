@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { setToken, consumeAuthNext } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { ensureDesktopOrbLinked } from "@/lib/orbDesktopLink";
 
 function CallbackHandler() {
   const router = useRouter();
@@ -18,6 +19,8 @@ function CallbackHandler() {
         return;
       }
       setToken(token);
+      // Try desktop orb handoff immediately after login.
+      await ensureDesktopOrbLinked();
       try {
         const returnTo = consumeAuthNext();
         if (returnTo) {

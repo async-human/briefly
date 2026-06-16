@@ -315,13 +315,13 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* ── Save devices (extension + mobile share) ── */}
+            {/* ── Connected devices (extension + mobile + desktop orb) ── */}
             <div className="dash-surface dash-surface-settings" id="capture-devices-section">
               <div className="dash-surface-head">
-                <h2 className="dash-surface-title">Save devices</h2>
+                <h2 className="dash-surface-title">Connected devices</h2>
                 <p className="dash-surface-desc">
-                  Connect the Chrome extension or your phone&apos;s share sheet. Each device gets a
-                  long-lived token so saves work without re-logging in.
+                  Connect the extension, your phone&apos;s share sheet, or the desktop orb. Each
+                  device gets a long-lived token so it can act on your behalf without re-login.
                 </p>
               </div>
               <div className="dash-surface-body dash-surface-body-form">

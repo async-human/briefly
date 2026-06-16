@@ -18,15 +18,34 @@ const store = {
   set token(v) {
     localStorage.setItem("briefly.token", v);
   },
-  get lastSpoken() {
-    return localStorage.getItem("briefly.lastSpoken") || "";
+  get wakeEnabled() {
+    return localStorage.getItem("briefly.wakeEnabled") !== "0";
   },
-  set lastSpoken(v) {
-    localStorage.setItem("briefly.lastSpoken", v);
+  set wakeEnabled(v) {
+    localStorage.setItem("briefly.wakeEnabled", v ? "1" : "0");
+  },
+  get wakeMuted() {
+    return localStorage.getItem("briefly.wakeMuted") === "1";
+  },
+  set wakeMuted(v) {
+    localStorage.setItem("briefly.wakeMuted", v ? "1" : "0");
   },
 };
 
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const state = {
+  mode: "idle", // idle | listening | thinking | speaking
+  mediaRecorder: null,
+  audioChunks: [],
+  micStream: null,
+  listeningStartedAt: 0,
+  turnAbort: null,
+  speakAbort: null,
+  ttsAudio: null,
+  wakeRecognizer: null,
+  wakeRestartTimer: null,
+  wakeBackend: "none",
+  wakeEventUnlisten: null,
+};
 
 // ── Window helpers (Tauri) ──────────────────────────────────────────────────
 async function showWindow() {
@@ -55,126 +74,364 @@ async function apiGet(path) {
   return await res.json();
 }
 
-async function loadBriefing() {
-  const [me, digest] = await Promise.all([
-    apiGet("/api/v1/me").catch(() => null),
-    apiGet("/api/v1/digests/today").catch(() => null),
-  ]);
-  return { me, digest };
-}
-
-// ── Spoken script ───────────────────────────────────────────────────────────
-function firstName(me) {
-  const n = me?.user?.name || me?.name || "";
-  return n ? n.split(" ")[0] : "";
-}
-
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
-}
-
-function buildScript(me, digest) {
-  const name = firstName(me);
-  const hi = greeting() + (name ? `, ${name}` : "") + ".";
-  const items = (digest && digest.items) || [];
-
-  if (items.length === 0) {
-    return [
-      hi,
-      "Your briefing isn't ready just yet. Open Briefly to finish connecting your sources, and I'll have it for you soon.",
-    ];
-  }
-
-  const top = items.slice(0, 3);
-  const lines = [hi];
-  const count = digest.total_items_shown || items.length;
-  lines.push(`Here's your briefing. ${count} ${count === 1 ? "thing" : "things"} matter today.`);
-
-  const ordinals = ["First", "Second", "Third"];
-  top.forEach((it, i) => {
-    lines.push(`${ordinals[i] || ""}. ${it.headline}.`.trim());
-    const why = it.why_this_summary || it.why_it_matters;
-    if (why) lines.push(why);
+async function apiTurn(audioBlob, signal) {
+  const form = new FormData();
+  form.append("audio", audioBlob, "turn.webm");
+  const doFetch = TAURI?.http?.fetch || window.fetch;
+  const res = await doFetch(store.apiBase + "/api/v1/orb/turn", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + store.token },
+    body: form,
+    signal,
   });
-
-  lines.push("That's the headline view. Open Briefly for the full briefing.");
-  return lines;
+  if (!res.ok) throw new Error("Turn failed: HTTP " + res.status);
+  return await res.json();
 }
 
-// ── Voice ───────────────────────────────────────────────────────────────────
-let speaking = false;
-
-function pickVoice() {
-  const vs = window.speechSynthesis ? speechSynthesis.getVoices() : [];
-  return (
-    vs.find((v) => /en(-|_)?(US|GB)/i.test(v.lang) && /natural|google|samantha|aria|jenny|libby/i.test(v.name)) ||
-    vs.find((v) => /^en/i.test(v.lang)) ||
-    vs[0]
-  );
-}
-
-function speakLine(line) {
-  return new Promise((resolve) => {
-    const u = new SpeechSynthesisUtterance(line);
-    const v = pickVoice();
-    if (v) u.voice = v;
-    u.rate = 1.0;
-    u.pitch = 1.0;
-    u.onstart = () => setCaption(line);
-    u.onboundary = () => bumpEnergy();
-    u.onend = resolve;
-    u.onerror = resolve;
-    speechSynthesis.speak(u);
+async function apiSpeakToBlob(text, signal) {
+  const doFetch = TAURI?.http?.fetch || window.fetch;
+  const res = await doFetch(store.apiBase + "/api/v1/orb/speak", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + store.token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text }),
+    signal,
   });
+  if (!res.ok) throw new Error("Speak failed: HTTP " + res.status);
+  return await res.blob();
 }
 
-async function speakLines(lines) {
-  if (!("speechSynthesis" in window)) return;
-  speechSynthesis.cancel();
-  await showWindow();
-  setSpeaking(true);
-  for (const line of lines) {
-    if (!speaking) break;
-    await speakLine(line);
+function setMode(mode) {
+  state.mode = mode;
+  document.body.dataset.mode = mode;
+  document.body.classList.toggle("is-speaking", mode === "speaking");
+  energyTarget =
+    mode === "listening" ? 0.86 :
+    mode === "thinking" ? 0.46 :
+    mode === "speaking" ? 0.68 :
+    0.08;
+}
+
+function wakeStatusEl() {
+  return document.getElementById("wakeStatus");
+}
+
+function updateWakeStatus() {
+  const el = wakeStatusEl();
+  if (!el) return;
+  if (!store.wakeEnabled) {
+    el.textContent = "Wake word off";
+  } else if (store.wakeMuted) {
+    el.textContent = "Wake word muted";
+  } else if (state.wakeBackend === "native") {
+    el.textContent = 'Wake word local: "hey briefly"';
+  } else if (state.wakeBackend === "web") {
+    el.textContent = 'Wake word beta: "hey briefly"';
+  } else {
+    el.textContent = "Wake word unavailable";
   }
-  setSpeaking(false);
-  setCaption("");
+  const wakeBtn = document.getElementById("wake");
+  if (wakeBtn) {
+    wakeBtn.classList.toggle("active", store.wakeEnabled && !store.wakeMuted);
+    wakeBtn.title = store.wakeMuted ? "Unmute wake word" : "Mute wake word";
+  }
 }
 
 function stopSpeaking() {
-  speaking = false;
-  try {
-    speechSynthesis.cancel();
-  } catch (_) {}
-  setSpeaking(false);
+  if (state.speakAbort) {
+    state.speakAbort.abort();
+    state.speakAbort = null;
+  }
+  if (state.ttsAudio) {
+    try {
+      state.ttsAudio.pause();
+      state.ttsAudio.currentTime = 0;
+    } catch (_) {}
+    state.ttsAudio = null;
+  }
+  setMode("idle");
+}
+
+function stopListening() {
+  const rec = state.mediaRecorder;
+  if (!rec) return;
+  if (rec.state !== "inactive") rec.stop();
+  state.mediaRecorder = null;
+}
+
+function stopCurrentTurn() {
+  if (state.turnAbort) {
+    state.turnAbort.abort();
+    state.turnAbort = null;
+  }
+  if (state.speakAbort) {
+    state.speakAbort.abort();
+    state.speakAbort = null;
+  }
+  stopListening();
+  stopSpeaking();
   setCaption("");
 }
 
-async function speakBriefing() {
-  if (speaking) {
-    stopSpeaking();
-    return;
+function normalizeTranscript(v) {
+  return String(v || "")
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function transcriptMatchesWakePhrase(text) {
+  const norm = normalizeTranscript(text);
+  return norm.includes("hey briefly") || norm.includes("hi briefly");
+}
+
+async function ensureMic() {
+  if (state.micStream) return state.micStream;
+  state.micStream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+  });
+  return state.micStream;
+}
+
+function chooseMimeType() {
+  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+  for (const candidate of candidates) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(candidate)) return candidate;
   }
+  return "";
+}
+
+async function startListening() {
   if (!store.token) {
-    await showWindow();
-    await speakLines([
-      greeting() + ".",
-      "Welcome to Briefly. Open settings and paste your access token, and I'll read you your morning briefing.",
-    ]);
+    setCaption("Add a device token in settings first.");
     openSettings(true);
     return;
   }
-  setCaption("Fetching your briefing…");
+  if (state.mode === "listening") return;
+  stopCurrentTurn();
+  await showWindow();
+  setCaption("Listening… click again to send");
+  setMode("listening");
+  state.audioChunks = [];
+  state.listeningStartedAt = Date.now();
+
   try {
-    const { me, digest } = await loadBriefing();
-    await speakLines(buildScript(me, digest));
-    store.lastSpoken = todayKey();
+    const stream = await ensureMic();
+    const opts = {};
+    const mimeType = chooseMimeType();
+    if (mimeType) opts.mimeType = mimeType;
+    const recorder = new MediaRecorder(stream, opts);
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) state.audioChunks.push(e.data);
+    };
+    recorder.start();
+    state.mediaRecorder = recorder;
   } catch (_) {
-    await speakLines(["I couldn't reach Briefly just now. I'll try again a little later."]);
+    setMode("idle");
+    setCaption("Microphone access was blocked.");
   }
+}
+
+async function stopListeningAndSend() {
+  if (state.mode !== "listening") return;
+  const recorder = state.mediaRecorder;
+  const elapsed = Date.now() - state.listeningStartedAt;
+  if (!recorder) {
+    setMode("idle");
+    return;
+  }
+  const blob = await new Promise((resolve) => {
+    recorder.onstop = () => resolve(new Blob(state.audioChunks, { type: recorder.mimeType || "audio/webm" }));
+    recorder.stop();
+  });
+  state.mediaRecorder = null;
+
+  if (elapsed < 120 || !blob || blob.size === 0) {
+    setMode("idle");
+    setCaption("Click the orb and start talking.");
+    setTimeout(() => setCaption(""), 1200);
+    return;
+  }
+
+  setMode("thinking");
+  setCaption("Thinking…");
+  const turnAbort = new AbortController();
+  state.turnAbort = turnAbort;
+  try {
+    const turn = await apiTurn(blob, turnAbort.signal);
+    state.turnAbort = null;
+    const answer = (turn && turn.answer ? String(turn.answer) : "").trim();
+    if (!answer) throw new Error("No answer");
+    setCaption(answer);
+    await playTts(answer);
+  } catch (err) {
+    if (turnAbort.signal.aborted) return;
+    setMode("idle");
+    setCaption(err instanceof Error ? err.message : "Turn failed.");
+    setTimeout(() => setCaption(""), 3000);
+  }
+}
+
+async function playTts(text) {
+  const speakAbort = new AbortController();
+  state.speakAbort = speakAbort;
+  setMode("speaking");
+  const audioBlob = await apiSpeakToBlob(text, speakAbort.signal);
+  if (speakAbort.signal.aborted) return;
+  const url = URL.createObjectURL(audioBlob);
+  await new Promise((resolve) => {
+    const audio = new Audio(url);
+    state.ttsAudio = audio;
+    audio.onended = resolve;
+    audio.onerror = resolve;
+    audio.play().catch(() => resolve());
+  });
+  URL.revokeObjectURL(url);
+  if (!speakAbort.signal.aborted) {
+    setMode("idle");
+  }
+  state.speakAbort = null;
+  state.ttsAudio = null;
+}
+
+function toggleTalk() {
+  if (state.mode === "speaking" || state.mode === "thinking") {
+    stopCurrentTurn();
+    setCaption("Interrupted");
+    setTimeout(() => setCaption(""), 900);
+    return;
+  }
+  if (state.mode === "listening") {
+    void stopListeningAndSend();
+    return;
+  }
+  void startListening();
+}
+
+function handleDesktopAuth(payload) {
+  const token = payload && payload.token ? String(payload.token).trim() : "";
+  const apiBase = payload && payload.api_base ? String(payload.api_base).trim().replace(/\/$/, "") : "";
+  if (!token) return;
+  if (apiBase) store.apiBase = apiBase;
+  store.token = token;
+  openSettings(false);
+  setCaption("Desktop orb linked. Click to talk.");
+  setTimeout(() => setCaption(""), 2500);
+}
+
+async function registerGlobalHotkey() {
+  if (!TAURI?.globalShortcut) return;
+  try {
+    await TAURI.globalShortcut.unregisterAll();
+    await TAURI.globalShortcut.register("Ctrl+Shift+Space", () => {
+      toggleTalk();
+    });
+    setCaption("Hotkey ready: Ctrl+Shift+Space");
+    setTimeout(() => setCaption(""), 1200);
+  } catch (_) {}
+}
+
+function stopWakeWord() {
+  if (state.wakeEventUnlisten) {
+    try { state.wakeEventUnlisten(); } catch (_) {}
+    state.wakeEventUnlisten = null;
+  }
+  if (state.wakeRestartTimer) {
+    clearTimeout(state.wakeRestartTimer);
+    state.wakeRestartTimer = null;
+  }
+  if (state.wakeRecognizer) {
+    try {
+      state.wakeRecognizer.onresult = null;
+      state.wakeRecognizer.onend = null;
+      state.wakeRecognizer.onerror = null;
+      state.wakeRecognizer.stop();
+    } catch (_) {}
+  }
+  state.wakeRecognizer = null;
+  if (state.wakeBackend === "native" && TAURI?.core?.invoke) {
+    TAURI.core.invoke("wakeword_stop").catch(() => {});
+  }
+  state.wakeBackend = "none";
+}
+
+function startWebWakeWord() {
+  state.wakeBackend = "none";
+  stopWakeWord();
+  if (!store.wakeEnabled || store.wakeMuted) {
+    updateWakeStatus();
+    return;
+  }
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) {
+    updateWakeStatus();
+    return;
+  }
+  const rec = new SpeechRec();
+  rec.lang = "en-US";
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+  rec.onresult = (event) => {
+    if (state.mode !== "idle") return;
+    let transcript = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0]?.transcript || "";
+    }
+    if (!transcriptMatchesWakePhrase(transcript)) return;
+    setCaption("Wake word heard.");
+    setTimeout(() => setCaption(""), 1000);
+    toggleTalk();
+  };
+  rec.onerror = () => {
+    state.wakeRestartTimer = setTimeout(() => startWakeWord(), 1500);
+  };
+  rec.onend = () => {
+    state.wakeRestartTimer = setTimeout(() => startWakeWord(), 500);
+  };
+  try {
+    rec.start();
+    state.wakeRecognizer = rec;
+    state.wakeBackend = "web";
+  } catch (_) {
+    state.wakeRecognizer = null;
+    state.wakeBackend = "none";
+  }
+  updateWakeStatus();
+}
+
+async function startWakeWord() {
+  stopWakeWord();
+  if (!store.wakeEnabled || store.wakeMuted) {
+    updateWakeStatus();
+    return;
+  }
+  if (TAURI?.core?.invoke) {
+    try {
+      const out = await TAURI.core.invoke("wakeword_start");
+      if (out && out.active) {
+        state.wakeBackend = "native";
+        if (TAURI?.event) {
+          state.wakeEventUnlisten = await TAURI.event.listen("wake-detected", () => {
+            if (state.mode !== "idle") return;
+            setCaption("Wake word heard.");
+            setTimeout(() => setCaption(""), 1000);
+            toggleTalk();
+          });
+        }
+        updateWakeStatus();
+        return;
+      }
+    } catch (_) {}
+  }
+  startWebWakeWord();
 }
 
 // ── Caption ─────────────────────────────────────────────────────────────────
@@ -189,11 +446,6 @@ function setCaption(text) {
 // ── Orb animation ───────────────────────────────────────────────────────────
 let energy = 0.06; // smoothed current energy
 let energyTarget = 0.06; // idle baseline
-function setSpeaking(on) {
-  speaking = on;
-  energyTarget = on ? 0.5 : 0.06;
-  document.body.classList.toggle("is-speaking", on);
-}
 function bumpEnergy() {
   energy = Math.min(1, energy + 0.22);
 }
@@ -216,6 +468,7 @@ function initOrb() {
     energy += (energyTarget - energy) * 0.08;
     const breathe = 0.5 + 0.5 * Math.sin(t / 1400);
     const e = Math.min(1, energy + breathe * 0.04);
+    if (state.mode === "listening" || state.mode === "speaking") bumpEnergy();
 
     ctx.clearRect(0, 0, SIZE, SIZE);
 
@@ -293,37 +546,61 @@ function openSettings(open) {
 // ── Wire-up ─────────────────────────────────────────────────────────────────
 function init() {
   initOrb();
+  setMode("idle");
 
-  // Warm up speech voices (they load asynchronously).
-  if (window.speechSynthesis) {
-    speechSynthesis.getVoices();
-    speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
-  }
-
-  document.getElementById("orb-hit").addEventListener("click", () => speakBriefing());
-  document.getElementById("replay").addEventListener("click", () => speakBriefing());
+  document.getElementById("orb-hit").addEventListener("click", (e) => {
+    e.preventDefault();
+    toggleTalk();
+  });
+  document.getElementById("replay").addEventListener("click", () => toggleTalk());
+  document.getElementById("wake").addEventListener("click", () => {
+    store.wakeMuted = !store.wakeMuted;
+    if (store.wakeMuted) {
+      stopWakeWord();
+    } else {
+      void startWakeWord();
+    }
+    updateWakeStatus();
+  });
   document.getElementById("gear").addEventListener("click", () => openSettings());
   document.getElementById("hide").addEventListener("click", () => {
-    stopSpeaking();
+    stopCurrentTurn();
     hideWindow();
   });
   document.getElementById("save").addEventListener("click", () => {
     store.apiBase = document.getElementById("apiBase").value.trim();
     store.token = document.getElementById("token").value.trim();
     openSettings(false);
-    setCaption("Saved. Click the orb to hear your briefing.");
+    setCaption("Saved. Click orb to talk.");
     setTimeout(() => setCaption(""), 3500);
   });
+  document.addEventListener("keydown", (e) => {
+    if (e.code !== "Space" || e.repeat) return;
+    if (document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
+    e.preventDefault();
+    void startListening();
+  });
+  document.addEventListener("keyup", (e) => {
+    if (e.code !== "Space") return;
+    e.preventDefault();
+    void stopListeningAndSend();
+  });
 
-  // Tray "Speak my briefing" → frontend.
+  // Tray action now toggles push-to-talk flow.
   if (TAURI?.event) {
-    TAURI.event.listen("speak-briefing", () => speakBriefing());
+    TAURI.event.listen("speak-briefing", () => toggleTalk());
+    TAURI.event.listen("desktop-auth", (event) => {
+      handleDesktopAuth(event.payload || {});
+    });
+  }
+  if (TAURI?.event) {
+    TAURI.event.listen("ptt-start", () => { void startListening(); });
+    TAURI.event.listen("ptt-stop", () => { void stopListeningAndSend(); });
   }
 
-  // First unlock of the day: greet + speak once, automatically.
-  if (store.token && store.lastSpoken !== todayKey()) {
-    setTimeout(() => speakBriefing(), 1500);
-  }
+  void registerGlobalHotkey();
+  void startWakeWord();
+  updateWakeStatus();
 }
 
 if (document.readyState === "loading") {
