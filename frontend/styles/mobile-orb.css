@@ -166,9 +166,16 @@
 }
 
 @media (min-width: 768px) {
-  .mob-orb-fab,
+  .mob-orb-fab {
+    right: 24px;
+    bottom: 24px;
+  }
+
   .mob-orb-panel {
-    display: none;
+    left: auto;
+    right: 24px;
+    bottom: 92px;
+    width: min(380px, calc(100vw - 48px));
   }
 }
 
