@@ -1,0 +1,81 @@
+.mob-orb-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 84px;
+  z-index: 85;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: radial-gradient(circle at 30% 30%, #b8a7ff, #6d53ff);
+  color: #fff;
+  font-size: 20px;
+}
+
+.mob-orb-panel {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 148px;
+  z-index: 85;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(17, 14, 38, 0.92);
+  backdrop-filter: blur(12px);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.mob-orb-core {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #cfc5ff, #6d53ff);
+  box-shadow: 0 0 32px rgba(109, 83, 255, 0.55);
+}
+
+.mob-orb-core.mode-listening {
+  box-shadow: 0 0 36px rgba(44, 209, 150, 0.62);
+}
+.mob-orb-core.mode-thinking {
+  box-shadow: 0 0 36px rgba(245, 190, 65, 0.62);
+}
+.mob-orb-core.mode-speaking {
+  box-shadow: 0 0 40px rgba(109, 83, 255, 0.8);
+}
+
+.mob-orb-caption {
+  color: #e9e6ff;
+  font-size: 13px;
+  text-align: center;
+  margin: 0;
+}
+
+.mob-orb-action,
+.mob-orb-sub {
+  width: 100%;
+  border-radius: 999px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.mob-orb-action {
+  background: #6d53ff;
+  color: white;
+}
+
+.mob-orb-sub {
+  background: transparent;
+  color: #c7bfef;
+}
+
+@media (min-width: 768px) {
+  .mob-orb-fab,
+  .mob-orb-panel {
+    display: none;
+  }
+}
+

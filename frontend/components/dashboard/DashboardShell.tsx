@@ -10,6 +10,7 @@ import { BrainDumpFab } from "./BrainDumpFab";
 import { LearnedToastProvider } from "./LearnedToast";
 import { FreeTierBanner } from "@/components/billing/FreeTierBanner";
 import { ensureDesktopOrbLinked } from "@/lib/orbDesktopLink";
+import { MobileOrbOverlay } from "@/components/mobile/MobileOrbOverlay";
 
 type DashboardShellProps = {
   children: React.ReactNode;
@@ -71,6 +72,7 @@ export function DashboardShell({ children, userName, avatarUrl }: DashboardShell
         </div>
       </div>
       <BrainDumpFab />
+      <MobileOrbOverlay />
     </div>
     </LearnedToastProvider>
   );

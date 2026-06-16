@@ -180,6 +180,38 @@ async function requestFormData<T>(
   return res.json() as Promise<T>;
 }
 
+async function requestBlob(
+  path: string,
+  options: RequestInit = {},
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const token = getToken() || getCaptureToken();
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers,
+    signal,
+  });
+  if (!res.ok) {
+    if (res.status === 401) handleUnauthorized();
+    const body = await res.json().catch(() => ({}));
+    const detail = body.detail;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join(", ")
+          : res.statusText;
+    throw new ApiError(message || res.statusText, res.status);
+  }
+  return res.blob();
+}
+
 export type User = {
   id: string;
   email: string;
@@ -212,6 +244,12 @@ export type BillingStatus = {
 
 export type BriefStyle = "analyst" | "scan" | "plain";
 export type BriefLanguage = "en" | "hi";
+export type OrbTurnResult = {
+  transcript: string;
+  thread_id: string | null;
+  answer: string;
+  citations: Array<Record<string, unknown>>;
+};
 
 export type Profile = {
   role: string | null;
@@ -1273,4 +1311,26 @@ export const api = {
       signal,
     );
   },
+  orbTurn: (
+    blob: Blob,
+    filename = "turn.webm",
+    opts?: { thread_id?: string; content_id?: string },
+    signal?: AbortSignal,
+  ) => {
+    const form = new FormData();
+    form.append("audio", blob, filename);
+    if (opts?.thread_id) form.append("thread_id", opts.thread_id);
+    if (opts?.content_id) form.append("content_id", opts.content_id);
+    return requestFormData<OrbTurnResult>("/api/v1/orb/turn", form, signal);
+  },
+  orbSpeak: (text: string, voice?: string, signal?: AbortSignal) =>
+    requestBlob(
+      "/api/v1/orb/speak",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, voice }),
+      },
+      signal,
+    ),
 };
