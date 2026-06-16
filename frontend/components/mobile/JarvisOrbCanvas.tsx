@@ -13,11 +13,13 @@ const MODE_ENERGY: Record<JarvisOrbMode, number> = {
   speaking: 0.72,
 };
 
+// Brand-violet family (product accent ≈ oklch hue 275). Subtle per-mode shifts
+// keep the states distinguishable while reading as one cohesive Briefly color.
 const MODE_HUE: Record<JarvisOrbMode, number> = {
-  idle: 215,
-  listening: 185,
-  thinking: 78,
-  speaking: 205,
+  idle: 278,
+  listening: 264,
+  thinking: 298,
+  speaking: 282,
 };
 
 type JarvisOrbCanvasProps = {

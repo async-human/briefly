@@ -2,8 +2,8 @@
   "id": "/",
   "name": "Briefly — your morning briefing",
   "short_name": "Briefly",
-  "description": "Your personal AI briefing, read aloud. Open Briefly and hear what matters today.",
-  "start_url": "/listen",
+  "description": "Your personal AI briefing — read it, or talk to it. Open Briefly and hear what matters today.",
+  "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#07070b",
   "theme_color": "#5e6ad2",
@@ -40,14 +40,9 @@
   },
   "shortcuts": [
     {
-      "name": "Listen to today's briefing",
-      "url": "/listen",
-      "description": "Hear your briefing read aloud"
-    },
-    {
       "name": "Open dashboard",
       "url": "/dashboard",
-      "description": "See your full briefing"
+      "description": "Your briefing and the Briefly assistant"
     },
     {
       "name": "Save a link",

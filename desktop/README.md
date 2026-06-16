@@ -1,5 +1,11 @@
 # Briefly Desktop — the floating voice orb
 
+> ⚠️ **PARKED — not maintained.** Superseded by the installable PWA and the
+> in-app voice orb on the dashboard, which is now the single Briefly assistant.
+> This native shell is kept for reference only; don't build features on it
+> unless we deliberately revive the native-desktop track. See the consolidation
+> decision: one assistant, one identity, no isolated surfaces.
+
 An always-on desktop companion: a small floating orb that lives in the corner of
 your screen, launches on login, and supports **push-to-talk voice turns** against
 the orb backend. Built with [Tauri v2](https://v2.tauri.app) — a
