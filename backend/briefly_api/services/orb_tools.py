@@ -23,7 +23,6 @@ from __future__ import annotations
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -31,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.db.models import Digest, DigestItem, User
 from briefly_api.services.browser_capture import list_recent_captures
+from briefly_api.utils.dates import local_date_string
 
 ToolHandler = Callable[..., Awaitable[dict]]
 
@@ -60,15 +60,31 @@ async def today_brief_handler(
     content_id: str | None = None,
     args: dict | None = None,
 ) -> dict:
-    today = datetime.now(timezone.utc).date().isoformat()
+    # Digests are stored under the user's LOCAL date (the pipeline uses their
+    # digest timezone), so match that — not the UTC date — or we miss today's
+    # brief whenever the user's timezone has crossed midnight relative to UTC.
+    profile = getattr(user, "profile", None)
+    tz = getattr(profile, "digest_timezone", None) or "UTC"
+    today = local_date_string(tz)
     digest = (
         await db.execute(
             select(Digest).where(Digest.user_id == user.id, Digest.digest_date == today)
         )
     ).scalar_one_or_none()
+    if digest is None:
+        # Fall back to the most recent digest — covers midnight/timezone edges
+        # and "give me my latest briefing".
+        digest = (
+            await db.execute(
+                select(Digest)
+                .where(Digest.user_id == user.id)
+                .order_by(Digest.digest_date.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
     if not digest:
         return {
-            "answer": "Your briefing for today is not ready yet. Ask me again in a few minutes.",
+            "answer": "Your briefing isn't ready yet. Ask me again in a few minutes.",
             "citations": [],
         }
     items = (
