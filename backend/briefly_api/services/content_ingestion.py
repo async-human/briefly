@@ -99,38 +99,55 @@ async def _find_existing_content(
     url: str | None,
     legacy_text: str,
 ) -> RawContent | None:
+    async def _first_or_none(stmt_base, label: str) -> RawContent | None:
+        # Legacy data can contain duplicates (same source+url/hash) from older
+        # ingestion behavior. Never crash the scheduler because of that; pick
+        # the newest row deterministically and proceed.
+        result = await session.execute(
+            stmt_base.order_by(RawContent.ingested_at.desc(), RawContent.id.desc())
+        )
+        rows = result.scalars().all()
+        if len(rows) > 1:
+            log.warning(
+                "ingestion: duplicate raw_content match (%s) source=%s count=%d",
+                label,
+                source_id,
+                len(rows),
+            )
+        return rows[0] if rows else None
+
     stmt = (
         select(RawContent)
         .options(selectinload(RawContent.embedding))
     )
     if url:
-        by_url = await session.execute(
+        by_url = (
             stmt.where(RawContent.source_id == source_id, RawContent.url == url)
         )
-        row = by_url.scalar_one_or_none()
+        row = await _first_or_none(by_url, "url")
         if row:
             return row
 
-    by_hash = await session.execute(
+    by_hash = (
         stmt.where(
             RawContent.source_id == source_id,
             RawContent.content_hash == content_hash,
         )
     )
-    row = by_hash.scalar_one_or_none()
+    row = await _first_or_none(by_hash, "hash")
     if row:
         return row
 
     legacy_hash = _legacy_content_hash(legacy_text)
     if legacy_hash == content_hash:
         return None
-    by_legacy = await session.execute(
+    by_legacy = (
         stmt.where(
             RawContent.source_id == source_id,
             RawContent.content_hash == legacy_hash,
         )
     )
-    return by_legacy.scalar_one_or_none()
+    return await _first_or_none(by_legacy, "legacy_hash")
 
 
 def _keyword_set(profile: dict) -> set[str]:
