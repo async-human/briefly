@@ -71,8 +71,10 @@ export function DashboardShell({ children, userName, avatarUrl }: DashboardShell
           <PageContentTransition key={pathname}>{children}</PageContentTransition>
         </div>
       </div>
-      <BrainDumpFab />
-      <MobileOrbOverlay />
+      <div className="app-fab-stack">
+        <BrainDumpFab />
+        <MobileOrbOverlay />
+      </div>
     </div>
     </LearnedToastProvider>
   );

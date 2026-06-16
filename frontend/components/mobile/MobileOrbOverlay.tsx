@@ -202,22 +202,38 @@ export function MobileOrbOverlay() {
   }
 
   return (
-    <>
-      <button className="mob-orb-fab" onClick={() => setOpen((v) => !v)} aria-label="Open Briefly orb">
-        <span className="mob-orb-fab-dot" aria-hidden />
+    <div className="mob-orb-wrap">
+      <button
+        type="button"
+        className="mob-orb-fab"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label="Open Briefly assistant"
+      >
+        <span className="mob-orb-fab-icon" aria-hidden>
+          <span className="mob-orb-fab-ring" />
+        </span>
+        <span className="mob-orb-fab-label">Ask Briefly</span>
       </button>
       {open ? (
-        <div className="mob-orb-panel" role="dialog" aria-label="Briefly mobile orb">
-          <div className="mob-orb-head">
-            <span className="mob-orb-title">Briefly Orb</span>
-            <button className="mob-orb-close" onClick={() => setOpen(false)} aria-label="Close orb">
-              ×
+        <div className="mob-orb-panel" role="dialog" aria-label="Briefly assistant">
+          <header className="mob-orb-head">
+            <div>
+              <p className="mob-orb-eyebrow">Voice</p>
+              <h2 className="mob-orb-title">Briefly assistant</h2>
+            </div>
+            <button type="button" className="mob-orb-close" onClick={() => setOpen(false)} aria-label="Close assistant">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
             </button>
+          </header>
+          <div className="mob-orb-stage">
+            <div className={`mob-orb-core mode-${mode}`} aria-hidden />
+            <p className="mob-orb-mode">
+              {mode === "idle" ? "Ready" : mode === "listening" ? "Listening" : mode === "thinking" ? "Thinking" : "Speaking"}
+            </p>
           </div>
-          <div className={`mob-orb-core mode-${mode}`} />
-          <p className="mob-orb-mode">
-            {mode === "idle" ? "Ready" : mode === "listening" ? "Listening" : mode === "thinking" ? "Thinking" : "Speaking"}
-          </p>
           <p className="mob-orb-caption">{caption}</p>
           {toolMode ? <p className="mob-orb-tool">Tools: {toolMode}</p> : null}
           <div className="mob-orb-text">
@@ -237,15 +253,15 @@ export function MobileOrbOverlay() {
               Send
             </button>
           </div>
-          <button className="mob-orb-action" onClick={onMainAction} disabled={mode === "thinking"}>
+          <button type="button" className="mob-orb-action" onClick={onMainAction} disabled={mode === "thinking"}>
             {buttonLabel}
           </button>
-          <button className="mob-orb-sub" onClick={() => setEnabled((v) => !v)}>
-            {enabled ? "Disable orb mic" : "Enable orb mic"}
+          <button type="button" className="mob-orb-sub" onClick={() => setEnabled((v) => !v)}>
+            {enabled ? "Mute microphone" : "Enable microphone"}
           </button>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }
 
