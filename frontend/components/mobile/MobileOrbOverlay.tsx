@@ -25,6 +25,39 @@ const STATUS_LABEL: Record<Mode, string> = {
   speaking: "Transmitting",
 };
 
+function isEmphasisWord(word: string): boolean {
+  const clean = word.replace(/[^\w]/g, "");
+  if (!clean) return false;
+  if (clean.length >= 10) return true;
+  if (/^[A-Z0-9]{3,}$/.test(clean)) return true;
+  return /[:!?]$/.test(word);
+}
+
+function buildWordTimeline(words: string[]): number[] {
+  if (!words.length) return [];
+  const weights = words.map((word) => {
+    const clean = word.replace(/[^\w]/g, "");
+    const len = clean.length;
+    let w = 1 + Math.min(len, 12) * 0.06;
+    if (len <= 3) w *= 0.8;
+    if (/[,:;]/.test(word)) w += 0.45;
+    if (/[.!?]$/.test(word)) w += 0.95; // sentence-end pause
+    if (/[()[\]{}]/.test(word)) w += 0.26;
+    if (/["'`]/.test(word)) w += 0.18;
+    if (/[—–-]/.test(word)) w += 0.42; // clause breaks
+    if (/[\\/|]/.test(word)) w += 0.3;
+    if (/\.\.\.$/.test(word)) w += 0.62; // dramatic pause
+    if (/:$/.test(word)) w += 0.28;
+    return w;
+  });
+  const total = weights.reduce((sum, w) => sum + w, 0) || 1;
+  let acc = 0;
+  return weights.map((w) => {
+    acc += w / total;
+    return Math.min(acc, 1);
+  });
+}
+
 export function MobileOrbOverlay() {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -34,6 +67,7 @@ export function MobileOrbOverlay() {
   const [toolMode, setToolMode] = useState("");
   const [query, setQuery] = useState("");
   const [composeOpen, setComposeOpen] = useState(false);
+  const [spokenWordIndex, setSpokenWordIndex] = useState(-1);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -47,6 +81,10 @@ export function MobileOrbOverlay() {
     if (mode === "thinking") return "Analyzing your request";
     return "Tap core to interrupt";
   }, [enabled, mode]);
+
+  const captionWords = useMemo(() => {
+    return caption.trim().split(/\s+/).filter(Boolean);
+  }, [caption]);
 
   useEffect(() => {
     setMounted(true);
@@ -90,6 +128,7 @@ export function MobileOrbOverlay() {
       }
       audioRef.current = null;
     }
+    setSpokenWordIndex(-1);
   }
 
   function closeOverlay() {
@@ -176,18 +215,47 @@ export function MobileOrbOverlay() {
     const tools = trace.map((t) => String(t.tool || "")).filter(Boolean);
     setToolMode(tools.length ? tools.join(" · ") : "");
     setCaption(turn.answer);
+    const words = turn.answer.trim().split(/\s+/).filter(Boolean);
+    const timeline = buildWordTimeline(words);
+    setSpokenWordIndex(words.length ? 0 : -1);
     setMode("speaking");
     const tts = await api.orbSpeak(turn.answer, undefined, signal);
     const url = URL.createObjectURL(tts);
     await new Promise<void>((resolve) => {
       const audio = new Audio(url);
       audioRef.current = audio;
-      audio.onended = () => resolve();
-      audio.onerror = () => resolve();
+      let ticker = 0;
+      const updateWordSync = () => {
+        if (!words.length) return;
+        const duration =
+          Number.isFinite(audio.duration) && audio.duration > 0
+            ? audio.duration
+            : Math.max(words.length * 0.42, 1.8);
+        const progress = Math.max(0, Math.min(1, audio.currentTime / duration));
+        let next = words.length - 1;
+        for (let i = 0; i < timeline.length; i += 1) {
+          if (progress <= timeline[i]) {
+            next = i;
+            break;
+          }
+        }
+        setSpokenWordIndex(next);
+      };
+      const finish = () => {
+        if (ticker) window.clearInterval(ticker);
+        setSpokenWordIndex(-1);
+        resolve();
+      };
+      audio.onloadedmetadata = updateWordSync;
+      audio.ontimeupdate = updateWordSync;
+      audio.onended = finish;
+      audio.onerror = finish;
+      ticker = window.setInterval(updateWordSync, 90);
       void audio.play().catch(() => resolve());
     });
     URL.revokeObjectURL(url);
     audioRef.current = null;
+    setSpokenWordIndex(-1);
   }
 
   async function sendTextQuery() {
@@ -231,6 +299,7 @@ export function MobileOrbOverlay() {
     setMode("idle");
     setCaption("Standing by.");
     setToolMode("");
+    setSpokenWordIndex(-1);
   }
 
   function onCoreAction() {
@@ -316,9 +385,44 @@ export function MobileOrbOverlay() {
           </button>
 
           <p className="jarvis-hint">{orbHint}</p>
-          <p className="jarvis-response" aria-live="polite">
-            {caption}
-          </p>
+          <div className={`jarvis-response-shell${mode === "speaking" ? " is-speaking" : ""}`}>
+            <p className="jarvis-response" aria-live="polite">
+              {captionWords.length
+                ? captionWords.map((word, i) => (
+                    <span
+                      key={`${word}-${i}`}
+                      className={[
+                        "jarvis-response-word",
+                        mode === "speaking" && i <= spokenWordIndex ? "is-spoken" : "",
+                        mode === "speaking" && i === spokenWordIndex ? "is-active" : "",
+                        isEmphasisWord(word) ? "is-emphasis" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {word}
+                      {i < captionWords.length - 1 ? " " : ""}
+                    </span>
+                  ))
+                : caption}
+            </p>
+            {mode === "speaking" ? (
+              <div className="jarvis-waveform" aria-hidden>
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+            ) : null}
+          </div>
           {toolMode ? <p className="jarvis-tools">{toolMode}</p> : null}
         </div>
 
