@@ -1324,6 +1324,17 @@ export const api = {
     if (opts?.content_id) form.append("content_id", opts.content_id);
     return requestFormData<OrbTurnResult>("/api/v1/orb/turn", form, signal);
   },
+  orbTurnText: (
+    text: string,
+    opts?: { thread_id?: string; content_id?: string },
+    signal?: AbortSignal,
+  ) => {
+    const form = new FormData();
+    form.append("text", text);
+    if (opts?.thread_id) form.append("thread_id", opts.thread_id);
+    if (opts?.content_id) form.append("content_id", opts.content_id);
+    return requestFormData<OrbTurnResult>("/api/v1/orb/turn", form, signal);
+  },
   orbSpeak: (text: string, voice?: string, signal?: AbortSignal) =>
     requestBlob(
       "/api/v1/orb/speak",

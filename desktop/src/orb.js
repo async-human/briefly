@@ -88,6 +88,20 @@ async function apiTurn(audioBlob, signal) {
   return await res.json();
 }
 
+async function apiTurnText(text, signal) {
+  const form = new FormData();
+  form.append("text", text);
+  const doFetch = TAURI?.http?.fetch || window.fetch;
+  const res = await doFetch(store.apiBase + "/api/v1/orb/turn", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + store.token },
+    body: form,
+    signal,
+  });
+  if (!res.ok) throw new Error("Turn failed: HTTP " + res.status);
+  return await res.json();
+}
+
 async function apiSpeakToBlob(text, signal) {
   const doFetch = TAURI?.http?.fetch || window.fetch;
   const res = await doFetch(store.apiBase + "/api/v1/orb/speak", {
@@ -268,12 +282,16 @@ async function stopListeningAndSend() {
     return;
   }
 
+  await executeTurn(async (signal) => apiTurn(blob, signal));
+}
+
+async function executeTurn(turnFactory) {
   setMode("thinking");
   setCaption("Thinking…");
   const turnAbort = new AbortController();
   state.turnAbort = turnAbort;
   try {
-    const turn = await apiTurn(blob, turnAbort.signal);
+    const turn = await turnFactory(turnAbort.signal);
     state.turnAbort = null;
     const answer = (turn && turn.answer ? String(turn.answer) : "").trim();
     if (!answer) throw new Error("No answer");
@@ -587,6 +605,20 @@ function init() {
     openSettings(false);
     setCaption("Saved. Click orb to talk.");
     setTimeout(() => setCaption(""), 3500);
+  });
+  document.getElementById("composer").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = document.getElementById("query");
+    const text = (input.value || "").trim();
+    if (!text) return;
+    if (!store.token) {
+      setCaption("Add a device token in settings first.");
+      openSettings(true);
+      return;
+    }
+    input.value = "";
+    stopCurrentTurn();
+    void executeTurn(async (signal) => apiTurnText(text, signal));
   });
   document.addEventListener("keydown", (e) => {
     if (e.code !== "Space" || e.repeat) return;

@@ -22,6 +22,7 @@ export function MobileOrbOverlay() {
   const [caption, setCaption] = useState("Tap orb to start talking");
   const [enabled, setEnabled] = useState(true);
   const [toolMode, setToolMode] = useState("");
+  const [query, setQuery] = useState("");
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -111,22 +112,57 @@ export function MobileOrbOverlay() {
         setCaption("No answer returned. Try again.");
         return;
       }
-      const trace = Array.isArray(turn.tool_trace) ? turn.tool_trace : [];
-      const tools = trace.map((t) => String(t.tool || "")).filter(Boolean);
-      setToolMode(tools.length ? tools.join(" + ") : "");
-      setCaption(turn.answer);
-      setMode("speaking");
-      const tts = await api.orbSpeak(turn.answer, undefined, ctl.signal);
-      const url = URL.createObjectURL(tts);
-      await new Promise<void>((resolve) => {
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        audio.onended = () => resolve();
-        audio.onerror = () => resolve();
-        void audio.play().catch(() => resolve());
-      });
-      URL.revokeObjectURL(url);
-      audioRef.current = null;
+      await handleTurnResponse(turn, ctl.signal);
+      setMode("idle");
+    } catch {
+      setMode("idle");
+      setCaption("Could not complete voice turn.");
+      setToolMode("");
+    } finally {
+      abortRef.current = null;
+    }
+  }
+
+  async function handleTurnResponse(turn: Awaited<ReturnType<typeof api.orbTurn>>, signal?: AbortSignal) {
+    if (!turn.answer?.trim()) {
+      setMode("idle");
+      setCaption("No answer returned. Try again.");
+      return;
+    }
+    const trace = Array.isArray(turn.tool_trace) ? turn.tool_trace : [];
+    const tools = trace.map((t) => String(t.tool || "")).filter(Boolean);
+    setToolMode(tools.length ? tools.join(" + ") : "");
+    setCaption(turn.answer);
+    setMode("speaking");
+    const tts = await api.orbSpeak(turn.answer, undefined, signal);
+    const url = URL.createObjectURL(tts);
+    await new Promise<void>((resolve) => {
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => resolve();
+      audio.onerror = () => resolve();
+      void audio.play().catch(() => resolve());
+    });
+    URL.revokeObjectURL(url);
+    audioRef.current = null;
+  }
+
+  async function sendTextQuery() {
+    const text = query.trim();
+    if (!text) return;
+    setQuery("");
+    setMode("thinking");
+    setCaption("Thinking…");
+    const ctl = new AbortController();
+    abortRef.current = ctl;
+    try {
+      const turn = await api.orbTurnText(text, undefined, ctl.signal);
+      if (!turn.answer?.trim()) {
+        setMode("idle");
+        setCaption("No answer returned. Try again.");
+        return;
+      }
+      await handleTurnResponse(turn, ctl.signal);
       setMode("idle");
     } catch {
       setMode("idle");
@@ -168,16 +204,39 @@ export function MobileOrbOverlay() {
   return (
     <>
       <button className="mob-orb-fab" onClick={() => setOpen((v) => !v)} aria-label="Open Briefly orb">
-        ◉
+        <span className="mob-orb-fab-dot" aria-hidden />
       </button>
       {open ? (
         <div className="mob-orb-panel" role="dialog" aria-label="Briefly mobile orb">
+          <div className="mob-orb-head">
+            <span className="mob-orb-title">Briefly Orb</span>
+            <button className="mob-orb-close" onClick={() => setOpen(false)} aria-label="Close orb">
+              ×
+            </button>
+          </div>
           <div className={`mob-orb-core mode-${mode}`} />
           <p className="mob-orb-mode">
             {mode === "idle" ? "Ready" : mode === "listening" ? "Listening" : mode === "thinking" ? "Thinking" : "Speaking"}
           </p>
           <p className="mob-orb-caption">{caption}</p>
           {toolMode ? <p className="mob-orb-tool">Tools: {toolMode}</p> : null}
+          <div className="mob-orb-text">
+            <input
+              className="mob-orb-input"
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Type a question…"
+              disabled={mode === "listening" || mode === "thinking"}
+            />
+            <button
+              className="mob-orb-send"
+              onClick={() => void sendTextQuery()}
+              disabled={!query.trim() || mode === "listening" || mode === "thinking"}
+            >
+              Send
+            </button>
+          </div>
           <button className="mob-orb-action" onClick={onMainAction} disabled={mode === "thinking"}>
             {buttonLabel}
           </button>

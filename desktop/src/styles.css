@@ -34,11 +34,17 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding-top: 6px;
+  padding-top: 8px;
+  border-radius: 24px;
+  background:
+    radial-gradient(120px 80px at 50% 12%, oklch(78% 0.08 280 / 0.12), transparent 70%),
+    linear-gradient(180deg, oklch(14% 0.02 275 / 0.68), oklch(12% 0.02 275 / 0.45));
+  border: 1px solid oklch(100% 0 0 / 0.08);
+  backdrop-filter: blur(14px);
 }
 
 .mode-chip {
-  margin-top: -2px;
+  margin-top: 2px;
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -46,7 +52,7 @@ body {
   border: 1px solid oklch(100% 0 0 / 0.12);
   border-radius: 999px;
   padding: 2px 8px;
-  background: oklch(16% 0.02 275 / 0.7);
+  background: oklch(20% 0.03 275 / 0.55);
   backdrop-filter: blur(12px);
 }
 
@@ -96,10 +102,10 @@ body[data-mode="listening"] .orb-hit {
 .caption {
   max-width: 196px;
   min-height: 30px;
-  margin-top: -6px;
+  margin-top: -2px;
   padding: 0 8px;
   text-align: center;
-  font-size: 11.5px;
+  font-size: 11px;
   line-height: 1.35;
   color: var(--text-dim);
   opacity: 0;
@@ -109,7 +115,7 @@ body[data-mode="listening"] .orb-hit {
 .wake-status {
   max-width: 196px;
   min-height: 16px;
-  margin-top: -10px;
+  margin-top: -6px;
   padding: 0 8px;
   text-align: center;
   font-size: 10px;
@@ -136,8 +142,8 @@ body[data-mode="thinking"] .caption {
 .controls {
   display: flex;
   gap: 8px;
-  margin-top: 6px;
-  opacity: 0;
+  margin-top: 8px;
+  opacity: 0.32;
   transform: translateY(4px);
   transition: opacity 0.22s ease, transform 0.22s ease;
 }
@@ -150,11 +156,11 @@ body[data-mode="thinking"] .caption {
 .ctl {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: 1px solid var(--border);
-  background: var(--panel);
+  background: oklch(17% 0.02 275 / 0.58);
   color: var(--text-dim);
   backdrop-filter: blur(12px);
   cursor: pointer;
@@ -167,9 +173,53 @@ body[data-mode="thinking"] .caption {
   background: var(--panel-strong);
 }
 
+body[data-mode="speaking"] .mode-chip {
+  color: oklch(90% 0.08 270);
+  border-color: oklch(84% 0.1 270 / 0.45);
+}
+
+body[data-mode="listening"] .mode-chip {
+  color: oklch(90% 0.1 160);
+  border-color: oklch(90% 0.1 160 / 0.45);
+}
+
 .ctl.active {
   color: oklch(86% 0.16 150);
   border-color: oklch(86% 0.16 150 / 0.35);
+}
+
+.composer {
+  margin-top: 8px;
+  width: 196px;
+  display: grid;
+  grid-template-columns: 1fr 30px;
+  gap: 6px;
+  opacity: 0.9;
+}
+
+.composer-input {
+  width: 100%;
+  border-radius: 999px;
+  border: 1px solid oklch(100% 0 0 / 0.14);
+  background: oklch(15% 0.02 275 / 0.6);
+  color: var(--text);
+  font-size: 11px;
+  padding: 7px 10px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.composer-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.composer-send {
+  border-radius: 999px;
+  border: 1px solid oklch(100% 0 0 / 0.14);
+  background: oklch(20% 0.04 275 / 0.7);
+  color: var(--text-dim);
+  cursor: pointer;
 }
 
 /* ── Settings ────────────────────────────────────────────────────────── */
