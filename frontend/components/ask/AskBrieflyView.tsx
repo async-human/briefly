@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type AskMessage, type AskThreadSummary } from "@/lib/api";
-import { BrieflyLogo } from "@/components/BrieflyLogo";
+import { JarvisOrbCanvas } from "@/components/mobile/JarvisOrbCanvas";
 import { buildContextualAskQuestion } from "@/lib/askLinks";
 import { AskMessageContent, CitationSources } from "./AskMessageContent";
 
@@ -332,7 +332,8 @@ export function AskBrieflyView({
             {!hasConversation ? (
               isScopedIdle ? (
                 <div className="ask-hero ask-hero-scoped">
-                  <BrieflyLogo variant="mark" size="lg" className="ask-hero-logo" />
+                  <JarvisOrbCanvas mode="idle" size="stage" className="ask-hero-orb" />
+                  <p className="ask-hero-eyebrow">Briefly Intelligence</p>
                   <h1 className="ask-hero-title">Going deeper on this story</h1>
                   {storyScope?.title ? (
                     <p className="ask-hero-anchor-title">{storyScope.title}</p>
@@ -350,7 +351,8 @@ export function AskBrieflyView({
                 </div>
               ) : (
                 <div className="ask-hero">
-                  <BrieflyLogo variant="mark" size="lg" className="ask-hero-logo" />
+                  <JarvisOrbCanvas mode="idle" size="stage" className="ask-hero-orb" />
+                  <p className="ask-hero-eyebrow">Briefly Intelligence</p>
                   <h1 className="ask-hero-title">What would you like to know?</h1>
                   <p className="ask-hero-sub">
                     Answers grounded in your briefings, saves, and brain dumps.
