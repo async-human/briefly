@@ -11,9 +11,12 @@ Supported providers (SPEECH_TO_TEXT_PROVIDER / STT_PROVIDER):
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import os
 import re
+import tempfile
 
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -85,7 +88,38 @@ class STTAdapter:
             )
         if provider == "deepgram":
             return await self._deepgram(audio_bytes, filename, content_type, model, language, prompt)
+        if provider == "local":
+            return await self._local(audio_bytes, filename, model, language)
         raise ValueError(f"Unknown STT provider: {provider}")
+
+    async def _local(
+        self,
+        audio_bytes: bytes,
+        filename: str,
+        model: str,
+        language: str | None,
+    ) -> str:
+        """Transcribe in-process with faster-whisper — no Docker, no server."""
+        device = getattr(self._s, "stt_device", "cpu")
+        compute_type = getattr(self._s, "stt_compute_type", "int8")
+
+        def _run() -> str:
+            wm = _get_faster_whisper_model(model, device, compute_type)
+            suffix = "." + filename.rsplit(".", 1)[-1] if "." in filename else ".webm"
+            fd, path = tempfile.mkstemp(suffix=suffix)
+            try:
+                with os.fdopen(fd, "wb") as f:
+                    f.write(audio_bytes)
+                segments, _info = wm.transcribe(path, language=language or None, beam_size=5)
+                # Whisper segments carry their own leading spaces; normalize whitespace.
+                return " ".join("".join(seg.text for seg in segments).split())
+            finally:
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
+
+        return await asyncio.to_thread(_run)
 
     async def _groq(
         self,
@@ -344,6 +378,23 @@ def _deepgram_keyterms_from_prompt(prompt: str, *, limit: int = 12) -> list[str]
         if len(terms) >= limit:
             break
     return terms
+
+
+# Cache the loaded model so we don't reload weights on every request.
+_FW_MODEL = None
+_FW_KEY: tuple[str, str, str] | None = None
+
+
+def _get_faster_whisper_model(model: str, device: str, compute_type: str):
+    """Lazily load + cache a faster-whisper model (provider=local)."""
+    global _FW_MODEL, _FW_KEY
+    key = (model or "large-v3", device, compute_type)
+    if _FW_MODEL is None or _FW_KEY != key:
+        from faster_whisper import WhisperModel  # optional dep: pip install faster-whisper
+
+        _FW_MODEL = WhisperModel(key[0], device=device, compute_type=compute_type)
+        _FW_KEY = key
+    return _FW_MODEL
 
 
 def get_stt_adapter(settings: Settings | None = None) -> STTAdapter:

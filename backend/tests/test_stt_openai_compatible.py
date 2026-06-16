@@ -49,3 +49,31 @@ def test_unknown_provider_raises():
     a = STTAdapter(_settings(speech_to_text_provider="bogus"))
     with pytest.raises(ValueError):
         asyncio.run(a.transcribe(b"audio", content_type="audio/wav", filename="r.wav", context_prompt="hint"))
+
+
+# ── In-process (local, no Docker) provider ──────────────────────────────────────
+
+def test_local_provider_uses_faster_whisper(monkeypatch):
+    import briefly_api.stt.adapter as mod
+
+    class _Seg:
+        def __init__(self, t): self.text = t
+
+    class _Model:
+        def transcribe(self, path, language=None, beam_size=5):
+            return ([_Seg("hello "), _Seg("world")], {})
+
+    captured = {}
+
+    def fake_get(model, device, compute_type):
+        captured["model"] = model
+        captured["device"] = device
+        captured["compute_type"] = compute_type
+        return _Model()
+
+    monkeypatch.setattr(mod, "_get_faster_whisper_model", fake_get)
+    a = STTAdapter(_settings(speech_to_text_provider="local", stt_model="distil-large-v3",
+                             stt_device="cpu", stt_compute_type="int8"))
+    out = asyncio.run(a.transcribe(b"audio", content_type="audio/wav", filename="r.wav", context_prompt="hint"))
+    assert out == "hello world"
+    assert captured == {"model": "distil-large-v3", "device": "cpu", "compute_type": "int8"}

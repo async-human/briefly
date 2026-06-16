@@ -83,7 +83,9 @@ class Settings(BaseSettings):
     #                     /v1/audio/transcriptions server (faster-whisper-server,
     #                     Speaches, Parakeet). Set STT_BASE_URL; STT_MODEL is the
     #                     server's model id (e.g. "Systran/faster-whisper-large-v3").
-    speech_to_text_provider: Literal["openai", "deepgram", "groq", "openai_compatible"] = Field(
+    # local             → run faster-whisper IN-PROCESS (no Docker, no server).
+    #                     STT_MODEL is the model id (e.g. "large-v3", "distil-large-v3").
+    speech_to_text_provider: Literal["openai", "deepgram", "groq", "openai_compatible", "local"] = Field(
         default="openai",
         validation_alias=AliasChoices("speech_to_text_provider", "stt_provider"),
     )
@@ -91,6 +93,9 @@ class Settings(BaseSettings):
     # Base URL for openai_compatible STT (e.g. http://localhost:8000/v1). Empty = OpenAI cloud.
     stt_base_url: str = ""
     stt_api_key: str = ""  # optional; many self-hosted servers accept any/none
+    # For provider=local (faster-whisper in-process):
+    stt_device: str = "cpu"           # cpu | cuda
+    stt_compute_type: str = "int8"    # int8 (CPU) | float16 (GPU) | int8_float16
     deepgram_api_key: str = ""
 
     # ── Embeddings — fully agnostic ───────────────────────────────────────────
@@ -282,13 +287,15 @@ class Settings(BaseSettings):
     #                       /v1/audio/speech server. Default targets Kokoro-FastAPI
     #                       (Apache-2.0, fast, CPU-friendly). Set TTS_BASE_URL.
     #   openai            → OpenAI cloud TTS (OPENAI_API_KEY).
+    #   local             → run Kokoro IN-PROCESS (no Docker, no server). Outputs WAV.
     #   disabled          → no streaming TTS (falls back to the AudioAgent path).
-    tts_provider: Literal["openai_compatible", "openai", "disabled"] = "openai_compatible"
+    tts_provider: Literal["openai_compatible", "openai", "local", "disabled"] = "openai_compatible"
     tts_model: str = "kokoro"               # server-side model id (Kokoro-FastAPI: "kokoro")
     tts_voice: str = "af_heart"             # Kokoro default voice
     tts_format: str = "mp3"                 # mp3 | wav | opus | pcm
     tts_base_url: str = "http://localhost:8880/v1"  # Kokoro-FastAPI default; empty = OpenAI cloud
     tts_api_key: str = ""                   # optional; self-hosted servers often need none
+    tts_lang_code: str = "a"                # for provider=local Kokoro: 'a'=American English, 'b'=British
 
     @field_validator("audio_voice_name", mode="before")
     @classmethod

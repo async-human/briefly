@@ -18,6 +18,7 @@ cloud one — or vice versa — is a config change, never a code change.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 
@@ -83,6 +84,8 @@ class TTSAdapter:
         text = (text or "").strip()
         if not text:
             return b""
+        if self._s.tts_provider == "local":
+            return await self._local_synthesize(text, voice)
         endpoint, api_key, _ = self._resolve()
         async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(
@@ -95,6 +98,12 @@ class TTSAdapter:
             resp.raise_for_status()
             return resp.content
 
+    async def _local_synthesize(self, text: str, voice: str | None) -> bytes:
+        """Synthesize in-process with Kokoro — no Docker, no server. Returns WAV."""
+        voice = voice or self._s.tts_voice
+        lang = getattr(self._s, "tts_lang_code", "a")
+        return await asyncio.to_thread(_kokoro_wav_bytes, text, voice, lang)
+
     async def synthesize_stream(
         self, text: str, *, voice: str | None = None
     ) -> AsyncIterator[bytes]:
@@ -104,6 +113,12 @@ class TTSAdapter:
         """
         text = (text or "").strip()
         if not text:
+            return
+        if self._s.tts_provider == "local":
+            # In-process synthesis isn't chunk-streamed; emit the full clip once.
+            data = await self._local_synthesize(text, voice)
+            if data:
+                yield data
             return
         endpoint, api_key, _ = self._resolve()
         async with httpx.AsyncClient(timeout=120.0) as client:
@@ -122,6 +137,8 @@ class TTSAdapter:
                         yield chunk
 
     def content_type(self) -> str:
+        if self._s.tts_provider == "local":
+            return "audio/wav"  # in-process Kokoro path emits WAV
         return _AUDIO_CONTENT_TYPES.get((self._s.tts_format or "mp3").lower(), "application/octet-stream")
 
 
@@ -133,6 +150,33 @@ _AUDIO_CONTENT_TYPES = {
     "flac": "audio/flac",
     "aac": "audio/aac",
 }
+
+
+# Cache Kokoro pipelines per language so weights load once (provider=local).
+_KOKORO_PIPELINES: dict[str, object] = {}
+_KOKORO_SAMPLE_RATE = 24000
+
+
+def _kokoro_wav_bytes(text: str, voice: str, lang_code: str) -> bytes:
+    """Run Kokoro in-process and return WAV bytes. Optional deps: kokoro, soundfile, numpy."""
+    import io
+
+    import numpy as np
+    import soundfile as sf
+    from kokoro import KPipeline
+
+    pipeline = _KOKORO_PIPELINES.get(lang_code)
+    if pipeline is None:
+        pipeline = KPipeline(lang_code=lang_code)
+        _KOKORO_PIPELINES[lang_code] = pipeline
+
+    chunks = [audio for _gs, _ps, audio in pipeline(text, voice=voice)]
+    if not chunks:
+        return b""
+    full = np.concatenate(chunks)
+    buf = io.BytesIO()
+    sf.write(buf, full, _KOKORO_SAMPLE_RATE, format="WAV")
+    return buf.getvalue()
 
 
 def get_tts_adapter(settings: Settings | None = None) -> TTSAdapter:

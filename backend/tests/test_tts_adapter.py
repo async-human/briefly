@@ -112,3 +112,37 @@ def test_synthesize_posts_to_endpoint(monkeypatch):
     assert captured["url"] == "http://localhost:8880/v1/audio/speech"
     assert captured["json"]["input"] == "read me"
     assert captured["auth"] == "Bearer k"
+
+
+# ── In-process (local, no Docker) provider ──────────────────────────────────────
+
+def test_local_provider_enabled_and_wav_content_type():
+    a = TTSAdapter(_settings(tts_provider="local"))
+    assert a.enabled is True
+    assert a.content_type() == "audio/wav"
+
+
+def test_local_synthesize_calls_kokoro(monkeypatch):
+    import briefly_api.tts.adapter as mod
+    captured = {}
+
+    def fake_kokoro(text, voice, lang):
+        captured["text"] = text
+        captured["voice"] = voice
+        captured["lang"] = lang
+        return b"WAVDATA"
+
+    monkeypatch.setattr(mod, "_kokoro_wav_bytes", fake_kokoro)
+    out = asyncio.run(TTSAdapter(_settings(tts_provider="local", tts_voice="af_heart", tts_lang_code="a")).synthesize("hi orb"))
+    assert out == b"WAVDATA"
+    assert captured == {"text": "hi orb", "voice": "af_heart", "lang": "a"}
+
+
+def test_local_stream_emits_full_clip(monkeypatch):
+    import briefly_api.tts.adapter as mod
+    monkeypatch.setattr(mod, "_kokoro_wav_bytes", lambda *a: b"CLIP")
+
+    async def collect():
+        return [c async for c in TTSAdapter(_settings(tts_provider="local")).synthesize_stream("hello")]
+
+    assert asyncio.run(collect()) == [b"CLIP"]
