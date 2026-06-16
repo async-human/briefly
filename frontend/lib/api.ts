@@ -1345,4 +1345,12 @@ export const api = {
       },
       signal,
     ),
+  // Pending high-priority items the orb can surface proactively during the day.
+  orbProactive: () => request<ProactiveEvent[]>("/api/v1/orb/proactive"),
+  orbProactiveSeen: (eventIds: string[]) =>
+    request<void>("/api/v1/orb/proactive/seen", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event_ids: eventIds }),
+    }),
 };

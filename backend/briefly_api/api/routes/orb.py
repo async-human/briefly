@@ -15,7 +15,12 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from briefly_api.api.schemas import OrbSpeakIn, OrbTurnOut, ProactiveEventOut
+from briefly_api.api.schemas import (
+    OrbProactiveSeenIn,
+    OrbSpeakIn,
+    OrbTurnOut,
+    ProactiveEventOut,
+)
 from briefly_api.auth.deps import get_capture_user
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import User
@@ -89,3 +94,21 @@ async def orb_proactive(
 
     events = await get_for_api(db, user.id)
     return [ProactiveEventOut(**e) for e in events]
+
+
+@router.post(
+    "/orb/proactive/seen",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+async def orb_proactive_seen(
+    body: OrbProactiveSeenIn,
+    user: User = Depends(get_capture_user),  # noqa: ARG001 — auth dep
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Mark proactive events as surfaced so they don't resurface once the orb shows them."""
+    from briefly_api.agents.proactive.proactive_surfacing import mark_surfaced
+
+    await mark_surfaced(db, body.event_ids)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -551,6 +551,10 @@ class OrbSpeakIn(BaseModel):
     voice: str | None = None
 
 
+class OrbProactiveSeenIn(BaseModel):
+    event_ids: list[str] = Field(default_factory=list)
+
+
 class OrbTurnOut(BaseModel):
     transcript: str
     thread_id: str | None = None

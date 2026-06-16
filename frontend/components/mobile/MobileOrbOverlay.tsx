@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, type ProactiveEvent } from "@/lib/api";
 import { askUrl } from "@/lib/askLinks";
 import {
   buildRecordingBlob,
@@ -92,6 +92,7 @@ export function MobileOrbOverlay() {
   const threadIdRef = useRef<string | null>(null);
   const router = useRouter();
   const [hasConversation, setHasConversation] = useState(false);
+  const [pending, setPending] = useState<ProactiveEvent[]>([]);
 
   const orbHint = useMemo(() => {
     if (!enabled) return "Microphone disabled";
@@ -108,6 +109,28 @@ export function MobileOrbOverlay() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Poll for high-priority items the orb can surface proactively. Best-effort,
+  // background only — it never opens, speaks, or interrupts on its own.
+  const refreshProactive = useCallback(async () => {
+    try {
+      const events = await api.orbProactive();
+      setPending(Array.isArray(events) ? events : []);
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshProactive();
+    const id = window.setInterval(() => void refreshProactive(), 4 * 60 * 1000);
+    const onFocus = () => void refreshProactive();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [refreshProactive]);
 
   useEffect(() => {
     if (!open) return;
@@ -142,6 +165,20 @@ export function MobileOrbOverlay() {
     if (mode !== "idle") interrupt();
     setOpen(false);
     setComposeOpen(false);
+  }
+
+  // Opening is always user-initiated. If something proactive is waiting, lead
+  // with it as a heads-up and mark it seen so it doesn't resurface.
+  function openOrb() {
+    setOpen(true);
+    if (pending.length > 0) {
+      const top = pending[0];
+      const ids = pending.map((e) => e.id);
+      setCaption(`Heads up — ${top.title}${top.body ? `. ${top.body}` : ""}`);
+      setHeardText("");
+      setPending([]);
+      void api.orbProactiveSeen(ids).catch(() => {});
+    }
   }
 
   // Hand off to the full conversation view, continuing the same thread so the
@@ -563,14 +600,19 @@ export function MobileOrbOverlay() {
     <div className="mob-orb-wrap">
       <button
         type="button"
-        className={`jarvis-fab${open ? " is-active" : ""}`}
-        onClick={() => (open ? closeOverlay() : setOpen(true))}
+        className={`jarvis-fab${open ? " is-active" : ""}${!open && pending.length > 0 ? " has-pending" : ""}`}
+        onClick={() => (open ? closeOverlay() : openOrb())}
         aria-expanded={open}
-        aria-label="Open Briefly intelligence core"
+        aria-label={
+          !open && pending.length > 0
+            ? `Briefly assistant — ${pending.length} new update${pending.length > 1 ? "s" : ""}`
+            : "Open Briefly intelligence core"
+        }
         title="Briefly assistant"
       >
         <JarvisOrbCanvas mode={open ? mode : "idle"} size="fab" className="jarvis-fab-canvas" />
         <span className="jarvis-fab-glow" aria-hidden />
+        {!open && pending.length > 0 && <span className="jarvis-fab-badge" aria-hidden />}
       </button>
       {mounted && overlay ? createPortal(overlay, document.body) : null}
     </div>

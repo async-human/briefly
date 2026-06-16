@@ -53,6 +53,24 @@
   animation: jarvis-fab-pulse 3s ease-in-out infinite;
 }
 
+/* Proactive-update badge — a quiet cue, never an interruption. */
+.jarvis-fab-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: oklch(72% 0.18 278);
+  border: 2px solid oklch(12% 0.03 270);
+  box-shadow: 0 0 8px oklch(70% 0.18 278 / 0.8);
+  pointer-events: none;
+}
+
+.jarvis-fab.has-pending {
+  border-color: oklch(80% 0.16 278 / 0.7);
+}
+
 /* Full-screen HUD */
 .jarvis-overlay {
   position: fixed;
