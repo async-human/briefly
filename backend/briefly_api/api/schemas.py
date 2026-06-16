@@ -545,3 +545,15 @@ class CaptureTokenOut(BaseModel):
 class CaptureTokenCreatedOut(CaptureTokenOut):
     token: str   # full plaintext secret — returned only once, at creation
 
+
+class OrbSpeakIn(BaseModel):
+    text: str = Field(..., min_length=1, max_length=4000)
+    voice: str | None = None
+
+
+class OrbTurnOut(BaseModel):
+    transcript: str
+    thread_id: str | None = None
+    answer: str
+    citations: list[dict] = Field(default_factory=list)
+
