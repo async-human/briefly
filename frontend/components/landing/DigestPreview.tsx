@@ -60,11 +60,11 @@ export function DigestPreview() {
   const reducedMotion = useReducedMotion();
   const pointerX = useMotionValue(0.5);
   const pointerY = useMotionValue(0.5);
-  const rotateX = useSpring(useTransform(pointerY, [0, 1], [3, -3]), {
+  const rotateX = useSpring(useTransform(pointerY, [0, 1], [7, -7]), {
     stiffness: 160,
     damping: 22,
   });
-  const rotateY = useSpring(useTransform(pointerX, [0, 1], [-4, 4]), {
+  const rotateY = useSpring(useTransform(pointerX, [0, 1], [-9, 9]), {
     stiffness: 160,
     damping: 22,
   });

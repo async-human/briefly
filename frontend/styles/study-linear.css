@@ -254,6 +254,143 @@ body[data-landing-theme="light"].study-linear-body {
   to { transform: translate3d(2%, -1.5%, 0) scale(1.03); }
 }
 
+/* ── Interactive layer · cursor spotlight · orbs · rotating word · progress ── */
+
+.study-linear .hero-linear {
+  --hero-mx: 50%;
+  --hero-my: 32%;
+  --hero-dx: 0;
+  --hero-dy: 0;
+}
+
+.study-linear .hero-cursor-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    460px circle at var(--hero-mx) var(--hero-my),
+    color-mix(in oklch, var(--accent) 22%, transparent) 0%,
+    transparent 60%
+  );
+  opacity: 0.85;
+  transition: opacity 320ms var(--ease-out);
+  mix-blend-mode: screen;
+}
+
+.study-linear[data-theme="light"] .hero-cursor-glow {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+.study-linear .hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(48px);
+  opacity: 0.55;
+  will-change: transform, translate;
+  transition: transform 260ms var(--ease-out);
+}
+
+.study-linear[data-theme="light"] .hero-orb {
+  opacity: 0.42;
+}
+
+.study-linear .hero-orb-1 {
+  width: 340px;
+  height: 340px;
+  top: 4%;
+  left: 6%;
+  background: radial-gradient(circle, oklch(58% 0.2 275 / 0.55), transparent 70%);
+  animation: hero-orb-a 19s var(--ease-in-out) infinite alternate;
+  transform: translate(calc(var(--hero-dx) * 36px), calc(var(--hero-dy) * 28px));
+}
+
+.study-linear .hero-orb-2 {
+  width: 280px;
+  height: 280px;
+  top: 10%;
+  right: 8%;
+  background: radial-gradient(circle, oklch(63% 0.17 305 / 0.5), transparent 70%);
+  animation: hero-orb-b 23s var(--ease-in-out) infinite alternate;
+  transform: translate(calc(var(--hero-dx) * -30px), calc(var(--hero-dy) * 24px));
+}
+
+.study-linear .hero-orb-3 {
+  width: 240px;
+  height: 240px;
+  bottom: 16%;
+  left: 44%;
+  background: radial-gradient(circle, oklch(56% 0.16 255 / 0.45), transparent 70%);
+  animation: hero-orb-a 27s var(--ease-in-out) infinite alternate-reverse;
+  transform: translate(calc(var(--hero-dx) * 22px), calc(var(--hero-dy) * -32px));
+}
+
+/* Float via the `translate` property so it composes with the pointer
+   parallax that lives on `transform` (the two are independent in CSS). */
+@keyframes hero-orb-a {
+  from { translate: 0 0; }
+  to { translate: 6% 7%; }
+}
+
+@keyframes hero-orb-b {
+  from { translate: 0 0; }
+  to { translate: -5% 6%; }
+}
+
+/* Rotating headline word — gradient violet→magenta, vertical flip */
+.study-linear .hero-headline-lead {
+  display: inline;
+}
+
+.study-linear .rotating-word {
+  position: relative;
+  display: inline-grid;
+  vertical-align: bottom;
+  perspective: 700px;
+}
+
+.study-linear .rotating-word-sizer {
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+.study-linear .rotating-word-value {
+  position: absolute;
+  inset: 0;
+  display: inline-block;
+  text-align: left;
+  white-space: nowrap;
+  transform-origin: center bottom;
+  backface-visibility: hidden;
+  background: linear-gradient(96deg, var(--accent), oklch(64% 0.2 305));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Scroll progress rail */
+.study-linear .landing-scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 200;
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  background: linear-gradient(90deg, var(--accent), oklch(64% 0.2 305));
+  box-shadow: 0 0 12px color-mix(in oklch, var(--accent) 55%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .study-linear .landing-scroll-progress {
+    display: none;
+  }
+}
+
 .study-linear .hero-linear-intro,
 .study-linear .hero-linear-product {
   position: relative;

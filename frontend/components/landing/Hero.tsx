@@ -4,10 +4,13 @@ import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { BrainCanvas } from "./BrainCanvas";
 import { DigestPreview } from "./DigestPreview";
-import { StaggerHeadline } from "./StaggerHeadline";
+import { MagneticButton } from "./MagneticButton";
+import { RotatingWord } from "./RotatingWord";
 import { ArrowRightIcon } from "./icons";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+const ROTATING = ["everything you follow", "your whole inbox", "every feed you trust", "all of it"];
 
 export function Hero() {
   const sectionRef = useRef<HTMLElement>(null);
@@ -25,8 +28,26 @@ export function Hero() {
   const introY = useTransform(scrollYProgress, [0, 1], [0, 60]);
   const productY = useTransform(scrollYProgress, [0, 1], [0, -36]);
 
+  // Cursor-reactive atmosphere — the violet spotlight + orbs track the pointer.
+  const handlePointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    if (reducedMotion || e.pointerType !== "mouse") return;
+    const el = sectionRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width;
+    const py = (e.clientY - r.top) / r.height;
+    el.style.setProperty("--hero-mx", `${(px * 100).toFixed(2)}%`);
+    el.style.setProperty("--hero-my", `${(py * 100).toFixed(2)}%`);
+    el.style.setProperty("--hero-dx", (px - 0.5).toFixed(3));
+    el.style.setProperty("--hero-dy", (py - 0.5).toFixed(3));
+  };
+
   return (
-    <section className="hero-linear landing-band-base" ref={sectionRef}>
+    <section
+      className="hero-linear landing-band-base"
+      ref={sectionRef}
+      onPointerMove={handlePointerMove}
+    >
       <motion.div
         className="hero-linear-atmosphere"
         aria-hidden
@@ -36,6 +57,14 @@ export function Hero() {
           className="hero-linear-mesh"
           style={reducedMotion ? undefined : { y: meshY }}
         />
+        {!reducedMotion && (
+          <>
+            <span className="hero-cursor-glow" aria-hidden />
+            <span className="hero-orb hero-orb-1" aria-hidden />
+            <span className="hero-orb hero-orb-2" aria-hidden />
+            <span className="hero-orb hero-orb-3" aria-hidden />
+          </>
+        )}
         <motion.div
           className="hero-linear-brain"
           style={reducedMotion ? undefined : { y: brainY }}
@@ -57,11 +86,17 @@ export function Hero() {
             Morning briefing →
           </a>
         </p>
-        <StaggerHeadline
-          className="hero-linear-headline"
-          text="The intelligence system for everything you follow"
-          highlight="intelligence system"
-        />
+        <h1 className="hero-linear-headline" aria-label="The intelligence system for everything you follow">
+          <motion.span
+            className="hero-headline-lead"
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.12, ease: EASE }}
+          >
+            The <span className="headline-shimmer">intelligence system</span> for{" "}
+          </motion.span>
+          <RotatingWord className="hero-headline-rotate" words={ROTATING} />
+        </h1>
         <motion.p
           className="hero-linear-sub"
           initial={{ opacity: 0, y: 8 }}
@@ -78,12 +113,12 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.42, delay: 0.68, ease: EASE }}
         >
-          <a href="/login" className="btn-light-primary">
+          <MagneticButton href="/login" className="btn-light-primary">
             Start free
             <span className="btn-arrow" aria-hidden>
               <ArrowRightIcon size={14} />
             </span>
-          </a>
+          </MagneticButton>
           <a href="#demo" className="btn-light-ghost">
             See it work
           </a>

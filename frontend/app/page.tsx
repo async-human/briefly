@@ -1,4 +1,5 @@
 import { LandingPageShell } from "@/components/landing/LandingPageShell";
+import { ScrollProgress } from "@/components/landing/ScrollProgress";
 import { Nav } from "@/components/landing/Nav";
 import { Hero } from "@/components/landing/Hero";
 import { LiveDemo } from "@/components/landing/LiveDemo";
@@ -13,6 +14,7 @@ import { Footer } from "@/components/landing/Footer";
 export default function Home() {
   return (
     <LandingPageShell>
+      <ScrollProgress />
       <Nav />
       <Hero />
       <LiveDemo />

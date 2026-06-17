@@ -14,18 +14,27 @@ type RevealProps = {
 export function Reveal({ children, className, delay = 0 }: RevealProps) {
   const ref = useRef<HTMLDivElement>(null);
   const reducedMotion = useReducedMotion();
-  const isInView = useInView(ref, { once: true, margin: "-48px 0px -48px 0px", amount: 0.15 });
-  const offset = reducedMotion ? 0 : 8;
-  const duration = reducedMotion ? 0.01 : 0.42;
+  const isInView = useInView(ref, { once: true, margin: "-64px 0px -64px 0px", amount: 0.15 });
   const cappedDelay = Math.min(delay, 0.36);
+
+  const hidden = reducedMotion
+    ? { opacity: 0 }
+    : { opacity: 0, y: 28, scale: 0.97 };
+  const shown = reducedMotion
+    ? { opacity: 1 }
+    : { opacity: 1, y: 0, scale: 1 };
 
   return (
     <motion.div
       ref={ref}
       className={className ? `landing-reveal ${className}` : "landing-reveal"}
-      initial={{ opacity: 0, y: offset }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: offset }}
-      transition={{ duration, ease: REVEAL_EASE, delay: cappedDelay }}
+      initial={hidden}
+      animate={isInView ? shown : hidden}
+      transition={
+        reducedMotion
+          ? { duration: 0.01, delay: cappedDelay }
+          : { type: "spring", stiffness: 120, damping: 18, mass: 0.7, delay: cappedDelay }
+      }
     >
       {children}
     </motion.div>
