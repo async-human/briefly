@@ -1,5 +1,6 @@
 import { LandingPageShell } from "@/components/landing/LandingPageShell";
 import { ScrollProgress } from "@/components/landing/ScrollProgress";
+import { CardSpotlight } from "@/components/landing/CardSpotlight";
 import { Nav } from "@/components/landing/Nav";
 import { Hero } from "@/components/landing/Hero";
 import { LiveDemo } from "@/components/landing/LiveDemo";
@@ -15,6 +16,7 @@ export default function Home() {
   return (
     <LandingPageShell>
       <ScrollProgress />
+      <CardSpotlight />
       <Nav />
       <Hero />
       <LiveDemo />

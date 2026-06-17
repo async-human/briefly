@@ -44,10 +44,10 @@ export function RotatingWord({ words, className, interval = 2600 }: RotatingWord
         <motion.span
           key={words[index]}
           className="rotating-word-value"
-          initial={{ y: "0.72em", opacity: 0, rotateX: -55 }}
-          animate={{ y: 0, opacity: 1, rotateX: 0 }}
-          exit={{ y: "-0.72em", opacity: 0, rotateX: 55 }}
-          transition={{ duration: 0.5, ease: EASE }}
+          initial={{ y: "0.6em", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "-0.6em", opacity: 0 }}
+          transition={{ duration: 0.42, ease: EASE }}
         >
           {words[index]}
         </motion.span>

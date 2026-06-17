@@ -345,25 +345,30 @@ body[data-landing-theme="light"].study-linear-body {
 }
 
 .study-linear .rotating-word {
-  position: relative;
   display: inline-grid;
+  justify-items: center;
+  align-items: end;
+  text-align: center;
   vertical-align: bottom;
-  perspective: 700px;
+  line-height: 1.14;
+  /* descender + gradient-clip breathing room so glyphs never cut off */
+  padding-bottom: 0.1em;
+  overflow: visible;
 }
 
 .study-linear .rotating-word-sizer {
+  grid-area: 1 / 1;
   visibility: hidden;
   white-space: nowrap;
 }
 
 .study-linear .rotating-word-value {
-  position: absolute;
-  inset: 0;
+  grid-area: 1 / 1;
   display: inline-block;
-  text-align: left;
+  width: 100%;
+  text-align: center;
   white-space: nowrap;
-  transform-origin: center bottom;
-  backface-visibility: hidden;
+  padding-bottom: 0.1em;
   background: linear-gradient(96deg, var(--accent), oklch(64% 0.2 305));
   -webkit-background-clip: text;
   background-clip: text;
@@ -388,6 +393,129 @@ body[data-landing-theme="light"].study-linear-body {
 @media (prefers-reduced-motion: reduce) {
   .study-linear .landing-scroll-progress {
     display: none;
+  }
+}
+
+/* Card cursor-glow — violet light tracks the pointer across mid-page cards */
+.study-linear .capability-card,
+.study-linear .trust-source-card,
+.study-linear .compare-verdict,
+.study-linear .pricing-v2-card,
+.study-linear .memory-node {
+  --mx: 50%;
+  --my: 50%;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.study-linear .capability-card::after,
+.study-linear .trust-source-card::after,
+.study-linear .compare-verdict::after,
+.study-linear .pricing-v2-card::after,
+.study-linear .memory-node::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(
+    240px circle at var(--mx) var(--my),
+    color-mix(in oklch, var(--accent) 20%, transparent) 0%,
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 300ms var(--ease-out);
+  pointer-events: none;
+}
+
+.study-linear .capability-card:hover::after,
+.study-linear .trust-source-card:hover::after,
+.study-linear .compare-verdict:hover::after,
+.study-linear .pricing-v2-card:hover::after,
+.study-linear .memory-node:hover::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  .study-linear .capability-card::after,
+  .study-linear .trust-source-card::after,
+  .study-linear .compare-verdict::after,
+  .study-linear .pricing-v2-card::after,
+  .study-linear .memory-node::after {
+    display: none;
+  }
+}
+
+/* ── Alternating section rhythm — break the centered monotony ──────────── */
+
+/* LiveDemo · asymmetric split header (heading left / lede right) */
+.study-linear .livedemo-section .section-header-centered {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  column-gap: clamp(32px, 5vw, 72px);
+  row-gap: 14px;
+  align-items: end;
+  max-width: none;
+  margin: 0 0 clamp(40px, 5vw, 56px);
+  text-align: left;
+}
+
+.study-linear .livedemo-section .section-eyebrow {
+  grid-column: 1;
+  grid-row: 1;
+  margin-bottom: 0;
+}
+
+.study-linear .livedemo-section .section-heading {
+  grid-column: 1;
+  grid-row: 2;
+  margin-bottom: 0;
+}
+
+.study-linear .livedemo-section .section-body {
+  grid-column: 2;
+  grid-row: 2;
+  margin: 0;
+  max-width: 460px;
+  align-self: end;
+}
+
+.study-linear .livedemo-section .section-header-centered::before {
+  left: 0;
+  transform: none;
+  width: min(420px, 70vw);
+}
+
+/* Trust · left-aligned stacked header */
+.study-linear .trust-sources-section .section-header-centered {
+  max-width: 720px;
+  margin-left: 0;
+  margin-right: auto;
+  text-align: left;
+  align-items: flex-start;
+}
+
+.study-linear .trust-sources-section .section-header-centered .section-body {
+  margin-left: 0;
+}
+
+.study-linear .trust-sources-section .section-header-centered::before {
+  left: 0;
+  transform: none;
+  width: min(420px, 70vw);
+}
+
+/* Collapse the split to a single column on narrow viewports */
+@media (max-width: 860px) {
+  .study-linear .livedemo-section .section-header-centered {
+    display: block;
+    text-align: left;
+  }
+
+  .study-linear .livedemo-section .section-body {
+    max-width: 560px;
+    margin-top: 14px;
   }
 }
 
