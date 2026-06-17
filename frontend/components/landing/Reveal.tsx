@@ -3,8 +3,6 @@
 import { motion, useInView, useReducedMotion } from "framer-motion";
 import { useRef, type ReactNode } from "react";
 
-const REVEAL_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
-
 type RevealProps = {
   children: ReactNode;
   className?: string;
