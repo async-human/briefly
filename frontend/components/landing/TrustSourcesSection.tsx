@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Reveal } from "./Reveal";
 import { SourceIcon } from "@/components/SourceIcon";
 import { StaggerHeadline } from "./StaggerHeadline";
+import { SourcesStrip } from "./SourcesStrip";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -44,6 +45,8 @@ export function TrustSourcesSection() {
   return (
     <section className="trust-sources-section landing-section landing-band-base" id="trust">
       <div className="landing-section-inner trust-sources-inner">
+        <SourcesStrip />
+
         <Reveal>
           <div className="section-header-centered">
             <p className="section-eyebrow">Your data, your rules</p>

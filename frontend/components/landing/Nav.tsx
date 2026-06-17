@@ -9,9 +9,7 @@ const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 const NAV_LINKS = [
   { href: "#trust", label: "Privacy" },
-  { href: "#why", label: "Why" },
   { href: "#features", label: "Features" },
-  { href: "#roadmap", label: "Roadmap" },
   { href: "#compare", label: "Compare" },
   { href: "#pricing", label: "Pricing" },
 ];
