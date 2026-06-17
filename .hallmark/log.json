@@ -1,5 +1,15 @@
 [
   {
+    "date": "2026-06-17",
+    "scope": "single-page",
+    "target": "frontend landing (app/page.tsx)",
+    "verb": "redesign (elevation pass)",
+    "macrostructure": "Marquee Hero (preserved)",
+    "theme": "Cobalt-adjacent · Linear + Liner studied-DNA (preserved)",
+    "enrichment": "none",
+    "brief": "Landing elevation: fluid section rhythm (--section-py/px), more confident type scale, larger hero, unified 14/16px card radii, softer depth, calmer headline shimmer; merged 12->8 sections, roadmap cut. Brand violet + Playfair/DM Sans kept."
+  },
+  {
     "date": "2026-06-10",
     "macrostructure": "Workbench",
     "theme": "Lumen-adjacent",

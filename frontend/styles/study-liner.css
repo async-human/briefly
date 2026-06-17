@@ -72,8 +72,10 @@
   border-bottom: 0.5px solid var(--liner-divider);
 }
 
+/* Folded into the privacy section as a lead-in — gutter comes from the parent
+   section, so the strip only owns its own bottom spacing. */
 .study-linear .sources-strip.landing-band-base {
-  padding: 56px 64px 40px;
+  padding: 0 0 clamp(32px, 4vw, 44px);
   border-top: none;
   border-bottom: none;
 }
@@ -189,7 +191,7 @@
 }
 
 .study-linear .trust-sources-section {
-  padding: 72px 64px 88px;
+  padding: var(--section-py) var(--section-px);
   border-bottom: 0.5px solid var(--liner-divider);
 }
 
@@ -207,7 +209,7 @@
 
 .study-linear .trust-source-card {
   padding: 18px 20px;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   border: 0.5px solid var(--liner-divider);
   background: var(--band-card, var(--surface));
 }
@@ -307,7 +309,7 @@
 /* ── Compare section ──────────────────────────────────────────────────── */
 
 .study-linear .compare-section {
-  padding: 88px 64px;
+  padding: var(--section-py) var(--section-px);
   border-bottom: 0.5px solid var(--liner-divider);
 }
 
@@ -568,7 +570,7 @@
 }
 
 .study-linear .landing-section {
-  padding: 88px 64px;
+  padding: var(--section-py) var(--section-px);
 }
 
 .study-linear .livedemo-section,
@@ -576,7 +578,7 @@
 .study-linear .principles-section,
 .study-linear .roadmap-section,
 .study-linear .pricing-v2 {
-  padding: 88px 64px;
+  padding: var(--section-py) var(--section-px);
 }
 
 /* Card surfaces within tinted sections */
@@ -805,7 +807,6 @@
 }
 
 @media (max-width: 768px) {
-  .study-linear .sources-strip.landing-band-base,
   .study-linear .trust-sources-section,
   .study-linear .landing-section,
   .study-linear .livedemo-section,
@@ -828,8 +829,7 @@
   }
 
   .study-linear .sources-strip.landing-band-base {
-    padding-top: 40px;
-    padding-bottom: 32px;
+    padding: 0 0 28px;
   }
 
   .study-linear .trust-sources-grid {
