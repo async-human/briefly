@@ -23,6 +23,7 @@ import { PageContentTransition } from "@/components/loading/PageContentTransitio
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { DashboardInsightsDrawer } from "@/components/dashboard/DashboardInsightsDrawer";
 import { ProactiveAlertsBanner } from "@/components/dashboard/ProactiveAlertsBanner";
+import { BriefingMode } from "@/components/dashboard/BriefingMode";
 import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
 import { filterBillableSources, sourceSlotUsage } from "@/lib/plans";
 import type { ProfileIntelligence } from "@/lib/api";
@@ -55,6 +56,7 @@ function DashboardContent() {
   const [connectBanner, setConnectBanner] = useState<string | null>(null);
   const [discoveryRunning, setDiscoveryRunning] = useState(false);
   const [intel, setIntel] = useState<ProfileIntelligence | null>(null);
+  const [briefingOpen, setBriefingOpen] = useState(false);
   const autoGenerateChecked = useRef(false);
   const upgrade = useUpgradeOptional();
   const refreshBilling = upgrade?.refreshBilling;
@@ -298,7 +300,18 @@ function DashboardContent() {
       <ProactiveAlertsBanner />
 
       <div className="dash-primary-zone">
-        <p className="dash-primary-label">Today&apos;s briefing</p>
+        <div className="dash-primary-head">
+          <p className="dash-primary-label">Today&apos;s briefing</p>
+          {digest && (digest.items?.length ?? 0) > 0 && (
+            <button
+              type="button"
+              className="brief-me-btn"
+              onClick={() => setBriefingOpen(true)}
+            >
+              ▶ Brief me
+            </button>
+          )}
+        </div>
         <div className="dash-page-grid">
         <section className="dash-surface dash-surface-briefing" aria-labelledby="briefing-surface-title">
           <h2 id="briefing-surface-title" className="sr-only">
@@ -355,6 +368,13 @@ function DashboardContent() {
         digest={digest}
         streak={me.reading_streak ?? 0}
         declaredInterests={me.profile?.interests?.map((i) => i.topic).filter(Boolean) ?? []}
+      />
+
+      <BriefingMode
+        open={briefingOpen}
+        digest={digest}
+        userName={me.user.name}
+        onClose={() => setBriefingOpen(false)}
       />
     </div>
     </PageContentTransition>

@@ -9673,3 +9673,199 @@ a.saved-capture-title:hover {
   color: var(--app-ink-muted, #64748b);
 }
 
+/* ── Briefing Mode — cinematic voice briefing ────────────────────────────── */
+.dash-primary-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.brief-me-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: 12px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--app-accent, #6d5ef0);
+  background: var(--app-accent-soft, rgba(109, 94, 240, 0.12));
+  color: var(--app-accent, #6d5ef0);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.brief-me-btn:hover {
+  transform: translateY(-1px);
+  background: color-mix(in oklch, var(--app-accent, #6d5ef0) 18%, transparent);
+}
+
+.briefmode {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: briefmode-in 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes briefmode-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.briefmode-veil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 70% 60% at 50% 38%,
+    oklch(24% 0.07 278) 0%,
+    oklch(11% 0.03 270) 58%,
+    oklch(7% 0.02 270) 100%
+  );
+}
+
+.briefmode-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid oklch(100% 0 0 / 0.16);
+  background: oklch(100% 0 0 / 0.05);
+  color: oklch(88% 0.01 270);
+  cursor: pointer;
+}
+
+.briefmode-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.briefmode-close:hover {
+  background: oklch(100% 0 0 / 0.1);
+}
+
+.briefmode-stage {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(20px, 4vw, 32px);
+  max-width: 640px;
+  text-align: center;
+}
+
+.briefmode-orb {
+  width: clamp(170px, 38vw, 260px);
+  height: clamp(170px, 38vw, 260px);
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.briefmode-orb-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.briefmode-caption {
+  margin: 0;
+  font-size: clamp(1.1rem, 2.6vw, 1.55rem);
+  line-height: 1.5;
+  font-weight: 500;
+  color: oklch(96% 0.01 270);
+  min-height: 3em;
+}
+
+.briefmode-word {
+  color: oklch(56% 0.02 270);
+  transition: color 220ms ease;
+}
+
+.briefmode-word.is-spoken {
+  color: oklch(97% 0.02 280);
+}
+
+.briefmode-progress {
+  display: flex;
+  gap: 6px;
+}
+
+.briefmode-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: oklch(38% 0.02 270);
+  transition: background-color 220ms ease, box-shadow 220ms ease;
+}
+
+.briefmode-dot.is-done {
+  background: oklch(58% 0.07 278);
+}
+
+.briefmode-dot.is-active {
+  background: oklch(72% 0.18 278);
+  box-shadow: 0 0 8px oklch(72% 0.18 278 / 0.7);
+}
+
+.briefmode-controls {
+  position: relative;
+  z-index: 1;
+  margin-top: clamp(28px, 5vw, 44px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.briefmode-btn {
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 1px solid oklch(100% 0 0 / 0.18);
+  background: oklch(100% 0 0 / 0.06);
+  color: oklch(92% 0.01 270);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease;
+}
+
+.briefmode-btn:hover {
+  background: oklch(100% 0 0 / 0.12);
+  transform: translateY(-1px);
+}
+
+.briefmode-btn-primary {
+  background: oklch(62% 0.19 278);
+  border-color: transparent;
+  color: oklch(99% 0.01 280);
+}
+
+.briefmode-btn-primary:hover {
+  background: oklch(66% 0.19 278);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .briefmode {
+    animation: none;
+  }
+  .briefmode-word {
+    transition: none;
+  }
+}
+
