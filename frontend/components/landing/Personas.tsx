@@ -259,11 +259,24 @@ export function Personas() {
     setProgress(0);
   }
 
+  const skipRailScrollRef = useRef(true);
+
   useEffect(() => {
     const rail = railRef.current;
     if (!rail) return;
+    if (skipRailScrollRef.current) {
+      skipRailScrollRef.current = false;
+      return;
+    }
+
     const activeBtn = rail.querySelector<HTMLButtonElement>('[aria-selected="true"]');
-    activeBtn?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    if (!activeBtn) return;
+
+    // Scroll only the horizontal rail on mobile — never the document.
+    if (rail.scrollWidth <= rail.clientWidth) return;
+    const targetLeft =
+      activeBtn.offsetLeft - (rail.clientWidth - activeBtn.offsetWidth) / 2;
+    rail.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
   }, [active]);
 
   return (
