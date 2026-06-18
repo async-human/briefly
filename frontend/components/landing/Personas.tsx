@@ -231,6 +231,7 @@ function BriefingPreview({ persona, reducedMotion }: { persona: Persona; reduced
 
 export function Personas() {
   const sectionRef = useRef<HTMLElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
   const inView = useInView(sectionRef, { once: false, margin: "-12% 0px" });
   const reducedMotion = useReducedMotion();
   const [active, setActive] = useState(0);
@@ -257,6 +258,13 @@ export function Personas() {
     setActive(i);
     setProgress(0);
   }
+
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const activeBtn = rail.querySelector<HTMLButtonElement>('[aria-selected="true"]');
+    activeBtn?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [active]);
 
   return (
     <section
@@ -287,39 +295,45 @@ export function Personas() {
             onMouseEnter={() => setPaused(true)}
             onMouseLeave={() => setPaused(false)}
           >
-            <div className="personas-rail" role="tablist" aria-label="Who Briefly is for">
-              {PERSONAS.map((p, i) => (
-                <button
-                  key={p.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={i === active}
-                  className={`personas-rail-item${i === active ? " is-active" : ""}`}
-                  onClick={() => selectPersona(i)}
-                  onFocus={() => setPaused(true)}
-                  onBlur={() => setPaused(false)}
-                >
-                  <span className="personas-rail-label">{p.label}</span>
-                  <span className="personas-rail-tagline">{p.tagline}</span>
-                  {i === active && !reducedMotion ? (
-                    <span
-                      className="personas-rail-progress"
-                      style={{ transform: `scaleX(${progress})` }}
-                      aria-hidden
-                    />
-                  ) : null}
-                </button>
-              ))}
+            <div className="personas-rail-wrap">
+              <div className="personas-rail" ref={railRef} role="tablist" aria-label="Who Briefly is for">
+                {PERSONAS.map((p, i) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === active}
+                    className={`personas-rail-item${i === active ? " is-active" : ""}`}
+                    onClick={() => selectPersona(i)}
+                    onFocus={() => setPaused(true)}
+                    onBlur={() => setPaused(false)}
+                  >
+                    <span className="personas-rail-label">{p.label}</span>
+                    <span className="personas-rail-tagline">{p.tagline}</span>
+                    {i === active && !reducedMotion ? (
+                      <span
+                        className="personas-rail-progress"
+                        style={{ transform: `scaleX(${progress})` }}
+                        aria-hidden
+                      />
+                    ) : null}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="personas-detail">
+              <p className="personas-mobile-active" aria-live="polite">
+                <span className="personas-mobile-active-label">{persona.label}</span>
+                <span className="personas-mobile-active-tagline">{persona.tagline}</span>
+              </p>
               <AnimatePresence mode="wait">
                 <motion.div
                   key={persona.key}
                   className="personas-detail-panel"
-                  initial={reducedMotion ? { opacity: 0 } : { opacity: 0, x: 12 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={reducedMotion ? { opacity: 0 } : { opacity: 0, x: -8 }}
+                  initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
                   transition={{ duration: 0.35, ease: EASE }}
                 >
                   <div className="personas-sources-block">

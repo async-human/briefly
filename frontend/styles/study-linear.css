@@ -542,6 +542,14 @@ body[data-landing-theme="light"].study-linear-body {
   top: 5.5rem;
 }
 
+.study-linear .personas-rail-wrap {
+  min-width: 0;
+}
+
+.study-linear .personas-mobile-active {
+  display: none;
+}
+
 .study-linear .personas-rail-item {
   position: relative;
   display: flex;
@@ -812,23 +820,75 @@ body[data-landing-theme="light"].study-linear-body {
 }
 
 @media (max-width: 56rem) {
+  .study-linear .personas-header {
+    margin-bottom: 0.25rem;
+  }
+
+  .study-linear .personas-lead {
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
   .study-linear .personas-layout {
     grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .study-linear .personas-rail-wrap {
+    position: relative;
+    margin-inline: calc(-1 * var(--section-px));
+    padding-inline: var(--section-px);
+  }
+
+  .study-linear .personas-rail-wrap::before,
+  .study-linear .personas-rail-wrap::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0.25rem;
+    width: 1.75rem;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .study-linear .personas-rail-wrap::before {
+    left: 0;
+    background: linear-gradient(90deg, var(--band-base, var(--surface)) 20%, transparent);
+  }
+
+  .study-linear .personas-rail-wrap::after {
+    right: 0;
+    background: linear-gradient(270deg, var(--band-base, var(--surface)) 20%, transparent);
   }
 
   .study-linear .personas-rail {
     position: static;
     flex-direction: row;
+    gap: 0.55rem;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     scroll-snap-type: x mandatory;
-    padding-bottom: 0.25rem;
+    scroll-padding-inline: var(--section-px);
+    padding-bottom: 0.35rem;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .study-linear .personas-rail::-webkit-scrollbar {
+    display: none;
   }
 
   .study-linear .personas-rail-item {
-    flex: 0 0 min(82vw, 18rem);
-    scroll-snap-align: start;
+    flex: 0 0 min(78vw, 16.5rem);
+    scroll-snap-align: center;
+    min-height: 5.5rem;
+    padding: 0.8rem 0.9rem;
+  }
+
+  .study-linear .personas-rail-label {
+    font-size: 0.8125rem;
+    line-height: 1.35;
   }
 
   .study-linear .personas-rail-tagline {
@@ -836,6 +896,95 @@ body[data-landing-theme="light"].study-linear-body {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    font-size: 0.7rem;
+    line-height: 1.4;
+  }
+
+  .study-linear .personas-mobile-active {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin: 0 0 0.15rem;
+    padding: 0 0.1rem;
+  }
+
+  .study-linear .personas-mobile-active-label {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+  }
+
+  .study-linear .personas-mobile-active-tagline {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--text-secondary);
+  }
+
+  .study-linear .personas-detail-panel {
+    gap: 1rem;
+  }
+
+  .study-linear .personas-sources-block,
+  .study-linear .personas-adapts {
+    padding-inline: 0;
+  }
+
+  .study-linear .personas-source-chip {
+    font-size: 0.7rem;
+    padding: 0.24rem 0.55rem;
+  }
+
+  .study-linear .personas-brief {
+    border-radius: var(--radius-card);
+  }
+
+  .study-linear .personas-brief-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.55rem;
+    padding: 0.9rem 1rem;
+  }
+
+  .study-linear .personas-brief-live {
+    font-size: 9px;
+  }
+
+  .study-linear .personas-brief-item {
+    padding: 0.9rem 1rem;
+  }
+
+  .study-linear .personas-brief-item-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .study-linear .personas-brief-headline {
+    font-size: 1rem;
+    line-height: 1.4;
+    margin-bottom: 0.55rem;
+  }
+
+  .study-linear .personas-brief-why {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    padding-left: 0.7rem;
+  }
+
+  .study-linear .personas-adapts-list li {
+    font-size: 0.8125rem;
+    line-height: 1.48;
+  }
+}
+
+@media (max-width: 24rem) {
+  .study-linear .personas-rail-item {
+    flex-basis: 86vw;
+  }
+
+  .study-linear .personas-brief-headline {
+    font-size: 0.95rem;
   }
 }
 
