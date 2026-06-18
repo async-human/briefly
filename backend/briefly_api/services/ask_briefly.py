@@ -11,7 +11,8 @@ import logging
 import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 
 import numpy as np
 from sqlalchemy import select
@@ -186,13 +187,37 @@ async def _retrieve_today_brief(
     never_show: list[str],
     limit: int = 12,
 ) -> list[ContextChunk]:
-    today = datetime.now(timezone.utc).date().isoformat()
-    digest_result = await db.execute(
-        select(Digest).where(Digest.user_id == user_id, Digest.digest_date == today)
-    )
-    digest = digest_result.scalar_one_or_none()
+    # "Today" must be the user's LOCAL date — digest_date is written in the
+    # user's timezone, not UTC. Comparing against UTC's date is why a brief that
+    # has been generated reads as "not ready" for any user whose local date
+    # differs from UTC (e.g. IST is +5:30).
+    profile = (
+        await db.execute(select(UserProfile).where(UserProfile.user_id == user_id))
+    ).scalar_one_or_none()
+    tz_name = getattr(profile, "digest_timezone", None) or "UTC"
+    try:
+        local_today = datetime.now(ZoneInfo(tz_name)).date()
+    except Exception:
+        local_today = datetime.now(timezone.utc).date()
+
+    # Grab the most recent brief and accept it if it's today (local) or at most
+    # ~2 days old — so "brief me on the current brief" always surfaces the
+    # latest available one instead of falsely reporting "not ready".
+    digest = (
+        await db.execute(
+            select(Digest)
+            .where(Digest.user_id == user_id)
+            .order_by(Digest.digest_date.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
     if not digest:
         return []
+    try:
+        if (local_today - date.fromisoformat(digest.digest_date)).days > 2:
+            return []
+    except (TypeError, ValueError):
+        pass
     items_result = await db.execute(
         select(DigestItem)
         .where(DigestItem.digest_id == digest.id)
