@@ -9508,3 +9508,73 @@ a.saved-capture-title:hover {
   }
 }
 
+/* ── Proactive notifications card ─────────────────────────────────────────── */
+.push-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.push-card-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.push-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--app-border-strong, #cbd5e1);
+  flex-shrink: 0;
+  transition: background-color var(--app-dur, 160ms) var(--app-ease, ease),
+    box-shadow var(--app-dur, 160ms) var(--app-ease, ease);
+}
+
+.push-status-dot.is-on {
+  background: var(--app-accent, #6d5ef0);
+  box-shadow: 0 0 0 4px var(--app-accent-soft, rgba(109, 94, 240, 0.18));
+}
+
+.push-status-text {
+  font-size: 0.9rem;
+  color: var(--app-ink-2, #475569);
+}
+
+.push-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.push-card-note,
+.push-card-msg {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.push-card-note {
+  color: var(--app-ink-muted, #64748b);
+}
+
+.push-card-note code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.82em;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--app-surface-2, rgba(0, 0, 0, 0.05));
+}
+
+.push-card-msg--ok {
+  color: var(--app-accent, #0f9d58);
+}
+
+.push-card-msg--err {
+  color: var(--app-warn, #dc2626);
+}
+
+.push-card-msg--info {
+  color: var(--app-ink-2, #475569);
+}
+

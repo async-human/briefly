@@ -27,9 +27,73 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, update
 
 from briefly_api.config import get_settings
-from briefly_api.db.models import ProactiveSurfacingEvent
+from briefly_api.db.models import ProactiveSurfacingEvent, UserProfile
 
 log = logging.getLogger(__name__)
+
+
+async def queue_relevant_content_event(session, user_id: str) -> bool:
+    """
+    Create a `relevant_content` proactive event from the top freshly-discovered
+    article (scored against the user's learned interests). Idempotent per 24h.
+    Returns True if an event was created. Caller commits.
+    """
+    s = get_settings()
+    if not s.proactive_surfacing_enabled:
+        return False
+
+    profile = (
+        await session.execute(select(UserProfile).where(UserProfile.user_id == user_id))
+    ).scalar_one_or_none()
+    articles = list(getattr(profile, "discovered_articles", None) or []) if profile else []
+    if not articles:
+        return False
+
+    def _score(a: dict) -> float:
+        try:
+            return float(a.get("relevance_score") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    top = max(articles, key=_score)
+    if _score(top) < s.relevant_content_min_score:
+        return False
+
+    title = (top.get("title") or "").strip()
+    if not title:
+        return False
+
+    # Don't fire more than one relevant_content alert per 24h.
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    existing = (
+        await session.execute(
+            select(ProactiveSurfacingEvent).where(
+                ProactiveSurfacingEvent.user_id == user_id,
+                ProactiveSurfacingEvent.event_type == "relevant_content",
+                ProactiveSurfacingEvent.created_at >= cutoff,
+            )
+        )
+    ).scalars().first()
+    if existing:
+        return False
+
+    why = (top.get("why_relevant") or top.get("summary") or "Matches what you've been reading.").strip()
+    url = top.get("url") or ""
+
+    session.add(
+        ProactiveSurfacingEvent(
+            user_id=user_id,
+            event_type="relevant_content",
+            title=f"Worth a look: {title[:80]}",
+            body=why[:300],
+            content_ids=[url] if url else [],
+            thread_key=top.get("intent_topic"),
+            priority=7,
+        )
+    )
+    await session.flush()
+    log.info("queue_relevant_content_event: queued for user %s", user_id)
+    return True
 
 
 async def get_pending_events(session, user_id: str) -> list[dict]:

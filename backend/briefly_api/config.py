@@ -249,6 +249,16 @@ class Settings(BaseSettings):
     proactive_surfacing_enabled: bool = True
     # Cap proactive events per user per day to avoid notification fatigue
     proactive_max_per_user_per_day: int = 2
+    # Min discovery relevance score for a "relevant_content" proactive alert
+    relevant_content_min_score: float = 0.65
+
+    # ── Web push (VAPID) ──────────────────────────────────────────────────────
+    web_push_enabled: bool = True
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_subject: str = "mailto:notifications@briefly.app"
+    # Min proactive priority that triggers a real-time push (digest still gets all)
+    push_min_priority: int = 6
 
     # ── Weekly intelligence skill ─────────────────────────────────────────────
     weekly_intelligence_enabled: bool = True

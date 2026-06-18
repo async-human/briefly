@@ -16,17 +16,35 @@ from briefly_api.config import get_settings
 from briefly_api.db.engine import SessionLocal
 from briefly_api.db.models import ProactiveSurfacingEvent, User
 from briefly_api.agents.proactive.proactive_surfacing import mark_surfaced
+from briefly_api.services.web_push import send_push_to_user
 
 log = logging.getLogger(__name__)
 
-_BREAKING_TYPES = frozenset({"breaking_development", "thread_update"})
-_MIN_PRIORITY = 8
+# Event types that warrant a real-time notification (not just digest injection).
+_NOTIFY_TYPES = frozenset(
+    {"breaking_development", "thread_update", "relevant_content", "meeting_prep", "voice_note_connection"}
+)
+# Email is reserved for high-priority events; web push goes to everything above
+# settings.push_min_priority so it stays timely without flooding the inbox.
+_EMAIL_MIN_PRIORITY = 8
+
+
+def _event_url(event: ProactiveSurfacingEvent) -> str:
+    if event.event_type == "relevant_content" and event.content_ids:
+        first = event.content_ids[0]
+        if isinstance(first, str) and first.startswith("http"):
+            return first
+    return "/dashboard"
 
 
 async def send_pending_proactive_alerts() -> int:
-    """Email users with unsurfaced high-priority proactive events. Returns send count."""
+    """Deliver unsurfaced proactive events via web push (+ email for high priority).
+
+    Returns the number of events delivered. An event is marked surfaced once it
+    has been delivered through at least one channel.
+    """
     s = get_settings()
-    if not s.proactive_surfacing_enabled or not s.resend_api_key:
+    if not s.proactive_surfacing_enabled:
         return 0
 
     sent = 0
@@ -37,8 +55,8 @@ async def send_pending_proactive_alerts() -> int:
             .where(
                 ProactiveSurfacingEvent.surfaced_at.is_(None),
                 ProactiveSurfacingEvent.dismissed_at.is_(None),
-                ProactiveSurfacingEvent.priority >= _MIN_PRIORITY,
-                ProactiveSurfacingEvent.event_type.in_(tuple(_BREAKING_TYPES)),
+                ProactiveSurfacingEvent.priority >= s.push_min_priority,
+                ProactiveSurfacingEvent.event_type.in_(tuple(_NOTIFY_TYPES)),
             )
             .order_by(ProactiveSurfacingEvent.priority.desc())
             .limit(50)
@@ -46,18 +64,40 @@ async def send_pending_proactive_alerts() -> int:
         rows = result.all()
 
     for event, email, name in rows:
+        delivered = False
+
+        # Web push — the primary real-time channel.
         try:
-            ok = await _send_one(email, name, event.title, event.body)
-            if ok:
-                async with SessionLocal() as session:
-                    await mark_surfaced(session, [event.id])
-                    await session.commit()
-                sent += 1
+            pushed = await send_push_to_user(
+                event.user_id,
+                {
+                    "title": event.title,
+                    "body": event.body,
+                    "url": _event_url(event),
+                    "tag": f"briefly-{event.event_type}",
+                },
+            )
+            if pushed:
+                delivered = True
         except Exception:
-            log.exception("ProactiveNotifier: failed for user event %s", event.id)
+            log.exception("ProactiveNotifier: push failed for event %s", event.id)
+
+        # Email — only for high-priority events, and only if Resend is configured.
+        if s.resend_api_key and event.priority >= _EMAIL_MIN_PRIORITY:
+            try:
+                if await _send_one(email, name, event.title, event.body):
+                    delivered = True
+            except Exception:
+                log.exception("ProactiveNotifier: email failed for event %s", event.id)
+
+        if delivered:
+            async with SessionLocal() as session:
+                await mark_surfaced(session, [event.id])
+                await session.commit()
+            sent += 1
 
     if sent:
-        log.info("ProactiveNotifier: sent %d breaking alert(s)", sent)
+        log.info("ProactiveNotifier: delivered %d proactive alert(s)", sent)
     return sent
 
 

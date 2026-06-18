@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import httpx
+from sqlalchemy import select
 
 from briefly_api.auth.calendar import (
     CALENDAR_API,
@@ -14,6 +15,7 @@ from briefly_api.auth.calendar import (
     refresh_calendar_access_token,
 )
 from briefly_api.config import get_settings
+from briefly_api.db.models import ProactiveSurfacingEvent, UserMemory, UserProfile
 
 log = logging.getLogger(__name__)
 
@@ -223,3 +225,74 @@ async def load_calendar_briefing(
         return None
 
     return build_meeting_briefing(events, enriched_items, selected_item_ids, story_threads)
+
+
+async def queue_meeting_prep_event(session, user_id: str) -> bool:
+    """
+    Create one `meeting_prep` proactive event summarizing today's meetings (with
+    any active story threads that match). Idempotent per day. Returns True if a
+    new event was created; the caller commits.
+    """
+    s = get_settings()
+    if not s.proactive_surfacing_enabled:
+        return False
+
+    if not await get_calendar_connection(session, user_id):
+        return False
+
+    profile = (
+        await session.execute(select(UserProfile).where(UserProfile.user_id == user_id))
+    ).scalar_one_or_none()
+    tz = (getattr(profile, "digest_timezone", None) or "UTC") if profile else "UTC"
+    try:
+        run_date = datetime.now(ZoneInfo(tz)).strftime("%Y-%m-%d")
+    except Exception:
+        run_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Cheap thread context (no enriched items needed here).
+    thread_rows = (
+        await session.execute(
+            select(UserMemory).where(
+                UserMemory.user_id == user_id,
+                UserMemory.memory_type == "story_thread",
+            )
+        )
+    ).scalars().all()
+    story_threads = [{"topic": t.key} for t in thread_rows]
+
+    briefing = await load_calendar_briefing(session, user_id, tz, run_date, [], [], story_threads)
+    if not briefing or not briefing.get("meetings"):
+        return False
+
+    # Idempotent: at most one meeting_prep per day.
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    existing = (
+        await session.execute(
+            select(ProactiveSurfacingEvent).where(
+                ProactiveSurfacingEvent.user_id == user_id,
+                ProactiveSurfacingEvent.event_type == "meeting_prep",
+                ProactiveSurfacingEvent.created_at >= today_start,
+            )
+        )
+    ).scalars().first()
+    if existing:
+        return False
+
+    count = briefing.get("meeting_count") or len(briefing["meetings"])
+    title = f"{count} meeting{'s' if count != 1 else ''} on your calendar today"
+    body = briefing.get("summary_text") or "You have meetings today — here's the rundown."
+
+    session.add(
+        ProactiveSurfacingEvent(
+            user_id=user_id,
+            event_type="meeting_prep",
+            title=title,
+            body=body[:400],
+            content_ids=[],
+            thread_key=None,
+            priority=8,
+        )
+    )
+    await session.flush()
+    log.info("queue_meeting_prep_event: queued for user %s (%d meetings)", user_id, count)
+    return True

@@ -760,6 +760,28 @@ class ProactiveSurfacingEvent(Base):
     dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class PushSubscription(Base):
+    """A browser Web Push (VAPID) subscription — one row per device/browser."""
+
+    __tablename__ = "push_subscriptions"
+    __table_args__ = (
+        Index("uq_push_subscription_endpoint", "endpoint", unique=True),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    endpoint: Mapped[str] = mapped_column(Text, nullable=False)
+    p256dh: Mapped[str] = mapped_column(Text, nullable=False)
+    auth: Mapped[str] = mapped_column(Text, nullable=False)
+    user_agent: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 # ── Background jobs ───────────────────────────────────────────────────────────
 
 class BackgroundJob(Base):

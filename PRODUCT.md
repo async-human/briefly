@@ -22,6 +22,39 @@ Gemini, Siri) structurally can't copy:
 
 ---
 
+## Direction — who it's for, trunk & branch
+
+**Who it's for.** Info-overloaded operators — founders, PMs, engineers, investors,
+researchers (24–40) who subscribe to too much, carry backlog guilt, and have already
+abandoned Notion/Obsidian because those tools made the overload *their* job. They pay
+for things that save time without demanding upkeep (Spotify, ChatGPT).
+
+**The pain.** Not "too much information" (everyone claims that) — the **maintenance
+tax**. Every PKM tool makes you save, tag, organise, revisit. Briefly's wedge: it does
+the reading and the remembering. Zero upkeep.
+
+**The trunk (what we are):** the morning brief that reads everything you follow and
+remembers it — the spine above. Retention, not acquisition, is the metric; the
+compounding memory is the moat (Day 1 = a digest anyone could clone; Day 90 = an
+intelligence layer holding *your* history that a general assistant structurally can't).
+
+**The proactive layer is part of the trunk, not a second product.** "The brief,
+surfaced when it can't wait." The existing `agents/proactive/` + `proactive_notifier`
+(priority-gated breaking-development alerts, capped per user/day, `proactive_surfacing_enabled`
+on by default) is the *Proactive surfacing* row of the feature map made real. It
+deepens the spine; it is not a pivot.
+
+**The branch (Jarvis — earned, not yet):** the always-on, cross-platform chief of staff
+— calendar-aware, real-time, crossing internal signals (mail/calendar) with external
+ones, at a premium tier. This is a **widen** under the stop rule and stays gated until
+(a) the morning habit demonstrably sticks and (b) the current surfaces cohere. Calendar
+OAuth scaffolding already exists (`calendar.readonly` scope); the next concrete step is
+**calendar pre-meeting prep**, which reuses the proactive infra and runs on batch
+economics — so it deepens the spine *before* any real-time streaming or new tier ships.
+Do not build the full notification product or the premium tier ahead of the habit.
+
+---
+
 ## Feature map
 
 Three pillars + utilities. Everything we ship lives in exactly one pillar and

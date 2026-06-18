@@ -1345,6 +1345,30 @@ export const api = {
       },
       signal,
     ),
+  // ── Web push notifications ──────────────────────────────────────────────
+  getVapidKey: () =>
+    request<{ public_key: string; enabled: boolean }>("/api/v1/push/vapid-key"),
+  pushSubscribe: (body: {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+    user_agent?: string;
+  }) =>
+    request<void>("/api/v1/push/subscribe", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  pushUnsubscribe: (endpoint: string) =>
+    request<void>("/api/v1/push/unsubscribe", {
+      method: "POST",
+      body: JSON.stringify({ endpoint }),
+    }),
+  sendTestPush: () =>
+    request<{ sent: number }>("/api/v1/push/test", { method: "POST" }),
+  triggerProactive: () =>
+    request<{ queued: number; delivered: number }>("/api/v1/push/trigger-proactive", {
+      method: "POST",
+    }),
+
   // Pending high-priority items the orb can surface proactively during the day.
   orbProactive: () => request<ProactiveEvent[]>("/api/v1/orb/proactive"),
   orbProactiveSeen: (eventIds: string[]) =>

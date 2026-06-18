@@ -13,6 +13,7 @@ import { PageContentTransition } from "@/components/loading/PageContentTransitio
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { getToken } from "@/lib/auth";
 import { CaptureDevicesCard } from "@/components/settings/CaptureDevicesCard";
+import { PushNotificationsCard } from "@/components/settings/PushNotificationsCard";
 import { ExtensionInstallCard } from "@/components/saved/ExtensionInstallCard";
 import { TopicsToTrackEditor } from "@/components/settings/TopicsToTrackEditor";
 
@@ -328,6 +329,20 @@ export default function SettingsPage() {
                 <ExtensionInstallCard />
                 <div className="capture-devices-divider" />
                 <CaptureDevicesCard />
+              </div>
+            </div>
+
+            {/* ── Notifications ── */}
+            <div className="dash-surface dash-surface-settings">
+              <div className="dash-surface-head">
+                <h2 className="dash-surface-title">Proactive notifications</h2>
+                <p className="dash-surface-desc">
+                  Get real-time pings when Briefly spots something relevant — a strongly-matched
+                  article, a breaking development on a thread you follow, or prep before a meeting.
+                </p>
+              </div>
+              <div className="dash-surface-body dash-surface-body-form">
+                <PushNotificationsCard />
               </div>
             </div>
 

@@ -396,6 +396,22 @@ async def _run_pipeline_for_user(user_id: str, local_date: str) -> None:
             log.exception("Scheduler: unhandled error for user %s", user_id)
             await handle_scheduled_digest_failure(user_id, str(exc))
 
+        # Generate proactive events for the morning push (relevant content +
+        # meeting prep). Delivered shortly after by the proactive_alerts job.
+        try:
+            from briefly_api.agents.proactive.proactive_surfacing import (
+                queue_relevant_content_event,
+            )
+            from briefly_api.services.calendar_briefing import queue_meeting_prep_event
+
+            async with SessionLocal() as session:
+                created = await queue_relevant_content_event(session, user_id)
+                created = await queue_meeting_prep_event(session, user_id) or created
+                if created:
+                    await session.commit()
+        except Exception:
+            log.exception("Scheduler: proactive event generation failed for user %s", user_id)
+
 
 async def digest_scheduler_loop() -> None:
     """
