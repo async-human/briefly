@@ -32,6 +32,7 @@ from briefly_api.db.models import (
     SourceFetchPattern,
     UserMemory,
     UserProfile,
+    WatchedEntity,
 )
 
 log = logging.getLogger(__name__)
@@ -95,14 +96,75 @@ async def run_for_user(session, user_id: str) -> dict:
         session, user_id, recent_items, s
     )
 
+    watched_count = await _detect_watched_entities(session, user_id, recent_items)
+
     log.info(
-        "ContentWatcherAgent: user=%s new=%d breaking=%d",
-        user_id, len(new_items), breaking_count,
+        "ContentWatcherAgent: user=%s new=%d breaking=%d watched=%d",
+        user_id, len(new_items), breaking_count, watched_count,
     )
     return {
         "new_items": len(new_items),
         "breaking_developments": breaking_count,
+        "watched_entity_alerts": watched_count,
     }
+
+
+async def _detect_watched_entities(
+    session, user_id: str, recent_items: list[RawContent]
+) -> int:
+    """Alert when fresh content matches an explicitly-watched entity (12h cooldown each)."""
+    if not recent_items:
+        return 0
+
+    entities = (
+        await session.execute(
+            select(WatchedEntity).where(WatchedEntity.user_id == user_id)
+        )
+    ).scalars().all()
+    if not entities:
+        return 0
+
+    now = datetime.now(timezone.utc)
+    created = 0
+    for ent in entities:
+        if ent.last_alerted_at:
+            la = ent.last_alerted_at
+            if la.tzinfo is None:
+                la = la.replace(tzinfo=timezone.utc)
+            if now - la < timedelta(hours=12):
+                continue
+
+        name_low = ent.name.lower()
+        keys = {w.lower() for w in ent.name.split() if len(w) > 2}
+        for kw in (ent.keywords or []):
+            keys |= {w.lower() for w in kw.split() if len(w) > 2}
+
+        match = None
+        for item in recent_items:
+            text = ((item.title or "") + " " + (item.clean_text or "")[:200]).lower()
+            if name_low in text or (keys and sum(1 for k in keys if k in text) >= max(1, len(keys) // 2)):
+                match = item
+                break
+        if not match:
+            continue
+
+        session.add(
+            ProactiveSurfacingEvent(
+                user_id=user_id,
+                event_type="watched_entity",
+                title=f"{ent.name}: new update",
+                body=(match.title or "New content matching something you're watching.")[:300],
+                content_ids=[match.id],
+                thread_key=ent.name,
+                priority=8,
+            )
+        )
+        ent.last_alerted_at = now
+        created += 1
+
+    if created:
+        await session.flush()
+    return created
 
 
 async def _update_source_fetch_pattern(

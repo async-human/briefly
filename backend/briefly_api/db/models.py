@@ -756,8 +756,13 @@ class ProactiveSurfacingEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # Delivered as a real-time push interrupt (distinct from being consumed).
+    pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Consumed: the user opened/acted on it in the orb inbox.
     surfaced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Held out of the inbox until this time (snooze).
+    snoozed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class PushSubscription(Base):
@@ -780,6 +785,31 @@ class PushSubscription(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WatchedEntity(Base):
+    """A company / topic / person the user explicitly asked Briefly to watch.
+
+    Distinct from interest weights — this is a first-class "tell me whenever X
+    ships something" object, matched against fresh content intraday.
+    """
+
+    __tablename__ = "watched_entities"
+    __table_args__ = (
+        Index("ix_watched_entities_user", "user_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    kind: Mapped[str] = mapped_column(String(20), default="company")  # company | topic | person
+    keywords: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 # ── Background jobs ───────────────────────────────────────────────────────────

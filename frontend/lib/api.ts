@@ -1377,4 +1377,28 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ event_ids: eventIds }),
     }),
+  dismissProactive: (eventId: string) =>
+    request<void>(`/api/v1/orb/proactive/${eventId}/dismiss`, { method: "POST" }),
+  snoozeProactive: (eventId: string, hours = 3) =>
+    request<void>(`/api/v1/orb/proactive/${eventId}/snooze`, {
+      method: "POST",
+      body: JSON.stringify({ hours }),
+    }),
+
+  // Watched entities (companies / topics / people to alert on)
+  listWatchedEntities: () => request<WatchedEntity[]>("/api/v1/watched-entities"),
+  addWatchedEntity: (body: { name: string; kind?: string; keywords?: string[] }) =>
+    request<WatchedEntity>("/api/v1/watched-entities", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  removeWatchedEntity: (id: string) =>
+    request<void>(`/api/v1/watched-entities/${id}`, { method: "DELETE" }),
+};
+
+export type WatchedEntity = {
+  id: string;
+  name: string;
+  kind: string;
+  keywords: string[];
 };

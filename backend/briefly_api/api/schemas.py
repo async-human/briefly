@@ -555,6 +555,10 @@ class OrbProactiveSeenIn(BaseModel):
     event_ids: list[str] = Field(default_factory=list)
 
 
+class OrbProactiveSnoozeIn(BaseModel):
+    hours: int = 3
+
+
 class OrbTurnOut(BaseModel):
     transcript: str
     thread_id: str | None = None

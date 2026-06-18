@@ -252,6 +252,13 @@ class Settings(BaseSettings):
     # Min discovery relevance score for a "relevant_content" proactive alert
     relevant_content_min_score: float = 0.65
 
+    # ── Intraday freshness ────────────────────────────────────────────────────
+    # Re-ingest sources + re-run discovery through the day so watched entities /
+    # relevant content surface intraday (not just at the nightly run). Cost scales
+    # with users × frequency — tune or disable if margins tighten.
+    intraday_refresh_enabled: bool = True
+    intraday_refresh_hours: int = 4
+
     # ── Web push (VAPID) ──────────────────────────────────────────────────────
     web_push_enabled: bool = True
     vapid_public_key: str = ""
@@ -259,6 +266,15 @@ class Settings(BaseSettings):
     vapid_subject: str = "mailto:notifications@briefly.app"
     # Min proactive priority that triggers a real-time push (digest still gets all)
     push_min_priority: int = 6
+
+    # ── Context-aware push gating ─────────────────────────────────────────────
+    # Priority >= this always interrupts, ignoring quiet hours / meetings.
+    push_always_priority: int = 9
+    # Local quiet-hours window (24h). Non-urgent pushes are held to the orb inbox.
+    quiet_hours_start: int = 22
+    quiet_hours_end: int = 7
+    # Hold non-urgent pushes while the user is in a calendar meeting.
+    push_respect_calendar_busy: bool = True
 
     # ── Weekly intelligence skill ─────────────────────────────────────────────
     weekly_intelligence_enabled: bool = True

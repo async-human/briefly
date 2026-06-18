@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.api.schemas import (
     OrbProactiveSeenIn,
+    OrbProactiveSnoozeIn,
     OrbSpeakIn,
     OrbTurnOut,
     ProactiveEventOut,
@@ -110,5 +111,42 @@ async def orb_proactive_seen(
     from briefly_api.agents.proactive.proactive_surfacing import mark_surfaced
 
     await mark_surfaced(db, body.event_ids)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/orb/proactive/{event_id}/dismiss",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+async def orb_proactive_dismiss(
+    event_id: str,
+    user: User = Depends(get_capture_user),  # noqa: ARG001 — auth dep
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Dismiss a proactive event (user said 'not interested')."""
+    from briefly_api.agents.proactive.proactive_surfacing import mark_dismissed
+
+    await mark_dismissed(db, event_id)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/orb/proactive/{event_id}/snooze",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+async def orb_proactive_snooze(
+    event_id: str,
+    body: OrbProactiveSnoozeIn,
+    user: User = Depends(get_capture_user),  # noqa: ARG001 — auth dep
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Snooze a proactive event out of the inbox for a few hours."""
+    from briefly_api.agents.proactive.proactive_surfacing import snooze_event
+
+    await snooze_event(db, event_id, hours=body.hours)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

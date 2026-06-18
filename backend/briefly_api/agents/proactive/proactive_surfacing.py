@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 
 from briefly_api.config import get_settings
 from briefly_api.db.models import ProactiveSurfacingEvent, UserProfile
@@ -163,6 +163,22 @@ async def mark_surfaced(session, event_ids: list[str]) -> None:
     await session.flush()
 
 
+async def mark_pushed(session, event_ids: list[str]) -> None:
+    """Mark events as delivered via real-time interrupt (push/email).
+
+    Distinct from `mark_surfaced`: a pushed event stays in the orb inbox until
+    the user actually opens or dismisses it.
+    """
+    if not event_ids:
+        return
+    await session.execute(
+        update(ProactiveSurfacingEvent)
+        .where(ProactiveSurfacingEvent.id.in_(event_ids))
+        .values(pushed_at=datetime.now(timezone.utc))
+    )
+    await session.flush()
+
+
 async def mark_dismissed(session, event_id: str) -> None:
     """Mark an event as dismissed by the user."""
     await session.execute(
@@ -173,12 +189,23 @@ async def mark_dismissed(session, event_id: str) -> None:
     await session.flush()
 
 
+async def snooze_event(session, event_id: str, hours: int = 3) -> None:
+    """Hold an event out of the inbox for `hours`."""
+    await session.execute(
+        update(ProactiveSurfacingEvent)
+        .where(ProactiveSurfacingEvent.id == event_id)
+        .values(snoozed_until=datetime.now(timezone.utc) + timedelta(hours=hours))
+    )
+    await session.flush()
+
+
 async def get_for_api(session, user_id: str) -> list[dict]:
     """
     Return unsurfaced proactive events for the frontend to display.
     Used by the dashboard API to show proactive notifications.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=48)
     result = await session.execute(
         select(ProactiveSurfacingEvent)
         .where(
@@ -186,12 +213,16 @@ async def get_for_api(session, user_id: str) -> list[dict]:
             ProactiveSurfacingEvent.surfaced_at.is_(None),
             ProactiveSurfacingEvent.dismissed_at.is_(None),
             ProactiveSurfacingEvent.created_at >= cutoff,
+            or_(
+                ProactiveSurfacingEvent.snoozed_until.is_(None),
+                ProactiveSurfacingEvent.snoozed_until <= now,
+            ),
         )
         .order_by(
             ProactiveSurfacingEvent.priority.desc(),
             ProactiveSurfacingEvent.created_at.desc(),
         )
-        .limit(5)
+        .limit(20)
     )
     events = result.scalars().all()
     return [

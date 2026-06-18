@@ -47,6 +47,7 @@ _POLL_INTERVAL_SECONDS = 60
 _last_footprint_scan_date: str | None = None
 _last_story_thread_date: str | None = None
 _last_weekly_intelligence_date: str | None = None
+_last_intraday_hour: str | None = None
 
 
 async def _profiles_for_scheduling() -> list[UserProfile]:
@@ -371,6 +372,36 @@ async def _run_ingestion_for_user(user_id: str, local_date: str) -> None:
             log.exception("Scheduler: ingestion failed for user %s", user_id)
 
 
+async def _run_intraday_refresh() -> None:
+    """Re-ingest sources for active users so fresh content lands in the pool
+    during the day. The ContentWatcher (enrichment loop) then detects breaking /
+    watched-entity events over it. Ingestion-only by design — the heavier
+    discovery pass stays nightly to protect margins."""
+    s = get_settings()
+    if not s.intraday_refresh_enabled:
+        return
+    try:
+        profiles = await _profiles_for_scheduling()
+    except Exception:
+        log.exception("Intraday refresh: could not load users")
+        return
+
+    refreshed = 0
+    for profile in profiles:
+        user_id = profile.user_id
+        lock_key = f"briefly:intraday:{user_id}"
+        try:
+            async with job_lock(lock_key, ttl_seconds=600) as acquired:
+                if not acquired:
+                    continue
+                async with SessionLocal() as session:
+                    await ingest_user_sources(session, user_id)
+                refreshed += 1
+        except Exception:
+            log.exception("Intraday refresh failed for user %s", user_id)
+    log.info("Intraday refresh complete (%d users)", refreshed)
+
+
 async def _run_pipeline_for_user(user_id: str, local_date: str) -> None:
     lock_key = f"briefly:digest:{user_id}"
     async with job_lock(lock_key, ttl_seconds=900) as acquired:
@@ -427,6 +458,7 @@ async def digest_scheduler_loop() -> None:
     """
     log.info("Digest + ingestion scheduler started (polling every %ds)", _POLL_INTERVAL_SECONDS)
     global _last_footprint_scan_date, _last_story_thread_date, _last_weekly_intelligence_date
+    global _last_intraday_hour
 
     s = get_settings()
 
@@ -508,6 +540,18 @@ async def digest_scheduler_loop() -> None:
 
                 await enqueue_background_job("story_thread_agent", {})
                 log.info("Scheduler: StoryThreadAgent enqueued for %s", today)
+
+            # ── Intraday source refresh (every N hours; keeps the pool fresh so
+            #    watched-entity / breaking alerts can fire during the day) ───────
+            if (
+                s.intraday_refresh_enabled
+                and now_utc.minute == 0
+                and now_utc.hour % max(1, s.intraday_refresh_hours) == 0
+            ):
+                intraday_key = f"{today}-{now_utc.hour}"
+                if _last_intraday_hour != intraday_key:
+                    _last_intraday_hour = intraday_key
+                    asyncio.create_task(_run_intraday_refresh())
 
             # ── Proactive breaking alerts (every 15 min, durable) ──────────────
             if s.proactive_surfacing_enabled and now_utc.minute % 15 == 0:

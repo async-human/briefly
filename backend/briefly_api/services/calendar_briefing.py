@@ -83,10 +83,12 @@ async def fetch_todays_events(
             for a in (ev.get("attendees") or [])
             if not a.get("self") and (a.get("displayName") or a.get("email"))
         ]
+        end_raw = (ev.get("end") or {}).get("dateTime") or (ev.get("end") or {}).get("date")
         events.append(
             {
                 "title": (ev.get("summary") or "Untitled meeting").strip(),
                 "start": start_raw,
+                "end": end_raw,
                 "start_label": _format_time(start_raw, tz) if "T" in start_raw else "All day",
                 "attendees": attendees[:6],
                 "description": (ev.get("description") or "")[:300],

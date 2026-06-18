@@ -14,6 +14,7 @@ import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { getToken } from "@/lib/auth";
 import { CaptureDevicesCard } from "@/components/settings/CaptureDevicesCard";
 import { PushNotificationsCard } from "@/components/settings/PushNotificationsCard";
+import { WatchedEntitiesCard } from "@/components/settings/WatchedEntitiesCard";
 import { ExtensionInstallCard } from "@/components/saved/ExtensionInstallCard";
 import { TopicsToTrackEditor } from "@/components/settings/TopicsToTrackEditor";
 
@@ -343,6 +344,21 @@ export default function SettingsPage() {
               </div>
               <div className="dash-surface-body dash-surface-body-form">
                 <PushNotificationsCard />
+              </div>
+            </div>
+
+            {/* ── Watching ── */}
+            <div className="dash-surface dash-surface-settings">
+              <div className="dash-surface-head">
+                <h2 className="dash-surface-title">Watching</h2>
+                <p className="dash-surface-desc">
+                  Companies, topics, or people you want Briefly to keep an eye on. When one ships
+                  something — a blog, a paper, a release — you&apos;ll get a proactive alert, even
+                  from sources you don&apos;t follow.
+                </p>
+              </div>
+              <div className="dash-surface-body dash-surface-body-form">
+                <WatchedEntitiesCard />
               </div>
             </div>
 

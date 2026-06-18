@@ -167,18 +167,26 @@ export function MobileOrbOverlay() {
     setComposeOpen(false);
   }
 
-  // Opening is always user-initiated. If something proactive is waiting, lead
-  // with it as a heads-up and mark it seen so it doesn't resurface.
+  // Opening is always user-initiated. Pending items render as an inbox the user
+  // works through (each item is consumed only when acted on) — no auto-speak.
   function openOrb() {
     setOpen(true);
-    if (pending.length > 0) {
-      const top = pending[0];
-      const ids = pending.map((e) => e.id);
-      setCaption(`Heads up — ${top.title}${top.body ? `. ${top.body}` : ""}`);
-      setHeardText("");
-      setPending([]);
-      void api.orbProactiveSeen(ids).catch(() => {});
-    }
+  }
+
+  async function dismissNotification(id: string) {
+    setPending((prev) => prev.filter((e) => e.id !== id));
+    await api.dismissProactive(id).catch(() => {});
+  }
+
+  async function snoozeNotification(id: string) {
+    setPending((prev) => prev.filter((e) => e.id !== id));
+    await api.snoozeProactive(id).catch(() => {});
+  }
+
+  function askAboutNotification(id: string) {
+    void api.orbProactiveSeen([id]).catch(() => {});
+    setPending((prev) => prev.filter((e) => e.id !== id));
+    openFullConversation();
   }
 
   // Hand off to the full conversation view, continuing the same thread so the
@@ -493,6 +501,43 @@ export function MobileOrbOverlay() {
         </header>
 
         <div className="jarvis-stage">
+          {pending.length > 0 && (
+            <div className="jarvis-inbox">
+              <p className="jarvis-inbox-title">
+                {pending.length} update{pending.length > 1 ? "s" : ""} for you
+              </p>
+              <ul className="jarvis-inbox-list">
+                {pending.map((e) => (
+                  <li key={e.id} className="jarvis-inbox-item">
+                    <span className={`jarvis-inbox-kind kind-${e.event_type}`}>
+                      {e.event_type === "relevant_content"
+                        ? "Worth a look"
+                        : e.event_type === "meeting_prep"
+                          ? "Meeting prep"
+                          : e.event_type === "breaking_development"
+                            ? "Breaking"
+                            : e.event_type === "thread_update"
+                              ? "Thread update"
+                              : "Update"}
+                    </span>
+                    <p className="jarvis-inbox-headline">{e.title}</p>
+                    {e.body ? <p className="jarvis-inbox-body">{e.body}</p> : null}
+                    <div className="jarvis-inbox-actions">
+                      <button type="button" onClick={() => askAboutNotification(e.id)}>
+                        Ask Briefly
+                      </button>
+                      <button type="button" onClick={() => snoozeNotification(e.id)}>
+                        Snooze
+                      </button>
+                      <button type="button" onClick={() => dismissNotification(e.id)}>
+                        Dismiss
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <p className="jarvis-status" aria-live="polite">
             <span className={`jarvis-status-dot mode-${mode}`} aria-hidden />
             {STATUS_LABEL[mode]}
@@ -612,7 +657,11 @@ export function MobileOrbOverlay() {
       >
         <JarvisOrbCanvas mode={open ? mode : "idle"} size="fab" className="jarvis-fab-canvas" />
         <span className="jarvis-fab-glow" aria-hidden />
-        {!open && pending.length > 0 && <span className="jarvis-fab-badge" aria-hidden />}
+        {!open && pending.length > 0 && (
+          <span className="jarvis-fab-badge" aria-hidden>
+            {pending.length > 9 ? "9+" : pending.length}
+          </span>
+        )}
       </button>
       {mounted && overlay ? createPortal(overlay, document.body) : null}
     </div>

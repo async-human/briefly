@@ -134,6 +134,15 @@ async def init_db() -> None:
                 await conn.execute(text(stmt))
             except Exception as exc:
                 logger.warning("cross-table migration: %s", exc)
+        # Proactive event delivery-state split (push interrupt vs orb-inbox consume).
+        for stmt in (
+            "ALTER TABLE proactive_surfacing_events ADD COLUMN IF NOT EXISTS pushed_at TIMESTAMPTZ",
+            "ALTER TABLE proactive_surfacing_events ADD COLUMN IF NOT EXISTS snoozed_until TIMESTAMPTZ",
+        ):
+            try:
+                await conn.execute(text(stmt))
+            except Exception as exc:
+                logger.warning("proactive_surfacing_events migration: %s", exc)
         try:
             await conn.execute(text("""
                 UPDATE user_profiles

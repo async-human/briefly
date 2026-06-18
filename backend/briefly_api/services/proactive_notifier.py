@@ -10,19 +10,27 @@ import logging
 from datetime import datetime, timezone
 
 import resend
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from briefly_api.config import get_settings
 from briefly_api.db.engine import SessionLocal
 from briefly_api.db.models import ProactiveSurfacingEvent, User
-from briefly_api.agents.proactive.proactive_surfacing import mark_surfaced
+from briefly_api.agents.proactive.proactive_surfacing import mark_pushed
+from briefly_api.services.proactive_gate import should_push
 from briefly_api.services.web_push import send_push_to_user
 
 log = logging.getLogger(__name__)
 
 # Event types that warrant a real-time notification (not just digest injection).
 _NOTIFY_TYPES = frozenset(
-    {"breaking_development", "thread_update", "relevant_content", "meeting_prep", "voice_note_connection"}
+    {
+        "breaking_development",
+        "thread_update",
+        "relevant_content",
+        "meeting_prep",
+        "voice_note_connection",
+        "watched_entity",
+    }
 )
 # Email is reserved for high-priority events; web push goes to everything above
 # settings.push_min_priority so it stays timely without flooding the inbox.
@@ -47,54 +55,80 @@ async def send_pending_proactive_alerts() -> int:
     if not s.proactive_surfacing_enabled:
         return 0
 
+    now = datetime.now(timezone.utc)
     sent = 0
     async with SessionLocal() as session:
         result = await session.execute(
             select(ProactiveSurfacingEvent, User.email, User.name)
             .join(User, User.id == ProactiveSurfacingEvent.user_id)
             .where(
+                ProactiveSurfacingEvent.pushed_at.is_(None),
                 ProactiveSurfacingEvent.surfaced_at.is_(None),
                 ProactiveSurfacingEvent.dismissed_at.is_(None),
                 ProactiveSurfacingEvent.priority >= s.push_min_priority,
                 ProactiveSurfacingEvent.event_type.in_(tuple(_NOTIFY_TYPES)),
+                or_(
+                    ProactiveSurfacingEvent.snoozed_until.is_(None),
+                    ProactiveSurfacingEvent.snoozed_until <= now,
+                ),
             )
             .order_by(ProactiveSurfacingEvent.priority.desc())
             .limit(50)
         )
         rows = result.all()
 
+    # Group by user so a batch of held events (e.g. flushed after a meeting) is
+    # delivered as ONE consolidated push, not N separate interruptions.
+    by_user: dict[str, list] = {}
+    user_contact: dict[str, tuple[str, str | None]] = {}
     for event, email, name in rows:
-        delivered = False
+        by_user.setdefault(event.user_id, []).append(event)
+        user_contact.setdefault(event.user_id, (email, name))
 
-        # Web push — the primary real-time channel.
+    for user_id, events in by_user.items():
+        # Context gate per event; "hold" leaves it un-pushed for the next window.
+        ready = [e for e in events if await should_push(user_id, e.priority) == "push"]
+        if not ready:
+            continue
+
+        email, name = user_contact[user_id]
+
+        # One push for the whole batch.
+        if len(ready) == 1:
+            payload = {
+                "title": ready[0].title,
+                "body": ready[0].body,
+                "url": _event_url(ready[0]),
+                "tag": f"briefly-{ready[0].event_type}",
+            }
+        else:
+            top = "; ".join(e.title for e in ready[:3])
+            payload = {
+                "title": f"{len(ready)} updates for you",
+                "body": top,
+                "url": "/dashboard",
+                "tag": "briefly-batch",
+            }
         try:
-            pushed = await send_push_to_user(
-                event.user_id,
-                {
-                    "title": event.title,
-                    "body": event.body,
-                    "url": _event_url(event),
-                    "tag": f"briefly-{event.event_type}",
-                },
-            )
-            if pushed:
-                delivered = True
+            await send_push_to_user(user_id, payload)
         except Exception:
-            log.exception("ProactiveNotifier: push failed for event %s", event.id)
+            log.exception("ProactiveNotifier: push failed for user %s", user_id)
 
-        # Email — only for high-priority events, and only if Resend is configured.
-        if s.resend_api_key and event.priority >= _EMAIL_MIN_PRIORITY:
-            try:
-                if await _send_one(email, name, event.title, event.body):
-                    delivered = True
-            except Exception:
-                log.exception("ProactiveNotifier: email failed for event %s", event.id)
+        # Email only the high-priority items, individually (if Resend configured).
+        if s.resend_api_key:
+            for e in ready:
+                if e.priority >= _EMAIL_MIN_PRIORITY:
+                    try:
+                        await _send_one(email, name, e.title, e.body)
+                    except Exception:
+                        log.exception("ProactiveNotifier: email failed for event %s", e.id)
 
-        if delivered:
-            async with SessionLocal() as session:
-                await mark_surfaced(session, [event.id])
-                await session.commit()
-            sent += 1
+        # Mark all delivered events as pushed (they remain in the orb inbox until
+        # the user acts). Held events stay un-pushed and retry next window.
+        async with SessionLocal() as session:
+            await mark_pushed(session, [e.id for e in ready])
+            await session.commit()
+        sent += len(ready)
 
     if sent:
         log.info("ProactiveNotifier: delivered %d proactive alert(s)", sent)

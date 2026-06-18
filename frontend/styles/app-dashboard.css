@@ -9578,3 +9578,98 @@ a.saved-capture-title:hover {
   color: var(--app-ink-2, #475569);
 }
 
+/* ── Watched entities card ────────────────────────────────────────────────── */
+.watched-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.watched-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.watched-kind,
+.watched-input {
+  height: 38px;
+  border: 1px solid var(--app-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--app-surface, #fff);
+  color: var(--app-ink, #1e293b);
+  font: inherit;
+  padding: 0 12px;
+}
+
+.watched-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.watched-kind:focus-visible,
+.watched-input:focus-visible {
+  outline: 2px solid var(--app-accent, #6d5ef0);
+  outline-offset: 1px;
+}
+
+.watched-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.watched-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px 5px 12px;
+  border: 1px solid var(--app-border, #e2e8f0);
+  border-radius: 999px;
+  background: var(--app-surface-2, rgba(0, 0, 0, 0.03));
+}
+
+.watched-chip-kind {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--app-accent, #6d5ef0);
+}
+
+.watched-chip-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--app-ink, #1e293b);
+}
+
+.watched-chip button {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--app-ink-muted, #94a3b8);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.watched-chip button:hover {
+  background: var(--app-border, #e2e8f0);
+  color: var(--app-ink, #1e293b);
+}
+
+.watched-empty {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--app-ink-muted, #64748b);
+}
+
