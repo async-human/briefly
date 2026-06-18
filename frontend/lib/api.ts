@@ -1394,6 +1394,25 @@ export const api = {
     }),
   removeWatchedEntity: (id: string) =>
     request<void>(`/api/v1/watched-entities/${id}`, { method: "DELETE" }),
+
+  // Grounded email (Phase 1 act layer) — draft → review → dispatch
+  composeEmailDraft: (body: { instruction: string; content_id?: string }) =>
+    request<EmailDraft>("/api/v1/email-drafts/compose", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }, 60000),
+  editEmailDraft: (
+    id: string,
+    body: { to_email?: string; to_name?: string; subject?: string; body?: string },
+  ) =>
+    request<EmailDraft>(`/api/v1/email-drafts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  markEmailDraftSent: (id: string) =>
+    request<EmailDraft>(`/api/v1/email-drafts/${id}/sent`, { method: "POST" }),
+  discardEmailDraft: (id: string) =>
+    request<void>(`/api/v1/email-drafts/${id}`, { method: "DELETE" }),
 };
 
 export type WatchedEntity = {
@@ -1401,4 +1420,16 @@ export type WatchedEntity = {
   name: string;
   kind: string;
   keywords: string[];
+};
+
+export type EmailDraft = {
+  id: string;
+  to_email: string | null;
+  to_name: string | null;
+  subject: string;
+  body: string;
+  rationale: string | null;
+  status: string;
+  source_content_ids: string[];
+  created_at: string | null;
 };

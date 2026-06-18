@@ -812,6 +812,37 @@ class WatchedEntity(Base):
     last_alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class EmailDraft(Base):
+    """A grounded email the agent drafted, pending human review before it's sent.
+
+    This row IS the audit record for the action — status + timestamps + the
+    corpus sources it was grounded in. Nothing is sent without the user's
+    explicit sign-off (human-in-the-loop).
+    """
+
+    __tablename__ = "email_drafts"
+    __table_args__ = (
+        Index("ix_email_drafts_user", "user_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    to_email: Mapped[str | None] = mapped_column(String(320))
+    to_name: Mapped[str | None] = mapped_column(String(160))
+    subject: Mapped[str] = mapped_column(Text, default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    rationale: Mapped[str | None] = mapped_column(Text)
+    instruction: Mapped[str | None] = mapped_column(Text)
+    source_content_ids: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    status: Mapped[str] = mapped_column(String(20), default="draft")  # draft | sent | discarded
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 # ── Background jobs ───────────────────────────────────────────────────────────
 
 class BackgroundJob(Base):

@@ -22,10 +22,10 @@ type Mode = JarvisOrbMode;
 const RECORDER_TIMESLICE_MS = 1000;
 
 const STATUS_LABEL: Record<Mode, string> = {
-  idle: "Standby",
-  listening: "Acquiring audio",
-  thinking: "Processing",
-  speaking: "Transmitting",
+  idle: "Ready",
+  listening: "Listening",
+  thinking: "Thinking",
+  speaking: "Speaking",
 };
 
 function isEmphasisWord(word: string): boolean {
@@ -419,7 +419,7 @@ export function MobileOrbOverlay() {
     recorderRef.current = null;
     stopStream();
     setMode("idle");
-    setCaption("Standing by.");
+    setCaption("How can I help?");
     setToolMode("");
     setSpokenWordIndex(-1);
   }, []);
@@ -456,19 +456,13 @@ export function MobileOrbOverlay() {
   }
 
   const overlay = open && mounted ? (
-    <div className="jarvis-overlay" role="dialog" aria-modal aria-label="Briefly intelligence core">
+    <div className="jarvis-overlay" role="dialog" aria-modal aria-label="Briefly assistant">
       <button type="button" className="jarvis-backdrop" onClick={closeOverlay} aria-label="Close assistant" />
       <div className="jarvis-shell">
-        <div className="jarvis-hud-corner jarvis-hud-tl" aria-hidden />
-        <div className="jarvis-hud-corner jarvis-hud-tr" aria-hidden />
-        <div className="jarvis-hud-corner jarvis-hud-bl" aria-hidden />
-        <div className="jarvis-hud-corner jarvis-hud-br" aria-hidden />
-        <div className="jarvis-scanline" aria-hidden />
-
         <header className="jarvis-header">
           <div>
-            <p className="jarvis-eyebrow">Briefly Intelligence</p>
-            <p className="jarvis-system">Core interface · online</p>
+            <p className="jarvis-eyebrow">Voice</p>
+            <h2 className="jarvis-title">Briefly assistant</h2>
           </div>
           <div className="jarvis-header-actions">
             <button
@@ -550,17 +544,19 @@ export function MobileOrbOverlay() {
             <span className={`jarvis-status-dot mode-${mode}`} aria-hidden />
             {STATUS_LABEL[mode]}
           </p>
-          {heardText ? <p className="jarvis-heard">Heard: {heardText}</p> : null}
+          {heardText ? <p className="jarvis-heard"><span className="jarvis-heard-label">You said</span> {heardText}</p> : null}
 
-          <button
-            type="button"
-            className={`jarvis-core mode-${mode}`}
-            onClick={onCoreAction}
-            disabled={mode === "thinking" || (!enabled && mode === "idle")}
-            aria-label={orbHint}
-          >
-            <JarvisOrbCanvas mode={mode} size="stage" className="jarvis-core-canvas" />
-          </button>
+          <div className="jarvis-core-wrap">
+            <button
+              type="button"
+              className={`jarvis-core mode-${mode}`}
+              onClick={onCoreAction}
+              disabled={mode === "thinking" || (!enabled && mode === "idle")}
+              aria-label={orbHint}
+            >
+              <JarvisOrbCanvas mode={mode} size="stage" className="jarvis-core-canvas" />
+            </button>
+          </div>
 
           <p className="jarvis-hint">{orbHint}</p>
           <div className={`jarvis-response-shell${mode === "speaking" ? " is-speaking" : ""}`}>
@@ -620,7 +616,7 @@ export function MobileOrbOverlay() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Type a command…"
+                placeholder="Ask anything…"
                 disabled={mode === "listening" || mode === "thinking"}
                 autoFocus
               />
@@ -639,7 +635,7 @@ export function MobileOrbOverlay() {
               </button>
               {hasConversation && (
                 <button type="button" className="jarvis-expand-link" onClick={openFullConversation}>
-                  Open full conversation →
+                  Open full conversation
                 </button>
               )}
             </div>
@@ -659,7 +655,7 @@ export function MobileOrbOverlay() {
         aria-label={
           !open && pending.length > 0
             ? `Briefly assistant — ${pending.length} new update${pending.length > 1 ? "s" : ""}`
-            : "Open Briefly intelligence core"
+            : "Open Briefly assistant"
         }
         title="Briefly assistant"
       >
