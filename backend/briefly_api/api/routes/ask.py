@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -19,6 +20,8 @@ from briefly_api.services.ask_briefly import (
     list_threads,
     stream_ask_briefly,
 )
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["ask"])
 
@@ -67,7 +70,23 @@ async def post_ask_stream(
             ):
                 yield chunk
         except ValueError as exc:
+            # Expected, user-facing validation errors — surface the message.
             yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        except Exception:
+            # Anything else would otherwise kill the stream mid-flight and show
+            # the browser a bare "Failed to fetch". Log it and send a clean error
+            # event so the UI can recover gracefully.
+            log.exception("ask stream failed for user %s", getattr(user, "id", "?"))
+            yield (
+                "data: "
+                + json.dumps(
+                    {
+                        "type": "error",
+                        "message": "Sorry — I hit an error answering that. Please try again.",
+                    }
+                )
+                + "\n\n"
+            )
 
     return StreamingResponse(
         event_generator(),
