@@ -7,6 +7,7 @@ import { LiveDemo } from "@/components/landing/LiveDemo";
 import { MemoryDemo } from "@/components/landing/MemoryDemo";
 import { TrustSourcesSection } from "@/components/landing/TrustSourcesSection";
 import { Features } from "@/components/landing/Features";
+import { Personas } from "@/components/landing/Personas";
 import { CompareSection } from "@/components/landing/CompareSection";
 import { Pricing } from "@/components/landing/Pricing";
 import { CTA } from "@/components/landing/CTA";
@@ -23,6 +24,7 @@ export default function Home() {
       <MemoryDemo />
       <TrustSourcesSection />
       <Features />
+      <Personas />
       <CompareSection />
       <Pricing />
       <CTA />

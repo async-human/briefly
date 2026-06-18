@@ -519,6 +519,118 @@ body[data-landing-theme="light"].study-linear-body {
   }
 }
 
+/* ── Personas — one engine, many people ─────────────────────────────────── */
+.study-linear .personas-stage {
+  max-width: 720px;
+  margin: clamp(36px, 5vw, 48px) auto 0;
+}
+
+.study-linear .personas-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+
+.study-linear .personas-pill {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition:
+    color 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out),
+    background-color 0.2s var(--ease-out);
+}
+
+.study-linear .personas-pill:hover {
+  color: var(--text);
+}
+
+.study-linear .personas-pill.is-active {
+  color: var(--accent);
+  border-color: color-mix(in oklch, var(--accent) 45%, var(--border-strong));
+  background: var(--accent-dim);
+}
+
+.study-linear .personas-card-wrap {
+  position: relative;
+  min-height: 230px;
+}
+
+.study-linear .personas-card {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card-lg);
+  background: var(--band-card, var(--surface));
+  padding: clamp(20px, 4vw, 32px);
+  box-shadow: 0 24px 60px -40px color-mix(in oklch, var(--accent) 30%, transparent);
+}
+
+.study-linear .personas-follows {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.study-linear .personas-follows-label {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-right: 10px;
+}
+
+.study-linear .personas-item-source {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.study-linear .personas-item-headline {
+  font-family: var(--sans);
+  font-size: clamp(1.05rem, 2.2vw, 1.3rem);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  margin: 8px 0 16px;
+}
+
+.study-linear .personas-item-why {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0;
+  padding-left: 14px;
+  border-left: 2px solid color-mix(in oklch, var(--accent) 45%, transparent);
+}
+
+.study-linear .personas-item-why-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 5px;
+}
+
+@media (max-width: 600px) {
+  .study-linear .personas-card-wrap {
+    min-height: 300px;
+  }
+}
+
 .study-linear .hero-linear-intro,
 .study-linear .hero-linear-product {
   position: relative;
