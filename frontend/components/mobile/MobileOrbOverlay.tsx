@@ -13,6 +13,7 @@ import {
   pickRecorderFormat,
   shouldUseRecorderTimeslice,
 } from "@/lib/mediaRecording";
+import { stopAllBrieflyAudio } from "@/lib/audioPlayback";
 import { JarvisOrbCanvas, type JarvisOrbMode } from "./JarvisOrbCanvas";
 import "@/styles/mobile-orb.css";
 
@@ -407,6 +408,7 @@ export function MobileOrbOverlay() {
   const interrupt = useCallback(() => {
     abortRef.current?.abort();
     stopPlayback();
+    stopAllBrieflyAudio();
     if (recorderRef.current && recorderRef.current.state === "recording") {
       try {
         recorderRef.current.stop();
@@ -421,6 +423,12 @@ export function MobileOrbOverlay() {
     setToolMode("");
     setSpokenWordIndex(-1);
   }, []);
+
+  useEffect(() => {
+    const onPauseOrb = () => interrupt();
+    window.addEventListener("briefly:pause-orb-audio", onPauseOrb);
+    return () => window.removeEventListener("briefly:pause-orb-audio", onPauseOrb);
+  }, [interrupt]);
 
   useEffect(() => {
     if (!open) return;

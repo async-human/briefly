@@ -24,6 +24,7 @@ import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { DashboardInsightsDrawer } from "@/components/dashboard/DashboardInsightsDrawer";
 import { ProactiveAlertsBanner } from "@/components/dashboard/ProactiveAlertsBanner";
 import { BriefingMode } from "@/components/dashboard/BriefingMode";
+import { unlockAudioPlayback, stopAllBrieflyAudio } from "@/lib/audioPlayback";
 import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
 import { filterBillableSources, sourceSlotUsage } from "@/lib/plans";
 import type { ProfileIntelligence } from "@/lib/api";
@@ -306,7 +307,11 @@ function DashboardContent() {
             <button
               type="button"
               className="brief-me-btn"
-              onClick={() => setBriefingOpen(true)}
+              onClick={() => {
+                stopAllBrieflyAudio();
+                unlockAudioPlayback();
+                setBriefingOpen(true);
+              }}
             >
               ▶ Brief me
             </button>

@@ -3,10 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type Digest } from "@/lib/api";
+import {
+  getSharedPlaybackAudio,
+  speakWithBrowser,
+  stopAllBrieflyAudio,
+  stopSpeechSynthesis,
+} from "@/lib/audioPlayback";
 import { JarvisOrbCanvas } from "@/components/mobile/JarvisOrbCanvas";
 
 type Segment = { kind: "greeting" | "intro" | "item" | "outro"; text: string };
-type Status = "loading" | "playing" | "paused" | "done" | "error";
+type Status = "loading" | "playing" | "paused" | "blocked" | "done" | "error";
 
 function timeGreeting(): string {
   const h = new Date().getHours();
@@ -58,100 +64,217 @@ export function BriefingMode({
   const [index, setIndex] = useState(0);
   const [progress, setProgress] = useState(0);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const cacheRef = useRef<Map<number, string>>(new Map());
-  const abortRef = useRef<AbortController | null>(null);
-  const activeRef = useRef(false);
+  const synthControllersRef = useRef<Map<number, AbortController>>(new Map());
+  const sessionRef = useRef(0);
   const resolveRef = useRef<(() => void) | null>(null);
+  const pendingUrlRef = useRef<string | null>(null);
+  const pendingTextRef = useRef<string>("");
+  const runNarrationRef = useRef<((from: number) => Promise<void>) | null>(null);
+  const userNameRef = useRef(userName);
+  const useBrowserVoiceRef = useRef(false);
 
-  const cleanup = useCallback(() => {
-    activeRef.current = false;
+  userNameRef.current = userName;
+
+  const stopAudio = useCallback(() => {
     resolveRef.current?.();
     resolveRef.current = null;
-    abortRef.current?.abort();
-    abortRef.current = null;
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = "";
-      audioRef.current = null;
-    }
+    stopAllBrieflyAudio();
+  }, []);
+
+  const revokeCache = useCallback(() => {
     Array.from(cacheRef.current.values()).forEach((url) => URL.revokeObjectURL(url));
     cacheRef.current.clear();
   }, []);
 
-  const synth = useCallback(async (segs: Segment[], i: number): Promise<string | null> => {
+  const cleanup = useCallback(() => {
+    sessionRef.current += 1;
+    synthControllersRef.current.forEach((c) => c.abort());
+    synthControllersRef.current.clear();
+    stopAudio();
+    revokeCache();
+    pendingUrlRef.current = null;
+    pendingTextRef.current = "";
+    useBrowserVoiceRef.current = false;
+  }, [revokeCache, stopAudio]);
+
+  const synth = useCallback(async (segs: Segment[], i: number, session: number): Promise<string | null> => {
+    if (session !== sessionRef.current || useBrowserVoiceRef.current) return null;
     if (i < 0 || i >= segs.length) return null;
     const cached = cacheRef.current.get(i);
     if (cached) return cached;
+    const ctl = new AbortController();
+    synthControllersRef.current.set(i, ctl);
     try {
-      abortRef.current = new AbortController();
-      const blob = await api.orbSpeak(segs[i].text, undefined, abortRef.current.signal);
+      const blob = await api.orbSpeak(segs[i].text, undefined, ctl.signal);
+      if (session !== sessionRef.current) return null;
       const url = URL.createObjectURL(blob);
       cacheRef.current.set(i, url);
       return url;
     } catch {
       return null;
+    } finally {
+      synthControllersRef.current.delete(i);
     }
   }, []);
 
-  const playUrl = useCallback((url: string) => {
-    return new Promise<void>((resolve) => {
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      resolveRef.current = resolve;
-      const done = () => {
-        audio.removeEventListener("ended", done);
-        resolve();
-      };
-      audio.addEventListener("ended", done);
-      audio.addEventListener("timeupdate", () => {
-        if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
-      });
-      audio.play().catch(() => resolve());
-    });
-  }, []);
+  const playUrl = useCallback(
+    async (url: string, text: string, session: number): Promise<"played" | "blocked" | "skipped"> => {
+      if (session !== sessionRef.current) return "skipped";
+      stopAudio();
 
-  // Main runner — starts when the overlay opens.
+      return new Promise((resolve) => {
+        const audio = getSharedPlaybackAudio();
+        pendingUrlRef.current = url;
+        pendingTextRef.current = text;
+
+        const finish = (result: "played" | "blocked" | "skipped") => {
+          audio.removeEventListener("ended", onEnded);
+          audio.removeEventListener("timeupdate", onTime);
+          audio.removeEventListener("error", onError);
+          resolveRef.current = null;
+          resolve(result);
+        };
+
+        const onEnded = () => finish("played");
+        const onError = () => finish("blocked");
+        const onTime = () => {
+          if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
+        };
+
+        resolveRef.current = () => finish("skipped");
+
+        audio.addEventListener("ended", onEnded);
+        audio.addEventListener("timeupdate", onTime);
+        audio.addEventListener("error", onError);
+        audio.src = url;
+
+        void audio.play().then(() => {
+          if (session !== sessionRef.current) {
+            audio.pause();
+            finish("skipped");
+            return;
+          }
+          setStatus("playing");
+        }).catch(() => {
+          if (session !== sessionRef.current) {
+            finish("skipped");
+            return;
+          }
+          setStatus("blocked");
+          finish("blocked");
+        });
+      });
+    },
+    [stopAudio],
+  );
+
+  const playSegment = useCallback(
+    async (segs: Segment[], i: number, session: number): Promise<"continue" | "stop"> => {
+      if (useBrowserVoiceRef.current) {
+        await speakWithBrowser(segs[i].text);
+        if (session !== sessionRef.current) return "stop";
+        return "continue";
+      }
+
+      const url = await synth(segs, i, session);
+      if (session !== sessionRef.current) return "stop";
+      if (i + 1 < segs.length) void synth(segs, i + 1, session);
+
+      if (url) {
+        const result = await playUrl(url, segs[i].text, session);
+        if (result === "blocked") return "stop";
+        return "continue";
+      }
+
+      // Server TTS unavailable — use browser voice for the whole briefing (never both).
+      useBrowserVoiceRef.current = true;
+      synthControllersRef.current.forEach((c) => c.abort());
+      synthControllersRef.current.clear();
+      revokeCache();
+      await speakWithBrowser(segs[i].text);
+      if (session !== sessionRef.current) return "stop";
+      setStatus("playing");
+      return "continue";
+    },
+    [playUrl, revokeCache, synth],
+  );
+
   useEffect(() => {
     if (!open) return;
     if (!digest) {
       setStatus("error");
       return;
     }
-    const segs = buildSegments(digest, userName);
-    setSegments(segs);
-    setStatus("playing");
-    activeRef.current = true;
 
-    (async () => {
-      for (let i = 0; i < segs.length; i++) {
-        if (!activeRef.current) return;
+    const session = sessionRef.current + 1;
+    sessionRef.current = session;
+    stopAllBrieflyAudio();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("briefly:pause-orb-audio"));
+    }
+
+    const segs = buildSegments(digest, userNameRef.current);
+    setSegments(segs);
+    setIndex(0);
+    setProgress(0);
+    setStatus("loading");
+    useBrowserVoiceRef.current = false;
+
+    const runNarration = async (from: number) => {
+      for (let i = from; i < segs.length; i++) {
+        if (session !== sessionRef.current) return;
         setIndex(i);
         setProgress(0);
-        const url = await synth(segs, i);
-        if (!activeRef.current) return;
-        // Prefetch the next segment while this one plays.
-        if (i + 1 < segs.length) void synth(segs, i + 1);
-        if (url) await playUrl(url);
-        if (!activeRef.current) return;
+        const next = await playSegment(segs, i, session);
+        if (next === "stop" || session !== sessionRef.current) return;
       }
-      if (activeRef.current) setStatus("done");
-    })();
+      if (session === sessionRef.current) setStatus("done");
+    };
+
+    runNarrationRef.current = runNarration;
+    void runNarration(0);
 
     return cleanup;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, digest, userName]);
+  }, [open, digest?.id, cleanup, playSegment]);
 
   const pause = () => {
-    audioRef.current?.pause();
+    getSharedPlaybackAudio().pause();
+    stopSpeechSynthesis();
     setStatus("paused");
   };
+
   const resume = () => {
-    audioRef.current?.play().catch(() => undefined);
+    const audio = getSharedPlaybackAudio();
+    if (audio.src) {
+      void audio.play().then(() => setStatus("playing")).catch(() => setStatus("blocked"));
+      return;
+    }
     setStatus("playing");
   };
+
+  const resumeBlocked = () => {
+    const url = pendingUrlRef.current;
+    const text = pendingTextRef.current;
+    const session = sessionRef.current;
+    const fromIndex = index;
+    if (url) {
+      void playUrl(url, text, session).then((result) => {
+        if (result !== "played" || session !== sessionRef.current) return;
+        void runNarrationRef.current?.(fromIndex + 1);
+      });
+      return;
+    }
+    if (text) {
+      void speakWithBrowser(text).then(() => {
+        if (session !== sessionRef.current) return;
+        void runNarrationRef.current?.(fromIndex + 1);
+      });
+    }
+  };
+
   const skip = () => {
-    if (audioRef.current) audioRef.current.pause();
+    stopAudio();
     resolveRef.current?.();
   };
 
@@ -169,7 +292,7 @@ export function BriefingMode({
   if (!open) return null;
 
   const current = segments[index];
-  const words = current ? current.text.split(/\s+/) : [];
+  const words = current ? current.text.split(/\s+/).filter(Boolean) : [];
   const revealed = Math.round(progress * words.length);
   const orbMode = status === "playing" ? "speaking" : "idle";
 
@@ -194,10 +317,12 @@ export function BriefingMode({
 
         {status === "error" ? (
           <p className="briefmode-caption">No brief is ready yet. Generate today&apos;s brief first.</p>
+        ) : status === "blocked" ? (
+          <p className="briefmode-caption">Tap play to start narration.</p>
         ) : status === "done" ? (
           <p className="briefmode-caption">That&apos;s your brief. Tap the orb to ask anything.</p>
         ) : (
-          <p className="briefmode-caption" aria-live="polite">
+          <p className="briefmode-caption" aria-hidden>
             {words.map((w, i) => (
               <span key={`${w}-${i}`} className={`briefmode-word${i < revealed ? " is-spoken" : ""}`}>
                 {w}{" "}
@@ -216,6 +341,16 @@ export function BriefingMode({
       </div>
 
       <div className="briefmode-controls">
+        {status === "blocked" && (
+          <button type="button" className="briefmode-btn briefmode-btn-primary" onClick={resumeBlocked}>
+            Play narration
+          </button>
+        )}
+        {status === "loading" && (
+          <button type="button" className="briefmode-btn" disabled>
+            Preparing audio…
+          </button>
+        )}
         {status === "playing" && (
           <button type="button" className="briefmode-btn" onClick={pause}>
             Pause
