@@ -22,11 +22,24 @@ type Mode = JarvisOrbMode;
 const RECORDER_TIMESLICE_MS = 1000;
 
 const STATUS_LABEL: Record<Mode, string> = {
-  idle: "Ready",
-  listening: "Listening",
-  thinking: "Thinking",
-  speaking: "Speaking",
+  idle: "Ready to listen",
+  listening: "Listening…",
+  thinking: "Thinking…",
+  speaking: "Speaking…",
 };
+
+const ACTION_CHIP: Record<Mode, string> = {
+  idle: "Tap orb to speak",
+  listening: "Tap when you're done",
+  thinking: "One moment",
+  speaking: "Tap to interrupt",
+};
+
+const QUICK_PROMPTS = [
+  "What's in my brief today?",
+  "Summarize my top story",
+  "What should I focus on?",
+];
 
 function isEmphasisWord(word: string): boolean {
   const clean = word.replace(/[^\w]/g, "");
@@ -373,11 +386,12 @@ export function MobileOrbOverlay() {
     setSpokenWordIndex(-1);
   }
 
-  async function sendTextQuery() {
-    const text = query.trim();
+  async function sendTextQuery(textOverride?: string) {
+    const text = (textOverride ?? query).trim();
     if (!text) return;
     setHeardText(text);
     setQuery("");
+    setComposeOpen(false);
     setMode("thinking");
     setCaption("One moment.");
     const ctl = new AbortController();
@@ -459,6 +473,7 @@ export function MobileOrbOverlay() {
     <div className="jarvis-overlay" role="dialog" aria-modal aria-label="Briefly assistant">
       <button type="button" className="jarvis-backdrop" onClick={closeOverlay} aria-label="Close assistant" />
       <div className="jarvis-shell">
+        <div className="jarvis-shell-glow" aria-hidden />
         <header className="jarvis-header">
           <div>
             <p className="jarvis-eyebrow">Voice</p>
@@ -540,13 +555,22 @@ export function MobileOrbOverlay() {
               </ul>
             </div>
           )}
-          <p className="jarvis-status" aria-live="polite">
-            <span className={`jarvis-status-dot mode-${mode}`} aria-hidden />
-            {STATUS_LABEL[mode]}
-          </p>
-          {heardText ? <p className="jarvis-heard"><span className="jarvis-heard-label">You said</span> {heardText}</p> : null}
+          <div className="jarvis-topbar">
+            <p className={`jarvis-status mode-${mode}`} aria-live="polite">
+              <span className={`jarvis-status-dot mode-${mode}`} aria-hidden />
+              {STATUS_LABEL[mode]}
+            </p>
+            {heardText ? (
+              <p className="jarvis-heard">
+                <span className="jarvis-heard-label">You said</span>
+                {heardText}
+              </p>
+            ) : null}
+          </div>
 
-          <div className="jarvis-core-wrap">
+          <div className={`jarvis-orb-stage mode-${mode}`}>
+            <span className="jarvis-orb-ring jarvis-orb-ring-1" aria-hidden />
+            <span className="jarvis-orb-ring jarvis-orb-ring-2" aria-hidden />
             <button
               type="button"
               className={`jarvis-core mode-${mode}`}
@@ -555,11 +579,52 @@ export function MobileOrbOverlay() {
               aria-label={orbHint}
             >
               <JarvisOrbCanvas mode={mode} size="stage" className="jarvis-core-canvas" />
+              <span className="jarvis-core-icon" aria-hidden>
+                {mode === "listening" ? (
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M6 10v4M10 8v8M14 6v12M18 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                ) : mode === "thinking" ? (
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 4" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                    />
+                    <path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                )}
+              </span>
             </button>
+            <p className={`jarvis-action-chip mode-${mode}`}>{enabled ? ACTION_CHIP[mode] : "Enable mic to speak"}</p>
           </div>
 
-          <p className="jarvis-hint">{orbHint}</p>
+          {mode === "idle" && enabled && !composeOpen ? (
+            <div className="jarvis-prompts" aria-label="Try asking">
+              <p className="jarvis-prompts-label">Try asking</p>
+              <div className="jarvis-prompts-list">
+                {QUICK_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    className="jarvis-prompt-chip"
+                    onClick={() => void sendTextQuery(prompt)}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div className={`jarvis-response-shell${mode === "speaking" ? " is-speaking" : ""}`}>
+            <p className="jarvis-response-label">
+              {mode === "speaking" ? "Briefly is saying" : mode === "thinking" ? "Working on it" : "Briefly says"}
+            </p>
             <p
               className={`jarvis-response${mode === "speaking" ? " is-karaoke" : ""}`}
               aria-live="polite"
@@ -630,14 +695,20 @@ export function MobileOrbOverlay() {
             </form>
           ) : (
             <div className="jarvis-footer-actions">
-              <button type="button" className="jarvis-compose-toggle" onClick={() => setComposeOpen(true)}>
+              <button type="button" className="jarvis-footer-btn" onClick={() => setComposeOpen(true)}>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M4 6h16M4 12h10M4 18h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
                 Type instead
               </button>
-              {hasConversation && (
-                <button type="button" className="jarvis-expand-link" onClick={openFullConversation}>
-                  Open full conversation
+              {hasConversation ? (
+                <button type="button" className="jarvis-footer-btn jarvis-footer-btn-primary" onClick={openFullConversation}>
+                  Full conversation
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </button>
-              )}
+              ) : null}
             </div>
           )}
         </footer>
