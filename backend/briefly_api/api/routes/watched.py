@@ -12,6 +12,7 @@ content watcher.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -85,12 +86,12 @@ async def add_watched(
     return _serialize(ent)
 
 
-@router.delete("/{entity_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{entity_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def remove_watched(
     entity_id: str,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> None:
+) -> Response:
     await db.execute(
         delete(WatchedEntity).where(
             WatchedEntity.id == entity_id,
@@ -98,3 +99,4 @@ async def remove_watched(
         )
     )
     await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
