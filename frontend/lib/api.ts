@@ -1413,6 +1413,12 @@ export const api = {
     request<EmailDraft>(`/api/v1/email-drafts/${id}/sent`, { method: "POST" }),
   discardEmailDraft: (id: string) =>
     request<void>(`/api/v1/email-drafts/${id}`, { method: "DELETE" }),
+  emailDraftCapabilities: () =>
+    request<{ can_send: boolean; gmail_email: string | null }>(
+      "/api/v1/email-drafts/capabilities",
+    ),
+  sendEmailDraft: (id: string) =>
+    request<EmailDraft>(`/api/v1/email-drafts/${id}/send`, { method: "POST" }, 30000),
 };
 
 export type WatchedEntity = {

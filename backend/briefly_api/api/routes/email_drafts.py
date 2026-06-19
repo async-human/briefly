@@ -23,6 +23,13 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.auth.deps import get_current_user
+from briefly_api.auth.gmail import (
+    GmailAccessError,
+    gmail_connection_can_send,
+    get_gmail_connection,
+    send_gmail_message,
+)
+from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import EmailDraft, User
 from briefly_api.services.email_drafts import compose_email_draft
@@ -107,6 +114,19 @@ async def list_drafts(
     return [_serialize(d) for d in rows]
 
 
+@router.get("/capabilities")
+async def capabilities(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Whether Briefly can send email directly (gmail.send granted) + the address."""
+    conn = await get_gmail_connection(db, user.id)
+    return {
+        "can_send": gmail_connection_can_send(conn),
+        "gmail_email": conn.account_email if conn else None,
+    }
+
+
 @router.get("/{draft_id}", response_model=EmailDraftOut)
 async def get_draft(
     draft_id: str,
@@ -132,6 +152,46 @@ async def edit_draft(
         draft.subject = body.subject
     if body.body is not None:
         draft.body = body.body
+    await db.commit()
+    await db.refresh(draft)
+    return _serialize(draft)
+
+
+@router.post("/{draft_id}/send", response_model=EmailDraftOut)
+async def send_draft(
+    draft_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> EmailDraftOut:
+    """Send the draft via the user's Gmail (explicit, user-triggered — the HITL
+    confirm). Requires the gmail.send scope; otherwise tells the client to
+    reconnect Gmail."""
+    draft = await _get_owned(db, user.id, draft_id)
+    if not (draft.to_email or "").strip():
+        raise HTTPException(status_code=400, detail="Add a recipient before sending.")
+
+    conn = await get_gmail_connection(db, user.id)
+    if not gmail_connection_can_send(conn):
+        raise HTTPException(
+            status_code=409,
+            detail="Reconnect Gmail to let Briefly send on your behalf.",
+        )
+
+    try:
+        await send_gmail_message(
+            conn,
+            settings,
+            to=draft.to_email,
+            subject=draft.subject,
+            body=draft.body,
+            from_email=conn.account_email,
+        )
+    except GmailAccessError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    draft.status = "sent"
+    draft.sent_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(draft)
     return _serialize(draft)

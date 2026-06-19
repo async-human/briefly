@@ -224,6 +224,34 @@ async def web_search_handler(
     return {"answer": " ".join(lines), "citations": cites}
 
 
+async def draft_email_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    """Draft a grounded email. Creates a reviewable draft only — never sends.
+    Sending stays behind the explicit review-card confirmation."""
+    from briefly_api.services.email_drafts import compose_email_draft
+
+    instruction = ((args or {}).get("instruction") or transcript or "").strip()
+    if not instruction:
+        return {"answer": "What should the email say, and who's it for?", "citations": []}
+
+    draft = await compose_email_draft(db, user, instruction, content_id=content_id)
+    subject = draft.subject or "your email"
+    return {
+        "answer": (
+            f'I\'ve drafted an email — "{subject}". I won\'t send anything on my own: '
+            "open Draft email on your dashboard to review, edit the recipient, and send it."
+        ),
+        "citations": [],
+    }
+
+
 # ── Registry of orb tools ─────────────────────────────────────────────────────
 # (ask_briefly is registered in services/orb.py, where the patchable brain lives.)
 
@@ -267,5 +295,20 @@ DATA_TOOLS: list[OrbTool] = [
             re.compile(r"\bgoogle\s+(it|this|that|for)\b", re.IGNORECASE),
         ),
         args_schema={"query": "what to search the web for"},
+    ),
+    OrbTool(
+        name="draft_email",
+        description=(
+            "Draft an email/note/reply on the user's behalf, grounded in what they've "
+            "read. Use when the user asks to write, draft, compose, or send an email, "
+            "note, or message to someone. Creates a reviewable draft — it never sends."
+        ),
+        handler=draft_email_handler,
+        side_effect="write",
+        fast_patterns=(
+            re.compile(r"\b(draft|write|compose|send)\b.{0,30}\b(e-?mail|note|message|reply)\b", re.IGNORECASE),
+            re.compile(r"\be-?mail\s+(to|him|her|them|my|the|a)\b", re.IGNORECASE),
+        ),
+        args_schema={"instruction": "what the email should say and to whom"},
     ),
 ]

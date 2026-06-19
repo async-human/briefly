@@ -24,6 +24,7 @@ import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { DashboardInsightsDrawer } from "@/components/dashboard/DashboardInsightsDrawer";
 import { ProactiveAlertsBanner } from "@/components/dashboard/ProactiveAlertsBanner";
 import { BriefingMode } from "@/components/dashboard/BriefingMode";
+import { EmailDraftCard } from "@/components/dashboard/EmailDraftCard";
 import { unlockAudioPlayback, stopAllBrieflyAudio } from "@/lib/audioPlayback";
 import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
 import { filterBillableSources, sourceSlotUsage } from "@/lib/plans";
@@ -58,6 +59,7 @@ function DashboardContent() {
   const [discoveryRunning, setDiscoveryRunning] = useState(false);
   const [intel, setIntel] = useState<ProfileIntelligence | null>(null);
   const [briefingOpen, setBriefingOpen] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
   const autoGenerateChecked = useRef(false);
   const upgrade = useUpgradeOptional();
   const refreshBilling = upgrade?.refreshBilling;
@@ -316,6 +318,15 @@ function DashboardContent() {
               ▶ Brief me
             </button>
           )}
+          {digest && (digest.items?.length ?? 0) > 0 && (
+            <button
+              type="button"
+              className="brief-me-btn brief-me-btn-ghost"
+              onClick={() => setEmailOpen(true)}
+            >
+              ✉ Draft email
+            </button>
+          )}
         </div>
         <div className="dash-page-grid">
         <section className="dash-surface dash-surface-briefing" aria-labelledby="briefing-surface-title">
@@ -381,6 +392,8 @@ function DashboardContent() {
         userName={me.user.name}
         onClose={() => setBriefingOpen(false)}
       />
+
+      <EmailDraftCard open={emailOpen} onClose={() => setEmailOpen(false)} />
     </div>
     </PageContentTransition>
   );

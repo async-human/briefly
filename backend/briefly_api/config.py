@@ -205,7 +205,10 @@ class Settings(BaseSettings):
         """Calendar OAuth completes via the Gmail callback (already in GCP)."""
         return self.gmail_redirect_uri
 
-    gmail_scopes: str = "https://www.googleapis.com/auth/gmail.readonly openid email"
+    gmail_scopes: str = (
+        "https://www.googleapis.com/auth/gmail.readonly "
+        "https://www.googleapis.com/auth/gmail.send openid email"
+    )
     calendar_scopes: str = (
         "https://www.googleapis.com/auth/calendar.readonly openid email"
     )

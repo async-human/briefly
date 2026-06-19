@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 from datetime import UTC, datetime, timedelta
+from email.message import EmailMessage
 from urllib.parse import urlencode
 
 import httpx
@@ -162,6 +164,42 @@ async def refresh_gmail_access_token(connection: OAuthConnection, settings: Sett
     if expires_in:
         connection.token_expires_at = now + timedelta(seconds=int(expires_in))
     return oauth_access_token(connection)
+
+
+def gmail_connection_can_send(connection: OAuthConnection | None) -> bool:
+    """True if the stored Gmail grant includes the gmail.send scope."""
+    return bool(connection and "gmail.send" in (connection.scopes or ""))
+
+
+async def send_gmail_message(
+    connection: OAuthConnection,
+    settings: Settings,
+    *,
+    to: str,
+    subject: str,
+    body: str,
+    from_email: str | None = None,
+) -> None:
+    """Send a plain-text email via the Gmail API (messages.send). Raises
+    GmailAccessError if the send scope wasn't granted (caller prompts reconnect)."""
+    token = await refresh_gmail_access_token(connection, settings)
+    msg = EmailMessage()
+    msg["To"] = to
+    if from_email:
+        msg["From"] = from_email
+    msg["Subject"] = subject
+    msg.set_content(body)
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        resp = await client.post(
+            f"{GMAIL_API}/messages/send",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={"raw": raw},
+        )
+    if resp.status_code in {401, 403}:
+        raise classify_gmail_http_error(resp)
+    resp.raise_for_status()
 
 
 async def get_gmail_connection(db: AsyncSession, user_id: str) -> OAuthConnection | None:

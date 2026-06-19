@@ -9703,6 +9703,187 @@ a.saved-capture-title:hover {
   background: color-mix(in oklch, var(--app-accent, #6d5ef0) 18%, transparent);
 }
 
+.brief-me-btn-ghost {
+  border-color: var(--app-border-strong, #cbd5e1);
+  background: transparent;
+  color: var(--app-ink-2, #475569);
+}
+
+.brief-me-btn-ghost:hover {
+  background: var(--app-surface-2, rgba(0, 0, 0, 0.04));
+}
+
+/* ── Grounded email draft — review card (HITL) ───────────────────────────── */
+.emaildraft {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.emaildraft-veil {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  background: oklch(20% 0.02 265 / 0.45);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+}
+
+.emaildraft-panel {
+  position: relative;
+  z-index: 1;
+  width: min(560px, 100%);
+  max-height: calc(100dvh - 40px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--app-canvas, #fff);
+  border: 1px solid var(--app-border, #e2e8f0);
+  border-radius: 16px;
+  box-shadow: 0 30px 70px -30px oklch(20% 0.02 265 / 0.5);
+}
+
+.emaildraft-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--app-border, #e2e8f0);
+}
+
+.emaildraft-eyebrow {
+  margin: 0 0 3px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--app-accent, #6d5ef0);
+}
+
+.emaildraft-title {
+  margin: 0;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--app-ink, #1e293b);
+}
+
+.emaildraft-close {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--app-ink-muted, #94a3b8);
+  cursor: pointer;
+}
+
+.emaildraft-body {
+  padding: 18px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.emaildraft-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--app-ink-2, #475569);
+  margin-top: 8px;
+}
+
+.emaildraft-input,
+.emaildraft-textarea {
+  width: 100%;
+  border: 1px solid var(--app-border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--app-surface, #fff);
+  color: var(--app-ink, #1e293b);
+  font: inherit;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.emaildraft-input:focus-visible,
+.emaildraft-textarea:focus-visible {
+  outline: 2px solid var(--app-accent, #6d5ef0);
+  outline-offset: 1px;
+}
+
+.emaildraft-rationale {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--app-ink-2, #475569);
+  padding-left: 12px;
+  border-left: 2px solid var(--app-accent, #6d5ef0);
+}
+
+.emaildraft-hitl {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--app-ink-muted, #64748b);
+}
+
+.emaildraft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.emaildraft-text-btn {
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--app-ink-muted, #64748b);
+  cursor: pointer;
+  padding: 8px 6px;
+}
+
+.emaildraft-text-btn:hover {
+  color: var(--app-ink, #1e293b);
+}
+
+.emaildraft-text-btn--danger:hover {
+  color: var(--app-warn, #dc2626);
+}
+
+.emaildraft-msg {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+}
+
+.emaildraft-msg--err {
+  color: var(--app-warn, #dc2626);
+}
+
+.emaildraft-reconnect {
+  margin-top: 12px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--app-accent, #6d5ef0);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.emaildraft-reconnect:hover {
+  text-decoration: underline;
+}
+
 .briefmode {
   position: fixed;
   inset: 0;
