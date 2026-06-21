@@ -457,6 +457,43 @@
   animation-duration: 1.8s;
 }
 
+/* Active modes — shrink the orb + rings so the ANSWER becomes the focus.
+   In idle the orb is the hero; once it's listening/thinking/speaking, the
+   spoken text is what matters and needs room. */
+.jarvis-orb-stage.mode-listening,
+.jarvis-orb-stage.mode-thinking,
+.jarvis-orb-stage.mode-speaking {
+  padding: 0.3rem 0 0.2rem;
+}
+
+.jarvis-orb-stage.mode-listening .jarvis-core,
+.jarvis-orb-stage.mode-thinking .jarvis-core,
+.jarvis-orb-stage.mode-speaking .jarvis-core {
+  width: min(5.5rem, 26vw);
+  height: min(5.5rem, 26vw);
+}
+
+.jarvis-orb-stage.mode-listening .jarvis-orb-ring-1,
+.jarvis-orb-stage.mode-thinking .jarvis-orb-ring-1,
+.jarvis-orb-stage.mode-speaking .jarvis-orb-ring-1 {
+  width: min(7.5rem, 34vw);
+  height: min(7.5rem, 34vw);
+}
+
+.jarvis-orb-stage.mode-listening .jarvis-orb-ring-2,
+.jarvis-orb-stage.mode-thinking .jarvis-orb-ring-2,
+.jarvis-orb-stage.mode-speaking .jarvis-orb-ring-2 {
+  width: min(9.5rem, 42vw);
+  height: min(9.5rem, 42vw);
+}
+
+.jarvis-orb-stage.mode-listening::before,
+.jarvis-orb-stage.mode-thinking::before,
+.jarvis-orb-stage.mode-speaking::before {
+  width: min(9rem, 40vw);
+  height: min(9rem, 40vw);
+}
+
 .jarvis-core {
   position: relative;
   z-index: 1;
@@ -541,17 +578,22 @@
 
 .jarvis-prompts-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
 .jarvis-prompt-chip {
-  padding: 0.45rem 0.75rem;
-  border-radius: 100px;
-  border: 1px solid var(--app-border-strong, oklch(22% 0.02 265 / 0.11));
-  background: var(--app-surface, oklch(100% 0.002 85));
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--app-radius, 14px);
+  border: 1px solid var(--app-border, oklch(22% 0.02 265 / 0.07));
+  background: oklch(100% 0.002 85 / 0.6);
   font-size: 0.8125rem;
   font-weight: 500;
+  text-align: left;
   color: var(--app-ink-secondary, oklch(44% 0.018 265));
   cursor: pointer;
   transition:
@@ -561,11 +603,28 @@
     box-shadow var(--app-dur, 180ms) ease;
 }
 
+.jarvis-prompt-chip::before {
+  content: "";
+  flex-shrink: 0;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: var(--app-linear, oklch(48% 0.12 278));
+  opacity: 0.4;
+  transition: opacity var(--app-dur, 180ms) ease, transform var(--app-dur, 180ms) ease;
+}
+
 .jarvis-prompt-chip:hover {
   border-color: var(--app-linear-ring, oklch(48% 0.12 278 / 0.28));
   background: var(--app-linear-soft, oklch(48% 0.12 278 / 0.08));
+  color: var(--app-ink, oklch(22% 0.022 265));
   transform: translateY(-1px);
   box-shadow: 0 6px 16px oklch(48% 0.12 278 / 0.1);
+}
+
+.jarvis-prompt-chip:hover::before {
+  opacity: 1;
+  transform: scale(1.2);
 }
 
 .jarvis-response-label {
@@ -615,13 +674,16 @@
 .jarvis-response-shell {
   position: relative;
   width: 100%;
-  padding: 0.95rem 1.05rem 1rem;
-  border-radius: var(--app-radius, 14px);
-  border: 1px solid var(--app-border-strong, oklch(22% 0.02 265 / 0.11));
-  border-left: 3px solid var(--app-linear, oklch(48% 0.12 278));
-  background: var(--app-surface, oklch(100% 0.002 85));
-  box-shadow: 0 10px 28px oklch(22% 0.02 265 / 0.05);
-  max-height: 8.5rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: calc(var(--app-radius, 14px) + 2px);
+  border: 1px solid var(--app-border, oklch(22% 0.02 265 / 0.07));
+  background:
+    radial-gradient(120% 100% at 0% 0%, oklch(48% 0.12 278 / 0.05), transparent 60%),
+    oklch(100% 0.002 85 / 0.85);
+  box-shadow: 0 12px 32px oklch(48% 0.12 278 / 0.08);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  max-height: min(34vh, 12rem);
   overflow: auto;
   text-align: left;
 }
@@ -632,7 +694,7 @@
   position: sticky;
   left: 0;
   right: 0;
-  height: 0.75rem;
+  height: 0.5rem;
   display: block;
   pointer-events: none;
   z-index: 1;
@@ -640,22 +702,22 @@
 
 .jarvis-response-shell::before {
   top: 0;
-  margin-bottom: -0.75rem;
-  background: linear-gradient(180deg, var(--app-surface, oklch(100% 0.002 85)), transparent);
+  margin-bottom: -0.5rem;
+  background: linear-gradient(180deg, oklch(100% 0.002 85 / 0.9), transparent);
 }
 
 .jarvis-response-shell::after {
   bottom: 0;
-  margin-top: -0.75rem;
-  background: linear-gradient(0deg, var(--app-surface, oklch(100% 0.002 85)), transparent);
+  margin-top: -0.5rem;
+  background: linear-gradient(0deg, oklch(100% 0.002 85 / 0.9), transparent);
 }
 
 .jarvis-response-word {
-  color: var(--app-ink-secondary, oklch(44% 0.018 265));
+  color: var(--app-muted, oklch(54% 0.014 265));
   display: inline-block;
   margin-right: 0.28em;
-  transform: translateY(0.12em);
-  opacity: 0.45;
+  transform: translateY(0.1em);
+  opacity: 0.62;
   transition:
     color 140ms ease,
     transform 200ms ease,
@@ -672,7 +734,7 @@
 
 .jarvis-response-word.is-spoken {
   transform: translateY(0);
-  opacity: 0.92;
+  opacity: 1;
   color: var(--app-ink-secondary, oklch(44% 0.018 265));
 }
 
@@ -741,18 +803,20 @@
 }
 
 .jarvis-footer-btn {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   padding: 0 0.85rem;
-  border-radius: var(--app-radius-sm, 9px);
+  border-radius: var(--app-radius, 14px);
   border: 1px solid var(--app-border-strong, oklch(22% 0.02 265 / 0.11));
   background: var(--app-surface, oklch(100% 0.002 85));
   font-size: 0.8125rem;
   font-weight: 600;
+  white-space: nowrap;
   color: var(--app-ink-secondary, oklch(44% 0.018 265));
   cursor: pointer;
   transition:
