@@ -292,7 +292,52 @@
 /* Brief-first single-column feed — capped to a comfortable reading measure so
    the briefing doesn't sprawl on wide screens (was bounded by the old 2-col grid). */
 .dash-page-feed {
-  max-width: 52rem;
+  max-width: 56rem;
+}
+
+/* Inviting hero header — the greeting reads as a warm panel, not a flat strip. */
+.dash-page-feed .dash-page-header {
+  position: relative;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  padding: clamp(1.5rem, 3vw, 2rem) clamp(1.5rem, 3vw, 2rem) clamp(1.25rem, 2.5vw, 1.6rem);
+  border: 1px solid var(--app-border);
+  border-radius: 20px;
+  background:
+    radial-gradient(130% 150% at 0% 0%, oklch(48% 0.12 278 / 0.08), transparent 58%),
+    linear-gradient(162deg, var(--app-surface) 0%, var(--app-surface-muted) 100%);
+  box-shadow:
+    0 1px 0 oklch(100% 0 0 / 0.6) inset,
+    var(--app-shadow-surface);
+}
+
+.dash-page-feed .dash-page-eyebrow {
+  color: var(--app-accent);
+}
+
+@media (min-width: 40rem) {
+  .dash-page-feed .dash-page-header-actions {
+    padding-top: 0.25rem;
+  }
+}
+
+/* The briefing is the centerpiece — give it real depth so it feels premium. */
+.dash-page-feed .dash-surface-briefing {
+  border-radius: 20px;
+  box-shadow: var(--app-shadow-elevated);
+}
+
+/* Section label + actions row above the brief */
+.dash-page-feed .dash-primary-head {
+  margin-bottom: 0.875rem;
+  gap: 0.5rem 0.5rem;
+}
+
+.dash-page-feed .dash-primary-label {
+  margin: 0;
+  margin-right: auto;
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
 }
 
 .dash-page-centered {
@@ -8039,9 +8084,12 @@ a.saved-capture-title:hover {
   align-items: flex-start;
   padding: 0.625rem 0.9rem;
   margin-bottom: 0.625rem;
-  border: 1px solid oklch(52% 0.14 278 / 0.25);
+  border: 1px solid oklch(52% 0.14 278 / 0.22);
   border-radius: var(--app-radius);
-  background: oklch(52% 0.14 278 / 0.06);
+  background:
+    radial-gradient(120% 180% at 0% 0%, oklch(52% 0.14 278 / 0.12), transparent 60%),
+    oklch(52% 0.14 278 / 0.05);
+  box-shadow: 0 6px 18px -12px oklch(52% 0.14 278 / 0.5);
 }
 
 .app-shell .proactive-alert-dot {
@@ -8128,7 +8176,8 @@ a.saved-capture-title:hover {
   border: 1px solid var(--app-border-strong);
   border-left: 3px solid var(--app-linear);
   border-radius: var(--app-radius);
-  background: var(--app-surface);
+  background: linear-gradient(180deg, var(--app-surface), var(--app-surface-muted));
+  box-shadow: 0 6px 18px -14px oklch(22% 0.02 265 / 0.35);
 }
 
 .app-shell .calendar-meetings-head {
@@ -9858,38 +9907,43 @@ a.saved-capture-title:hover {
 /* Connections trigger — opens the management slide-over; pushed to the far right */
 .dash-connections-trigger {
   display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-left: auto;
-  padding: 6px 12px;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px 6px 11px;
   border-radius: 999px;
-  border: 1px solid var(--app-border-strong, #cbd5e1);
-  background: transparent;
-  color: var(--app-ink-2, #475569);
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-surface);
+  color: var(--app-ink-secondary);
   font: inherit;
   font-size: 0.78rem;
   cursor: pointer;
-  transition: background-color 160ms ease, border-color 160ms ease;
+  box-shadow: var(--app-shadow-surface);
+  transition: background-color 160ms ease, border-color 160ms ease,
+    box-shadow 160ms ease, transform 160ms ease;
+}
+
+.dash-connections-trigger::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--app-accent);
+  box-shadow: 0 0 0 3px var(--app-accent-soft);
 }
 
 .dash-connections-trigger:hover {
-  background: var(--app-surface-2, rgba(0, 0, 0, 0.04));
-  border-color: var(--app-accent, #6d5ef0);
+  transform: translateY(-1px);
+  border-color: var(--app-accent-ring);
+  background: var(--app-surface-muted);
 }
 
 .dash-connections-trigger-label {
   font-weight: 600;
-  color: var(--app-ink, #0f172a);
+  color: var(--app-ink);
 }
 
 .dash-connections-trigger-meta {
-  color: var(--app-muted, #94a3b8);
-}
-
-@media (max-width: 32rem) {
-  .dash-connections-trigger {
-    margin-left: 0;
-  }
+  color: var(--app-muted);
 }
 
 /* ── Connections slide-over drawer ─────────────────────────────────────────── */
