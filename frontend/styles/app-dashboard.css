@@ -78,6 +78,18 @@
   --app-chip-negative-fg: oklch(42% 0.1 25);
   --app-chip-caution-fg: oklch(42% 0.08 55);
   --app-chip-brand-fg: oklch(42% 0.1 65);
+  --app-paper-2: oklch(98.2% 0.006 85);
+  --app-danger-zone-bg: oklch(98% 0.02 25);
+  --app-danger-zone-border: oklch(72% 0.08 25 / 0.45);
+  --app-hero-card-bg: linear-gradient(155deg, oklch(99.2% 0.008 278) 0%, var(--app-surface) 55%);
+  --app-hero-card-inset: oklch(100% 0 0 / 0.6);
+  --app-warm-panel-bg: linear-gradient(180deg, oklch(97.5% 0.018 75) 0%, oklch(96% 0.012 75) 100%);
+  --app-warm-panel-bg-hover: linear-gradient(180deg, oklch(97% 0.022 75) 0%, oklch(95.5% 0.015 75) 100%);
+  --app-warm-panel-body-bg: oklch(98.2% 0.008 75);
+  --app-warm-accordion-bg: linear-gradient(180deg, oklch(97.8% 0.02 75) 0%, oklch(96.5% 0.015 75) 100%);
+  --app-warm-accordion-bg-hover: oklch(97.5% 0.015 75);
+  --app-warm-accordion-bg-open-hover: linear-gradient(180deg, oklch(97.5% 0.022 75) 0%, oklch(96% 0.018 75) 100%);
+  --app-callout-bg: oklch(97% 0.03 85);
 
   display: grid;
   grid-template-columns: var(--app-sidebar-w) minmax(0, 1fr);
@@ -150,6 +162,17 @@
   --app-chip-negative-fg: oklch(78% 0.1 25);
   --app-chip-caution-fg: oklch(78% 0.08 55);
   --app-chip-brand-fg: oklch(78% 0.1 65);
+  --app-danger-zone-bg: oklch(58% 0.08 25 / 0.16);
+  --app-danger-zone-border: oklch(78% 0.14 25 / 0.35);
+  --app-hero-card-bg: linear-gradient(155deg, oklch(20% 0.02 278) 0%, var(--app-surface) 58%);
+  --app-hero-card-inset: oklch(100% 0 0 / 0.04);
+  --app-warm-panel-bg: linear-gradient(180deg, oklch(18% 0.018 75) 0%, oklch(16% 0.012 75) 100%);
+  --app-warm-panel-bg-hover: linear-gradient(180deg, oklch(19% 0.02 75) 0%, oklch(17% 0.014 75) 100%);
+  --app-warm-panel-body-bg: var(--app-surface-muted);
+  --app-warm-accordion-bg: linear-gradient(180deg, oklch(18% 0.018 75) 0%, oklch(16% 0.012 75) 100%);
+  --app-warm-accordion-bg-hover: oklch(19% 0.016 75);
+  --app-warm-accordion-bg-open-hover: linear-gradient(180deg, oklch(19% 0.02 75) 0%, oklch(17% 0.014 75) 100%);
+  --app-callout-bg: oklch(58% 0.08 65 / 0.18);
 
   background:
     radial-gradient(ellipse 120% 80% at 50% -20%, oklch(58% 0.18 275 / 0.1), transparent 55%),
@@ -1615,7 +1638,7 @@
 
 .app-shell .topics-suggest-block--reading {
   border-color: oklch(78% 0.06 278 / 0.45);
-  background: oklch(98% 0.015 278 / 0.55);
+  background: var(--app-accent-soft);
 }
 
 .app-shell .topics-suggest-head {
@@ -1698,7 +1721,7 @@
 
 .app-shell .topics-pick-chip--suggested {
   border-color: oklch(78% 0.06 278 / 0.4);
-  background: oklch(99% 0.02 278 / 0.7);
+  background: var(--app-accent-soft);
 }
 
 .app-shell .topics-browse {
@@ -1792,7 +1815,7 @@
 }
 
 .app-shell .topics-category-trigger:hover {
-  background: oklch(99% 0.004 85 / 0.8);
+  background: var(--app-surface-overlay);
 }
 
 .app-shell .topics-category-trigger-main {
@@ -6200,11 +6223,7 @@ a.saved-capture-title:hover {
   width: 100%;
   padding: 1.125rem 1.25rem;
   border: none;
-  background: linear-gradient(
-    180deg,
-    oklch(97.5% 0.018 75) 0%,
-    oklch(96% 0.012 75) 100%
-  );
+  background: var(--app-warm-panel-bg);
   text-align: left;
   cursor: pointer;
   color: inherit;
@@ -6212,11 +6231,7 @@ a.saved-capture-title:hover {
 }
 
 .app-shell .dash-insights-drawer-trigger:hover {
-  background: linear-gradient(
-    180deg,
-    oklch(97% 0.022 75) 0%,
-    oklch(95.5% 0.015 75) 100%
-  );
+  background: var(--app-warm-panel-bg-hover);
 }
 
 .app-shell .dash-insights-drawer-trigger-main {
@@ -6281,7 +6296,7 @@ a.saved-capture-title:hover {
   gap: 0.75rem;
   padding: 1rem 1.25rem 1.25rem;
   border-top: 1px solid oklch(72% 0.04 75 / 0.45);
-  background: oklch(98.2% 0.008 75);
+  background: var(--app-warm-panel-body-bg);
 }
 
 .app-shell .dash-insights-drawer-intro {
@@ -6337,24 +6352,16 @@ a.saved-capture-title:hover {
 }
 
 .app-shell .dash-accordion--open .dash-accordion-trigger {
-  background: linear-gradient(
-    180deg,
-    oklch(97.8% 0.02 75) 0%,
-    oklch(96.5% 0.015 75) 100%
-  );
+  background: var(--app-warm-accordion-bg);
   border-bottom: 1px solid oklch(72% 0.04 75 / 0.45);
 }
 
 .app-shell .dash-accordion-trigger:hover {
-  background: oklch(97.5% 0.015 75);
+  background: var(--app-warm-accordion-bg-hover);
 }
 
 .app-shell .dash-accordion--open .dash-accordion-trigger:hover {
-  background: linear-gradient(
-    180deg,
-    oklch(97.5% 0.022 75) 0%,
-    oklch(96% 0.018 75) 100%
-  );
+  background: var(--app-warm-accordion-bg-open-hover);
 }
 
 .app-shell .dash-accordion-trigger-main {
@@ -7176,7 +7183,7 @@ a.saved-capture-title:hover {
 
 .app-shell .intel-topic-row--emerging {
   border-color: oklch(72% 0.07 145 / 0.35);
-  background: oklch(97% 0.02 145 / 0.45);
+  background: var(--app-depth-deep-bg);
 }
 
 .app-shell .intel-topic-row--gap {
@@ -7873,7 +7880,7 @@ a.saved-capture-title:hover {
 
 .app-shell .wif-topic-row--ignored {
   border-color: oklch(72% 0.05 25 / 0.3);
-  background: oklch(98% 0.015 25 / 0.5);
+  background: var(--app-tint-alert-bg);
 }
 
 .app-shell .wif-topic-row--uncovered {
@@ -7884,7 +7891,7 @@ a.saved-capture-title:hover {
 
 .app-shell .wif-topic-row--emerging {
   border-color: oklch(72% 0.07 145 / 0.35);
-  background: oklch(97% 0.02 145 / 0.45);
+  background: var(--app-depth-deep-bg);
 }
 
 .app-shell .wif-topic-top {
@@ -8003,7 +8010,7 @@ a.saved-capture-title:hover {
   margin-top: 0.55rem;
   padding: 0.55rem 0.65rem;
   border-radius: 8px;
-  background: oklch(97% 0.02 25);
+  background: var(--app-tint-alert-bg);
   border-left: 3px solid oklch(58% 0.1 25);
 }
 
@@ -8456,8 +8463,8 @@ a.saved-capture-title:hover {
   padding: 1.25rem 1.35rem 1.15rem;
   border: 1px solid oklch(52% 0.14 278 / 0.18);
   border-radius: var(--app-radius);
-  background: linear-gradient(155deg, oklch(99.2% 0.008 278) 0%, var(--app-surface) 55%);
-  box-shadow: 0 1px 0 oklch(100% 0 0 / 0.6) inset;
+  background: var(--app-hero-card-bg);
+  box-shadow: 0 1px 0 var(--app-hero-card-inset) inset;
 }
 
 .app-shell .briefing-hero-meta {
@@ -8527,7 +8534,7 @@ a.saved-capture-title:hover {
   font-size: 0.8125rem;
   line-height: 1.5;
   color: var(--app-chip-brand-fg);
-  background: oklch(97% 0.03 85);
+  background: var(--app-callout-bg);
   border-radius: var(--app-radius-sm);
   border-left: 3px solid oklch(65% 0.14 65);
 }
@@ -8579,7 +8586,7 @@ a.saved-capture-title:hover {
   font-size: 0.875rem;
   line-height: 1.5;
   color: var(--app-chip-brand-fg);
-  background: oklch(97% 0.02 85);
+  background: var(--app-callout-bg);
   border-radius: var(--app-radius-sm);
   border-left: 3px solid oklch(68% 0.12 65);
 }
@@ -8950,8 +8957,8 @@ a.saved-capture-title:hover {
 }
 
 .data-controls-danger {
-  border-color: oklch(72% 0.08 25 / 0.45);
-  background: oklch(98% 0.02 25);
+  border-color: var(--app-danger-zone-border);
+  background: var(--app-danger-zone-bg);
 }
 
 .data-controls-title {
@@ -9073,6 +9080,7 @@ a.saved-capture-title:hover {
   border: 1px solid var(--app-border);
   border-radius: var(--app-radius-sm);
   background: transparent;
+  color: var(--app-ink-secondary);
   font-size: 0.8125rem;
   cursor: pointer;
 }
@@ -9140,8 +9148,8 @@ a.saved-capture-title:hover {
   margin: 0.75rem 0 0.5rem;
   padding: 0.75rem 0.85rem;
   border-radius: var(--app-radius-sm);
-  border: 1px solid oklch(72% 0.08 25 / 0.28);
-  background: oklch(99% 0.012 25 / 0.45);
+  border: 1px solid var(--app-danger-border);
+  background: var(--app-danger-bg);
 }
 
 .app-shell .yt-sync--empty {
@@ -9401,8 +9409,8 @@ a.saved-capture-title:hover {
 }
 
 .app-shell .discovery-integration--error {
-  background: oklch(98% 0.02 25);
-  border-color: oklch(78% 0.08 25 / 0.35);
+  background: var(--app-danger-bg);
+  border-color: var(--app-danger-border);
 }
 
 .app-shell .discovery-integration-icon {
@@ -10514,7 +10522,16 @@ a.saved-capture-title:hover {
 
 .app-shell[data-theme="dark"] .read-contradiction-callout,
 .app-shell[data-theme="dark"] .briefing-hero-contradiction {
-  background: oklch(58% 0.08 65 / 0.18);
+  color: var(--app-chip-brand-fg);
+}
+
+.app-shell[data-theme="dark"] .briefing-hero-item {
+  border-color: oklch(58% 0.18 275 / 0.28);
+}
+
+.app-shell[data-theme="dark"] .dash-insights-drawer,
+.app-shell[data-theme="dark"] .dash-accordion {
+  border-color: oklch(58% 0.08 75 / 0.28);
 }
 
 .app-shell[data-theme="dark"] .briefing-preview-index,
