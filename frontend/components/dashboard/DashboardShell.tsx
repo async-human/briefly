@@ -11,6 +11,7 @@ import { LearnedToastProvider } from "./LearnedToast";
 import { FreeTierBanner } from "@/components/billing/FreeTierBanner";
 import { ensureDesktopOrbLinked } from "@/lib/orbDesktopLink";
 import { MobileOrbOverlay } from "@/components/mobile/MobileOrbOverlay";
+import { useAppTheme } from "@/components/app/AppThemeProvider";
 
 type DashboardShellProps = {
   children: React.ReactNode;
@@ -20,6 +21,7 @@ type DashboardShellProps = {
 
 export function DashboardShell({ children, userName, avatarUrl }: DashboardShellProps) {
   const pathname = usePathname();
+  const { theme } = useAppTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export function DashboardShell({ children, userName, avatarUrl }: DashboardShell
 
   return (
     <LearnedToastProvider>
-    <div className="app-shell">
+    <div className="app-shell" data-theme={theme} suppressHydrationWarning>
       <AppSidebar
         userName={userName}
         avatarUrl={avatarUrl}

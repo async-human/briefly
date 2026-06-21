@@ -61,6 +61,35 @@
   overflow-x: clip;
 }
 
+.app-shell[data-theme="dark"] {
+  --app-sidebar-bg: oklch(14% 0.012 270);
+  --app-canvas: oklch(12% 0.012 270);
+  --app-surface: oklch(18% 0.014 270);
+  --app-surface-muted: oklch(16% 0.014 270);
+  --app-ink: oklch(97% 0.006 270);
+  --app-ink-secondary: oklch(72% 0.012 270);
+  --app-muted: oklch(55% 0.014 270);
+  --app-ink-muted: oklch(55% 0.014 270);
+  --app-border: oklch(96% 0.01 270 / 0.08);
+  --app-border-strong: oklch(96% 0.01 270 / 0.14);
+  --app-linear-soft: oklch(58% 0.18 275 / 0.12);
+  --app-linear-ring: oklch(58% 0.18 275 / 0.35);
+  --app-accent-soft: oklch(58% 0.18 275 / 0.12);
+  --app-accent-ring: oklch(58% 0.18 275 / 0.35);
+  --app-paper-2: oklch(16% 0.014 270);
+  --app-shadow-surface: 0 0 0 1px var(--app-border);
+  --app-shadow-elevated:
+    0 20px 50px oklch(0% 0 0 / 0.45),
+    0 0 0 1px var(--app-border);
+  --surface: oklch(20% 0.016 270);
+  --surface-hover: oklch(23% 0.018 270);
+
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -20%, oklch(58% 0.18 275 / 0.08), transparent 55%),
+    var(--app-canvas);
+  color-scheme: dark;
+}
+
 /* ── Sidebar ── */
 
 .app-sidebar-backdrop {
@@ -226,6 +255,30 @@
   color: var(--app-ink);
 }
 
+.app-shell[data-theme="dark"] .app-sidebar-link:hover {
+  background: oklch(100% 0 0 / 0.05);
+}
+
+.app-shell[data-theme="dark"] .app-sidebar-link.is-active {
+  background: oklch(58% 0.18 275 / 0.14);
+}
+
+.app-shell[data-theme="dark"] .app-sidebar-signout:hover {
+  background: oklch(100% 0 0 / 0.05);
+}
+
+.app-sidebar-theme {
+  margin-bottom: 0.75rem;
+}
+
+.app-sidebar-theme .theme-seg {
+  width: 100%;
+}
+
+.app-sidebar-theme .theme-seg__btn {
+  flex: 1;
+}
+
 /* ── Main canvas ── */
 
 .app-main {
@@ -308,6 +361,12 @@
     linear-gradient(162deg, var(--app-surface) 0%, var(--app-surface-muted) 100%);
   box-shadow:
     0 1px 0 oklch(100% 0 0 / 0.6) inset,
+    var(--app-shadow-surface);
+}
+
+.app-shell[data-theme="dark"] .dash-page-feed .dash-page-header {
+  box-shadow:
+    0 1px 0 oklch(100% 0 0 / 0.04) inset,
     var(--app-shadow-surface);
 }
 
@@ -10373,3 +10432,126 @@ a.saved-capture-title:hover {
   }
 }
 
+/* ── Settings appearance ── */
+
+.app-shell .settings-appearance-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+}
+
+/* ── Dark theme — component overrides ── */
+
+.app-shell[data-theme="dark"] .topics-suggest-block--reading {
+  background: oklch(58% 0.18 275 / 0.1);
+  border-color: oklch(58% 0.18 275 / 0.28);
+}
+
+.app-shell[data-theme="dark"] .topics-pick-chip--suggested {
+  background: oklch(58% 0.18 275 / 0.12);
+}
+
+.app-shell[data-theme="dark"] .topics-category-trigger:hover {
+  background: oklch(100% 0 0 / 0.04);
+}
+
+.app-shell[data-theme="dark"] .dash-accordion-panel {
+  background: var(--app-surface-muted);
+}
+
+.app-shell[data-theme="dark"] .intel-card-calendar {
+  background: linear-gradient(
+    135deg,
+    oklch(22% 0.03 230) 0%,
+    oklch(18% 0.02 230) 55%,
+    var(--app-surface) 100%
+  );
+  border-color: oklch(58% 0.12 230 / 0.35);
+}
+
+.app-shell[data-theme="dark"] .intel-card-wrapped {
+  background: linear-gradient(
+    135deg,
+    oklch(22% 0.025 75) 0%,
+    oklch(18% 0.015 75) 50%,
+    var(--app-surface) 100%
+  );
+  border-color: oklch(58% 0.08 75 / 0.35);
+}
+
+.app-shell[data-theme="dark"] .intel-card-blind {
+  background: linear-gradient(
+    135deg,
+    oklch(22% 0.02 25) 0%,
+    oklch(18% 0.015 25) 50%,
+    var(--app-surface) 100%
+  );
+  border-color: oklch(58% 0.08 25 / 0.35);
+}
+
+.app-shell[data-theme="dark"] .intel-doc-row.wif-topic-row--ignored {
+  background: oklch(55% 0.08 25 / 0.12);
+}
+
+.app-shell[data-theme="dark"] .intel-doc-row.wif-topic-row--emerging {
+  background: oklch(55% 0.08 145 / 0.12);
+}
+
+.app-shell[data-theme="dark"] .free-tier-banner-text,
+.app-shell[data-theme="dark"] .free-tier-banner-dismiss {
+  color: oklch(78% 0.08 25);
+}
+
+.app-shell[data-theme="dark"] .jarvis-shell {
+  background: linear-gradient(
+    168deg,
+    var(--app-canvas) 0%,
+    var(--app-surface-muted) 55%,
+    oklch(16% 0.014 270) 100%
+  );
+  box-shadow:
+    0 28px 70px oklch(0% 0 0 / 0.5),
+    0 12px 32px oklch(0% 0 0 / 0.35),
+    0 0 0 1px oklch(100% 0 0 / 0.06) inset;
+}
+
+.app-shell[data-theme="dark"] .jarvis-backdrop {
+  background: oklch(0% 0 0 / 0.55);
+}
+
+/* Portaled modals — inherit theme via body dataset */
+body[data-app-theme="dark"] .upgrade-modal-backdrop,
+body[data-app-theme="dark"] .cancel-sub-backdrop {
+  --pm-bg: oklch(16% 0.014 270);
+  --pm-surface: oklch(20% 0.016 270);
+  --pm-ink: oklch(97% 0.006 270);
+  --pm-ink-2: oklch(72% 0.012 270);
+  --pm-muted: oklch(55% 0.014 270);
+  --pm-border: oklch(96% 0.01 270 / 0.1);
+  --pm-border-strong: oklch(96% 0.01 270 / 0.16);
+  --pm-accent: oklch(62% 0.18 275);
+  --pm-accent-soft: oklch(62% 0.18 275 / 0.12);
+}
+
+body[data-app-theme="dark"] .upgrade-modal {
+  box-shadow:
+    0 32px 64px oklch(0% 0 0 / 0.55),
+    0 0 0 1px oklch(100% 0 0 / 0.06) inset;
+}
+
+body[data-app-theme="dark"] .upgrade-modal-btn-primary {
+  background: oklch(97% 0.006 270);
+  color: oklch(14% 0.012 270);
+}
+
+body[data-app-theme="dark"] .upgrade-modal-feature-check {
+  background: oklch(55% 0.08 145 / 0.18);
+  color: oklch(72% 0.1 145);
+}
+
+body[data-app-theme="dark"] .upgrade-modal-error {
+  color: oklch(72% 0.1 25);
+  background: oklch(55% 0.08 25 / 0.15);
+}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
+import { AppThemeToggle } from "@/components/app/AppThemeToggle";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccountConnections } from "@/components/settings/AccountConnections";
 import { DataControls } from "@/components/settings/DataControls";
@@ -277,6 +278,27 @@ export default function SettingsPage() {
         ) : (
           <PageContentTransition>
           <div className="dash-page-stack">
+            {/* ── Appearance ── */}
+            <div className="dash-surface dash-surface-settings">
+              <div className="dash-surface-head">
+                <h2 className="dash-surface-title">Appearance</h2>
+                <p className="dash-surface-desc">
+                  Choose light or dark mode for the dashboard and sidebar.
+                </p>
+              </div>
+              <div className="dash-surface-body dash-surface-body-form">
+                <div className="settings-appearance-row">
+                  <div>
+                    <p className="settings-field-label">Color theme</p>
+                    <p className="settings-field-hint">
+                      Syncs with your landing page preference.
+                    </p>
+                  </div>
+                  <AppThemeToggle />
+                </div>
+              </div>
+            </div>
+
             {/* ── Plan & billing ── */}
             <div className="dash-surface dash-surface-settings dash-surface-billing">
               <div className="dash-surface-head">

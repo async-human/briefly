@@ -6,6 +6,7 @@ import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { SidebarPlanBadge } from "@/components/billing/SidebarPlanBadge";
 import { clearToken } from "@/lib/auth";
 import { useBriefingGeneration } from "./BriefingGenerationProvider";
+import { AppThemeToggle } from "@/components/app/AppThemeToggle";
 
 const NAV = [
   {
@@ -176,6 +177,9 @@ export function AppSidebar({ userName, avatarUrl, open, onClose }: AppSidebarPro
         </nav>
 
         <div className="app-sidebar-foot">
+          <div className="app-sidebar-theme">
+            <AppThemeToggle compact />
+          </div>
           <SidebarPlanBadge />
           {userName && (
             <div className="app-sidebar-user">
