@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type MeResponse, type Source } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { BriefingPanel, SourcesSidebar } from "@/components/dashboard/BriefingPanel";
+import { BriefingPanel } from "@/components/dashboard/BriefingPanel";
+import { ConnectionsDrawer } from "@/components/dashboard/ConnectionsDrawer";
 import { DiscoverContentPanel } from "@/components/dashboard/DiscoverContentPanel";
 import { DashboardToolbar } from "@/components/dashboard/DashboardToolbar";
 import { SourceDiscoveryWizard } from "@/components/dashboard/SourceDiscoveryWizard";
@@ -64,6 +65,7 @@ function DashboardContent() {
   const [intel, setIntel] = useState<ProfileIntelligence | null>(null);
   const [briefingOpen, setBriefingOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
   const autoGenerateChecked = useRef(false);
   const upgrade = useUpgradeOptional();
   const refreshBilling = upgrade?.refreshBilling;
@@ -302,7 +304,7 @@ function DashboardContent() {
 
   return (
     <PageContentTransition>
-    <div className="dash-page">
+    <div className="dash-page dash-page-feed">
       <DashboardToolbar
         name={greeting}
         dateLabel={today}
@@ -348,8 +350,16 @@ function DashboardContent() {
               ✉ Draft email
             </button>
           )}
+          <button
+            type="button"
+            className="dash-connections-trigger"
+            onClick={() => setConnectionsOpen(true)}
+            aria-haspopup="dialog"
+          >
+            <span className="dash-connections-trigger-label">Connections</span>
+            <span className="dash-connections-trigger-meta">{sourcesDesc}</span>
+          </button>
         </div>
-        <div className="dash-page-grid">
         <section className="dash-surface dash-surface-briefing" aria-labelledby="briefing-surface-title">
           <h2 id="briefing-surface-title" className="sr-only">
             Today&apos;s briefing
@@ -372,32 +382,6 @@ function DashboardContent() {
             <DiscoverContentPanel onSourceAdded={handleSourceAdded} />
           </div>
         </section>
-
-        <aside className="dash-surface dash-surface-sources" aria-labelledby="sources-surface-title">
-          <div className="dash-surface-head dash-surface-head-rail">
-            <h2 id="sources-surface-title" className="dash-surface-title">
-              Connections
-            </h2>
-            <p className="dash-surface-desc">{sourcesDesc}</p>
-          </div>
-          <div className="dash-surface-body dash-surface-body-sources">
-            <SourcesSidebar
-              ingestionEmail={me.ingestion_email}
-              sources={sources}
-              gmailConnected={me.gmail_connected}
-              autoSuggestions={me.auto_suggestions ?? []}
-              onSourceAdded={handleSourceAdded}
-              onSourcesRemoved={handleSourcesRemoved}
-              onSourceUpdated={(updated) =>
-                setSources((prev) =>
-                  prev.map((s) => (s.id === updated.id ? updated : s)),
-                )
-              }
-              onRediscover={() => void handleRediscover()}
-            />
-          </div>
-        </aside>
-        </div>
       </div>
 
       <DashboardInsightsDrawer
@@ -405,6 +389,21 @@ function DashboardContent() {
         digest={digest}
         streak={me.reading_streak ?? 0}
         declaredInterests={me.profile?.interests?.map((i) => i.topic).filter(Boolean) ?? []}
+      />
+
+      <ConnectionsDrawer
+        open={connectionsOpen}
+        onClose={() => setConnectionsOpen(false)}
+        ingestionEmail={me.ingestion_email}
+        sources={sources}
+        gmailConnected={me.gmail_connected}
+        autoSuggestions={me.auto_suggestions ?? []}
+        onSourceAdded={handleSourceAdded}
+        onSourcesRemoved={handleSourcesRemoved}
+        onSourceUpdated={(updated) =>
+          setSources((prev) => prev.map((s) => (s.id === updated.id ? updated : s)))
+        }
+        onRediscover={() => void handleRediscover()}
       />
 
       <BriefingMode
