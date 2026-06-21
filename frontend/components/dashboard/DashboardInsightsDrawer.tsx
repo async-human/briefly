@@ -10,6 +10,7 @@ import { IntelligenceBriefingPanel } from "@/components/dashboard/IntelligenceBr
 import { WeeklyReportCard } from "@/components/dashboard/WeeklyReportCard";
 import { DashboardAccordion } from "@/components/dashboard/DashboardAccordion";
 import { getBrieflyKnowsTeaser } from "@/lib/brieflyKnows";
+import { getWeekFocusDescription, hasSubstantiveWrappedContent } from "@/lib/weekInFocus";
 
 const STORAGE_KEY = "briefly:dash-insights-open";
 
@@ -23,7 +24,9 @@ type Props = {
 function buildSummaryChips(intel: ProfileIntelligence | null, digest: Digest | null): string[] {
   const chips: string[] = [];
   const wrapped = digest?.meta?.wrapped;
-  if (wrapped?.synthesis || wrapped?.weekly_synthesis || wrapped?.shifts?.length) {
+  if (wrapped && hasSubstantiveWrappedContent(wrapped)) {
+    chips.push("Week in focus");
+  } else if (digest) {
     chips.push("Week in focus");
   }
   if ((intel?.active_threads?.length ?? 0) > 0) {
@@ -55,13 +58,7 @@ export function DashboardInsightsDrawer({
 
   const chips = useMemo(() => buildSummaryChips(intel, digest), [intel, digest]);
 
-  const hasWeekFocus = Boolean(
-    digest?.meta?.wrapped &&
-      (digest.meta.wrapped.synthesis ||
-        digest.meta.wrapped.weekly_synthesis ||
-        digest.meta.wrapped.shifts?.length ||
-        digest.meta.wrapped.active_topics?.length),
-  );
+  const wrapped = digest?.meta?.wrapped;
   const hasThreads = (intel?.active_threads?.length ?? 0) > 0;
   const hasConnections = (digest?.meta?.serendipity?.length ?? 0) > 0;
   const hasMeetings = (digest?.meta?.calendar?.meetings?.length ?? 0) > 0;
@@ -69,7 +66,12 @@ export function DashboardInsightsDrawer({
   const hasIntel = Boolean(intel && intel.digest_day > 0);
 
   const hasContent =
-    hasWeekFocus || hasThreads || hasConnections || hasMeetings || hasBlindSpots || hasIntel;
+    Boolean(digest) ||
+    hasThreads ||
+    hasConnections ||
+    hasMeetings ||
+    hasBlindSpots ||
+    hasIntel;
 
   useEffect(() => {
     try {
@@ -101,7 +103,8 @@ export function DashboardInsightsDrawer({
       .filter((id): id is string => Boolean(id)),
   );
 
-  const defaultFirst = hasWeekFocus || hasIntel;
+  const defaultFirst = true;
+  const weekDescription = getWeekFocusDescription(wrapped);
 
   return (
     <section className="dash-insights-drawer" aria-label="Intelligence and connections">
@@ -137,23 +140,21 @@ export function DashboardInsightsDrawer({
             Optional depth — your briefing above is complete. Expand a section when you want more context.
           </p>
 
-          {hasWeekFocus && digest?.meta?.wrapped && (
-            <DashboardAccordion
-              id="week-in-focus"
-              title="Your week in focus"
-              description={digest.meta.wrapped.synthesis?.slice(0, 72) ?? "Attention patterns this week"}
-              defaultOpen={defaultFirst}
-            >
-              <IntelligenceBriefingPanel wrapped={digest.meta.wrapped} embedded />
-            </DashboardAccordion>
-          )}
+          <DashboardAccordion
+            id="week-in-focus"
+            title="Your week in focus"
+            description={weekDescription}
+            defaultOpen={defaultFirst}
+          >
+            <WeeklyReportCard embedded intel={intel} wrapped={wrapped} />
+          </DashboardAccordion>
 
           {hasIntel && intel && (
             <DashboardAccordion
               id="knows"
               title="What Briefly knows"
               description={getBrieflyKnowsTeaser(intel, streak)}
-              defaultOpen={!hasWeekFocus}
+              defaultOpen={false}
             >
               <BrieflyKnowsSummary
                 intel={intel}
@@ -197,17 +198,6 @@ export function DashboardInsightsDrawer({
           {hasBlindSpots && digest?.meta?.blind_spots && (
             <DashboardAccordion id="blind-spots" title="Blind spots" description="Perspectives you might miss">
               <IntelligenceBriefingPanel blindSpots={digest.meta.blind_spots} embedded />
-            </DashboardAccordion>
-          )}
-
-          {!hasWeekFocus && (
-            <DashboardAccordion
-              id="week-patterns"
-              title="Your week in focus"
-              description="Topics, skips, and shifts from your reading"
-              defaultOpen={defaultFirst}
-            >
-              <WeeklyReportCard embedded intel={intel} wrapped={digest?.meta?.wrapped} />
             </DashboardAccordion>
           )}
 

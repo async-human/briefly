@@ -6,6 +6,7 @@ import { api, ApiError, type ProfileIntelligence, type WeeklyReport, type Wrappe
 import { WeekInFocusCard } from "@/components/intelligence/WeekInFocusCard";
 import {
   buildWrappedFromIntel,
+  hasSubstantiveWrappedContent,
   hasWrappedContent,
   isGenericWeeklyCopy,
 } from "@/lib/weekInFocus";
@@ -24,9 +25,13 @@ function WeeklyReportFallback({ report }: { report: WeeklyReport }) {
       ? report.thinking_shift
       : null;
 
-  const topics = (report.top_topics ?? []).filter(
+  const meaningfulTopics = (report.top_topics ?? []).filter(
     (t) => t.topic && !GENERIC_OBSERVATIONS.has(t.observation),
   );
+  const topics =
+    meaningfulTopics.length > 0
+      ? meaningfulTopics
+      : (report.top_topics ?? []).filter((t) => t.topic);
 
   const hasStats = report.stories_read > 0 || Boolean(report.top_source);
 
@@ -91,29 +96,22 @@ function WeeklyReportFallback({ report }: { report: WeeklyReport }) {
   );
 }
 
+function pickBestWrapped(candidates: WrappedSnapshot[]): WrappedSnapshot | null {
+  return candidates.find(hasSubstantiveWrappedContent) ?? candidates.find(hasWrappedContent) ?? null;
+}
+
 export function WeeklyReportCard({
   embedded = false,
   wrapped: wrappedProp,
   intel,
 }: WeeklyReportCardProps) {
-  const [wrapped, setWrapped] = useState<WrappedSnapshot | null>(() =>
-    wrappedProp && hasWrappedContent(wrappedProp) ? wrappedProp : null,
-  );
+  const [wrapped, setWrapped] = useState<WrappedSnapshot | null>(null);
   const [report, setReport] = useState<WeeklyReport | null>(null);
-  const [loading, setLoading] = useState(() => !(wrappedProp && hasWrappedContent(wrappedProp)));
+  const [loading, setLoading] = useState(true);
   const [empty, setEmpty] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (wrappedProp && hasWrappedContent(wrappedProp)) {
-      setWrapped(wrappedProp);
-      setReport(null);
-      setEmpty(false);
-      setError("");
-      setLoading(false);
-      return;
-    }
-
     let cancelled = false;
 
     async function load() {
@@ -123,30 +121,59 @@ export function WeeklyReportCard({
       setWrapped(null);
       setReport(null);
 
+      const wrappedCandidates: WrappedSnapshot[] = [];
+      if (wrappedProp && hasWrappedContent(wrappedProp)) {
+        wrappedCandidates.push(wrappedProp);
+      }
+
       try {
         const wif = await api.getWeekInFocus();
-        if (!cancelled && hasWrappedContent(wif)) {
-          setWrapped(wif);
-          return;
+        if (hasWrappedContent(wif)) {
+          wrappedCandidates.push(wif);
         }
       } catch {
         /* fall through */
       }
 
-      if (intel && !cancelled) {
-        const built = buildWrappedFromIntel(intel);
-        if (built && hasWrappedContent(built)) {
-          setWrapped(built);
-          return;
-        }
+      const builtFromIntel = intel ? buildWrappedFromIntel(intel) : null;
+      if (builtFromIntel && hasWrappedContent(builtFromIntel)) {
+        wrappedCandidates.push(builtFromIntel);
       }
 
       try {
         const data = await api.getWeeklyReport();
         if (cancelled) return;
+
+        const bestWrapped = pickBestWrapped(wrappedCandidates);
+        if (bestWrapped && hasSubstantiveWrappedContent(bestWrapped)) {
+          setWrapped(bestWrapped);
+          return;
+        }
+
         setReport(data);
+
+        if (!bestWrapped) return;
+
+        // Thin wrapped snapshot — prefer weekly report stats/topics when available.
+        const reportHasBody =
+          data.stories_read > 0 ||
+          Boolean(data.top_source) ||
+          (data.top_topics?.length ?? 0) > 0 ||
+          Boolean(data.building_thread) ||
+          Boolean(data.blind_spot);
+        if (!reportHasBody) {
+          setReport(null);
+          setWrapped(bestWrapped);
+        }
       } catch (err) {
         if (cancelled) return;
+
+        const bestWrapped = pickBestWrapped(wrappedCandidates);
+        if (bestWrapped) {
+          setWrapped(bestWrapped);
+          return;
+        }
+
         if (err instanceof ApiError && err.status === 404) {
           setEmpty(true);
         } else {
@@ -191,7 +218,7 @@ export function WeeklyReportCard({
   if (wrapped) {
     return (
       <section className={`weekly-report-card${embedded ? " weekly-report-card--embedded" : ""}`}>
-        <WeekInFocusCard wrapped={wrapped} variant="teaser" />
+        <WeekInFocusCard wrapped={wrapped} variant={embedded ? "full" : "teaser"} />
       </section>
     );
   }
@@ -204,5 +231,12 @@ export function WeeklyReportCard({
     );
   }
 
-  return null;
+  return (
+    <div className="weekly-report-empty">
+      <p className="weekly-report-empty-title">Patterns still forming</p>
+      <p className="weekly-report-empty-desc">
+        Keep reading your brief — weekly patterns will show up here once Briefly has enough signal.
+      </p>
+    </div>
+  );
 }

@@ -92,6 +92,28 @@ export function buildWrappedFromIntel(intel: ProfileIntelligence): WrappedSnapsh
   };
 }
 
+/** True when wrapped data has enough structure to show meaningful week-in-focus rows. */
+export function hasSubstantiveWrappedContent(wrapped: WrappedSnapshot): boolean {
+  if (!hasWrappedContent(wrapped)) return false;
+
+  const synthesis = (wrapped.synthesis || wrapped.weekly_synthesis || wrapped.lead || "").trim();
+  if (synthesis && !isGenericWeeklyCopy(synthesis)) return true;
+  if ((wrapped.active_topics?.length ?? 0) > 0) return true;
+  if ((wrapped.high_engagement?.length ?? 0) > 0) return true;
+  if ((wrapped.shifts?.length ?? 0) > 0 || (wrapped.mind_shifts?.length ?? 0) > 0) return true;
+  if ((wrapped.ignored?.length ?? 0) > 0) return true;
+  if ((wrapped.uncovered?.length ?? 0) > 0 || (wrapped.gaps?.length ?? 0) > 0) return true;
+  if ((wrapped.emerging?.length ?? 0) > 0) return true;
+  if (wrapped.depth_label || wrapped.week_stats?.delta_label) return true;
+  return false;
+}
+
+export function getWeekFocusDescription(wrapped?: WrappedSnapshot | null): string {
+  const lead = (wrapped?.synthesis || wrapped?.weekly_synthesis || wrapped?.lead || "").trim();
+  if (lead && !isGenericWeeklyCopy(lead)) return lead.slice(0, 72);
+  return "Topics, skips, and shifts from your reading";
+}
+
 export function isGenericWeeklyCopy(text: string): boolean {
   const lower = text.toLowerCase();
   return (
