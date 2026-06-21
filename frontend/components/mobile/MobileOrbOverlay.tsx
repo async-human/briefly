@@ -354,7 +354,7 @@ export function MobileOrbOverlay() {
     const fullAnswer = turn.answer.trim();
     setCaption(fullAnswer);
     const allWords = fullAnswer.split(/\s+/).filter(Boolean);
-    setSpokenWordIndex(allWords.length ? 0 : -1);
+    setSpokenWordIndex(-1);
     setMode("speaking");
 
     // Pipeline TTS: synthesize sentence-by-sentence, start playing the first as
@@ -380,11 +380,15 @@ export function MobileOrbOverlay() {
       ensure(i + 1); // keep the pipeline full while this clip plays
       if (blob && !signal?.aborted) {
         await playSentence(blob, sentenceWords[i], wordOffset, signal);
+      } else if (sentenceWords[i].length > 0 && !signal?.aborted) {
+        setSpokenWordIndex(wordOffset + sentenceWords[i].length - 1);
       }
       wordOffset += sentenceWords[i].length;
     }
     audioRef.current = null;
-    setSpokenWordIndex(-1);
+    if (allWords.length > 0) {
+      setSpokenWordIndex(allWords.length - 1);
+    }
   }
 
   async function sendTextQuery(textOverride?: string) {
@@ -458,11 +462,12 @@ export function MobileOrbOverlay() {
   }, [open, mode, interrupt]);
 
   useEffect(() => {
-    if (mode !== "speaking") return;
-    const node = transcriptScrollRef.current;
-    if (!node) return;
-    node.scrollTop = node.scrollHeight;
-  }, [mode, spokenWordIndex, caption]);
+    if (mode !== "speaking" || spokenWordIndex < 0) return;
+    const container = transcriptScrollRef.current;
+    if (!container) return;
+    const active = container.querySelector(".jarvis-transcript-word.is-active");
+    active?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [mode, spokenWordIndex]);
 
   function onCoreAction() {
     if (!enabled && mode === "idle") return;
@@ -478,8 +483,106 @@ export function MobileOrbOverlay() {
   }
 
   const showTranscript = mode !== "idle" || Boolean(heardText);
+  const isConversation = mode !== "idle";
   const responseLabel =
     mode === "speaking" ? "Briefly is saying" : mode === "thinking" ? "Working on it" : "Briefly says";
+
+  const transcriptSection = showTranscript ? (
+    <section
+      className={`jarvis-transcript${mode === "speaking" ? " is-speaking" : ""}`}
+      aria-label="Assistant response"
+    >
+      <div className="jarvis-transcript-head">
+        <p className="jarvis-transcript-label">{responseLabel}</p>
+        <div className="jarvis-transcript-head-aside">
+          {mode === "speaking" ? (
+            <>
+              <div className="jarvis-waveform jarvis-waveform--inline" aria-hidden>
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+              <span className="jarvis-transcript-live">
+                <span className="jarvis-transcript-live-dot" aria-hidden />
+                Live
+              </span>
+            </>
+          ) : null}
+        </div>
+      </div>
+      <div className="jarvis-transcript-scroll" ref={transcriptScrollRef}>
+        <p
+          className={`jarvis-transcript-text${mode === "speaking" ? " is-karaoke" : ""}`}
+          aria-live="polite"
+        >
+          {mode === "speaking" && captionWords.length
+            ? captionWords.map((word, i) => (
+                <span
+                  key={`${word}-${i}`}
+                  className={[
+                    "jarvis-transcript-word",
+                    i < spokenWordIndex ? "is-spoken" : "",
+                    i === spokenWordIndex ? "is-active" : "",
+                    i > spokenWordIndex ? "is-pending" : "",
+                    isEmphasisWord(word) ? "is-emphasis" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {word}{" "}
+                </span>
+              ))
+            : caption}
+        </p>
+      </div>
+      {toolMode ? <p className="jarvis-transcript-tools">{toolMode}</p> : null}
+    </section>
+  ) : null;
+
+  const orbStage = (
+    <div className={`jarvis-orb-stage mode-${mode}${isConversation ? " is-compact" : ""}`}>
+      {!isConversation ? (
+        <>
+          <span className="jarvis-orb-ring jarvis-orb-ring-1" aria-hidden />
+          <span className="jarvis-orb-ring jarvis-orb-ring-2" aria-hidden />
+        </>
+      ) : null}
+      <button
+        type="button"
+        className={`jarvis-core mode-${mode}`}
+        onClick={onCoreAction}
+        disabled={mode === "thinking" || (!enabled && mode === "idle")}
+        aria-label={orbHint}
+      >
+        <JarvisOrbCanvas mode={mode} size="stage" className="jarvis-core-canvas" />
+        <span className="jarvis-core-icon" aria-hidden>
+          {mode === "listening" ? (
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M6 10v4M10 8v8M14 6v12M18 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          ) : mode === "thinking" ? (
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 4" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          )}
+        </span>
+      </button>
+      <p className={`jarvis-action-chip mode-${mode}`}>
+        {enabled ? ACTION_CHIP[mode] : "Enable mic to speak"}
+      </p>
+    </div>
+  );
 
   const overlay = open && mounted ? (
     <div className="jarvis-overlay" role="dialog" aria-modal aria-label="Briefly assistant">
@@ -581,113 +684,34 @@ export function MobileOrbOverlay() {
           </div>
 
           <div className={`jarvis-main mode-${mode}`}>
-            <div className={`jarvis-orb-stage mode-${mode}`}>
-              <span className="jarvis-orb-ring jarvis-orb-ring-1" aria-hidden />
-              <span className="jarvis-orb-ring jarvis-orb-ring-2" aria-hidden />
-              <button
-                type="button"
-                className={`jarvis-core mode-${mode}`}
-                onClick={onCoreAction}
-                disabled={mode === "thinking" || (!enabled && mode === "idle")}
-                aria-label={orbHint}
-              >
-                <JarvisOrbCanvas mode={mode} size="stage" className="jarvis-core-canvas" />
-                <span className="jarvis-core-icon" aria-hidden>
-                  {mode === "listening" ? (
-                    <svg viewBox="0 0 24 24" fill="none">
-                      <path d="M6 10v4M10 8v8M14 6v12M18 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                  ) : mode === "thinking" ? (
-                    <svg viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 4" />
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                      />
-                      <path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  )}
-                </span>
-              </button>
-              <p className={`jarvis-action-chip mode-${mode}`}>
-                {enabled ? ACTION_CHIP[mode] : "Enable mic to speak"}
-              </p>
-            </div>
-
-            {mode === "idle" && enabled && !composeOpen ? (
-              <div className="jarvis-prompts" aria-label="Try asking">
-                <p className="jarvis-prompts-label">Try asking</p>
-                <div className="jarvis-prompts-list">
-                  {QUICK_PROMPTS.map((prompt) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      className="jarvis-prompt-chip"
-                      onClick={() => void sendTextQuery(prompt)}
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {showTranscript ? (
-              <section
-                className={`jarvis-transcript${mode === "speaking" ? " is-speaking" : ""}`}
-                aria-label="Assistant response"
-              >
-                <div className="jarvis-transcript-head">
-                  <p className="jarvis-transcript-label">{responseLabel}</p>
-                  {mode === "speaking" ? (
-                    <span className="jarvis-transcript-live">
-                      <span className="jarvis-transcript-live-dot" aria-hidden />
-                      Live
-                    </span>
-                  ) : null}
-                </div>
-                <div className="jarvis-transcript-scroll" ref={transcriptScrollRef}>
-                  <p
-                    className={`jarvis-transcript-text${mode === "speaking" ? " is-karaoke" : ""}`}
-                    aria-live="polite"
-                  >
-                    {mode === "speaking" && captionWords.length
-                      ? captionWords.map((word, i) => (
-                          <span
-                            key={`${word}-${i}`}
-                            className={[
-                              "jarvis-transcript-word",
-                              i <= spokenWordIndex ? "is-spoken" : "",
-                              i === spokenWordIndex ? "is-active" : "",
-                              isEmphasisWord(word) ? "is-emphasis" : "",
-                            ]
-                              .filter(Boolean)
-                              .join(" ")}
-                          >
-                            {word}{" "}
-                          </span>
-                        ))
-                      : caption}
-                  </p>
-                </div>
-                {mode === "speaking" ? (
-                  <div className="jarvis-waveform" aria-hidden>
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                    <span />
-                    <span />
+            {isConversation ? (
+              <>
+                {transcriptSection}
+                {orbStage}
+              </>
+            ) : (
+              <>
+                {orbStage}
+                {mode === "idle" && enabled && !composeOpen ? (
+                  <div className="jarvis-prompts" aria-label="Try asking">
+                    <p className="jarvis-prompts-label">Try asking</p>
+                    <div className="jarvis-prompts-list">
+                      {QUICK_PROMPTS.map((prompt) => (
+                        <button
+                          key={prompt}
+                          type="button"
+                          className="jarvis-prompt-chip"
+                          onClick={() => void sendTextQuery(prompt)}
+                        >
+                          {prompt}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
-                {toolMode ? <p className="jarvis-transcript-tools">{toolMode}</p> : null}
-              </section>
-            ) : null}
+                {transcriptSection}
+              </>
+            )}
           </div>
         </div>
 

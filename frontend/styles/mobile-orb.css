@@ -212,7 +212,25 @@
 .jarvis-main.mode-listening,
 .jarvis-main.mode-thinking,
 .jarvis-main.mode-speaking {
-  gap: 0.65rem;
+  display: grid;
+  grid-template-rows: minmax(14rem, 1fr) auto;
+  gap: 0.55rem;
+  overflow: hidden;
+}
+
+.jarvis-main.mode-listening .jarvis-transcript,
+.jarvis-main.mode-thinking .jarvis-transcript,
+.jarvis-main.mode-speaking .jarvis-transcript {
+  min-height: 14rem;
+}
+
+.jarvis-shell.mode-speaking .jarvis-user-turn-text,
+.jarvis-shell.mode-listening .jarvis-user-turn-text,
+.jarvis-shell.mode-thinking .jarvis-user-turn-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* Proactive inbox */
@@ -401,6 +419,21 @@
   place-items: center;
   width: 100%;
   padding: 0.35rem 0 0.15rem;
+  overflow: hidden;
+}
+
+.jarvis-orb-stage.is-compact {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 0.15rem 0 0.25rem;
+  min-height: 0;
+}
+
+.jarvis-orb-stage.is-compact::before {
+  display: none;
 }
 
 .jarvis-orb-stage::before {
@@ -450,9 +483,21 @@
     orb-ring-spin 48s linear infinite;
 }
 
-.jarvis-main.mode-listening .jarvis-core,
-.jarvis-main.mode-thinking .jarvis-core,
-.jarvis-main.mode-speaking .jarvis-core {
+.jarvis-orb-stage.is-compact .jarvis-core {
+  width: 3.35rem;
+  height: 3.35rem;
+  flex-shrink: 0;
+}
+
+.jarvis-orb-stage.is-compact .jarvis-action-chip {
+  margin: 0;
+  max-width: 11rem;
+  text-align: center;
+}
+
+.jarvis-main.mode-listening .jarvis-orb-stage:not(.is-compact) .jarvis-core,
+.jarvis-main.mode-thinking .jarvis-orb-stage:not(.is-compact) .jarvis-core,
+.jarvis-main.mode-speaking .jarvis-orb-stage:not(.is-compact) .jarvis-core {
   width: min(4.75rem, 22vw);
   height: min(4.75rem, 22vw);
 }
@@ -647,6 +692,13 @@
   background: var(--app-surface-muted, oklch(98% 0.006 278));
 }
 
+.jarvis-transcript-head-aside {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
 .jarvis-transcript-label {
   margin: 0;
   font-size: 0.6875rem;
@@ -680,10 +732,10 @@
 
 .jarvis-transcript-scroll {
   flex: 1;
-  min-height: 0;
+  min-height: 10rem;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0.95rem 0.95rem 0.75rem;
+  padding: 1rem 1rem 0.85rem;
   scrollbar-width: thin;
   scrollbar-color: var(--app-border-strong, oklch(22% 0.02 265 / 0.18)) transparent;
 }
@@ -710,59 +762,74 @@
   font-weight: 450;
 }
 
+.jarvis-transcript-text.is-karaoke {
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
 .jarvis-transcript-word {
-  color: var(--app-ink-secondary, oklch(44% 0.018 265));
-  transition: color 120ms ease, background 120ms ease;
+  display: inline;
+  border-radius: 0.22rem;
+  transition:
+    color 140ms ease,
+    background 140ms ease,
+    opacity 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.jarvis-transcript-word.is-pending {
+  color: var(--app-muted, oklch(54% 0.014 265));
+  opacity: 0.55;
 }
 
 .jarvis-transcript-word.is-spoken {
   color: var(--app-ink, oklch(22% 0.022 265));
+  opacity: 1;
+  font-weight: 500;
 }
 
 .jarvis-transcript-word.is-active {
-  color: var(--app-ink, oklch(22% 0.022 265));
-  font-weight: 600;
-  background: var(--app-linear-soft, oklch(48% 0.12 278 / 0.12));
-  border-radius: 0.2rem;
+  color: var(--app-linear, oklch(48% 0.12 278));
+  opacity: 1;
+  font-weight: 700;
+  background: var(--app-linear-soft, oklch(48% 0.12 278 / 0.16));
+  box-shadow: 0 0 0 1px var(--app-linear-ring, oklch(48% 0.12 278 / 0.28));
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
-  padding: 0 0.08em;
+  padding: 0.06em 0.14em;
 }
 
 .jarvis-transcript-word.is-emphasis.is-active {
-  color: var(--app-linear, oklch(48% 0.12 278));
+  color: var(--app-linear, oklch(42% 0.14 278));
 }
 
-.jarvis-waveform {
-  flex-shrink: 0;
-  height: 1.5rem;
-  display: flex;
+.jarvis-waveform--inline {
+  display: inline-flex;
   align-items: end;
-  justify-content: center;
-  gap: 0.2rem;
-  padding: 0 0.85rem 0.65rem;
-  border-top: 1px solid var(--app-border, oklch(22% 0.02 265 / 0.06));
-  background: var(--app-surface-muted, oklch(98% 0.006 278));
+  gap: 0.16rem;
+  height: 0.85rem;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
 }
 
-.jarvis-waveform span {
-  width: 0.14rem;
-  height: 0.28rem;
+.jarvis-waveform--inline span {
+  width: 0.12rem;
+  height: 0.24rem;
   border-radius: 999px;
   background: var(--app-linear, oklch(48% 0.12 278));
   transform-origin: center bottom;
   animation: orb-wave-bar 1s ease-in-out infinite;
 }
 
-.jarvis-waveform span:nth-child(2n) { animation-duration: 0.85s; }
-.jarvis-waveform span:nth-child(3n) { animation-duration: 1.15s; }
-.jarvis-waveform span:nth-child(1) { animation-delay: 0ms; }
-.jarvis-waveform span:nth-child(2) { animation-delay: 80ms; }
-.jarvis-waveform span:nth-child(3) { animation-delay: 160ms; }
-.jarvis-waveform span:nth-child(4) { animation-delay: 40ms; }
-.jarvis-waveform span:nth-child(5) { animation-delay: 120ms; }
-.jarvis-waveform span:nth-child(6) { animation-delay: 200ms; }
-.jarvis-waveform span:nth-child(7) { animation-delay: 60ms; }
+.jarvis-waveform--inline span:nth-child(2n) { animation-duration: 0.85s; }
+.jarvis-waveform--inline span:nth-child(3n) { animation-duration: 1.15s; }
+.jarvis-waveform--inline span:nth-child(1) { animation-delay: 0ms; }
+.jarvis-waveform--inline span:nth-child(2) { animation-delay: 80ms; }
+.jarvis-waveform--inline span:nth-child(3) { animation-delay: 160ms; }
+.jarvis-waveform--inline span:nth-child(4) { animation-delay: 40ms; }
+.jarvis-waveform--inline span:nth-child(5) { animation-delay: 120ms; }
 
 .jarvis-transcript-tools {
   flex-shrink: 0;
@@ -946,7 +1013,7 @@
   .jarvis-status-dot.mode-thinking,
   .jarvis-status-dot.mode-speaking,
   .jarvis-transcript-live-dot,
-  .jarvis-waveform span {
+  .jarvis-waveform--inline span {
     animation: none;
   }
 
@@ -976,7 +1043,13 @@
     flex-direction: column;
   }
 
-  .jarvis-transcript {
-    min-height: 9rem;
+  .jarvis-transcript-scroll {
+    min-height: 12rem;
+  }
+
+  .jarvis-main.mode-listening,
+  .jarvis-main.mode-thinking,
+  .jarvis-main.mode-speaking {
+    grid-template-rows: minmax(12rem, 1fr) auto;
   }
 }

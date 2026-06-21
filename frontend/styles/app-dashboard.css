@@ -10874,10 +10874,18 @@ a.saved-capture-title:hover {
   background: var(--app-surface);
 }
 
-.app-shell[data-theme="dark"] .jarvis-transcript-head,
-.app-shell[data-theme="dark"] .jarvis-waveform,
-.app-shell[data-theme="dark"] .jarvis-user-turn {
-  background: var(--app-surface-muted);
+.app-shell[data-theme="dark"] .jarvis-transcript-word.is-active {
+  color: var(--app-accent);
+  background: var(--app-accent-soft);
+  box-shadow: 0 0 0 1px oklch(72% 0.16 278 / 0.35);
+}
+
+.app-shell[data-theme="dark"] .jarvis-transcript-word.is-spoken {
+  color: var(--app-ink);
+}
+
+.app-shell[data-theme="dark"] .jarvis-transcript-word.is-pending {
+  color: var(--app-muted);
 }
 
 .app-shell[data-theme="dark"] .jarvis-backdrop {
