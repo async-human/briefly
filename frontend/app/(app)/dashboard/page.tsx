@@ -23,6 +23,10 @@ import { PageContentTransition } from "@/components/loading/PageContentTransitio
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { DashboardInsightsDrawer } from "@/components/dashboard/DashboardInsightsDrawer";
 import { ProactiveAlertsBanner } from "@/components/dashboard/ProactiveAlertsBanner";
+import {
+  CalendarConnectNudge,
+  CalendarMeetingsPanel,
+} from "@/components/dashboard/CalendarMeetingsPanel";
 import { BriefingMode } from "@/components/dashboard/BriefingMode";
 import { EmailDraftCard } from "@/components/dashboard/EmailDraftCard";
 import { unlockAudioPlayback, stopAllBrieflyAudio } from "@/lib/audioPlayback";
@@ -74,7 +78,8 @@ function DashboardContent() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const gmail = params.get("gmail");
-    if (!gmail) return;
+    const calendar = params.get("calendar");
+    if (!gmail && !calendar) return;
 
     window.history.replaceState({}, "", "/dashboard");
 
@@ -94,6 +99,16 @@ function DashboardContent() {
       setConnectBanner("Google blocked Gmail access. Add your email as a test user in Google Cloud Console, then try again.");
     } else if (gmail === "error") {
       setConnectBanner("Gmail connection was cancelled or failed. Please try again.");
+    }
+
+    if (calendar === "connected") {
+      setConnectBanner("Google Calendar connected — loading your upcoming meetings…");
+      void api.getMe().then(setMe);
+      void api.triggerProactive().catch(() => undefined);
+    } else if (calendar === "denied") {
+      setConnectBanner("Google Calendar access was denied. Try again and approve calendar permissions.");
+    } else if (calendar === "error") {
+      setConnectBanner("Calendar connection failed. Please try again from Settings.");
     }
   }, []);
 
@@ -301,6 +316,12 @@ function DashboardContent() {
       />
 
       <ProactiveAlertsBanner />
+
+      {!me.calendar_connected ? (
+        <CalendarConnectNudge />
+      ) : (
+        <CalendarMeetingsPanel calendarConnected={me.calendar_connected} />
+      )}
 
       <div className="dash-primary-zone">
         <div className="dash-primary-head">

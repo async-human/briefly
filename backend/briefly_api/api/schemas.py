@@ -233,6 +233,20 @@ class ProactiveEventOut(BaseModel):
     created_at: str | None = None
 
 
+class CalendarMeetingOut(BaseModel):
+    title: str
+    time: str
+    day_label: str | None = None
+    attendees: list[str] = Field(default_factory=list)
+
+
+class CalendarUpcomingOut(BaseModel):
+    connected: bool
+    meetings: list[CalendarMeetingOut] = Field(default_factory=list)
+    meeting_count: int = 0
+    summary_text: str | None = None
+
+
 class DigestOut(BaseModel):
     id: str
     digest_date: str

@@ -1163,6 +1163,13 @@ export const api = {
 
   getProactiveEvents: () =>
     request<ProactiveEvent[]>("/api/v1/proactive-events"),
+  getCalendarUpcoming: () =>
+    request<{
+      connected: boolean;
+      meetings: { title: string; time: string; day_label?: string | null; attendees: string[] }[];
+      meeting_count: number;
+      summary_text: string | null;
+    }>("/api/v1/calendar/upcoming"),
 
   // Reading session completion — records a "opened" signal with elapsed time
   completeReading: (digestId: string, readTimeSec: number) =>

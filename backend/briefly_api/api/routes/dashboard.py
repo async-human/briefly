@@ -19,6 +19,8 @@ from briefly_api.api.deps.rate_limit import rate_limit_digest_generate_dep
 from briefly_api.api.schemas import (
     BulkSourceCreate,
     BulkSourceOut,
+    CalendarMeetingOut,
+    CalendarUpcomingOut,
     DigestOut,
     DigestSummaryOut,
     FeedbackIn,
@@ -1258,6 +1260,35 @@ async def list_proactive_events(
 
     events = await get_for_api(db, user.id)
     return [ProactiveEventOut(**e) for e in events]
+
+
+@router.get("/calendar/upcoming", response_model=CalendarUpcomingOut)
+async def calendar_upcoming(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> CalendarUpcomingOut:
+    """Upcoming meetings (today + tomorrow) when Google Calendar is connected."""
+    from briefly_api.services.calendar_briefing import load_upcoming_meetings
+
+    briefing = await load_upcoming_meetings(db, user.id)
+    if not briefing:
+        return CalendarUpcomingOut(connected=False, meetings=[], meeting_count=0)
+
+    meetings = [
+        CalendarMeetingOut(
+            title=m["title"],
+            time=m["time"],
+            day_label=m.get("day_label"),
+            attendees=list(m.get("attendees") or []),
+        )
+        for m in briefing.get("meetings") or []
+    ]
+    return CalendarUpcomingOut(
+        connected=True,
+        meetings=meetings,
+        meeting_count=briefing.get("meeting_count") or len(meetings),
+        summary_text=briefing.get("summary_text"),
+    )
 
 
 # ── Week in focus (live fingerprint snapshot) ─────────────────────────────────

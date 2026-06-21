@@ -8061,6 +8061,142 @@ a.saved-capture-title:hover {
   line-height: 1.5;
 }
 
+.app-shell .calendar-nudge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 1rem 1.05rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius);
+  background: linear-gradient(165deg, var(--app-surface), var(--app-surface-muted));
+}
+
+.app-shell .calendar-nudge-label {
+  margin: 0 0 0.2rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--app-linear);
+}
+
+.app-shell .calendar-nudge-title {
+  margin: 0;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.app-shell .calendar-nudge-body {
+  margin: 0.35rem 0 0;
+  max-width: 36rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--app-ink-secondary);
+}
+
+.app-shell .calendar-nudge-btn {
+  flex-shrink: 0;
+  min-height: 2.375rem;
+  padding: 0 1rem;
+  border: none;
+  border-radius: var(--app-radius-sm);
+  background: var(--app-linear);
+  color: oklch(99% 0.01 85);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.app-shell .calendar-nudge-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.app-shell .calendar-meetings-panel {
+  padding: 0.95rem 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--app-border-strong);
+  border-left: 3px solid var(--app-linear);
+  border-radius: var(--app-radius);
+  background: var(--app-surface);
+}
+
+.app-shell .calendar-meetings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.app-shell .calendar-meetings-label {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+.app-shell .calendar-meetings-link {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--app-linear);
+  text-decoration: none;
+}
+
+.app-shell .calendar-meetings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.app-shell .calendar-meetings-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.app-shell .calendar-meetings-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.app-shell .calendar-meetings-time {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--app-linear);
+}
+
+.app-shell .calendar-meetings-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.app-shell .calendar-meetings-attendees {
+  font-size: 0.75rem;
+  color: var(--app-muted);
+}
+
+.app-shell .calendar-meetings-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--app-muted);
+}
+
 .app-shell .weekly-report-toggle {
   display: flex;
   justify-content: space-between;

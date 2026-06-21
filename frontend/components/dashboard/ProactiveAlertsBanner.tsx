@@ -3,6 +3,20 @@
 import { useEffect, useState } from "react";
 import { api, type ProactiveEvent } from "@/lib/api";
 
+const EVENT_LABEL: Record<string, string> = {
+  meeting_prep: "Meeting prep",
+  breaking_development: "Breaking",
+  thread_update: "Thread update",
+  relevant_content: "Worth a look",
+  voice_note_connection: "Voice note",
+  watched_entity: "Watchlist",
+  coverage_gap_alert: "Coverage gap",
+};
+
+function labelFor(event: ProactiveEvent): string {
+  return EVENT_LABEL[event.event_type] ?? "Update";
+}
+
 export function ProactiveAlertsBanner() {
   const [events, setEvents] = useState<ProactiveEvent[]>([]);
 
@@ -17,7 +31,7 @@ export function ProactiveAlertsBanner() {
     <div className="proactive-alert-banner" role="status">
       <span className="proactive-alert-dot" aria-hidden />
       <div>
-        <p className="proactive-alert-label">Breaking in your threads</p>
+        <p className="proactive-alert-label">{labelFor(top)}</p>
         <p className="proactive-alert-title">{top.title}</p>
         <p className="proactive-alert-body">{top.body}</p>
       </div>

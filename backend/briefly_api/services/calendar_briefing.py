@@ -38,26 +38,38 @@ def _format_time(iso: str, tz: ZoneInfo) -> str:
         return ""
 
 
-async def fetch_todays_events(
+def _day_label(iso: str, tz: ZoneInfo, today: datetime.date) -> str | None:
+    try:
+        if "T" not in iso:
+            day = datetime.strptime(iso, "%Y-%m-%d").date()
+        else:
+            day = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(tz).date()
+        if day == today:
+            return None
+        if day == today + timedelta(days=1):
+            return "Tomorrow"
+        return day.strftime("%a")
+    except Exception:
+        return None
+
+
+async def fetch_events_between(
     access_token: str,
     timezone_str: str,
-    run_date: str,
+    range_start: datetime,
+    range_end: datetime,
 ) -> list[dict]:
     try:
         tz = ZoneInfo(timezone_str)
     except Exception:
         tz = ZoneInfo("UTC")
 
-    day = datetime.strptime(run_date, "%Y-%m-%d").date()
-    start = datetime.combine(day, datetime.min.time(), tzinfo=tz)
-    end = start + timedelta(days=1)
-
     params = {
-        "timeMin": start.isoformat(),
-        "timeMax": end.isoformat(),
+        "timeMin": range_start.isoformat(),
+        "timeMax": range_end.isoformat(),
         "singleEvents": "true",
         "orderBy": "startTime",
-        "maxResults": 12,
+        "maxResults": 20,
     }
     async with httpx.AsyncClient(timeout=20.0) as client:
         resp = await client.get(
@@ -71,6 +83,7 @@ async def fetch_todays_events(
         resp.raise_for_status()
         data = resp.json()
 
+    today = datetime.now(tz).date()
     events: list[dict] = []
     for ev in data.get("items") or []:
         if ev.get("status") == "cancelled":
@@ -84,17 +97,54 @@ async def fetch_todays_events(
             if not a.get("self") and (a.get("displayName") or a.get("email"))
         ]
         end_raw = (ev.get("end") or {}).get("dateTime") or (ev.get("end") or {}).get("date")
+        day_label = _day_label(start_raw, tz, today)
+        time_label = _format_time(start_raw, tz) if "T" in start_raw else "All day"
         events.append(
             {
                 "title": (ev.get("summary") or "Untitled meeting").strip(),
                 "start": start_raw,
                 "end": end_raw,
-                "start_label": _format_time(start_raw, tz) if "T" in start_raw else "All day",
+                "start_label": time_label,
+                "day_label": day_label,
                 "attendees": attendees[:6],
                 "description": (ev.get("description") or "")[:300],
             }
         )
     return events
+
+
+async def fetch_todays_events(
+    access_token: str,
+    timezone_str: str,
+    run_date: str,
+) -> list[dict]:
+    try:
+        tz = ZoneInfo(timezone_str)
+    except Exception:
+        tz = ZoneInfo("UTC")
+
+    day = datetime.strptime(run_date, "%Y-%m-%d").date()
+    start = datetime.combine(day, datetime.min.time(), tzinfo=tz)
+    end = start + timedelta(days=1)
+    return await fetch_events_between(access_token, timezone_str, start, end)
+
+
+async def fetch_upcoming_events(
+    access_token: str,
+    timezone_str: str,
+    *,
+    days: int = 2,
+) -> list[dict]:
+    """Events from start of today through end of `days` calendar days (default: today + tomorrow)."""
+    try:
+        tz = ZoneInfo(timezone_str)
+    except Exception:
+        tz = ZoneInfo("UTC")
+
+    start = datetime.now(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    last_day = start.date() + timedelta(days=max(days, 1) - 1)
+    end = datetime.combine(last_day, datetime.max.time().replace(microsecond=0), tzinfo=tz)
+    return await fetch_events_between(access_token, timezone_str, start, end)
 
 
 def _match_items(
@@ -168,6 +218,7 @@ def build_meeting_briefing(
             {
                 "title": ev["title"],
                 "time": ev["start_label"],
+                "day_label": ev.get("day_label"),
                 "attendees": ev.get("attendees") or [],
                 "relevant_stories": relevant,
                 "active_threads": threads,
@@ -180,6 +231,7 @@ def build_meeting_briefing(
             {
                 "title": ev["title"],
                 "time": ev["start_label"],
+                "day_label": ev.get("day_label"),
                 "attendees": ev.get("attendees") or [],
                 "relevant_stories": [],
                 "active_threads": [],
@@ -189,7 +241,10 @@ def build_meeting_briefing(
 
     summary_lines = []
     for m in meetings[:4]:
-        line = f"- {m['time']}: {m['title']}"
+        when = m["time"]
+        if m.get("day_label"):
+            when = f"{m['day_label']} {when}"
+        line = f"- {when}: {m['title']}"
         if m["attendees"]:
             line += f" (with {', '.join(m['attendees'][:3])})"
         if m["relevant_stories"]:
@@ -213,6 +268,8 @@ async def load_calendar_briefing(
     enriched_items: list,
     selected_item_ids: list[str],
     story_threads: list[dict],
+    *,
+    upcoming_days: int = 1,
 ) -> dict | None:
     connection = await get_calendar_connection(session, user_id)
     if not connection:
@@ -221,12 +278,43 @@ async def load_calendar_briefing(
     settings = get_settings()
     try:
         access_token = await refresh_calendar_access_token(connection, settings)
-        events = await fetch_todays_events(access_token, timezone_str, run_date)
+        if upcoming_days > 1:
+            events = await fetch_upcoming_events(
+                access_token, timezone_str, days=upcoming_days,
+            )
+        else:
+            events = await fetch_todays_events(access_token, timezone_str, run_date)
     except Exception:
         log.debug("Calendar briefing load failed for user %s", user_id, exc_info=True)
         return None
 
     return build_meeting_briefing(events, enriched_items, selected_item_ids, story_threads)
+
+
+async def load_upcoming_meetings(session, user_id: str) -> dict | None:
+    """Lightweight upcoming-meetings fetch for the dashboard (today + tomorrow)."""
+    connection = await get_calendar_connection(session, user_id)
+    if not connection:
+        return None
+
+    profile = (
+        await session.execute(select(UserProfile).where(UserProfile.user_id == user_id))
+    ).scalar_one_or_none()
+    tz = (getattr(profile, "digest_timezone", None) or "UTC") if profile else "UTC"
+
+    settings = get_settings()
+    try:
+        access_token = await refresh_calendar_access_token(connection, settings)
+        events = await fetch_upcoming_events(access_token, tz, days=2)
+    except Exception:
+        log.debug("load_upcoming_meetings failed for user %s", user_id, exc_info=True)
+        return None
+
+    if not events:
+        return {"meetings": [], "meeting_count": 0, "summary_text": None}
+
+    briefing = build_meeting_briefing(events, [], [], [])
+    return briefing
 
 
 async def queue_meeting_prep_event(session, user_id: str) -> bool:
@@ -262,7 +350,9 @@ async def queue_meeting_prep_event(session, user_id: str) -> bool:
     ).scalars().all()
     story_threads = [{"topic": t.key} for t in thread_rows]
 
-    briefing = await load_calendar_briefing(session, user_id, tz, run_date, [], [], story_threads)
+    briefing = await load_calendar_briefing(
+        session, user_id, tz, run_date, [], [], story_threads, upcoming_days=2,
+    )
     if not briefing or not briefing.get("meetings"):
         return False
 
@@ -281,7 +371,7 @@ async def queue_meeting_prep_event(session, user_id: str) -> bool:
         return False
 
     count = briefing.get("meeting_count") or len(briefing["meetings"])
-    title = f"{count} meeting{'s' if count != 1 else ''} on your calendar today"
+    title = f"{count} upcoming meeting{'s' if count != 1 else ''} on your calendar"
     body = briefing.get("summary_text") or "You have meetings today — here's the rundown."
 
     session.add(

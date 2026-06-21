@@ -288,6 +288,12 @@ async def gmail_callback(
     if flow == "calendar":
         tokens = await exchange_calendar_code(code, settings)
         await upsert_calendar_connection(db, user, tokens, user.email, settings=settings)
+        try:
+            from briefly_api.services.calendar_briefing import queue_meeting_prep_event
+
+            await queue_meeting_prep_event(db, user.id)
+        except Exception:
+            log.exception("Failed to queue meeting prep after calendar connect for user %s", user.id)
         await db.commit()
         return RedirectResponse(f"{base}{redirect_path}?calendar=connected")
 
