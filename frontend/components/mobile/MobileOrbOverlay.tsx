@@ -621,6 +621,7 @@ export function MobileOrbOverlay() {
             </div>
           ) : null}
 
+          {(mode !== "idle" || heardText) ? (
           <div className={`jarvis-response-shell${mode === "speaking" ? " is-speaking" : ""}`}>
             <p className="jarvis-response-label">
               {mode === "speaking" ? "Briefly is saying" : mode === "thinking" ? "Working on it" : "Briefly says"}
@@ -664,6 +665,7 @@ export function MobileOrbOverlay() {
               </div>
             ) : null}
           </div>
+          ) : null}
           {toolMode ? <p className="jarvis-tools">{toolMode}</p> : null}
         </div>
 

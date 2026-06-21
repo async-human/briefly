@@ -198,8 +198,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.85rem;
-  padding: 0.85rem 1.35rem 1.15rem;
+  gap: 0.7rem;
+  padding: 0.75rem 1.35rem 1.1rem;
   text-align: center;
   min-height: 0;
   overflow-y: auto;
@@ -389,32 +389,26 @@
   display: grid;
   place-items: center;
   width: 100%;
-  padding: 1.6rem 0 1.1rem;
+  padding: 0.9rem 0 0.4rem;
 }
 
+/* No box — a soft aura that radiates from the orb and dissolves into the card. */
 .jarvis-orb-stage {
-  border-radius: calc(var(--app-radius, 14px) + 6px);
-  border: 1px solid oklch(48% 0.16 285 / 0.4);
-  /* Deep "spotlight" field — the orb glows against a night-violet screen. */
-  background:
-    radial-gradient(ellipse 66% 56% at 50% 40%, oklch(52% 0.18 288 / 0.55), transparent 70%),
-    radial-gradient(ellipse 120% 80% at 50% 116%, oklch(48% 0.18 320 / 0.22), transparent 62%),
-    linear-gradient(170deg, oklch(34% 0.13 280) 0%, oklch(26% 0.1 280) 52%, oklch(20% 0.08 278) 100%);
-  box-shadow:
-    0 1px 0 oklch(100% 0 0 / 0.1) inset,
-    0 22px 60px oklch(20% 0.08 278 / 0.45) inset,
-    0 14px 40px oklch(48% 0.16 285 / 0.18);
+  border: none;
+  border-radius: 0;
+  background: radial-gradient(ellipse 56% 50% at 50% 46%, oklch(62% 0.14 286 / 0.12), transparent 72%);
+  box-shadow: none;
 }
 
 /* Luminous halo breathing directly behind the core — gives the orb presence. */
 .jarvis-orb-stage::before {
   content: "";
   position: absolute;
-  width: min(15rem, 64vw);
-  height: min(15rem, 64vw);
+  width: min(13rem, 58vw);
+  height: min(13rem, 58vw);
   border-radius: 50%;
-  background: radial-gradient(circle, oklch(66% 0.2 290 / 0.6), oklch(62% 0.18 288 / 0.16) 44%, transparent 70%);
-  filter: blur(5px);
+  background: radial-gradient(circle, oklch(64% 0.16 288 / 0.22), oklch(64% 0.16 288 / 0.05) 46%, transparent 70%);
+  filter: blur(6px);
   pointer-events: none;
   animation: orb-halo-breathe 4.5s ease-in-out infinite;
 }
@@ -431,25 +425,25 @@
 .jarvis-orb-ring {
   position: absolute;
   border-radius: 50%;
-  border: 1px solid oklch(100% 0 0 / 0.22);
+  border: 1px solid oklch(48% 0.13 285 / 0.16);
   pointer-events: none;
 }
 
 .jarvis-orb-ring-1 {
-  width: min(13.5rem, 58vw);
-  height: min(13.5rem, 58vw);
-  box-shadow: 0 0 24px oklch(70% 0.16 290 / 0.25);
+  width: min(10.5rem, 48vw);
+  height: min(10.5rem, 48vw);
+  box-shadow: 0 0 34px oklch(60% 0.14 286 / 0.12);
   animation: orb-ring-breathe 3.2s ease-in-out infinite;
 }
 
 .jarvis-orb-ring-2 {
-  width: min(15.5rem, 66vw);
-  height: min(15.5rem, 66vw);
+  width: min(12.5rem, 56vw);
+  height: min(12.5rem, 56vw);
   border-style: dashed;
-  border-color: oklch(100% 0 0 / 0.16);
+  border-color: oklch(48% 0.13 285 / 0.1);
   animation:
     orb-ring-breathe 3.2s ease-in-out infinite reverse,
-    orb-ring-spin 40s linear infinite;
+    orb-ring-spin 48s linear infinite;
 }
 
 .jarvis-orb-stage.mode-listening .jarvis-orb-ring-1 {
@@ -466,8 +460,8 @@
 .jarvis-core {
   position: relative;
   z-index: 1;
-  width: min(11.5rem, 48vw);
-  height: min(11.5rem, 48vw);
+  width: min(8.5rem, 40vw);
+  height: min(8.5rem, 40vw);
   padding: 0;
   border: none;
   border-radius: 50%;
@@ -509,19 +503,17 @@
 .jarvis-action-chip {
   position: relative;
   z-index: 1;
-  margin: 0.7rem 0 0;
-  padding: 0.5rem 1.15rem;
+  margin: 0.75rem 0 0;
+  padding: 0.42rem 1.05rem;
   border-radius: 100px;
-  border: 1px solid oklch(100% 0 0 / 0.7);
-  background: oklch(99% 0.004 85 / 0.96);
+  border: 1px solid oklch(48% 0.12 278 / 0.14);
+  background: oklch(100% 0.002 85 / 0.66);
   font-size: 0.8125rem;
   font-weight: 600;
-  color: oklch(30% 0.1 280);
-  box-shadow:
-    0 8px 24px oklch(20% 0.08 278 / 0.4),
-    0 0 0 5px oklch(100% 0 0 / 0.08);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  color: var(--app-ink-secondary, oklch(44% 0.018 265));
+  box-shadow: 0 6px 20px oklch(48% 0.12 278 / 0.1);
+  backdrop-filter: blur(10px) saturate(1.1);
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
 }
 
 .jarvis-action-chip.mode-listening {
@@ -959,18 +951,18 @@
   }
 
   .jarvis-core {
-    width: min(11rem, 54vw);
-    height: min(11rem, 54vw);
+    width: min(8rem, 44vw);
+    height: min(8rem, 44vw);
   }
 
   .jarvis-orb-ring-1 {
-    width: min(12.5rem, 62vw);
-    height: min(12.5rem, 62vw);
+    width: min(10rem, 52vw);
+    height: min(10rem, 52vw);
   }
 
   .jarvis-orb-ring-2 {
-    width: min(14rem, 70vw);
-    height: min(14rem, 70vw);
+    width: min(12rem, 60vw);
+    height: min(12rem, 60vw);
   }
 
   .jarvis-footer-actions {
