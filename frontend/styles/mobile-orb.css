@@ -123,8 +123,9 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 90% 55% at 50% -5%, oklch(48% 0.12 278 / 0.14), transparent 58%),
-    radial-gradient(ellipse 70% 45% at 85% 100%, oklch(48% 0.12 278 / 0.06), transparent 50%);
+    radial-gradient(ellipse 95% 50% at 50% -8%, oklch(48% 0.12 278 / 0.2), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 12% 8%, oklch(62% 0.15 320 / 0.08), transparent 55%),
+    radial-gradient(ellipse 70% 45% at 88% 102%, oklch(48% 0.12 278 / 0.08), transparent 52%);
 }
 
 .jarvis-header {
@@ -388,28 +389,54 @@
   display: grid;
   place-items: center;
   width: 100%;
-  padding: 1.1rem 0 0.35rem;
+  padding: 1.6rem 0 1.1rem;
 }
 
 .jarvis-orb-stage {
-  border-radius: calc(var(--app-radius, 14px) + 2px);
-  border: 1px solid var(--app-border, oklch(22% 0.02 265 / 0.06));
+  border-radius: calc(var(--app-radius, 14px) + 6px);
+  border: 1px solid oklch(48% 0.12 278 / 0.1);
   background:
-    radial-gradient(ellipse 80% 70% at 50% 35%, oklch(48% 0.12 278 / 0.1), transparent 62%),
+    radial-gradient(ellipse 62% 58% at 50% 42%, oklch(60% 0.14 285 / 0.16), transparent 64%),
+    radial-gradient(ellipse 120% 90% at 50% 120%, oklch(62% 0.15 320 / 0.06), transparent 60%),
     linear-gradient(180deg, var(--app-surface, oklch(100% 0.002 85)), var(--app-surface-muted, oklch(98.2% 0.006 278)));
-  box-shadow: 0 10px 28px oklch(48% 0.12 278 / 0.06) inset;
+  box-shadow:
+    0 1px 0 oklch(100% 0 0 / 0.6) inset,
+    0 18px 44px oklch(48% 0.12 278 / 0.1) inset;
+}
+
+/* Luminous halo breathing directly behind the core — gives the orb presence. */
+.jarvis-orb-stage::before {
+  content: "";
+  position: absolute;
+  width: min(15rem, 64vw);
+  height: min(15rem, 64vw);
+  border-radius: 50%;
+  background: radial-gradient(circle, oklch(56% 0.16 285 / 0.3), oklch(56% 0.16 285 / 0.06) 46%, transparent 70%);
+  filter: blur(4px);
+  pointer-events: none;
+  animation: orb-halo-breathe 4.5s ease-in-out infinite;
+}
+
+.jarvis-orb-stage.mode-listening::before {
+  background: radial-gradient(circle, oklch(58% 0.14 155 / 0.3), transparent 68%);
+  animation-duration: 2s;
+}
+
+.jarvis-orb-stage.mode-speaking::before {
+  animation-duration: 2.4s;
 }
 
 .jarvis-orb-ring {
   position: absolute;
   border-radius: 50%;
-  border: 1px solid oklch(48% 0.12 278 / 0.14);
+  border: 1px solid oklch(48% 0.12 278 / 0.22);
   pointer-events: none;
 }
 
 .jarvis-orb-ring-1 {
   width: min(13.5rem, 58vw);
   height: min(13.5rem, 58vw);
+  box-shadow: 0 0 0 1px oklch(48% 0.12 278 / 0.05);
   animation: orb-ring-breathe 3.2s ease-in-out infinite;
 }
 
@@ -417,8 +444,10 @@
   width: min(15.5rem, 66vw);
   height: min(15.5rem, 66vw);
   border-style: dashed;
-  border-color: oklch(48% 0.12 278 / 0.1);
-  animation: orb-ring-breathe 3.2s ease-in-out infinite reverse;
+  border-color: oklch(48% 0.12 278 / 0.16);
+  animation:
+    orb-ring-breathe 3.2s ease-in-out infinite reverse,
+    orb-ring-spin 40s linear infinite;
 }
 
 .jarvis-orb-stage.mode-listening .jarvis-orb-ring-1 {
@@ -478,15 +507,19 @@
 .jarvis-action-chip {
   position: relative;
   z-index: 1;
-  margin: 0.15rem 0 0;
-  padding: 0.45rem 1rem;
+  margin: 0.6rem 0 0;
+  padding: 0.5rem 1.1rem;
   border-radius: 100px;
-  border: 1px solid var(--app-border-strong, oklch(22% 0.02 265 / 0.11));
-  background: var(--app-canvas, oklch(99.2% 0.004 85));
+  border: 1px solid oklch(48% 0.12 278 / 0.18);
+  background: color-mix(in srgb, var(--app-canvas, oklch(99.2% 0.004 85)) 88%, oklch(60% 0.14 285 / 0.12));
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--app-ink, oklch(22% 0.022 265));
-  box-shadow: 0 6px 18px oklch(22% 0.02 265 / 0.06);
+  box-shadow:
+    0 6px 18px oklch(48% 0.12 278 / 0.12),
+    0 0 0 4px oklch(48% 0.12 278 / 0.04);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .jarvis-action-chip.mode-listening {
@@ -833,6 +866,23 @@
   }
 }
 
+@keyframes orb-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orb-halo-breathe {
+  0%, 100% {
+    transform: scale(0.94);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
 @keyframes orb-fab-breathe {
   0%, 100% { opacity: 0.35; }
   50% { opacity: 0.7; }
@@ -874,6 +924,7 @@
   .jarvis-fab-glow,
   .jarvis-orb-ring-1,
   .jarvis-orb-ring-2,
+  .jarvis-orb-stage::before,
   .jarvis-status-dot.mode-listening,
   .jarvis-status-dot.mode-thinking,
   .jarvis-status-dot.mode-speaking,

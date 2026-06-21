@@ -67,6 +67,14 @@ async def lifespan(_app: FastAPI):
     except Exception:
         logger.warning("Could not reschedule stuck failures — non-fatal", exc_info=True)
 
+    if settings.telegram_enabled and settings.api_public_url:
+        try:
+            from briefly_api.services.telegram import register_webhook
+
+            await register_webhook()
+        except Exception:
+            logger.warning("Could not register Telegram webhook — non-fatal", exc_info=True)
+
     background_tasks: list[asyncio.Task] = []
     smtp_controller = None
 

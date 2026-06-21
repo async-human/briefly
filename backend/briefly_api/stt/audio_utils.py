@@ -79,3 +79,46 @@ def convert_to_wav(audio_bytes: bytes, *, input_suffix: str = ".webm") -> bytes 
         except (subprocess.TimeoutExpired, OSError) as exc:
             log.warning("ffmpeg conversion error: %s", exc)
             return None
+
+
+def convert_to_ogg_opus(audio_bytes: bytes, *, input_suffix: str = ".mp3") -> bytes | None:
+    """
+    Convert arbitrary audio to OGG/Opus — the format Telegram `sendVoice` needs to
+    render a native voice-message bubble. Returns None if ffmpeg is unavailable or
+    conversion fails (caller falls back to a text reply).
+    """
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return None
+
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / f"input{input_suffix}"
+        dst = Path(tmp) / "output.ogg"
+        src.write_bytes(audio_bytes)
+        try:
+            proc = subprocess.run(
+                [
+                    ffmpeg,
+                    "-y",
+                    "-i", str(src),
+                    "-ac", "1",
+                    "-c:a", "libopus",
+                    "-b:a", "32k",
+                    "-f", "ogg",
+                    str(dst),
+                ],
+                capture_output=True,
+                timeout=120,
+                check=False,
+            )
+            if proc.returncode != 0 or not dst.exists():
+                log.warning(
+                    "ffmpeg ogg/opus conversion failed (code=%s): %s",
+                    proc.returncode,
+                    proc.stderr.decode("utf-8", errors="replace")[:500],
+                )
+                return None
+            return dst.read_bytes()
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            log.warning("ffmpeg ogg/opus conversion error: %s", exc)
+            return None

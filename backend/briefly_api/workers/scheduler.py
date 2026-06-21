@@ -419,6 +419,13 @@ async def _run_pipeline_for_user(user_id: str, local_date: str) -> None:
                     "Scheduler: digest sent for user %s (%d items)",
                     user_id, result.get("total_shown", 0),
                 )
+                # Mirror the morning brief to Telegram for linked users.
+                try:
+                    from briefly_api.services.telegram import send_brief_ready
+
+                    await send_brief_ready(user_id)
+                except Exception:
+                    log.exception("Scheduler: telegram brief notify failed for user %s", user_id)
             else:
                 error = result.get("error") or "Unknown error"
                 log.warning("Scheduler: briefing failed for user %s: %s", user_id, error)

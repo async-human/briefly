@@ -334,6 +334,15 @@ class Settings(BaseSettings):
     tts_api_key: str = ""                   # optional; self-hosted servers often need none
     tts_lang_code: str = "a"                # for provider=local Kokoro: 'a'=American English, 'b'=British
 
+    # ── Telegram channel — proactive delivery + voice/text Q&A ─────────────────
+    # The bot reuses the orb brain (run_orb_turn) for inbound and the proactive
+    # gate for outbound — it's a delivery adapter, not a second product.
+    telegram_enabled: bool = False
+    telegram_bot_token: str = ""            # @BotFather token
+    telegram_bot_username: str = ""         # bot handle, no '@' (for the t.me deep link)
+    telegram_webhook_secret: str = ""       # verifies X-Telegram-Bot-Api-Secret-Token
+    api_public_url: str = ""                # public backend base, e.g. https://api.briefly.app
+
     @field_validator("audio_voice_name", mode="before")
     @classmethod
     def normalize_audio_voice_name(cls, value: object) -> str:

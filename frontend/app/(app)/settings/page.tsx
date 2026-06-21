@@ -15,6 +15,7 @@ import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { getToken } from "@/lib/auth";
 import { CaptureDevicesCard } from "@/components/settings/CaptureDevicesCard";
 import { PushNotificationsCard } from "@/components/settings/PushNotificationsCard";
+import { TelegramConnectCard } from "@/components/settings/TelegramConnectCard";
 import { WatchedEntitiesCard } from "@/components/settings/WatchedEntitiesCard";
 import { ExtensionInstallCard } from "@/components/saved/ExtensionInstallCard";
 import { TopicsToTrackEditor } from "@/components/settings/TopicsToTrackEditor";
@@ -366,6 +367,20 @@ export default function SettingsPage() {
               </div>
               <div className="dash-surface-body dash-surface-body-form">
                 <PushNotificationsCard />
+              </div>
+            </div>
+
+            {/* ── Telegram ── */}
+            <div className="dash-surface dash-surface-settings">
+              <div className="dash-surface-head">
+                <h2 className="dash-surface-title">Briefly on Telegram</h2>
+                <p className="dash-surface-desc">
+                  Get your morning brief and proactive alerts on Telegram — and ask Briefly anything
+                  by text or voice note, answered from your own sources.
+                </p>
+              </div>
+              <div className="dash-surface-body dash-surface-body-form">
+                <TelegramConnectCard />
               </div>
             </div>
 

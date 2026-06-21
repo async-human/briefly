@@ -967,6 +967,13 @@ export type KnowledgeGraphResponse = {
   };
 };
 
+export type TelegramStatus = {
+  connected: boolean;
+  username?: string | null;
+  voice_replies: boolean;
+  proactive_enabled: boolean;
+};
+
 export const api = {
   getMe: () => request<MeResponse>("/api/v1/me"),
 
@@ -1374,6 +1381,19 @@ export const api = {
   triggerProactive: () =>
     request<{ queued: number; delivered: number }>("/api/v1/push/trigger-proactive", {
       method: "POST",
+    }),
+
+  getTelegramStatus: () => request<TelegramStatus>("/api/v1/telegram/status"),
+  createTelegramLinkCode: () =>
+    request<{ deep_link: string; bot_username: string }>("/api/v1/telegram/link-code", {
+      method: "POST",
+    }),
+  disconnectTelegram: () =>
+    request<void>("/api/v1/telegram/disconnect", { method: "POST" }),
+  updateTelegramPrefs: (body: { voice_replies?: boolean; proactive_enabled?: boolean }) =>
+    request<TelegramStatus>("/api/v1/telegram/preferences", {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
 
   // Pending high-priority items the orb can surface proactively during the day.

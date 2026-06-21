@@ -787,6 +787,46 @@ class PushSubscription(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class TelegramAccount(Base):
+    """Links a Briefly user to their Telegram chat — one channel adapter per user.
+
+    `chat_id` is null until the user completes the /start linking handshake. The
+    bot reuses the orb brain for inbound turns (continuity via `thread_id`) and the
+    proactive gate for outbound alerts.
+    """
+
+    __tablename__ = "telegram_accounts"
+    __table_args__ = (
+        Index("uq_telegram_account_user", "user_id", unique=True),
+        Index("uq_telegram_account_chat", "chat_id", unique=True),
+        Index("ix_telegram_account_link_code", "link_code"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    chat_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    telegram_user_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Orb conversation continuity — one rolling thread per Telegram chat.
+    thread_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    voice_replies: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
+    proactive_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text("true")
+    )
+    # Short-lived handshake code minted in the web app, redeemed via /start <code>.
+    link_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    link_code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    linked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class WatchedEntity(Base):
     """A company / topic / person the user explicitly asked Briefly to watch.
 

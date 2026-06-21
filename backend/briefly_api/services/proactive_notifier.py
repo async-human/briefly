@@ -17,6 +17,7 @@ from briefly_api.db.engine import SessionLocal
 from briefly_api.db.models import ProactiveSurfacingEvent, User
 from briefly_api.agents.proactive.proactive_surfacing import mark_pushed
 from briefly_api.services.proactive_gate import should_push
+from briefly_api.services.telegram import send_telegram_to_user
 from briefly_api.services.web_push import send_push_to_user
 
 log = logging.getLogger(__name__)
@@ -113,6 +114,13 @@ async def send_pending_proactive_alerts() -> int:
             await send_push_to_user(user_id, payload)
         except Exception:
             log.exception("ProactiveNotifier: push failed for user %s", user_id)
+
+        # Telegram fan-out — same gated payload, reaches users where they already
+        # are. Per-account opt-out is enforced inside send_telegram_to_user.
+        try:
+            await send_telegram_to_user(user_id, payload)
+        except Exception:
+            log.exception("ProactiveNotifier: telegram failed for user %s", user_id)
 
         # Email only the high-priority items, individually (if Resend configured).
         if s.resend_api_key:
