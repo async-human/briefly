@@ -200,9 +200,16 @@ export function DashboardInsightsDrawer({
             </DashboardAccordion>
           )}
 
-          <DashboardAccordion id="weekly-report" title="Weekly intelligence report" description="Sunday-style recap">
-            <WeeklyReportCard embedded />
-          </DashboardAccordion>
+          {!hasWeekFocus && (
+            <DashboardAccordion
+              id="week-patterns"
+              title="Your week in focus"
+              description="Topics, skips, and shifts from your reading"
+              defaultOpen={defaultFirst}
+            >
+              <WeeklyReportCard embedded intel={intel} wrapped={digest?.meta?.wrapped} />
+            </DashboardAccordion>
+          )}
 
           <p className="dash-insights-drawer-foot">
             <Link href="/intelligence" className="dash-insights-drawer-link">

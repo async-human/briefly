@@ -370,6 +370,148 @@
   flex: 1;
 }
 
+/* ── Account menu (profile + theme + plan + sign out) ── */
+.app-account {
+  position: relative;
+}
+
+.app-account-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--app-radius-sm);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--app-dur) var(--app-ease),
+    border-color var(--app-dur) var(--app-ease);
+}
+
+.app-account-trigger:hover,
+.app-account-trigger.is-open {
+  background: var(--app-surface-muted);
+  border-color: var(--app-border);
+}
+
+.app-account-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--app-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-account-caret {
+  flex-shrink: 0;
+  color: var(--app-muted);
+  transition: transform var(--app-dur) var(--app-ease);
+}
+
+.app-account-trigger.is-open .app-account-caret {
+  transform: rotate(180deg);
+}
+
+.app-account-menu {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  padding: 0.5rem;
+  border-radius: var(--app-radius);
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow-elevated);
+  animation: app-account-menu-in 160ms var(--app-ease);
+}
+
+@keyframes app-account-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.app-account-menu-section {
+  padding: 0.25rem;
+}
+
+.app-account-menu-label {
+  margin: 0 0 0.4rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+.app-account-menu-divider {
+  height: 1px;
+  margin: 0.4rem 0.25rem;
+  background: var(--app-border);
+}
+
+/* Plan badge blends into the menu instead of being a nested card. */
+.app-account-menu .app-sidebar-plan {
+  margin-bottom: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.app-account-menu .theme-seg {
+  width: 100%;
+}
+
+.app-account-menu .theme-seg__btn {
+  flex: 1;
+}
+
+.app-account-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  border: none;
+  border-radius: var(--app-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--app-ink-secondary);
+  cursor: pointer;
+  transition: background-color var(--app-dur) var(--app-ease),
+    color var(--app-dur) var(--app-ease);
+}
+
+.app-account-menu-item:hover {
+  background: var(--app-surface-muted);
+  color: var(--app-ink);
+}
+
+.app-account-menu-signout svg {
+  flex-shrink: 0;
+  color: var(--app-muted);
+}
+
+.app-account-menu-signout:hover {
+  color: var(--app-danger-fg, #dc2626);
+}
+
+.app-account-menu-signout:hover svg {
+  color: var(--app-danger-fg, #dc2626);
+}
+
 /* ── Main canvas ── */
 
 .app-main {
@@ -8456,6 +8598,105 @@ a.saved-capture-title:hover {
   font-family: var(--font-mono), monospace;
   font-size: 0.6875rem;
   color: var(--app-muted);
+}
+
+.app-shell .weekly-report-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.app-shell .weekly-report-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-muted);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6875rem;
+  color: var(--app-ink-2);
+}
+
+.app-shell .weekly-report-topics {
+  list-style: none;
+  margin: 0 0 0.85rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.app-shell .weekly-report-topic {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--app-radius-sm);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-muted);
+}
+
+.app-shell .weekly-report-topic-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--app-ink);
+}
+
+.app-shell .weekly-report-topic-detail {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--app-muted);
+}
+
+.app-shell .weekly-report-callout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.65rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--app-radius-sm);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-muted);
+}
+
+.app-shell .weekly-report-callout p {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--app-ink-2);
+}
+
+.app-shell .weekly-report-callout--thread {
+  border-color: color-mix(in oklch, var(--app-accent) 35%, var(--app-border));
+}
+
+.app-shell .weekly-report-callout--blind {
+  border-color: color-mix(in oklch, var(--app-warn, #c49a3c) 35%, var(--app-border));
+}
+
+.app-shell .weekly-report-label {
+  display: block;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+.app-shell .weekly-report-foot {
+  margin: 0.85rem 0 0;
+}
+
+.app-shell .weekly-report-foot-link {
+  font-size: 0.75rem;
+  color: var(--app-accent);
+  text-decoration: none;
+}
+
+.app-shell .weekly-report-foot-link:hover {
+  text-decoration: underline;
 }
 
 .app-shell .briefing-hero-item {

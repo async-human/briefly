@@ -2,6 +2,7 @@
 
 import type { WrappedSnapshot } from "@/lib/api";
 import { WeekInFocusCard } from "@/components/intelligence/WeekInFocusCard";
+import { hasWrappedContent } from "@/lib/weekInFocus";
 
 export type CalendarMeeting = {
   title: string;
@@ -59,23 +60,6 @@ function LensIcon() {
       <path d="M16 16l5 5" strokeLinecap="round" />
       <path d="M8 11h6M11 8v6" strokeLinecap="round" opacity="0.5" />
     </svg>
-  );
-}
-
-function hasWrappedContent(wrapped: WrappedSnapshot): boolean {
-  return Boolean(
-    wrapped.synthesis ||
-      wrapped.weekly_synthesis ||
-      wrapped.lead ||
-      (wrapped.shifts && wrapped.shifts.length > 0) ||
-      (wrapped.mind_shifts && wrapped.mind_shifts.length > 0) ||
-      (wrapped.active_topics && wrapped.active_topics.length > 0) ||
-      (wrapped.high_engagement && wrapped.high_engagement.length > 0) ||
-      (wrapped.ignored && wrapped.ignored.length > 0) ||
-      (wrapped.uncovered && wrapped.uncovered.length > 0) ||
-      (wrapped.gaps && wrapped.gaps.length > 0) ||
-      (wrapped.emerging && wrapped.emerging.length > 0) ||
-      wrapped.depth_label,
   );
 }
 

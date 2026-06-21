@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { BrieflyLogo } from "@/components/BrieflyLogo";
-import { SidebarPlanBadge } from "@/components/billing/SidebarPlanBadge";
-import { clearToken } from "@/lib/auth";
 import { useBriefingGeneration } from "./BriefingGenerationProvider";
-import { AppThemeToggle } from "@/components/app/AppThemeToggle";
+import { AppAccountMenu } from "@/components/app/AppAccountMenu";
 
 const NAV = [
   {
@@ -128,19 +126,12 @@ type AppSidebarProps = {
 };
 
 export function AppSidebar({ userName, avatarUrl, open, onClose }: AppSidebarProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const { generating } = useBriefingGeneration();
-  const initial = userName?.charAt(0).toUpperCase() ?? "?";
 
   function isActive(href: string) {
     if (href === "/dashboard") return pathname === "/dashboard";
     return pathname.startsWith(href);
-  }
-
-  function handleLogout() {
-    clearToken();
-    router.push("/login");
   }
 
   return (
@@ -177,24 +168,7 @@ export function AppSidebar({ userName, avatarUrl, open, onClose }: AppSidebarPro
         </nav>
 
         <div className="app-sidebar-foot">
-          <div className="app-sidebar-theme">
-            <AppThemeToggle compact />
-          </div>
-          <SidebarPlanBadge />
-          {userName && (
-            <div className="app-sidebar-user">
-              {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatarUrl} alt="" className="app-sidebar-avatar" />
-              ) : (
-                <span className="app-sidebar-avatar app-sidebar-avatar-fallback">{initial}</span>
-              )}
-              <span className="app-sidebar-user-name">{userName}</span>
-            </div>
-          )}
-          <button type="button" className="app-sidebar-signout" onClick={handleLogout}>
-            Sign out
-          </button>
+          <AppAccountMenu userName={userName} avatarUrl={avatarUrl} onNavigate={onClose} />
         </div>
       </aside>
     </>

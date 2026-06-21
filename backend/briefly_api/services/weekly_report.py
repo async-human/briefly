@@ -25,6 +25,7 @@ from briefly_api.db.models import (
 )
 from briefly_api.llm.adapter import Message, get_llm_adapter
 from briefly_api.services.profile_utils import cluster_label
+from briefly_api.services.wrapped_snapshot import _engagement_detail, _ignored_detail
 
 log = logging.getLogger(__name__)
 
@@ -277,11 +278,18 @@ def _report_from_fingerprint(
         name = (topic.get("topic") or "").strip()
         if not name:
             continue
-        follow_ups = int(topic.get("follow_up_count") or 0)
-        observation = (
-            f"{follow_ups} deep dives this month" if follow_ups else "Consistently engaged"
-        )
+        observation = _engagement_detail(topic)
         top_topics.append({"topic": name, "observation": observation})
+
+    for topic in (fp.low_engagement_topics or [])[:2]:
+        if not isinstance(topic, dict):
+            continue
+        name = (topic.get("topic") or "").strip()
+        if not name or any(t["topic"] == name for t in top_topics):
+            continue
+        top_topics.append({"topic": name, "observation": _ignored_detail(topic)})
+        if len(top_topics) >= 4:
+            break
 
     if not top_topics and fp.current_focus:
         top_topics.append(
