@@ -10858,16 +10858,26 @@ a.saved-capture-title:hover {
 }
 
 .app-shell[data-theme="dark"] .jarvis-shell {
-  background: linear-gradient(
-    168deg,
-    var(--app-canvas) 0%,
-    var(--app-surface-muted) 55%,
-    oklch(15% 0.014 265) 100%
-  );
+  background: var(--app-canvas);
   box-shadow:
-    0 28px 70px oklch(0% 0 0 / 0.55),
-    0 12px 32px oklch(0% 0 0 / 0.4),
+    0 32px 80px oklch(0% 0 0 / 0.55),
     0 0 0 1px oklch(100% 0 0 / 0.06) inset;
+}
+
+.app-shell[data-theme="dark"] .jarvis-transcript,
+.app-shell[data-theme="dark"] .jarvis-user-turn,
+.app-shell[data-theme="dark"] .jarvis-status,
+.app-shell[data-theme="dark"] .jarvis-action-chip,
+.app-shell[data-theme="dark"] .jarvis-prompt-chip,
+.app-shell[data-theme="dark"] .jarvis-footer-btn,
+.app-shell[data-theme="dark"] .jarvis-compose-input {
+  background: var(--app-surface);
+}
+
+.app-shell[data-theme="dark"] .jarvis-transcript-head,
+.app-shell[data-theme="dark"] .jarvis-waveform,
+.app-shell[data-theme="dark"] .jarvis-user-turn {
+  background: var(--app-surface-muted);
 }
 
 .app-shell[data-theme="dark"] .jarvis-backdrop {

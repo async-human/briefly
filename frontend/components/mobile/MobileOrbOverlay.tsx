@@ -107,6 +107,7 @@ export function MobileOrbOverlay() {
   const router = useRouter();
   const [hasConversation, setHasConversation] = useState(false);
   const [pending, setPending] = useState<ProactiveEvent[]>([]);
+  const transcriptScrollRef = useRef<HTMLDivElement | null>(null);
 
   const orbHint = useMemo(() => {
     if (!enabled) return "Microphone disabled";
@@ -456,6 +457,13 @@ export function MobileOrbOverlay() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, mode, interrupt]);
 
+  useEffect(() => {
+    if (mode !== "speaking") return;
+    const node = transcriptScrollRef.current;
+    if (!node) return;
+    node.scrollTop = node.scrollHeight;
+  }, [mode, spokenWordIndex, caption]);
+
   function onCoreAction() {
     if (!enabled && mode === "idle") return;
     if (mode === "idle") {
@@ -469,15 +477,18 @@ export function MobileOrbOverlay() {
     interrupt();
   }
 
+  const showTranscript = mode !== "idle" || Boolean(heardText);
+  const responseLabel =
+    mode === "speaking" ? "Briefly is saying" : mode === "thinking" ? "Working on it" : "Briefly says";
+
   const overlay = open && mounted ? (
     <div className="jarvis-overlay" role="dialog" aria-modal aria-label="Briefly assistant">
       <button type="button" className="jarvis-backdrop" onClick={closeOverlay} aria-label="Close assistant" />
-      <div className="jarvis-shell">
-        <div className="jarvis-shell-glow" aria-hidden />
+      <div className={`jarvis-shell mode-${mode}`}>
         <header className="jarvis-header">
-          <div>
-            <p className="jarvis-eyebrow">Voice</p>
-            <h2 className="jarvis-title">Briefly assistant</h2>
+          <div className="jarvis-header-copy">
+            <p className="jarvis-eyebrow">Voice assistant</p>
+            <h2 className="jarvis-title">Briefly</h2>
           </div>
           <div className="jarvis-header-actions">
             <button
@@ -517,7 +528,7 @@ export function MobileOrbOverlay() {
           </div>
         </header>
 
-        <div className="jarvis-stage">
+        <div className="jarvis-body">
           {pending.length > 0 && (
             <div className="jarvis-inbox">
               <p className="jarvis-inbox-title">
@@ -555,118 +566,129 @@ export function MobileOrbOverlay() {
               </ul>
             </div>
           )}
-          <div className="jarvis-topbar">
+
+          <div className="jarvis-meta">
             <p className={`jarvis-status mode-${mode}`} aria-live="polite">
               <span className={`jarvis-status-dot mode-${mode}`} aria-hidden />
               {STATUS_LABEL[mode]}
             </p>
             {heardText ? (
-              <p className="jarvis-heard">
-                <span className="jarvis-heard-label">You said</span>
-                {heardText}
+              <div className="jarvis-user-turn">
+                <span className="jarvis-user-turn-label">You</span>
+                <p className="jarvis-user-turn-text">{heardText}</p>
+              </div>
+            ) : null}
+          </div>
+
+          <div className={`jarvis-main mode-${mode}`}>
+            <div className={`jarvis-orb-stage mode-${mode}`}>
+              <span className="jarvis-orb-ring jarvis-orb-ring-1" aria-hidden />
+              <span className="jarvis-orb-ring jarvis-orb-ring-2" aria-hidden />
+              <button
+                type="button"
+                className={`jarvis-core mode-${mode}`}
+                onClick={onCoreAction}
+                disabled={mode === "thinking" || (!enabled && mode === "idle")}
+                aria-label={orbHint}
+              >
+                <JarvisOrbCanvas mode={mode} size="stage" className="jarvis-core-canvas" />
+                <span className="jarvis-core-icon" aria-hidden>
+                  {mode === "listening" ? (
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M6 10v4M10 8v8M14 6v12M18 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
+                  ) : mode === "thinking" ? (
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 4" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                      <path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  )}
+                </span>
+              </button>
+              <p className={`jarvis-action-chip mode-${mode}`}>
+                {enabled ? ACTION_CHIP[mode] : "Enable mic to speak"}
               </p>
-            ) : null}
-          </div>
-
-          <div className={`jarvis-orb-stage mode-${mode}`}>
-            <span className="jarvis-orb-ring jarvis-orb-ring-1" aria-hidden />
-            <span className="jarvis-orb-ring jarvis-orb-ring-2" aria-hidden />
-            <button
-              type="button"
-              className={`jarvis-core mode-${mode}`}
-              onClick={onCoreAction}
-              disabled={mode === "thinking" || (!enabled && mode === "idle")}
-              aria-label={orbHint}
-            >
-              <JarvisOrbCanvas mode={mode} size="stage" className="jarvis-core-canvas" />
-              <span className="jarvis-core-icon" aria-hidden>
-                {mode === "listening" ? (
-                  <svg viewBox="0 0 24 24" fill="none">
-                    <path d="M6 10v4M10 8v8M14 6v12M18 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                  </svg>
-                ) : mode === "thinking" ? (
-                  <svg viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 4" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="none">
-                    <path
-                      d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3Z"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                    />
-                    <path d="M5 11v1a7 7 0 0 0 14 0v-1M12 19v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                )}
-              </span>
-            </button>
-            <p className={`jarvis-action-chip mode-${mode}`}>{enabled ? ACTION_CHIP[mode] : "Enable mic to speak"}</p>
-          </div>
-
-          {mode === "idle" && enabled && !composeOpen ? (
-            <div className="jarvis-prompts" aria-label="Try asking">
-              <p className="jarvis-prompts-label">Try asking</p>
-              <div className="jarvis-prompts-list">
-                {QUICK_PROMPTS.map((prompt) => (
-                  <button
-                    key={prompt}
-                    type="button"
-                    className="jarvis-prompt-chip"
-                    onClick={() => void sendTextQuery(prompt)}
-                  >
-                    {prompt}
-                  </button>
-                ))}
-              </div>
             </div>
-          ) : null}
 
-          {(mode !== "idle" || heardText) ? (
-          <div className={`jarvis-response-shell${mode === "speaking" ? " is-speaking" : ""}`}>
-            <p className="jarvis-response-label">
-              {mode === "speaking" ? "Briefly is saying" : mode === "thinking" ? "Working on it" : "Briefly says"}
-            </p>
-            <p
-              className={`jarvis-response${mode === "speaking" ? " is-karaoke" : ""}`}
-              aria-live="polite"
-            >
-              {mode === "speaking" && captionWords.length
-                ? captionWords.map((word, i) => (
-                    <span
-                      key={`${word}-${i}`}
-                      className={[
-                        "jarvis-response-word",
-                        i <= spokenWordIndex ? "is-spoken" : "",
-                        i === spokenWordIndex ? "is-active" : "",
-                        isEmphasisWord(word) ? "is-emphasis" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
+            {mode === "idle" && enabled && !composeOpen ? (
+              <div className="jarvis-prompts" aria-label="Try asking">
+                <p className="jarvis-prompts-label">Try asking</p>
+                <div className="jarvis-prompts-list">
+                  {QUICK_PROMPTS.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      className="jarvis-prompt-chip"
+                      onClick={() => void sendTextQuery(prompt)}
                     >
-                      {word}
-                    </span>
-                  ))
-                : caption}
-            </p>
-            {mode === "speaking" ? (
-              <div className="jarvis-waveform" aria-hidden>
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
-                <span />
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : null}
+
+            {showTranscript ? (
+              <section
+                className={`jarvis-transcript${mode === "speaking" ? " is-speaking" : ""}`}
+                aria-label="Assistant response"
+              >
+                <div className="jarvis-transcript-head">
+                  <p className="jarvis-transcript-label">{responseLabel}</p>
+                  {mode === "speaking" ? (
+                    <span className="jarvis-transcript-live">
+                      <span className="jarvis-transcript-live-dot" aria-hidden />
+                      Live
+                    </span>
+                  ) : null}
+                </div>
+                <div className="jarvis-transcript-scroll" ref={transcriptScrollRef}>
+                  <p
+                    className={`jarvis-transcript-text${mode === "speaking" ? " is-karaoke" : ""}`}
+                    aria-live="polite"
+                  >
+                    {mode === "speaking" && captionWords.length
+                      ? captionWords.map((word, i) => (
+                          <span
+                            key={`${word}-${i}`}
+                            className={[
+                              "jarvis-transcript-word",
+                              i <= spokenWordIndex ? "is-spoken" : "",
+                              i === spokenWordIndex ? "is-active" : "",
+                              isEmphasisWord(word) ? "is-emphasis" : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                          >
+                            {word}{" "}
+                          </span>
+                        ))
+                      : caption}
+                  </p>
+                </div>
+                {mode === "speaking" ? (
+                  <div className="jarvis-waveform" aria-hidden>
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                ) : null}
+                {toolMode ? <p className="jarvis-transcript-tools">{toolMode}</p> : null}
+              </section>
+            ) : null}
           </div>
-          ) : null}
-          {toolMode ? <p className="jarvis-tools">{toolMode}</p> : null}
         </div>
 
         <footer className="jarvis-footer">
