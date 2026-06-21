@@ -394,14 +394,16 @@
 
 .jarvis-orb-stage {
   border-radius: calc(var(--app-radius, 14px) + 6px);
-  border: 1px solid oklch(48% 0.12 278 / 0.1);
+  border: 1px solid oklch(48% 0.16 285 / 0.4);
+  /* Deep "spotlight" field — the orb glows against a night-violet screen. */
   background:
-    radial-gradient(ellipse 62% 58% at 50% 42%, oklch(60% 0.14 285 / 0.16), transparent 64%),
-    radial-gradient(ellipse 120% 90% at 50% 120%, oklch(62% 0.15 320 / 0.06), transparent 60%),
-    linear-gradient(180deg, var(--app-surface, oklch(100% 0.002 85)), var(--app-surface-muted, oklch(98.2% 0.006 278)));
+    radial-gradient(ellipse 66% 56% at 50% 40%, oklch(52% 0.18 288 / 0.55), transparent 70%),
+    radial-gradient(ellipse 120% 80% at 50% 116%, oklch(48% 0.18 320 / 0.22), transparent 62%),
+    linear-gradient(170deg, oklch(34% 0.13 280) 0%, oklch(26% 0.1 280) 52%, oklch(20% 0.08 278) 100%);
   box-shadow:
-    0 1px 0 oklch(100% 0 0 / 0.6) inset,
-    0 18px 44px oklch(48% 0.12 278 / 0.1) inset;
+    0 1px 0 oklch(100% 0 0 / 0.1) inset,
+    0 22px 60px oklch(20% 0.08 278 / 0.45) inset,
+    0 14px 40px oklch(48% 0.16 285 / 0.18);
 }
 
 /* Luminous halo breathing directly behind the core — gives the orb presence. */
@@ -411,8 +413,8 @@
   width: min(15rem, 64vw);
   height: min(15rem, 64vw);
   border-radius: 50%;
-  background: radial-gradient(circle, oklch(56% 0.16 285 / 0.3), oklch(56% 0.16 285 / 0.06) 46%, transparent 70%);
-  filter: blur(4px);
+  background: radial-gradient(circle, oklch(66% 0.2 290 / 0.6), oklch(62% 0.18 288 / 0.16) 44%, transparent 70%);
+  filter: blur(5px);
   pointer-events: none;
   animation: orb-halo-breathe 4.5s ease-in-out infinite;
 }
@@ -429,14 +431,14 @@
 .jarvis-orb-ring {
   position: absolute;
   border-radius: 50%;
-  border: 1px solid oklch(48% 0.12 278 / 0.22);
+  border: 1px solid oklch(100% 0 0 / 0.22);
   pointer-events: none;
 }
 
 .jarvis-orb-ring-1 {
   width: min(13.5rem, 58vw);
   height: min(13.5rem, 58vw);
-  box-shadow: 0 0 0 1px oklch(48% 0.12 278 / 0.05);
+  box-shadow: 0 0 24px oklch(70% 0.16 290 / 0.25);
   animation: orb-ring-breathe 3.2s ease-in-out infinite;
 }
 
@@ -444,7 +446,7 @@
   width: min(15.5rem, 66vw);
   height: min(15.5rem, 66vw);
   border-style: dashed;
-  border-color: oklch(48% 0.12 278 / 0.16);
+  border-color: oklch(100% 0 0 / 0.16);
   animation:
     orb-ring-breathe 3.2s ease-in-out infinite reverse,
     orb-ring-spin 40s linear infinite;
@@ -507,19 +509,19 @@
 .jarvis-action-chip {
   position: relative;
   z-index: 1;
-  margin: 0.6rem 0 0;
-  padding: 0.5rem 1.1rem;
+  margin: 0.7rem 0 0;
+  padding: 0.5rem 1.15rem;
   border-radius: 100px;
-  border: 1px solid oklch(48% 0.12 278 / 0.18);
-  background: color-mix(in srgb, var(--app-canvas, oklch(99.2% 0.004 85)) 88%, oklch(60% 0.14 285 / 0.12));
+  border: 1px solid oklch(100% 0 0 / 0.7);
+  background: oklch(99% 0.004 85 / 0.96);
   font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--app-ink, oklch(22% 0.022 265));
+  color: oklch(30% 0.1 280);
   box-shadow:
-    0 6px 18px oklch(48% 0.12 278 / 0.12),
-    0 0 0 4px oklch(48% 0.12 278 / 0.04);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+    0 8px 24px oklch(20% 0.08 278 / 0.4),
+    0 0 0 5px oklch(100% 0 0 / 0.08);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .jarvis-action-chip.mode-listening {
