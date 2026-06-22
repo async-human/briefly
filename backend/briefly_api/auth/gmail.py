@@ -167,8 +167,49 @@ async def refresh_gmail_access_token(connection: OAuthConnection, settings: Sett
 
 
 def gmail_connection_can_send(connection: OAuthConnection | None) -> bool:
-    """True if the stored Gmail grant includes the gmail.send scope."""
-    return bool(connection and "gmail.send" in (connection.scopes or ""))
+    """True if the grant can send mail. gmail.compose is a superset that also
+    permits sending, so either scope qualifies."""
+    scopes = (connection.scopes or "") if connection else ""
+    return bool(connection and ("gmail.send" in scopes or "gmail.compose" in scopes))
+
+
+def gmail_connection_can_create_draft(connection: OAuthConnection | None) -> bool:
+    """True if the grant can create drafts in the user's Gmail (gmail.compose)."""
+    return bool(connection and "gmail.compose" in (connection.scopes or ""))
+
+
+async def create_gmail_draft(
+    connection: OAuthConnection,
+    settings: Settings,
+    *,
+    to: str | None,
+    subject: str,
+    body: str,
+    from_email: str | None = None,
+) -> str:
+    """Create a draft in the user's Gmail (drafts.create). The user opens Gmail
+    and hits Send — Briefly never sends. Requires the gmail.compose scope.
+    Returns the Gmail draft id. Raises GmailAccessError if the scope is missing."""
+    token = await refresh_gmail_access_token(connection, settings)
+    msg = EmailMessage()
+    if to:
+        msg["To"] = to
+    if from_email:
+        msg["From"] = from_email
+    msg["Subject"] = subject
+    msg.set_content(body)
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        resp = await client.post(
+            f"{GMAIL_API}/drafts",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json={"message": {"raw": raw}},
+        )
+    if resp.status_code in {401, 403}:
+        raise classify_gmail_http_error(resp)
+    resp.raise_for_status()
+    return (resp.json() or {}).get("id", "")
 
 
 async def send_gmail_message(

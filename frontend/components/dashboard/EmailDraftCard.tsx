@@ -25,6 +25,7 @@ export function EmailDraftCard({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [canSend, setCanSend] = useState(false);
+  const [canCreateDraft, setCanCreateDraft] = useState(false);
 
   if (!open) return null;
 
@@ -58,7 +59,13 @@ export function EmailDraftCard({
       setSubject(d.subject);
       setBody(d.body);
       setStage("review");
-      void api.emailDraftCapabilities().then((c) => setCanSend(c.can_send)).catch(() => undefined);
+      void api
+        .emailDraftCapabilities()
+        .then((c) => {
+          setCanSend(c.can_send);
+          setCanCreateDraft(c.can_create_draft);
+        })
+        .catch(() => undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't draft that — try again.");
       setStage("compose");
@@ -79,6 +86,20 @@ export function EmailDraftCard({
       close();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Send failed — try Open in Gmail.");
+      setBusy(false);
+    }
+  }
+
+  async function addToGmailDrafts() {
+    if (!draft) return;
+    setBusy(true);
+    setError("");
+    try {
+      await persistEdits();
+      await api.draftEmailToGmail(draft.id);
+      close();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't create the Gmail draft — try Open in Gmail.");
       setBusy(false);
     }
   }
@@ -174,6 +195,17 @@ export function EmailDraftCard({
           <div className="emaildraft-body">
             {draft?.rationale && <p className="emaildraft-rationale">{draft.rationale}</p>}
 
+            {draft?.source_headlines && draft.source_headlines.length > 0 && (
+              <div className="emaildraft-citations">
+                <span className="emaildraft-citations-label">Grounded in what you read</span>
+                <ul className="emaildraft-citations-list">
+                  {draft.source_headlines.slice(0, 4).map((h) => (
+                    <li key={h}>{h}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <label className="emaildraft-label" htmlFor="emaildraft-to">To</label>
             <input
               id="emaildraft-to"
@@ -203,33 +235,47 @@ export function EmailDraftCard({
             />
 
             <p className="emaildraft-hitl">
-              {canSend
-                ? "You're the final check — Briefly only sends when you click Send."
-                : "Briefly never sends on its own — review, edit, then send it yourself from Gmail."}
+              {canCreateDraft
+                ? "Briefly puts a ready draft in your Gmail — you review and hit Send."
+                : canSend
+                  ? "You're the final check — Briefly only sends when you click Send."
+                  : "Briefly never sends on its own — review, edit, then send it yourself from Gmail."}
             </p>
 
             {error && <p className="emaildraft-msg emaildraft-msg--err">{error}</p>}
 
             <div className="emaildraft-actions">
-              {canSend ? (
-                <>
-                  <button type="button" className="dash-btn dash-btn-primary" onClick={send} disabled={busy}>
-                    {busy ? "Sending…" : "Send"}
-                  </button>
-                  <button type="button" className="dash-btn dash-btn-secondary" onClick={openInGmail} disabled={busy}>
-                    Open in Gmail →
-                  </button>
-                </>
+              {/* Default = the safe act: drop a ready draft into the user's Gmail. */}
+              {canCreateDraft ? (
+                <button type="button" className="dash-btn dash-btn-primary" onClick={addToGmailDrafts} disabled={busy}>
+                  {busy ? "Working…" : "Add to Gmail drafts"}
+                </button>
+              ) : canSend ? (
+                <button type="button" className="dash-btn dash-btn-primary" onClick={send} disabled={busy}>
+                  {busy ? "Sending…" : "Send"}
+                </button>
               ) : (
-                <>
-                  <button type="button" className="dash-btn dash-btn-primary" onClick={openInGmail} disabled={busy}>
-                    Open in Gmail →
-                  </button>
-                  <button type="button" className="dash-btn dash-btn-secondary" onClick={markSent} disabled={busy}>
-                    Mark as sent
-                  </button>
-                </>
+                <button type="button" className="dash-btn dash-btn-primary" onClick={openInGmail} disabled={busy}>
+                  Open in Gmail →
+                </button>
               )}
+
+              {/* Direct send is the opt-in once drafting is the default. */}
+              {canCreateDraft && canSend && (
+                <button type="button" className="dash-btn dash-btn-secondary" onClick={send} disabled={busy}>
+                  {busy ? "Sending…" : "Send now"}
+                </button>
+              )}
+
+              {(canCreateDraft || canSend) && (
+                <button type="button" className="dash-btn dash-btn-secondary" onClick={openInGmail} disabled={busy}>
+                  Open in Gmail →
+                </button>
+              )}
+
+              <button type="button" className="emaildraft-text-btn" onClick={markSent} disabled={busy}>
+                Mark as sent
+              </button>
               <button type="button" className="emaildraft-text-btn" onClick={() => setStage("compose")} disabled={busy}>
                 Redraft
               </button>
@@ -238,9 +284,9 @@ export function EmailDraftCard({
               </button>
             </div>
 
-            {!canSend && (
+            {!canCreateDraft && (
               <button type="button" className="emaildraft-reconnect" onClick={reconnectGmail}>
-                Connect Gmail to send straight from Briefly →
+                Connect Gmail so Briefly can draft &amp; send for you →
               </button>
             )}
           </div>

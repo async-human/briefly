@@ -1441,9 +1441,11 @@ export const api = {
   discardEmailDraft: (id: string) =>
     request<void>(`/api/v1/email-drafts/${id}`, { method: "DELETE" }),
   emailDraftCapabilities: () =>
-    request<{ can_send: boolean; gmail_email: string | null }>(
+    request<{ can_create_draft: boolean; can_send: boolean; gmail_email: string | null }>(
       "/api/v1/email-drafts/capabilities",
     ),
+  draftEmailToGmail: (id: string) =>
+    request<EmailDraft>(`/api/v1/email-drafts/${id}/to-gmail`, { method: "POST" }, 30000),
   sendEmailDraft: (id: string) =>
     request<EmailDraft>(`/api/v1/email-drafts/${id}/send`, { method: "POST" }, 30000),
 };
@@ -1464,5 +1466,6 @@ export type EmailDraft = {
   rationale: string | null;
   status: string;
   source_content_ids: string[];
+  source_headlines?: string[];
   created_at: string | null;
 };

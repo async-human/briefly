@@ -207,8 +207,11 @@ class Settings(BaseSettings):
 
     gmail_scopes: str = (
         "https://www.googleapis.com/auth/gmail.readonly "
-        "https://www.googleapis.com/auth/gmail.send openid email"
+        "https://www.googleapis.com/auth/gmail.send "
+        "https://www.googleapis.com/auth/gmail.compose openid email"
     )
+    # Act layer: max grounded emails a user can send/draft-to-Gmail per day.
+    act_email_daily_cap: int = 20
     calendar_scopes: str = (
         "https://www.googleapis.com/auth/calendar.readonly openid email"
     )

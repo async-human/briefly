@@ -10537,6 +10537,34 @@ a.saved-capture-title:hover {
   border-left: 2px solid var(--app-accent, #6d5ef0);
 }
 
+.emaildraft-citations {
+  margin: 10px 0 2px;
+}
+
+.emaildraft-citations-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--app-ink-muted, #64748b);
+  margin-bottom: 4px;
+}
+
+.emaildraft-citations-list {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.emaildraft-citations-list li {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--app-ink-2, #475569);
+}
+
 .emaildraft-hitl {
   margin: 8px 0 0;
   font-size: 0.75rem;
