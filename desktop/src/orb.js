@@ -30,7 +30,17 @@ const store = {
   set wakeMuted(v) {
     localStorage.setItem("briefly.wakeMuted", v ? "1" : "0");
   },
+  // Proactive voice: lets Briefly speak up on its own through the orb.
+  get proactiveEnabled() {
+    return localStorage.getItem("briefly.proactiveEnabled") !== "0";
+  },
+  set proactiveEnabled(v) {
+    localStorage.setItem("briefly.proactiveEnabled", v ? "1" : "0");
+  },
 };
+
+// How often the idle orb checks whether Briefly has something to say.
+const PROACTIVE_POLL_MS = 90000;
 
 const state = {
   mode: "idle", // idle | listening | thinking | speaking
@@ -58,6 +68,14 @@ async function showWindow() {
   } catch (_) {}
 }
 
+// Reveal the orb without stealing keyboard focus — used when Briefly speaks up
+// on its own, so it never interrupts what you're typing.
+async function showWindowQuiet() {
+  try {
+    if (TAURI?.window) await TAURI.window.getCurrentWindow().show();
+  } catch (_) {}
+}
+
 async function hideWindow() {
   try {
     if (TAURI?.window) await TAURI.window.getCurrentWindow().hide();
@@ -72,6 +90,20 @@ async function apiGet(path) {
   const res = await doFetch(url, { method: "GET", headers });
   if (!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
+}
+
+async function apiPostJson(path, payload) {
+  const doFetch = TAURI?.http?.fetch || window.fetch;
+  const res = await doFetch(store.apiBase + path, {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + store.token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res;
 }
 
 async function apiTurn(audioBlob, signal) {
@@ -331,6 +363,61 @@ async function playTts(text) {
   }
   state.speakAbort = null;
   state.ttsAudio = null;
+}
+
+// ── Proactive voice ───────────────────────────────────────────────────────
+// The orb periodically asks the backend whether Briefly should speak up. The
+// server applies the context gate (quiet hours / in a meeting / "afraid to
+// miss"), so we only act on a positive, gated response — and never interrupt an
+// in-progress turn.
+async function pollProactive() {
+  if (!store.token || !store.proactiveEnabled) return;
+  if (state.mode !== "idle") return;
+  let res;
+  try {
+    res = await apiGet("/api/v1/orb/proactive/voice");
+  } catch (_) {
+    return; // offline / auth issue — try again next tick
+  }
+  if (!res || !res.speak || !res.script) return;
+  if (state.mode !== "idle") return; // re-check: user may have started talking
+
+  await showWindowQuiet();
+  setCaption(res.script);
+  try {
+    await playTts(res.script);
+  } catch (_) {
+    setMode("idle");
+  }
+  const ids = Array.isArray(res.event_ids) ? res.event_ids : [];
+  if (ids.length) {
+    try {
+      await apiPostJson("/api/v1/orb/proactive/spoken", { event_ids: ids });
+    } catch (_) {}
+  }
+}
+
+function updateProactiveStatus() {
+  const btn = document.getElementById("proactive");
+  if (!btn) return;
+  btn.classList.toggle("active", store.proactiveEnabled);
+  btn.title = store.proactiveEnabled
+    ? "Proactive voice on — Briefly will speak up"
+    : "Proactive voice off";
+}
+
+function toggleProactive() {
+  store.proactiveEnabled = !store.proactiveEnabled;
+  updateProactiveStatus();
+  setCaption(store.proactiveEnabled ? "Briefly will reach out by voice." : "Proactive voice off.");
+  setTimeout(() => setCaption(""), 1800);
+  if (store.proactiveEnabled) void pollProactive();
+}
+
+function startProactiveLoop() {
+  // Stagger the first check so it doesn't race app startup / auth linking.
+  setTimeout(() => void pollProactive(), 8000);
+  setInterval(() => void pollProactive(), PROACTIVE_POLL_MS);
 }
 
 function toggleTalk() {
@@ -594,6 +681,7 @@ function init() {
     }
     updateWakeStatus();
   });
+  document.getElementById("proactive").addEventListener("click", () => toggleProactive());
   document.getElementById("gear").addEventListener("click", () => openSettings());
   document.getElementById("hide").addEventListener("click", () => {
     stopCurrentTurn();
@@ -647,6 +735,8 @@ function init() {
   void registerGlobalHotkey();
   void startWakeWord();
   updateWakeStatus();
+  updateProactiveStatus();
+  startProactiveLoop();
 }
 
 if (document.readyState === "loading") {

@@ -28,6 +28,13 @@
       "csp": null
     }
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["briefly"]
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

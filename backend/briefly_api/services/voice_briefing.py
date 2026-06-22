@@ -12,14 +12,16 @@ This rides the existing surfaces (web push + the orb): the push payload carries 
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from briefly_api.agents.proactive.proactive_surfacing import get_for_api
 from briefly_api.config import get_settings
 from briefly_api.db.engine import SessionLocal
-from briefly_api.db.models import User
+from briefly_api.db.models import ProactiveSurfacingEvent, User
 from briefly_api.llm.adapter import Message, get_llm_adapter
+from briefly_api.services.proactive_gate import should_push
 from briefly_api.tts.adapter import get_tts_adapter
 
 log = logging.getLogger(__name__)
@@ -118,3 +120,72 @@ async def synthesize_proactive_voice(user_id: str) -> tuple[str, bytes, str] | N
     if not audio:
         return None
     return script, audio, tts.content_type()
+
+
+async def build_orb_proactive_voice(user_id: str) -> dict:
+    """
+    Decide whether the always-on desktop orb should speak up right now, and what
+    to say. Applies the SAME context gate as the push notifier (quiet hours, in a
+    meeting, "afraid to miss" boost) so the orb only interrupts when appropriate.
+
+    Returns {"speak": bool, "script": str | None, "event_ids": [str]}.
+    """
+    s = get_settings()
+    if not (s.proactive_surfacing_enabled and s.proactive_voice_enabled):
+        return {"speak": False, "script": None, "event_ids": []}
+
+    # Lazy import avoids a circular import (proactive_notifier imports this module
+    # indirectly through the gate at call time, not import time).
+    from briefly_api.services.proactive_notifier import _NOTIFY_TYPES
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=48)
+    async with SessionLocal() as session:
+        rows = (
+            await session.execute(
+                select(ProactiveSurfacingEvent)
+                .where(
+                    ProactiveSurfacingEvent.user_id == user_id,
+                    # pushed_at gates against re-interrupting: whichever realtime
+                    # channel (web push or orb) speaks first marks it.
+                    ProactiveSurfacingEvent.pushed_at.is_(None),
+                    ProactiveSurfacingEvent.surfaced_at.is_(None),
+                    ProactiveSurfacingEvent.dismissed_at.is_(None),
+                    ProactiveSurfacingEvent.created_at >= cutoff,
+                    ProactiveSurfacingEvent.priority >= s.push_min_priority,
+                    ProactiveSurfacingEvent.event_type.in_(tuple(_NOTIFY_TYPES)),
+                    or_(
+                        ProactiveSurfacingEvent.snoozed_until.is_(None),
+                        ProactiveSurfacingEvent.snoozed_until <= now,
+                    ),
+                )
+                .order_by(ProactiveSurfacingEvent.priority.desc())
+                .limit(10)
+            )
+        ).scalars().all()
+
+        user = (
+            await session.execute(select(User).where(User.id == user_id))
+        ).scalar_one_or_none()
+
+    # Context gate per event — only speak the ones that pass right now.
+    ready = [
+        e
+        for e in rows
+        if await should_push(
+            user_id,
+            e.priority,
+            topic_text=" ".join(filter(None, [e.title, e.body, e.thread_key])),
+        )
+        == "push"
+    ]
+    if not ready:
+        return {"speak": False, "script": None, "event_ids": []}
+
+    first_name = None
+    if user and user.name:
+        first_name = user.name.strip().split(" ")[0] or None
+
+    events = [{"title": e.title, "body": e.body} for e in ready]
+    script = await build_voice_script(events, first_name)
+    return {"speak": True, "script": script, "event_ids": [e.id for e in ready]}

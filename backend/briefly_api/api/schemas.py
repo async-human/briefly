@@ -571,6 +571,13 @@ class OrbProactiveSeenIn(BaseModel):
     event_ids: list[str] = Field(default_factory=list)
 
 
+class OrbProactiveVoiceOut(BaseModel):
+    """Whether the always-on orb should speak up now, and what to say."""
+    speak: bool = False
+    script: str | None = None
+    event_ids: list[str] = Field(default_factory=list)
+
+
 class OrbProactiveSnoozeIn(BaseModel):
     hours: int = 3
 

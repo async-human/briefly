@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from briefly_api.api.schemas import (
     OrbProactiveSeenIn,
     OrbProactiveSnoozeIn,
+    OrbProactiveVoiceOut,
     OrbSpeakIn,
     OrbTurnOut,
     ProactiveEventOut,
@@ -95,6 +96,40 @@ async def orb_proactive(
 
     events = await get_for_api(db, user.id)
     return [ProactiveEventOut(**e) for e in events]
+
+
+@router.get("/orb/proactive/voice", response_model=OrbProactiveVoiceOut)
+async def orb_proactive_voice(
+    user: User = Depends(get_capture_user),
+    db: AsyncSession = Depends(get_db),  # noqa: ARG001 — auth dep needs a session
+) -> OrbProactiveVoiceOut:
+    """Should the always-on orb speak up right now? Returns a gated, spoken-style
+    script for any pending proactive events that pass the context gate (quiet
+    hours / in a meeting / "afraid to miss"). The orb speaks it via /orb/speak,
+    then acks via /orb/proactive/spoken so it isn't repeated."""
+    from briefly_api.services.voice_briefing import build_orb_proactive_voice
+
+    result = await build_orb_proactive_voice(user.id)
+    return OrbProactiveVoiceOut(**result)
+
+
+@router.post(
+    "/orb/proactive/spoken",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+async def orb_proactive_spoken(
+    body: OrbProactiveSeenIn,
+    user: User = Depends(get_capture_user),  # noqa: ARG001 — auth dep
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Mark proactive events as delivered-by-voice (pushed) so the orb won't
+    re-speak them. They remain in the inbox until the user acts on them."""
+    from briefly_api.agents.proactive.proactive_surfacing import mark_pushed
+
+    await mark_pushed(db, body.event_ids)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

@@ -1,16 +1,25 @@
 # Briefly Desktop — the floating voice orb
 
-> ⚠️ **PARKED — not maintained.** Superseded by the installable PWA and the
-> in-app voice orb on the dashboard, which is now the single Briefly assistant.
-> This native shell is kept for reference only; don't build features on it
-> unless we deliberately revive the native-desktop track. See the consolidation
-> decision: one assistant, one identity, no isolated surfaces.
+> 🟢 **REVIVED (2026-06-22) as the proactive-voice surface.** The desktop orb is
+> the channel through which Briefly reaches out *first* by voice — see
+> `project_proactive_direction` in project memory. This is a deliberate revival
+> of the native-desktop track for proactive voice; it complements (does not
+> replace) the in-app dashboard orb.
 
 An always-on desktop companion: a small floating orb that lives in the corner of
-your screen, launches on login, and supports **push-to-talk voice turns** against
-the orb backend. Built with [Tauri v2](https://v2.tauri.app) — a
-~5 MB native app with a tiny memory footprint (it sits idle all day, so that
-matters).
+your screen, launches on login, and:
+
+- **Two-way voice** — push-to-talk / wake word / hotkey → `/orb/turn` (STT → Ask
+  Briefly with its tools → answer) → spoken via `/orb/speak`. Ask it things and
+  it performs grounded tasks, same brain as the web assistant.
+- **Proactive voice** — when idle it polls `/orb/proactive/voice`; the backend
+  applies the context gate (quiet hours / in a meeting / "afraid to miss") and,
+  when something's worth it, the orb **speaks up on its own** (toggle on the orb).
+- **Zero-setup auth** — the web app deep-links a desktop token via `briefly://`,
+  registered by the app (single-instance forwards it to the running orb).
+
+Built with [Tauri v2](https://v2.tauri.app) — a ~5 MB native app with a tiny
+memory footprint (it sits idle all day, so that matters).
 
 Wake-word support is available with a native-worker-first design:
 - preferred: local wake worker process (emits wake events to the app)
@@ -75,9 +84,11 @@ The orb talks to your Briefly backend with the same token the web app uses.
 3. **Device token** — create one in Briefly web app: **Settings → Connected devices**.
    Use a `desktop` token (`bcap_...`) and paste it into the orb settings.
 
-> A cleaner one-click handoff (a `/desktop` page in the web app that deep-links
-> the token straight into the orb) is the natural next step — noted in the
-> roadmap below.
+> **One-click handoff (now wired):** after web login, `ensureDesktopOrbLinked()`
+> mints a `desktop` capture token and fires `briefly://auth?token=…&api_base=…`.
+> The app registers the `briefly://` scheme (`tauri-plugin-deep-link`) and uses
+> `tauri-plugin-single-instance` to forward the link into the running orb, so the
+> token lands without any copy-paste. Manual paste (below) remains as a fallback.
 
 Hold the orb core to talk, then release to send. The orb transcribes with
 `/orb/turn` and plays back with `/orb/speak`.
@@ -116,12 +127,50 @@ Windows, `.dmg` on macOS, `.AppImage`/`.deb` on Linux).
 
 Neither is needed to run it yourself — only to distribute.
 
-## Notes & next steps
+## Verify it end-to-end (the runbook)
 
-- **Auth**: token-paste today; a `/desktop` deep-link handoff is the clean next step.
+This needs a machine with **Rust** + the platform webview (above). The Rust layer
+can't be compiled in CI without a toolchain, so do this once locally:
+
+```bash
+cd desktop
+npm install
+npm run icons          # one-time, generates app/tray icons
+npm run dev            # compiles Rust, launches the floating orb
+```
+
+Then confirm each capability:
+
+1. **Voice task** — click the orb (or say "hey briefly", or Ctrl+Shift+Space),
+   ask something ("what's new today?"). It transcribes, answers, and speaks back.
+2. **Proactive voice** — ensure the proactive button (the bars icon) is lit. With
+   pending proactive events on your account (try `POST /api/v1/push/trigger-proactive`
+   from the web app while logged in), the idle orb speaks up within ~90 s — unless
+   the gate holds it (quiet hours / in a meeting).
+3. **One-click auth** — log into the web app; it should deep-link the token into
+   the orb automatically. If the browser blocks the scheme, paste a `bcap_` token
+   from **Settings → Connected devices** (gear on the orb).
+4. **Single instance** — relaunch the app; the existing orb focuses instead of a
+   second one appearing.
+
+## Ship it (distribution)
+
+```bash
+npm run build          # installers under src-tauri/target/release/bundle/
+```
+
+- **Code signing** — required to avoid SmartScreen/Gatekeeper warnings
+  (Authenticode on Windows; Apple Developer ID + notarization on macOS).
+- **Auto-update** — wire the Tauri updater so users get new versions in place.
+- **Deep link in production** — the installer registers `briefly://` at install
+  time; in dev it's registered at runtime by `register_all()` (Windows/Linux).
+
+## Notes
+
 - **Briefing source**: `GET /api/v1/digests/today` + `/api/v1/me`. The CORS-free
-  path is the Tauri HTTP plugin (configured in `capabilities/default.json` — add
-  your production API origin there if it changes).
-- **Heads-up**: this scaffold was written against the Tauri v2 spec but **not
-  compiled in this environment** (no Rust toolchain here). Run `npm run dev`
-  first; if the Rust side needs a tweak it'll surface there.
+  path is the Tauri HTTP plugin (`capabilities/default.json` — add your production
+  API origin there if it changes).
+- **Heads-up**: the Rust changes for deep-link + single-instance were written to
+  the Tauri v2 spec but **compiled-checked is on you** — there's no Rust toolchain
+  in the authoring environment. `npm run dev` will surface any tweak needed; the
+  most likely spots are plugin version pins in `Cargo.toml`.

@@ -10,6 +10,7 @@ use tauri::{
     Emitter, Manager,
 };
 use tauri_plugin_autostart::{ManagerExt, MacosLauncher};
+use tauri_plugin_deep_link::DeepLinkExt;
 
 const DASHBOARD_URL: &str = "https://app.sendbriefly.app/dashboard";
 
@@ -64,6 +65,20 @@ fn parse_auth_deep_link(arg: &str) -> Option<DesktopAuthPayload> {
         token: token?,
         api_base,
     })
+}
+
+/// Parse a `briefly://auth?...` arg and, if valid, hand the token to the orb UI
+/// and reveal the window. Returns true if the arg was an auth deep link.
+fn handle_auth_deep_link(app: &tauri::AppHandle, arg: &str) -> bool {
+    let Some(payload) = parse_auth_deep_link(arg) else {
+        return false;
+    };
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit("desktop-auth", payload);
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    true
 }
 
 /// Toggle the floating orb window visibility.
@@ -173,10 +188,29 @@ fn wakeword_stop(state: tauri::State<'_, WakewordState>) -> bool {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    // Single-instance MUST be the first plugin registered. It keeps exactly one
+    // orb alive and forwards a second launch's argv (which carries the
+    // briefly:// auth deep link on Windows/Linux) into the running instance.
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+            for arg in argv.iter() {
+                handle_auth_deep_link(app, arg);
+            }
+        }));
+    }
+
+    builder
         .manage(WakewordState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![wakeword_start, wakeword_stop])
         .plugin(tauri_plugin_autostart::init(
@@ -184,6 +218,19 @@ pub fn run() {
             None,
         ))
         .setup(|app| {
+            // Register the briefly:// scheme at runtime so `npm run dev` works
+            // without an installer (bundled installs register it at install time).
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            {
+                let _ = app.deep_link().register_all();
+            }
+            // macOS delivers deep links as an event, not argv — handle those here.
+            let dl_handle = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                for url in event.urls() {
+                    handle_auth_deep_link(&dl_handle, url.as_str());
+                }
+            });
             // Register to launch on login — this is the "always on" behaviour.
             // Safe to call every launch; it's a no-op once registered.
             let _ = app.autolaunch().enable();
@@ -228,15 +275,13 @@ pub fn run() {
 
             if let Some(window) = app.get_webview_window("main") {
                 position_bottom_right(&window);
-                // Handle deep-link bootstrap: briefly://auth?token=bcap_...&api_base=...
-                let args: Vec<String> = std::env::args().collect();
-                for arg in args {
-                    if let Some(payload) = parse_auth_deep_link(&arg) {
-                        let _ = window.emit("desktop-auth", payload);
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                        break;
-                    }
+            }
+            // Cold-start deep link: briefly://auth?token=bcap_...&api_base=...
+            // (the OS launches the orb with the URL as an argv on first open).
+            let app_handle = app.handle().clone();
+            for arg in std::env::args() {
+                if handle_auth_deep_link(&app_handle, &arg) {
+                    break;
                 }
             }
 
