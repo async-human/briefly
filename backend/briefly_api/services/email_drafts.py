@@ -83,6 +83,43 @@ def _parse_json(text: str) -> dict:
         return {}
 
 
+async def compose_from_context(
+    instruction: str,
+    context: str,
+    name: str,
+    *,
+    user_id: str | None = None,
+) -> dict:
+    """Pure grounded composition: (instruction, context, name) → parsed draft fields.
+
+    Shared by the live draft path AND the eval harness so we measure exactly what
+    ships. Returns {subject, body, rationale, to_hint}. Raises on LLM failure.
+    """
+    user_prompt = (
+        f"User's name: {name or 'the user'}\n"
+        f"Instruction: {instruction.strip()}\n\n"
+        f"Context — things the user has read:\n{context or '(no recent brief found)'}\n\n"
+        "Draft the email now as strict JSON."
+    )
+    llm = get_llm_adapter()
+    response = await llm.complete(
+        [Message(role="user", content=user_prompt)],
+        system=_SYSTEM,
+        temperature=0.4,
+        max_tokens=700,
+        user_id=user_id,
+        agent="email_draft",
+    )
+    parsed = _parse_json(response.content)
+    body = (parsed.get("body") or "").strip() or response.content.strip()
+    return {
+        "subject": (parsed.get("subject") or "").strip(),
+        "body": body,
+        "rationale": (parsed.get("rationale") or "").strip() or None,
+        "to_hint": (parsed.get("to_hint") or "").strip() or None,
+    }
+
+
 async def compose_email_draft(
     db: AsyncSession,
     user: User,
@@ -94,34 +131,16 @@ async def compose_email_draft(
     context, source_ids = await _grounding_context(db, user.id, content_id)
 
     name = (user.name or "").strip()
-    user_prompt = (
-        f"User's name: {name or 'the user'}\n"
-        f"Instruction: {instruction.strip()}\n\n"
-        f"Context — things the user has read:\n{context or '(no recent brief found)'}\n\n"
-        "Draft the email now as strict JSON."
-    )
-
-    subject, body, rationale, to_hint = "", "", None, None
     try:
-        llm = get_llm_adapter()
-        response = await llm.complete(
-            [Message(role="user", content=user_prompt)],
-            system=_SYSTEM,
-            temperature=0.4,
-            max_tokens=700,
-            user_id=user.id,
-            agent="email_draft",
-        )
-        parsed = _parse_json(response.content)
-        subject = (parsed.get("subject") or "").strip()
-        body = (parsed.get("body") or "").strip()
-        rationale = (parsed.get("rationale") or "").strip() or None
-        to_hint = (parsed.get("to_hint") or "").strip() or None
-        if not body:
-            body = response.content.strip()
+        fields = await compose_from_context(instruction, context, name, user_id=user.id)
     except Exception:
         log.exception("compose_email_draft: LLM failed for user %s", user.id)
         raise
+
+    subject = fields["subject"]
+    body = fields["body"]
+    rationale = fields["rationale"]
+    to_hint = fields["to_hint"]
 
     draft = EmailDraft(
         user_id=user.id,

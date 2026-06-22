@@ -212,6 +212,11 @@ class Settings(BaseSettings):
     )
     # Act layer: max grounded emails a user can send/draft-to-Gmail per day.
     act_email_daily_cap: int = 20
+
+    # Eval harness: optional cheap model for LLM-as-judge scorers (faithfulness,
+    # task-success). Empty = use the configured llm_model. Set to a small/fast
+    # model (e.g. claude-haiku-4-5) to keep eval runs cheap.
+    eval_judge_model: str = ""
     calendar_scopes: str = (
         "https://www.googleapis.com/auth/calendar.readonly openid email"
     )
