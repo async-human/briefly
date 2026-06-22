@@ -388,3 +388,117 @@ async def queue_meeting_prep_event(session, user_id: str) -> bool:
     await session.flush()
     log.info("queue_meeting_prep_event: queued for user %s (%d meetings)", user_id, count)
     return True
+
+
+def _meeting_thread_key(event: dict) -> str:
+    """Stable per-meeting key for idempotency (start time + title)."""
+    start = (event.get("start") or "")[:16]  # to the minute
+    title = (event.get("title") or "").strip().lower()[:60]
+    return f"meeting:{start}:{title}"
+
+
+async def queue_imminent_meeting_prep(session, user_id: str) -> int:
+    """
+    Fire a focused, high-priority `meeting_prep` event for each meeting starting
+    within the next `meeting_prep_lead_minutes` — the "you meet X in 30 min,
+    here's what changed in your world" moment. Idempotent per meeting. Returns
+    the number of new events queued; the caller commits.
+    """
+    s = get_settings()
+    if not (s.proactive_surfacing_enabled and s.meeting_prep_enabled):
+        return 0
+
+    connection = await get_calendar_connection(session, user_id)
+    if not connection:
+        return 0
+
+    profile = (
+        await session.execute(select(UserProfile).where(UserProfile.user_id == user_id))
+    ).scalar_one_or_none()
+    tz = (getattr(profile, "digest_timezone", None) or "UTC") if profile else "UTC"
+
+    now = datetime.now(timezone.utc)
+    window_end = now + timedelta(minutes=max(1, s.meeting_prep_lead_minutes))
+    try:
+        access_token = await refresh_calendar_access_token(connection, get_settings())
+        events = await fetch_events_between(access_token, tz, now, window_end)
+    except Exception:
+        log.debug("queue_imminent_meeting_prep: fetch failed for %s", user_id, exc_info=True)
+        return 0
+
+    # Only timed meetings that actually START inside the lead window.
+    imminent: list[dict] = []
+    for ev in events:
+        start_raw = ev.get("start")
+        if not start_raw or "T" not in start_raw:
+            continue
+        try:
+            start = datetime.fromisoformat(start_raw.replace("Z", "+00:00")).astimezone(timezone.utc)
+        except Exception:
+            continue
+        if now <= start <= window_end:
+            imminent.append(ev)
+
+    if not imminent:
+        return 0
+
+    # Cheap thread context for matching, mirroring queue_meeting_prep_event.
+    thread_rows = (
+        await session.execute(
+            select(UserMemory).where(
+                UserMemory.user_id == user_id,
+                UserMemory.memory_type == "story_thread",
+            )
+        )
+    ).scalars().all()
+    story_threads = [{"topic": t.key} for t in thread_rows]
+
+    cutoff = now - timedelta(hours=24)
+    queued = 0
+    for ev in imminent:
+        key = _meeting_thread_key(ev)
+        existing = (
+            await session.execute(
+                select(ProactiveSurfacingEvent).where(
+                    ProactiveSurfacingEvent.user_id == user_id,
+                    ProactiveSurfacingEvent.event_type == "meeting_prep",
+                    ProactiveSurfacingEvent.thread_key == key,
+                    ProactiveSurfacingEvent.created_at >= cutoff,
+                )
+            )
+        ).scalars().first()
+        if existing:
+            continue
+
+        threads = _match_threads(ev, story_threads)
+        when = ev.get("start_label") or "soon"
+        attendees = ev.get("attendees") or []
+        title = f"In {when}: {ev['title']}"
+        parts = []
+        if attendees:
+            parts.append(f"with {', '.join(attendees[:3])}")
+        if threads:
+            parts.append(f"connects to your threads: {', '.join(threads)}")
+        body = (
+            f"You have '{ev['title']}' coming up {('— ' + '; '.join(parts)) if parts else 'shortly'}. "
+            "Open Briefly for the prep."
+        )
+
+        session.add(
+            ProactiveSurfacingEvent(
+                user_id=user_id,
+                event_type="meeting_prep",
+                title=title[:200],
+                body=body[:400],
+                content_ids=[],
+                thread_key=key,
+                # High priority: imminent + matched threads break through context gates.
+                priority=9 if threads else 8,
+            )
+        )
+        queued += 1
+
+    if queued:
+        await session.flush()
+        log.info("queue_imminent_meeting_prep: queued %d for user %s", queued, user_id)
+    return queued

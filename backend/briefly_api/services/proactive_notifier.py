@@ -88,7 +88,16 @@ async def send_pending_proactive_alerts() -> int:
 
     for user_id, events in by_user.items():
         # Context gate per event; "hold" leaves it un-pushed for the next window.
-        ready = [e for e in events if await should_push(user_id, e.priority) == "push"]
+        ready = [
+            e
+            for e in events
+            if await should_push(
+                user_id,
+                e.priority,
+                topic_text=" ".join(filter(None, [e.title, e.body, e.thread_key])),
+            )
+            == "push"
+        ]
         if not ready:
             continue
 
@@ -110,6 +119,12 @@ async def send_pending_proactive_alerts() -> int:
                 "url": "/dashboard",
                 "tag": "briefly-batch",
             }
+
+        # Jarvis-style outreach: signal the client that a spoken briefing is ready
+        # at /proactive/voice (the client decides whether/when to play it).
+        if s.proactive_voice_enabled:
+            payload["voice"] = True
+            payload["voiceUrl"] = "/api/v1/proactive/voice"
         try:
             await send_push_to_user(user_id, payload)
         except Exception:

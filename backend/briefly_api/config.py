@@ -278,6 +278,30 @@ class Settings(BaseSettings):
     quiet_hours_end: int = 7
     # Hold non-urgent pushes while the user is in a calendar meeting.
     push_respect_calendar_busy: bool = True
+    # Boost applied to an event's effective priority when it matches a user's
+    # onboarding "what are you most afraid to miss?" topics — so the things they
+    # told us they can't miss break through quiet hours / busy.
+    priority_topic_boost: int = 3
+
+    # ── Imminent meeting prep ─────────────────────────────────────────────────
+    # Beyond the once-daily meeting rundown, fire a focused, high-priority prep
+    # alert shortly before each meeting starts ("you meet X in 30 min — here's
+    # what changed in your corpus"). Reuses the proactive infra + batch economics.
+    meeting_prep_enabled: bool = True
+    meeting_prep_lead_minutes: int = 30      # how far ahead of a meeting to prep
+    meeting_prep_sweep_minutes: int = 5      # how often the scheduler sweeps calendars
+
+    # ── Proactive voice (Jarvis-style outreach) ───────────────────────────────
+    # When proactive alerts fire, Briefly can also speak — a short spoken briefing
+    # synthesized via the TTS adapter, surfaced via /proactive/voice. Off-channel
+    # telephony is out of scope; this rides the existing push + orb surfaces.
+    proactive_voice_enabled: bool = True
+    proactive_voice_persona: str = (
+        "You are Briefly, a calm, precise chief of staff speaking aloud to the "
+        "person you work for. Warm but economical — never chatty. You reach out "
+        "first because something is worth their attention."
+    )
+    proactive_voice_max_chars: int = 700     # keep the spoken clip short
 
     # ── Weekly intelligence skill ─────────────────────────────────────────────
     weekly_intelligence_enabled: bool = True

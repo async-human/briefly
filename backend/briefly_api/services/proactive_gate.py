@@ -41,6 +41,14 @@ def _user_tz(tz_name: str | None) -> ZoneInfo:
         return ZoneInfo("UTC")
 
 
+def _matches_priority_topics(text: str | None, priority_topics: list[str]) -> bool:
+    """True if the event text mentions any of the user's "afraid to miss" topics."""
+    if not text or not priority_topics:
+        return False
+    low = text.lower()
+    return any(topic and topic in low for topic in priority_topics)
+
+
 def _in_quiet_hours(tz: ZoneInfo, start_h: int, end_h: int) -> bool:
     if start_h == end_h:
         return False
@@ -96,8 +104,13 @@ async def _is_busy_now(user_id: str, tz_name: str | None) -> bool:
     return busy
 
 
-async def should_push(user_id: str, priority: int) -> str:
-    """Return "push" or "hold" for delivering a proactive event right now."""
+async def should_push(user_id: str, priority: int, *, topic_text: str | None = None) -> str:
+    """Return "push" or "hold" for delivering a proactive event right now.
+
+    `topic_text` (event title/body/thread) is matched against the user's
+    onboarding "what are you most afraid to miss?" topics; a match boosts the
+    event's effective priority so those alerts break through quiet hours / busy.
+    """
     s = get_settings()
 
     if priority >= s.push_always_priority:
@@ -113,6 +126,12 @@ async def should_push(user_id: str, priority: int) -> str:
             ).scalar_one_or_none()
     except Exception:
         log.debug("proactive_gate: profile load failed for %s", user_id, exc_info=True)
+
+    priority_topics = list((getattr(profile, "profile_meta", None) or {}).get("priority_topics", []))
+    if _matches_priority_topics(topic_text, priority_topics):
+        priority += s.priority_topic_boost
+        if priority >= s.push_always_priority:
+            return "push"
 
     tz_name = getattr(profile, "digest_timezone", None)
     tz = _user_tz(tz_name)

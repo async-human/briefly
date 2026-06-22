@@ -163,6 +163,44 @@ async def run_proactive_alerts_job() -> None:
     await send_pending_proactive_alerts()
 
 
+async def run_imminent_meeting_prep_job() -> None:
+    await _run_imminent_meeting_prep_sweep()
+
+
+async def _run_imminent_meeting_prep_sweep() -> None:
+    """Sweep calendar-connected users and queue focused prep for meetings starting
+    within the lead window. Cheap per-user short-circuit when no calendar is linked;
+    delivery rides the next proactive_alerts run."""
+    s = get_settings()
+    if not (s.proactive_surfacing_enabled and s.meeting_prep_enabled):
+        return
+    from briefly_api.services.calendar_briefing import queue_imminent_meeting_prep
+
+    try:
+        profiles = await _profiles_for_scheduling()
+    except Exception:
+        log.exception("Imminent meeting prep: could not load users")
+        return
+
+    queued_total = 0
+    for profile in profiles:
+        user_id = profile.user_id
+        try:
+            lock_key = f"briefly:meeting_prep:{user_id}"
+            async with job_lock(lock_key, ttl_seconds=120) as acquired:
+                if not acquired:
+                    continue
+                async with SessionLocal() as session:
+                    n = await queue_imminent_meeting_prep(session, user_id)
+                    if n:
+                        await session.commit()
+                        queued_total += n
+        except Exception:
+            log.exception("Imminent meeting prep failed for user %s", user_id)
+    if queued_total:
+        log.info("Imminent meeting prep: queued %d event(s)", queued_total)
+
+
 async def run_weekly_reports_job() -> None:
     from briefly_api.services.weekly_email import send_weekly_reports_for_due_users
 
@@ -559,6 +597,23 @@ async def digest_scheduler_loop() -> None:
                 if _last_intraday_hour != intraday_key:
                     _last_intraday_hour = intraday_key
                     asyncio.create_task(_run_intraday_refresh())
+
+            # ── Imminent meeting prep sweep (every N min) ──────────────────────
+            if (
+                s.proactive_surfacing_enabled
+                and s.meeting_prep_enabled
+                and now_utc.minute % max(1, s.meeting_prep_sweep_minutes) == 0
+            ):
+                from briefly_api.services.background_jobs import enqueue_background_job
+
+                await enqueue_background_job(
+                    "imminent_meeting_prep",
+                    {},
+                    idempotency_key=(
+                        f"meeting_prep:{now_utc.strftime('%Y-%m-%d-%H')}-"
+                        f"{now_utc.minute // max(1, s.meeting_prep_sweep_minutes)}"
+                    ),
+                )
 
             # ── Proactive breaking alerts (every 15 min, durable) ──────────────
             if s.proactive_surfacing_enabled and now_utc.minute % 15 == 0:

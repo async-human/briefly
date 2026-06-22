@@ -89,6 +89,7 @@ class ProfileUpdate(BaseModel):
     digest_timezone: str | None = None
     interests: list[str] | None = None       # topic strings → stored as {topic, weight, source}
     never_show: list[str] | None = None      # hard-filter strings
+    priority_topics: list[str] | None = None # "what are you most afraid to miss?" → interrupt-worthy
     recent_insight: str | None = None        # a piece of content that changed their thinking
     brief_style: Literal["analyst", "scan", "plain"] | None = None
     brief_language: Literal["en", "hi"] | None = None
@@ -111,6 +112,7 @@ class OnboardingStatusOut(BaseModel):
     calendar_connected: bool = False
     calendar_email: str | None = None
     sources_count: int
+    priority_topics: list[str] = []
 
 
 class OnboardingCompleteOut(BaseModel):

@@ -30,14 +30,43 @@ self.addEventListener("push", (event) => {
     badge: "/briefly-mark.svg",
     tag: data.tag || undefined,
     renotify: Boolean(data.tag),
-    data: { url: data.url || "/dashboard" },
+    data: {
+      url: data.url || "/dashboard",
+      voice: Boolean(data.voice),
+      voiceUrl: data.voiceUrl || "/api/v1/proactive/voice",
+    },
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+
+  event.waitUntil(
+    (async () => {
+      await self.registration.showNotification(title, options);
+      // Jarvis-style outreach: if a window is already open, ask it to speak now
+      // (it has the audio context + any prior user gesture). Otherwise the spoken
+      // briefing plays after the user clicks the notification (see below).
+      if (data.voice) {
+        const clientList = await self.clients.matchAll({
+          type: "window",
+          includeUncontrolled: true,
+        });
+        for (const client of clientList) {
+          client.postMessage({
+            type: "briefly-voice",
+            voiceUrl: options.data.voiceUrl,
+          });
+        }
+      }
+    })(),
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/dashboard";
+  const nd = event.notification.data || {};
+  let url = nd.url || "/dashboard";
+  // The click is a user gesture — let the destination page autoplay the briefing.
+  if (nd.voice) {
+    url += (url.includes("?") ? "&" : "?") + "briefly_voice=1";
+  }
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })

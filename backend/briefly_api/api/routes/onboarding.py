@@ -101,6 +101,7 @@ async def _build_onboarding_status(
         calendar_connected=calendar is not None,
         calendar_email=calendar.account_email if calendar else None,
         sources_count=sources_count or 0,
+        priority_topics=list((profile.profile_meta or {}).get("priority_topics", [])) if profile else [],
     )
 
 
@@ -139,6 +140,13 @@ async def update_onboarding_profile(
         ]
     if body.never_show is not None:
         profile.never_show = [t.strip().lower() for t in body.never_show if t.strip()]
+    if body.priority_topics is not None:
+        from sqlalchemy.orm.attributes import flag_modified
+
+        meta = dict(profile.profile_meta or {})
+        meta["priority_topics"] = [t.strip().lower() for t in body.priority_topics if t.strip()]
+        profile.profile_meta = meta
+        flag_modified(profile, "profile_meta")
     if body.recent_insight is not None:
         profile.recent_insight = body.recent_insight.strip() or None
     if body.brief_style is not None:

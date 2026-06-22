@@ -37,6 +37,12 @@ async def _proactive(_payload: dict[str, Any]) -> None:
     await send_pending_proactive_alerts()
 
 
+async def _imminent_meeting_prep(_payload: dict[str, Any]) -> None:
+    from briefly_api.workers.scheduler import run_imminent_meeting_prep_job
+
+    await run_imminent_meeting_prep_job()
+
+
 async def _weekly_reports(payload: dict[str, Any]) -> None:
     from briefly_api.services.weekly_email import send_weekly_reports_for_due_users
 
@@ -72,5 +78,6 @@ def register_all_job_handlers() -> None:
     register_job_handler("weekly_intelligence", _weekly_intelligence)
     register_job_handler("story_thread_agent", _story_thread)
     register_job_handler("proactive_alerts", _proactive)
+    register_job_handler("imminent_meeting_prep", _imminent_meeting_prep)
     register_job_handler("weekly_reports", _weekly_reports)
     register_job_handler("account_deletion_cleanup", _account_deletion_cleanup)
