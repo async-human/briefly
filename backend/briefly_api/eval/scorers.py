@@ -134,7 +134,10 @@ class FaithfulnessJudge:
 
 @dataclass
 class TaskSuccessJudge:
-    """Did the output actually accomplish the instruction?"""
+    """Did the output accomplish the task? A case may define its own success bar via
+    reference['success_criteria'] — important when the *right* behavior is to refuse
+    (e.g. don't invent a figure that isn't in context). Falls back to the raw
+    instruction when no criteria is given."""
     instruction_field: str
     output_field: str = "body"
     threshold: float = 0.7
@@ -143,13 +146,23 @@ class TaskSuccessJudge:
     async def score(self, case: EvalCase, output: dict[str, Any]) -> ScoreResult:
         instruction = _get(case.inputs, self.instruction_field)
         text = _get(output, self.output_field)
+        criteria = (case.reference or {}).get("success_criteria")
+        if criteria:
+            rubric = (
+                "Judge whether the OUTPUT meets the SUCCESS CRITERIA (this defines what "
+                "success means for this task; the raw instruction may be impossible to "
+                "satisfy faithfully, and refusing to fabricate can itself be success).\n\n"
+                f"SUCCESS CRITERIA:\n{criteria}\n\n"
+                f"INSTRUCTION (for context):\n{instruction}\n\nOUTPUT:\n{text}"
+            )
+        else:
+            rubric = (
+                "Given the INSTRUCTION and the OUTPUT, judge whether the output satisfies "
+                f"the instruction.\n\nINSTRUCTION:\n{instruction}\n\nOUTPUT:\n{text}"
+            )
         verdict = await _judge(
             "You are a strict evaluator of whether a task was accomplished. JSON only.",
-            (
-                "Given the INSTRUCTION and the OUTPUT, judge whether the output satisfies "
-                'the instruction. Return JSON: {"success": <0.0-1.0>, "reason": "<short>"}.\n\n'
-                f"INSTRUCTION:\n{instruction}\n\nOUTPUT:\n{text}"
-            ),
+            rubric + '\n\nReturn JSON: {"success": <0.0-1.0>, "reason": "<short>"}.',
         )
         score = float(verdict.get("success", 0.0) or 0.0)
         ok = score >= self.threshold
