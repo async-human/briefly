@@ -140,25 +140,30 @@ class TaskSuccessJudge:
     instruction when no criteria is given."""
     instruction_field: str
     output_field: str = "body"
+    context_field: str = "context"  # so the judge can tell grounded facts from invented ones
     threshold: float = 0.7
     name: str = "task_success"
 
     async def score(self, case: EvalCase, output: dict[str, Any]) -> ScoreResult:
         instruction = _get(case.inputs, self.instruction_field)
         text = _get(output, self.output_field)
+        context = _get(case.inputs, self.context_field)
+        context_block = f"\n\nCONTEXT (the only legitimate source of facts):\n{context}" if context else ""
         criteria = (case.reference or {}).get("success_criteria")
         if criteria:
             rubric = (
                 "Judge whether the OUTPUT meets the SUCCESS CRITERIA (this defines what "
                 "success means for this task; the raw instruction may be impossible to "
-                "satisfy faithfully, and refusing to fabricate can itself be success).\n\n"
+                "satisfy faithfully, and refusing to fabricate can itself be success). "
+                "A fact is NOT invented if it appears in the CONTEXT below.\n\n"
                 f"SUCCESS CRITERIA:\n{criteria}\n\n"
-                f"INSTRUCTION (for context):\n{instruction}\n\nOUTPUT:\n{text}"
+                f"INSTRUCTION (for context):\n{instruction}{context_block}\n\nOUTPUT:\n{text}"
             )
         else:
             rubric = (
                 "Given the INSTRUCTION and the OUTPUT, judge whether the output satisfies "
-                f"the instruction.\n\nINSTRUCTION:\n{instruction}\n\nOUTPUT:\n{text}"
+                "the instruction. A fact is NOT invented if it appears in the CONTEXT below.\n\n"
+                f"INSTRUCTION:\n{instruction}{context_block}\n\nOUTPUT:\n{text}"
             )
         verdict = await _judge(
             "You are a strict evaluator of whether a task was accomplished. JSON only.",
