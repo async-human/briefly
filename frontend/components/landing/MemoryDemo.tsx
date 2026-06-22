@@ -145,7 +145,9 @@ export function MemoryDemo() {
             <p className="section-body">
               Every other tool forgets the moment you close it. Briefly builds a memory of
               what you&apos;ve read and the views you&apos;ve formed, so each morning&apos;s story
-              arrives already tied to the thread you&apos;ve been following.
+              arrives already tied to the thread you&apos;ve been following. Day one, it&apos;s a
+              digest anyone could clone. Day ninety, it&apos;s an intelligence layer that knows
+              your thinking.
             </p>
           </div>
         </Reveal>

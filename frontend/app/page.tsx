@@ -3,6 +3,7 @@ import { ScrollProgress } from "@/components/landing/ScrollProgress";
 import { CardSpotlight } from "@/components/landing/CardSpotlight";
 import { Nav } from "@/components/landing/Nav";
 import { Hero } from "@/components/landing/Hero";
+import { WhyBriefly } from "@/components/landing/WhyBriefly";
 import { LiveDemo } from "@/components/landing/LiveDemo";
 import { MemoryDemo } from "@/components/landing/MemoryDemo";
 import { TrustSourcesSection } from "@/components/landing/TrustSourcesSection";
@@ -20,6 +21,7 @@ export default function Home() {
       <CardSpotlight />
       <Nav />
       <Hero />
+      <WhyBriefly />
       <LiveDemo />
       <MemoryDemo />
       <TrustSourcesSection />

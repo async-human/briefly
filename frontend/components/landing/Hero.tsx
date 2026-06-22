@@ -86,14 +86,14 @@ export function Hero() {
             Morning briefing →
           </a>
         </p>
-        <h1 className="hero-linear-headline" aria-label="The intelligence system for everything you follow">
+        <h1 className="hero-linear-headline" aria-label="The brief that reads and remembers everything you follow">
           <motion.span
             className="hero-headline-lead"
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.12, ease: EASE }}
           >
-            The <span className="headline-shimmer">intelligence system</span> for{" "}
+            The brief that reads and <span className="headline-shimmer">remembers</span>{" "}
           </motion.span>
           <RotatingWord className="hero-headline-rotate" words={ROTATING} />
         </h1>
@@ -103,9 +103,9 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.42, delay: 0.55, ease: EASE }}
         >
-          Purpose-built for people who subscribe to too much. Briefly processes the
-          newsletters, feeds, and channels you choose — then delivers one sharp,
-          cited briefing designed for how you actually consume news.
+          For people who subscribe to too much. Briefly reads every newsletter, feed,
+          and channel you follow, remembers how it all connects, and hands you one
+          sharp, cited briefing each morning. No tagging. No managing. No starting over.
         </motion.p>
         <motion.div
           className="hero-linear-actions"
