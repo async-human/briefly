@@ -96,10 +96,16 @@ def _parse_json(text: str) -> dict:
 
 
 _ANSWERABILITY_SYSTEM = (
-    "You decide whether a body of CONTEXT can support an email INSTRUCTION using ONLY "
-    "facts present in the context, with no outside knowledge. Be strict: if the context "
-    "is missing the specific facts the instruction needs (figures, a topic it never "
-    "mentions, etc.), it CANNOT answer. Respond in STRICT JSON only."
+    "You decide whether the CONTEXT has enough substance to write a USEFUL, honest email "
+    "for the INSTRUCTION WITHOUT inventing facts. Lean toward CAN answer. "
+    "Answer CANNOT only when writing the email would force inventing specific facts that "
+    "are simply absent — e.g. a figure/metric the context never states, or a topic the "
+    "context never covers at all, or empty context. "
+    "If the context has relevant material and a useful draft can be written from it — even "
+    "when the user's wording is loose (a quote 'about moats' that is actually about "
+    "distribution still counts), or the task is to summarize, select, or EXCLUDE something "
+    "— then it CAN answer. Only refuse when answering would require invention. "
+    "Respond in STRICT JSON only."
 )
 
 _GAP_SYSTEM = (
