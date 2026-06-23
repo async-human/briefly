@@ -3,6 +3,7 @@
 // Tauri globals (present when running inside the desktop app; absent in a plain
 // browser, where we fall back gracefully for dev/preview).
 const TAURI = window.__TAURI__ || null;
+const DEFAULT_APP_BASE = "https://app.sendbriefly.app";
 
 // ── Persistent settings ────────────────────────────────────────────────────
 const store = {
@@ -100,6 +101,43 @@ const state = {
   wakePrimed: false,
   wakeErrorShownAt: 0,
 };
+
+function isAccountLinked() {
+  return !!store.token;
+}
+
+function connectPageUrl() {
+  if (store.apiBase.includes("localhost")) {
+    return "http://localhost:3000/desktop/connect";
+  }
+  return `${DEFAULT_APP_BASE}/desktop/connect`;
+}
+
+async function openBrieflyConnect() {
+  const url = connectPageUrl();
+  try {
+    if (TAURI?.opener?.openUrl) {
+      await TAURI.opener.openUrl(url);
+    } else {
+      window.open(url, "_blank", "noopener");
+    }
+    flashCaption("Sign in in your browser to connect.", 3200);
+  } catch (_) {
+    flashCaption("Open " + url + " in your browser.", 4000);
+  }
+}
+
+function updateLinkStatus() {
+  const el = document.getElementById("linkStatus");
+  if (!el) return;
+  if (isAccountLinked()) {
+    el.textContent = "Connected to Briefly";
+    el.classList.add("linked");
+  } else {
+    el.textContent = "Not connected — click Connect below";
+    el.classList.remove("linked");
+  }
+}
 
 function appendTurnFormFields(form) {
   if (store.threadId) form.append("thread_id", store.threadId);
@@ -310,7 +348,7 @@ function updateWakeStatus() {
   } else if (state.wakeBackend === "mic") {
     el.textContent = store.token
       ? 'Wake word listening: say "hey briefly"'
-      : 'Wake word needs a device token (settings)';
+      : "Connect account to enable wake word";
   } else if (state.wakeBackend === "web") {
     el.textContent = 'Wake word beta: "hey briefly"';
   } else {
@@ -499,7 +537,6 @@ async function ensureMic() {
 async function verifyDeviceToken() {
   const token = store.token;
   if (!token) return { ok: false, reason: "missing" };
-  if (!token.startsWith("bcap_")) return { ok: false, reason: "format" };
   try {
     const res = await apiFetch(store.apiBase + "/api/v1/orb/session", {
       method: "POST",
@@ -554,8 +591,8 @@ async function parseWakeCheckResponse(res) {
 
 async function apiWakeCheck(audioBlob) {
   const token = store.token;
-  if (!token.startsWith("bcap_")) {
-    throw new Error("HTTP 401 — token must start with bcap_");
+  if (!token) {
+    throw new Error("HTTP 401 — connect your Briefly account in settings");
   }
   const mime = audioBlob.type || "audio/webm";
   const headers = {
@@ -586,7 +623,7 @@ function chooseMimeType() {
 
 async function startListening() {
   if (!store.token) {
-    flashCaption("Add a device token in settings first.", 2500);
+    flashCaption("Connect your Briefly account first (gear icon).", 2800);
     openSettings(true);
     return;
   }
@@ -786,7 +823,8 @@ function handleDesktopAuth(payload) {
   if (apiBase) store.apiBase = apiBase;
   store.token = token;
   openSettings(false);
-  flashCaption("Desktop orb linked.", 2200);
+  updateLinkStatus();
+  flashCaption("Briefly account connected.", 2200);
   void primeWakeListening();
   void startWakeWord();
   void initLiveSession();
@@ -851,7 +889,7 @@ function onWakeMonitorError(kind, err) {
     return;
   }
   if (msg.includes("401") || msg.includes("rejected")) {
-    flashCaption("Create a new Desktop token (bcap_…) in Briefly settings.", 3600);
+    flashCaption("Connect your Briefly account (gear → Connect).", 3600);
     return;
   }
   if (msg.includes("502") || msg.includes("503")) {
@@ -1112,6 +1150,7 @@ function openSettings(open) {
   if (willOpen) {
     document.getElementById("apiBase").value = store.apiBase;
     document.getElementById("token").value = store.token;
+    updateLinkStatus();
     panel.classList.remove("hidden");
   } else {
     panel.classList.add("hidden");
@@ -1199,35 +1238,34 @@ function init() {
   });
   document.getElementById("proactive").addEventListener("click", () => toggleProactive());
   document.getElementById("gear").addEventListener("click", () => openSettings());
+  document.getElementById("connect").addEventListener("click", () => {
+    void openBrieflyConnect();
+  });
   document.getElementById("hide").addEventListener("click", () => {
     stopCurrentTurn();
     hideWindow();
   });
   document.getElementById("save").addEventListener("click", async () => {
     store.apiBase = document.getElementById("apiBase").value.trim().replace(/\/$/, "");
-    const rawToken = document.getElementById("token").value.trim();
-    if (rawToken && !rawToken.startsWith("bcap_")) {
-      flashCaption("Desktop token must start with bcap_", 3200);
-      return;
-    }
-    store.token = rawToken;
+    store.token = document.getElementById("token").value.trim();
     if (!store.token) {
       openSettings(false);
+      updateLinkStatus();
       flashCaption("Saved.", 1600);
       return;
     }
     const check = await verifyDeviceToken();
     openSettings(false);
+    updateLinkStatus();
     if (!check.ok) {
       const reason =
-        check.reason === "format" ? "Token must start with bcap_" :
-        check.reason === "rejected" ? "Token rejected — create a new Desktop token in Briefly web app" :
-        check.reason === "network" ? "Could not reach API to verify token" :
-        "Token check failed (" + check.reason + ")";
+        check.reason === "rejected" ? "Account link failed — use Connect button instead" :
+        check.reason === "network" ? "Could not reach API to verify" :
+        "Account link failed (" + check.reason + ")";
       flashCaption(reason, 3800);
       return;
     }
-    flashCaption("Saved — token verified.", 2000);
+    flashCaption("Connected.", 2000);
     void primeWakeListening();
     void startWakeWord();
     await initLiveSession();
@@ -1273,11 +1311,14 @@ function init() {
   void registerGlobalHotkey();
   if (store.token) {
     void verifyDeviceToken().then((check) => {
+      updateLinkStatus();
       if (!check.ok && check.reason === "rejected") {
-        flashCaption("Device token invalid — create a new Desktop token (bcap_…)", 4200);
+        flashCaption("Session expired — click Connect in settings.", 4200);
         openSettings(true);
       }
     });
+  } else {
+    updateLinkStatus();
   }
   void startWakeWord();
   updateWakeStatus();

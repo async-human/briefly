@@ -322,6 +322,40 @@ body:not([data-mode="idle"]) .composer {
   justify-content: flex-end;
 }
 
+.link-status {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.link-status.linked {
+  color: oklch(72% 0.14 145);
+}
+
+.connect-btn {
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent);
+  color: oklch(18% 0.02 275);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.advanced-settings {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.advanced-settings summary {
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
 .save {
   padding: 6px 14px;
   border-radius: 999px;

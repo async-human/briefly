@@ -30,6 +30,19 @@ function openDesktopLink(token: string): void {
   setTimeout(() => iframe.remove(), 3000);
 }
 
+/** Public helper for the desktop connect page (manual link flow). */
+export function openDesktopOrbLink(token: string): void {
+  openDesktopLink(token);
+}
+
+export function desktopConnectPageUrl(): string {
+  const app =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXT_PUBLIC_DASHBOARD_URL ??
+    "https://app.sendbriefly.app";
+  return `${app.replace(/\/$/, "")}/desktop/connect`;
+}
+
 /** Best-effort zero-setup desktop orb handoff after web login. */
 export async function ensureDesktopOrbLinked(): Promise<void> {
   if (typeof window === "undefined") return;

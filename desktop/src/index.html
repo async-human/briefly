@@ -42,19 +42,24 @@
       </form>
 
       <div id="settings" class="settings hidden">
-        <label class="field">
-          <span>API base</span>
-          <input id="apiBase" type="text" spellcheck="false" placeholder="https://api.sendbriefly.app" />
-        </label>
-        <label class="field">
-          <span>Device token</span>
-          <input id="token" type="password" spellcheck="false" placeholder="paste your bcap_ token" />
-        </label>
-        <div class="settings-actions">
-          <button id="save" class="save">Save</button>
-        </div>
+        <p id="linkStatus" class="link-status">Not connected</p>
+        <button id="connect" type="button" class="connect-btn">Connect Briefly account</button>
+        <details class="advanced-settings">
+          <summary>Advanced</summary>
+          <label class="field">
+            <span>API base</span>
+            <input id="apiBase" type="text" spellcheck="false" placeholder="https://api.sendbriefly.app" />
+          </label>
+          <label class="field">
+            <span>Manual token (fallback)</span>
+            <input id="token" type="password" spellcheck="false" placeholder="only if auto-connect fails" />
+          </label>
+          <div class="settings-actions">
+            <button id="save" type="button" class="save">Save</button>
+          </div>
+        </details>
         <p class="hint">
-          Create a Desktop token in Briefly Settings -> Connected devices, then paste it here.
+          One click signs you in via the browser — no copy/paste. The orb receives the link automatically.
         </p>
       </div>
     </div>

@@ -15,6 +15,7 @@ use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_deep_link::DeepLinkExt;
 
 const DASHBOARD_URL: &str = "https://app.sendbriefly.app/dashboard";
+const CONNECT_URL: &str = "https://app.sendbriefly.app/desktop/connect";
 
 #[derive(Clone, serde::Serialize)]
 struct DesktopAuthPayload {
@@ -251,10 +252,12 @@ pub fn run() {
                 MenuItem::with_id(app, "speak", "Push to talk", true, None::<&str>)?;
             let show_i =
                 MenuItem::with_id(app, "show", "Show / hide orb", true, None::<&str>)?;
+            let connect_i =
+                MenuItem::with_id(app, "connect", "Connect account", true, None::<&str>)?;
             let open_i =
                 MenuItem::with_id(app, "open", "Open Briefly in browser", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&speak_i, &show_i, &open_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&speak_i, &show_i, &connect_i, &open_i, &quit_i])?;
 
             let _tray = TrayIconBuilder::with_id("main")
                 .tooltip("Briefly")
@@ -264,6 +267,10 @@ pub fn run() {
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "speak" => trigger_speak(app),
                     "show" => toggle_orb(app),
+                    "connect" => {
+                        use tauri_plugin_opener::OpenerExt;
+                        let _ = app.opener().open_url(CONNECT_URL, None::<&str>);
+                    }
                     "open" => {
                         use tauri_plugin_opener::OpenerExt;
                         let _ = app.opener().open_url(DASHBOARD_URL, None::<&str>);
