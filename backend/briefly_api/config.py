@@ -217,6 +217,11 @@ class Settings(BaseSettings):
     # task-success). Empty = use the configured llm_model. Set to a small/fast
     # model (e.g. claude-haiku-4-5) to keep eval runs cheap.
     eval_judge_model: str = ""
+
+    # Agent runtime: per-task budget — the max plan→execute steps a single agentic
+    # task may take. Bounds tool/LLM calls so multi-step agents can't burn runaway
+    # tokens. The primary cost cap for the act layer.
+    agent_max_steps: int = 4
     calendar_scopes: str = (
         "https://www.googleapis.com/auth/calendar.readonly openid email"
     )

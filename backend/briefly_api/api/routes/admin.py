@@ -13,8 +13,11 @@ import hmac
 import logging
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.config import Settings, get_settings
+from briefly_api.db.engine import get_db
 
 log = logging.getLogger(__name__)
 
@@ -67,3 +70,43 @@ async def run_eval(
 
     log.info("admin eval run: suites=%s ok=%s", names, overall_ok)
     return {"suites": summaries, "ok": overall_ok}
+
+
+@router.get("/agent-runs")
+async def list_agent_runs(
+    limit: int = Query(20, ge=1, le=100),
+    x_admin_key: str | None = Header(None, alias="X-Admin-Key"),
+    settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Inspect the act-layer audit log — recent agent runs with their tool traces.
+    Observability: see what the agent did, how it ended, and how long it took."""
+    _require_admin(x_admin_key, settings)
+
+    from briefly_api.db.models import AgentRun
+
+    rows = (
+        await db.execute(
+            select(AgentRun).order_by(AgentRun.created_at.desc()).limit(limit)
+        )
+    ).scalars().all()
+
+    return {
+        "count": len(rows),
+        "runs": [
+            {
+                "id": r.id,
+                "user_id": r.user_id,
+                "surface": r.surface,
+                "goal": r.goal,
+                "answer": r.answer,
+                "tools_used": r.tools_used,
+                "stopped_reason": r.stopped_reason,
+                "duration_ms": r.duration_ms,
+                "steps": r.steps,
+                "thread_id": r.thread_id,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+    }

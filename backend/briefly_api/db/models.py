@@ -883,6 +883,33 @@ class EmailDraft(Base):
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class AgentRun(Base):
+    """Audit log of every agentic task the runtime executes — the goal, the tools it
+    used, the full step trace, how it ended, and how long it took. The durable record
+    for the act layer (VISION non-negotiable: audit every action)."""
+
+    __tablename__ = "agent_runs"
+    __table_args__ = (
+        Index("ix_agent_runs_user", "user_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    surface: Mapped[str] = mapped_column(String(20), default="orb")  # where it ran
+    goal: Mapped[str] = mapped_column(Text, default="")
+    answer: Mapped[str] = mapped_column(Text, default="")
+    tools_used: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    stopped_reason: Mapped[str] = mapped_column(String(40), default="final")
+    steps: Mapped[list[dict]] = mapped_column(JSONB, default=list)  # the plan→execute trace
+    thread_id: Mapped[str | None] = mapped_column(String(64))
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 # ── Background jobs ───────────────────────────────────────────────────────────
 
 class BackgroundJob(Base):

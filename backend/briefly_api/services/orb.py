@@ -23,8 +23,11 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from briefly_api.db.engine import SessionLocal
 
 from briefly_api.agent import AgentRuntime, ToolContext, ToolRegistry, from_orb_tool
 from briefly_api.config import get_settings
@@ -241,6 +244,33 @@ def _agent_registry() -> ToolRegistry:
     return ToolRegistry([from_orb_tool(t) for t in REGISTRY])
 
 
+async def _persist_agent_run(
+    user_id: str, goal: str, result, duration_ms: int
+) -> None:
+    """Write the audit record for an agent run on its own session, so auditing never
+    affects or depends on the request transaction. Best-effort — never raises."""
+    from briefly_api.db.models import AgentRun
+
+    try:
+        async with SessionLocal() as session:
+            session.add(
+                AgentRun(
+                    user_id=user_id,
+                    surface="orb",
+                    goal=(goal or "")[:2000],
+                    answer=(result.answer or "")[:4000],
+                    tools_used=list(result.tools_used or []),
+                    stopped_reason=result.stopped_reason,
+                    steps=[s.to_dict() for s in result.steps],
+                    thread_id=result.thread_id,
+                    duration_ms=duration_ms,
+                )
+            )
+            await session.commit()
+    except Exception:
+        log.exception("agent run audit persist failed for user %s", user_id)
+
+
 async def _run_agent(
     db: AsyncSession,
     user: User,
@@ -249,20 +279,26 @@ async def _run_agent(
     thread_id: str | None,
     content_id: str | None,
 ) -> dict | None:
-    runtime = AgentRuntime(_agent_registry(), max_steps=4, allow_writes=True)
+    settings = get_settings()
+    runtime = AgentRuntime(_agent_registry(), max_steps=settings.agent_max_steps, allow_writes=True)
     ctx = ToolContext(
         db=db,
         user=user,
-        settings=get_settings(),
+        settings=settings,
         goal=transcript,
         thread_id=thread_id,
         content_id=content_id,
     )
+    started = time.monotonic()
     try:
         result = await runtime.run(ctx)
     except Exception:
         log.exception("orb agent runtime failed — falling back")
         return None
+    duration_ms = int((time.monotonic() - started) * 1000)
+
+    await _persist_agent_run(user.id, transcript, result, duration_ms)
+
     answer = (result.answer or "").strip()
     if not answer:
         return None
