@@ -20,8 +20,9 @@ function splitSentences(text) {
  * @param {(sentence: string, signal?: AbortSignal) => Promise<Blob>} opts.speakFn
  * @param {AbortSignal} [opts.signal]
  * @param {number} [opts.prefetch=2]
+ * @param {(audio: HTMLAudioElement) => void} [opts.onAudio]
  */
-async function playSentencePipeline({ text, speakFn, signal, prefetch = 2 }) {
+async function playSentencePipeline({ text, speakFn, signal, prefetch = 2, onAudio }) {
   const sentences = splitSentences(text);
   if (!sentences.length) return;
   const jobs = new Array(sentences.length).fill(null);
@@ -41,9 +42,27 @@ async function playSentencePipeline({ text, speakFn, signal, prefetch = 2 }) {
     const url = URL.createObjectURL(blob);
     await new Promise((resolve) => {
       const audio = new Audio(url);
-      audio.onended = resolve;
-      audio.onerror = resolve;
-      audio.play().catch(() => resolve());
+      if (onAudio) onAudio(audio);
+      const finish = () => {
+        if (onAudio) onAudio(null);
+        resolve();
+      };
+      if (signal) {
+        signal.addEventListener(
+          "abort",
+          () => {
+            try {
+              audio.pause();
+              audio.currentTime = 0;
+            } catch (_) {}
+            finish();
+          },
+          { once: true },
+        );
+      }
+      audio.onended = finish;
+      audio.onerror = finish;
+      audio.play().catch(() => finish());
     });
     URL.revokeObjectURL(url);
   }

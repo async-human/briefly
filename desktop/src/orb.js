@@ -904,6 +904,9 @@ async function playTts(text) {
     speakFn: apiSpeakToBlob,
     signal: speakAbort.signal,
     prefetch: 2,
+    onAudio: (audio) => {
+      state.ttsAudio = audio;
+    },
   });
   if (!speakAbort.signal.aborted) {
     setMode("idle");
@@ -1050,6 +1053,13 @@ function stopWakeWord() {
 }
 
 function onWakePhraseHeard() {
+  if (state.mode === "listening") return;
+  if (state.mode === "speaking" || state.mode === "thinking") {
+    stopCurrentTurn();
+    flashCaption("Interrupted — listening.", 1200);
+    void startListening();
+    return;
+  }
   if (state.mode !== "idle") return;
   flashCaption("Wake word heard.", 900);
   void startListening();
@@ -1116,7 +1126,11 @@ async function startMicWakeWord() {
     onError: onWakeMonitorError,
     isLinked: isAccountLinked,
     verifyLinked: async () => refreshLinkState(),
-    isIdle: () => state.mode === "idle" && store.wakeEnabled && !store.wakeMuted,
+    isIdle: () => {
+      if (!store.wakeEnabled || store.wakeMuted) return false;
+      if (state.mode === "listening") return false;
+      return state.mode === "idle" || state.mode === "speaking" || state.mode === "thinking";
+    },
     measureRms: measureMicRms,
     chooseMimeType,
   });
@@ -1148,7 +1162,7 @@ function startWebWakeWord() {
   rec.interimResults = true;
   rec.maxAlternatives = 1;
   rec.onresult = (event) => {
-    if (state.mode !== "idle") return;
+    if (state.mode === "listening") return;
     let transcript = "";
     for (let i = event.resultIndex; i < event.results.length; i++) {
       transcript += event.results[i][0]?.transcript || "";
@@ -1399,7 +1413,12 @@ async function initLiveSession() {
       setStatusForMode("listening", truncateStatus(text, 48));
       return;
     }
-    if (state.mode === "idle" && store.wakeEnabled && !store.wakeMuted && transcriptMatchesWakePhrase(text)) {
+    if (
+      (state.mode === "idle" || state.mode === "speaking" || state.mode === "thinking") &&
+      store.wakeEnabled &&
+      !store.wakeMuted &&
+      transcriptMatchesWakePhrase(text)
+    ) {
       onWakePhraseHeard();
     }
   };
