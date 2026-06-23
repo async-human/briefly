@@ -612,3 +612,9 @@ class OrbWakeCheckOut(BaseModel):
     transcript: str
     wake: bool
 
+
+class OrbWakeCheckIn(BaseModel):
+    audio_base64: str
+    content_type: str = "audio/webm"
+    filename: str = "wake.webm"
+

@@ -364,6 +364,8 @@ async def check_wake_phrase(
     content_type: str = "audio/webm",
 ) -> dict:
     """Transcribe a short wake clip; STT only — no agent turn."""
+    if not audio_bytes or len(audio_bytes) < 200:
+        return {"transcript": "", "wake": False}
     stt = get_stt_adapter()
     context_prompt = (
         'The user may say "hey briefly" or "hi briefly" to wake a voice assistant.'
@@ -374,14 +376,18 @@ async def check_wake_phrase(
         profile = await transcription_prompt_for_user(db, user.id)
         if profile:
             context_prompt = f"{context_prompt} {profile}"
-    transcript = (
-        await stt.transcribe(
-            audio_bytes,
-            filename=filename,
-            content_type=content_type,
-            context_prompt=context_prompt,
-        )
-    ).strip()
+    try:
+        transcript = (
+            await stt.transcribe(
+                audio_bytes,
+                filename=filename,
+                content_type=content_type,
+                context_prompt=context_prompt,
+            )
+        ).strip()
+    except Exception as exc:
+        log.warning("wake phrase STT failed: %s", exc)
+        return {"transcript": "", "wake": False}
     return {
         "transcript": transcript,
         "wake": transcript_matches_wake_phrase(transcript),

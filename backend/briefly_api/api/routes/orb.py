@@ -8,6 +8,8 @@ JWT (get_capture_user), so the desktop orb is just another device client.
 """
 from __future__ import annotations
 
+import base64
+import binascii
 import logging
 
 import httpx
@@ -23,6 +25,7 @@ from briefly_api.api.schemas import (
     OrbSessionOut,
     OrbSpeakIn,
     OrbTurnOut,
+    OrbWakeCheckIn,
     OrbWakeCheckOut,
     ProactiveEventOut,
 )
@@ -36,6 +39,26 @@ from briefly_api.tts.adapter import TTSError, get_tts_adapter
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["orb"])
+
+
+async def _wake_check_bytes(
+    db: AsyncSession,
+    user: User,
+    audio_bytes: bytes,
+    *,
+    filename: str,
+    content_type: str,
+) -> OrbWakeCheckOut:
+    result = await orb_service.check_wake_phrase(
+        db,
+        user,
+        audio_bytes=audio_bytes,
+        filename=filename,
+        content_type=content_type,
+    )
+    snippet = (result.get("transcript") or "")[:80]
+    log.info("orb_wake_check user=%s wake=%s transcript=%r", user.id, result["wake"], snippet)
+    return OrbWakeCheckOut(**result)
 
 
 @router.post("/orb/session", response_model=OrbSessionOut)
@@ -89,20 +112,33 @@ async def orb_wake_check(
 ) -> OrbWakeCheckOut:
     """STT-only wake phrase check for always-on desktop orb listening."""
     audio_bytes = await audio.read()
-    if not audio_bytes:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty audio.")
+    return await _wake_check_bytes(
+        db,
+        user,
+        audio_bytes,
+        filename=audio.filename or "wake.webm",
+        content_type=audio.content_type or "audio/webm",
+    )
+
+
+@router.post("/orb/wake-check/json", response_model=OrbWakeCheckOut)
+async def orb_wake_check_json(
+    body: OrbWakeCheckIn,
+    user: User = Depends(get_capture_user),
+    db: AsyncSession = Depends(get_db),
+) -> OrbWakeCheckOut:
+    """Wake check via JSON + base64 — reliable for Tauri desktop (no multipart)."""
     try:
-        result = await orb_service.check_wake_phrase(
-            db,
-            user,
-            audio_bytes=audio_bytes,
-            filename=audio.filename or "wake.webm",
-            content_type=audio.content_type or "audio/webm",
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    log.info("orb_wake_check user=%s wake=%s transcript=%r", user.id, result["wake"], result["transcript"][:80])
-    return OrbWakeCheckOut(**result)
+        audio_bytes = base64.b64decode(body.audio_base64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid audio_base64") from exc
+    return await _wake_check_bytes(
+        db,
+        user,
+        audio_bytes,
+        filename=body.filename or "wake.webm",
+        content_type=body.content_type or "audio/webm",
+    )
 
 
 @router.post("/orb/speak")

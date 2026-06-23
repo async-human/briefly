@@ -153,6 +153,7 @@ class MicWakeMonitor {
         resolve(blob.size > 0 ? blob : null);
       };
       try {
+        if (rec.state === "recording") rec.requestData();
         rec.stop();
       } catch (_) {
         resolve(null);
@@ -214,7 +215,9 @@ class MicWakeMonitor {
       if (result?.wake || transcriptMatchesWakePhrase(result?.transcript)) {
         this.cooldownUntil = Date.now() + this.cooldownMs;
         this.onWake(result?.transcript || "");
+        return;
       }
+      // Heard speech but not the wake phrase — stay silent (not an error).
     } catch (err) {
       if (this.onError) this.onError("check", err);
     } finally {

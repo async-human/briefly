@@ -459,19 +459,66 @@ async function ensureMic() {
   return state.micStream;
 }
 
-async function apiWakeCheck(audioBlob) {
-  const form = new FormData();
-  form.append("audio", audioBlob, "wake.webm");
-  const res = await apiFetch(store.apiBase + "/api/v1/orb/wake-check", {
-    method: "POST",
-    headers: { Authorization: "Bearer " + store.token },
-    body: form,
-  });
+async function blobToBase64(blob) {
+  const buf = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+async function parseWakeCheckResponse(res) {
   if (res.status === 404) {
     throw new Error("Wake API missing — deploy latest backend");
   }
-  if (!res.ok) throw new Error("Wake check failed: HTTP " + res.status);
-  return await res.json();
+  if (res.status === 401) {
+    throw new Error("HTTP 401 — check device token in settings");
+  }
+  let payload = null;
+  try {
+    payload = await res.json();
+  } catch (_) {
+    if (!res.ok) throw new Error("Wake check failed: HTTP " + res.status);
+    throw new Error("Wake check returned invalid JSON");
+  }
+  if (!res.ok) {
+    const detail = payload?.detail ? String(payload.detail) : "";
+    throw new Error(detail ? `HTTP ${res.status}: ${detail}` : "Wake check failed: HTTP " + res.status);
+  }
+  return payload;
+}
+
+async function apiWakeCheck(audioBlob) {
+  const mime = audioBlob.type || "audio/webm";
+  const headers = {
+    Authorization: "Bearer " + store.token,
+    "Content-Type": "application/json",
+  };
+  const body = JSON.stringify({
+    audio_base64: await blobToBase64(audioBlob),
+    content_type: mime,
+    filename: mime.includes("mp4") ? "wake.m4a" : "wake.webm",
+  });
+
+  // Tauri native HTTP avoids WebView CORS/multipart issues.
+  if (TAURI?.http?.fetch) {
+    const res = await TAURI.http.fetch(store.apiBase + "/api/v1/orb/wake-check/json", {
+      method: "POST",
+      headers,
+      body,
+    });
+    return await parseWakeCheckResponse(res);
+  }
+
+  const res = await window.fetch(store.apiBase + "/api/v1/orb/wake-check/json", {
+    method: "POST",
+    headers,
+    body,
+  });
+  return await parseWakeCheckResponse(res);
 }
 
 function chooseMimeType() {
@@ -740,8 +787,16 @@ function onWakeMonitorError(kind, err) {
     flashCaption("Wake API not deployed yet — use tap-to-talk.", 3200);
     return;
   }
+  if (msg.includes("401")) {
+    flashCaption("Invalid device token — update in settings.", 3200);
+    return;
+  }
+  if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+    flashCaption("Can't reach API — check connection.", 2800);
+    return;
+  }
   if (kind === "check" && msg) {
-    flashCaption("Wake check failed — try tap-to-talk.", 2200);
+    flashCaption(truncateStatus(msg, 72) || "Wake check failed.", 2800);
   }
 }
 
