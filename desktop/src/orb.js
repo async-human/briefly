@@ -13,10 +13,10 @@ const store = {
     localStorage.setItem("briefly.apiBase", v);
   },
   get token() {
-    return localStorage.getItem("briefly.token") || "";
+    return (localStorage.getItem("briefly.token") || "").trim();
   },
   set token(v) {
-    localStorage.setItem("briefly.token", v);
+    localStorage.setItem("briefly.token", String(v || "").trim());
   },
   get wakeEnabled() {
     return localStorage.getItem("briefly.wakeEnabled") !== "0";
@@ -459,6 +459,30 @@ async function ensureMic() {
   return state.micStream;
 }
 
+async function verifyDeviceToken() {
+  const token = store.token;
+  if (!token) return { ok: false, reason: "missing" };
+  if (!token.startsWith("bcap_")) return { ok: false, reason: "format" };
+  try {
+    const res = await window.fetch(store.apiBase + "/api/v1/orb/session", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ surface: "desktop" }),
+    });
+    if (res.status === 401) return { ok: false, reason: "rejected" };
+    if (!res.ok) return { ok: false, reason: "http_" + res.status };
+    const data = await res.json();
+    if (data.session_id) store.sessionId = data.session_id;
+    if (data.thread_id) store.threadId = data.thread_id;
+    return { ok: true };
+  } catch (_) {
+    return { ok: false, reason: "network" };
+  }
+}
+
 async function blobToBase64(blob) {
   const buf = await blob.arrayBuffer();
   const bytes = new Uint8Array(buf);
@@ -492,9 +516,13 @@ async function parseWakeCheckResponse(res) {
 }
 
 async function apiWakeCheck(audioBlob) {
+  const token = store.token;
+  if (!token.startsWith("bcap_")) {
+    throw new Error("HTTP 401 — token must start with bcap_");
+  }
   const mime = audioBlob.type || "audio/webm";
   const headers = {
-    Authorization: "Bearer " + store.token,
+    Authorization: "Bearer " + token,
     "Content-Type": "application/json",
   };
   const body = JSON.stringify({
@@ -503,16 +531,7 @@ async function apiWakeCheck(audioBlob) {
     filename: mime.includes("mp4") ? "wake.m4a" : "wake.webm",
   });
 
-  // Tauri native HTTP avoids WebView CORS/multipart issues.
-  if (TAURI?.http?.fetch) {
-    const res = await TAURI.http.fetch(store.apiBase + "/api/v1/orb/wake-check/json", {
-      method: "POST",
-      headers,
-      body,
-    });
-    return await parseWakeCheckResponse(res);
-  }
-
+  // Same transport as tap-to-talk (WebView fetch) — avoids Tauri HTTP header quirks.
   const res = await window.fetch(store.apiBase + "/api/v1/orb/wake-check/json", {
     method: "POST",
     headers,
@@ -727,6 +746,9 @@ function handleDesktopAuth(payload) {
   store.token = token;
   openSettings(false);
   flashCaption("Desktop orb linked.", 2200);
+  void primeWakeListening();
+  void startWakeWord();
+  void initLiveSession();
 }
 
 async function registerGlobalHotkey() {
@@ -787,8 +809,12 @@ function onWakeMonitorError(kind, err) {
     flashCaption("Wake API not deployed yet — use tap-to-talk.", 3200);
     return;
   }
-  if (msg.includes("401")) {
-    flashCaption("Invalid device token — update in settings.", 3200);
+  if (msg.includes("401") || msg.includes("rejected")) {
+    flashCaption("Create a new Desktop token (bcap_…) in Briefly settings.", 3600);
+    return;
+  }
+  if (msg.includes("502") || msg.includes("503")) {
+    flashCaption("Server busy — opening mic anyway.", 2200);
     return;
   }
   if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
@@ -1054,11 +1080,12 @@ function openSettings(open) {
 // ── Wire-up ─────────────────────────────────────────────────────────────────
 async function initLiveSession() {
   if (typeof OrbSessionClient === "undefined") return;
+  if (state.liveClient) state.liveClient.close();
   state.liveClient = new OrbSessionClient({
-    apiBase: store.apiBase,
-    token: store.token,
-    sessionId: store.sessionId,
-    threadId: store.threadId,
+    getApiBase: () => store.apiBase,
+    getToken: () => store.token,
+    getSessionId: () => store.sessionId,
+    getThreadId: () => store.threadId,
     surface: "desktop",
     setSessionId: (id) => { store.sessionId = id; },
     setThreadId: (id) => { store.threadId = id; },
@@ -1066,8 +1093,14 @@ async function initLiveSession() {
   state.liveClient.onSessionReady = (frame) => {
     state.serverStreamingStt = !!frame.streaming_stt;
   };
-  state.liveClient.onPartialTranscript = (text) => {
-    if (state.mode === "listening") setStatusForMode("listening", truncateStatus(text, 48));
+  state.liveClient.onPartialTranscript = (text, isFinal) => {
+    if (state.mode === "listening") {
+      setStatusForMode("listening", truncateStatus(text, 48));
+      return;
+    }
+    if (state.mode === "idle" && store.wakeEnabled && !store.wakeMuted && transcriptMatchesWakePhrase(text)) {
+      onWakePhraseHeard();
+    }
   };
   state.liveClient.onTurnStart = () => {
     state.wsTurnActive = true;
@@ -1120,13 +1153,34 @@ function init() {
     stopCurrentTurn();
     hideWindow();
   });
-  document.getElementById("save").addEventListener("click", () => {
-    store.apiBase = document.getElementById("apiBase").value.trim();
-    store.token = document.getElementById("token").value.trim();
+  document.getElementById("save").addEventListener("click", async () => {
+    store.apiBase = document.getElementById("apiBase").value.trim().replace(/\/$/, "");
+    const rawToken = document.getElementById("token").value.trim();
+    if (rawToken && !rawToken.startsWith("bcap_")) {
+      flashCaption("Desktop token must start with bcap_", 3200);
+      return;
+    }
+    store.token = rawToken;
+    if (!store.token) {
+      openSettings(false);
+      flashCaption("Saved.", 1600);
+      return;
+    }
+    const check = await verifyDeviceToken();
     openSettings(false);
-    flashCaption("Saved.", 1600);
+    if (!check.ok) {
+      const reason =
+        check.reason === "format" ? "Token must start with bcap_" :
+        check.reason === "rejected" ? "Token rejected — create a new Desktop token in Briefly web app" :
+        check.reason === "network" ? "Could not reach API to verify token" :
+        "Token check failed (" + check.reason + ")";
+      flashCaption(reason, 3800);
+      return;
+    }
+    flashCaption("Saved — token verified.", 2000);
     void primeWakeListening();
     void startWakeWord();
+    await initLiveSession();
   });
   document.getElementById("composer").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -1167,6 +1221,14 @@ function init() {
   }
 
   void registerGlobalHotkey();
+  if (store.token) {
+    void verifyDeviceToken().then((check) => {
+      if (!check.ok && check.reason === "rejected") {
+        flashCaption("Device token invalid — create a new Desktop token (bcap_…)", 4200);
+        openSettings(true);
+      }
+    });
+  }
   void startWakeWord();
   updateWakeStatus();
   updateProactiveStatus();

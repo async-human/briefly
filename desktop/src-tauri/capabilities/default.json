@@ -21,8 +21,14 @@
     {
       "identifier": "http:default",
       "allow": [
-        { "url": "https://api.sendbriefly.app/*" },
-        { "url": "http://localhost:8000/*" }
+        {
+          "url": "https://api.sendbriefly.app/*",
+          "headers": ["Authorization", "Content-Type"]
+        },
+        {
+          "url": "http://localhost:8000/*",
+          "headers": ["Authorization", "Content-Type"]
+        }
       ]
     }
   ]

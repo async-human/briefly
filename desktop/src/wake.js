@@ -219,7 +219,16 @@ class MicWakeMonitor {
       }
       // Heard speech but not the wake phrase — stay silent (not an error).
     } catch (err) {
+      const msg = String(err?.message || err || "");
+      const authFailed = msg.includes("401");
+      if (authFailed) {
+        if (this.onError) this.onError("check", err);
+        return;
+      }
       if (this.onError) this.onError("check", err);
+      // Server/STT unavailable — still open the mic so voice isn't blocked.
+      this.cooldownUntil = Date.now() + this.cooldownMs;
+      this.onWake("");
     } finally {
       this.busy = false;
     }
