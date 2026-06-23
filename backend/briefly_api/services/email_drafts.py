@@ -14,10 +14,22 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.config import get_settings
-from briefly_api.db.models import Digest, DigestItem, EmailDraft, User
+from briefly_api.db.models import (
+    ContentEmbedding,
+    Digest,
+    DigestItem,
+    EmailDraft,
+    RawContent,
+    User,
+)
+from briefly_api.embeddings.adapter import get_embedding_adapter
 from briefly_api.llm.adapter import Message, get_llm_adapter
 
 log = logging.getLogger(__name__)
+
+# Stage 2 corpus grounding: how relevant a past item must be to ground a draft.
+_CORPUS_MIN_SIMILARITY = 0.25
+_CORPUS_MAX_DISTANCE = 1.0 - _CORPUS_MIN_SIMILARITY
 
 _SYSTEM = (
     "You draft concise, professional emails on behalf of the user, grounded ONLY in "
@@ -78,6 +90,68 @@ async def _grounding_context(
         if it.content_id:
             source_ids.append(it.content_id)
     return ("\n".join(lines), source_ids[:8])
+
+
+async def _corpus_grounding_context(
+    db: AsyncSession,
+    user_id: str,
+    instruction: str,
+    content_id: str | None = None,
+    *,
+    limit: int = 6,
+) -> tuple[str, list[str]] | None:
+    """Stage 2: ground the draft in the user's ENTIRE reading history, not just
+    today's brief. Embed the instruction and semantic-search the corpus for the
+    most relevant items. Returns (context_text, source_ids), or None to signal the
+    caller to fall back to the brief (so this is never worse than Stage 1).
+    """
+    instruction = (instruction or "").strip()
+    if not instruction:
+        return None
+    try:
+        query_emb = await get_embedding_adapter().embed(instruction)
+    except Exception:
+        log.debug("corpus grounding: embed failed — falling back", exc_info=True)
+        return None
+    if not query_emb:
+        return None
+
+    distance = ContentEmbedding.embedding.cosine_distance(query_emb)
+    stmt = (
+        select(RawContent.id, RawContent.title, RawContent.summary, RawContent.clean_text)
+        .join(ContentEmbedding, ContentEmbedding.content_id == RawContent.id)
+        .where(RawContent.user_id == user_id)
+        .where(distance <= _CORPUS_MAX_DISTANCE)
+        .order_by(distance)
+        .limit(limit)
+    )
+    try:
+        rows = (await db.execute(stmt)).all()
+    except Exception:
+        log.debug("corpus grounding: retrieval query failed — falling back", exc_info=True)
+        return None
+
+    lines: list[str] = []
+    ids: list[str] = []
+
+    # Anchor: if the user is drafting "about this item", make sure it's included.
+    if content_id:
+        anchor = await db.get(RawContent, content_id)
+        if anchor is not None:
+            snippet = (anchor.summary or anchor.clean_text or "").strip()[:300]
+            lines.append(f"- {(anchor.title or 'Untitled').strip()}. {snippet}".strip())
+            ids.append(anchor.id)
+
+    for cid, title, summary, clean_text in rows:
+        if cid in ids:
+            continue
+        snippet = (summary or clean_text or "").strip()[:300]
+        lines.append(f"- {(title or 'Untitled').strip()}. {snippet}".strip())
+        ids.append(cid)
+
+    if not lines:
+        return None
+    return "\n".join(lines), ids[:8]
 
 
 def _parse_json(text: str) -> dict:
@@ -212,8 +286,15 @@ async def compose_email_draft(
     *,
     content_id: str | None = None,
 ) -> EmailDraft:
-    """Compose a grounded email draft. Persists it as status='draft' (not sent)."""
-    context, source_ids = await _grounding_context(db, user.id, content_id)
+    """Compose a grounded email draft. Persists it as status='draft' (not sent).
+
+    Stage 2: grounds in the user's whole corpus via retrieval, falling back to
+    today's brief if retrieval is unavailable or finds nothing relevant."""
+    grounding = await _corpus_grounding_context(db, user.id, instruction, content_id)
+    if grounding is not None:
+        context, source_ids = grounding
+    else:
+        context, source_ids = await _grounding_context(db, user.id, content_id)
 
     name = (user.name or "").strip()
     try:

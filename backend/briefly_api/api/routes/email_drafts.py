@@ -33,7 +33,7 @@ from briefly_api.auth.gmail import (
 )
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
-from briefly_api.db.models import Digest, DigestItem, EmailDraft, User
+from briefly_api.db.models import EmailDraft, RawContent, User
 from briefly_api.services.email_drafts import compose_email_draft
 
 router = APIRouter(prefix="/email-drafts", tags=["email-drafts"])
@@ -80,22 +80,23 @@ def _serialize(d: EmailDraft, source_headlines: list[str] | None = None) -> Emai
 
 
 async def _resolve_headlines(db: AsyncSession, content_ids: list[str]) -> list[str]:
-    """Best-effort: map a draft's grounding content_ids back to headlines so the
-    review card can show 'grounded in …' citations — the trust proof."""
+    """Best-effort: map a draft's grounding content_ids back to titles so the review
+    card can show 'grounded in …' citations — the trust proof. Resolves from
+    RawContent so it covers both today's-brief and whole-corpus (Stage 2) items."""
     if not content_ids:
         return []
     rows = (
         await db.execute(
-            select(DigestItem.headline)
-            .where(DigestItem.content_id.in_(content_ids))
+            select(RawContent.title)
+            .where(RawContent.id.in_(content_ids))
             .limit(8)
         )
     ).all()
     seen: list[str] = []
-    for (headline,) in rows:
-        h = (headline or "").strip()
-        if h and h not in seen:
-            seen.append(h)
+    for (title,) in rows:
+        t = (title or "").strip()
+        if t and t not in seen:
+            seen.append(t)
     return seen
 
 
