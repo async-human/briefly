@@ -494,3 +494,64 @@ body:not([data-mode="idle"]) .controls {
 .hint[hidden] {
   display: none;
 }
+
+/* ── Mobile web (same orb app at /orb-app — not Tauri) ─────────────────── */
+
+html.mobile-web,
+body.mobile-web {
+  background: oklch(10% 0.02 275);
+}
+
+body.mobile-web #app {
+  width: 100%;
+  min-height: 100dvh;
+  max-width: 26rem;
+  margin: 0 auto;
+  border-radius: 0;
+  border: none;
+  padding:
+    max(12px, env(safe-area-inset-top))
+    max(12px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+  justify-content: center;
+}
+
+body.mobile-web .orb-wrap {
+  width: min(72vw, 220px);
+  height: min(72vw, 220px);
+}
+
+body.mobile-web #orb {
+  width: min(72vw, 220px);
+  height: min(72vw, 220px);
+}
+
+body.mobile-web .orb-hit {
+  width: min(42vw, 120px);
+  height: min(42vw, 120px);
+}
+
+body.mobile-web .controls {
+  opacity: 1;
+}
+
+body.mobile-web .ctl {
+  width: 36px;
+  height: 36px;
+}
+
+body.mobile-web .composer-input {
+  font-size: 16px;
+  padding: 10px 12px;
+}
+
+body.mobile-web .connect-btn,
+body.mobile-web .save {
+  padding: 12px 14px;
+  font-size: 13px;
+}
+
+body.mobile-web .settings-body {
+  max-height: 50dvh;
+}

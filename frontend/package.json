@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "sync-orb": "node scripts/sync-orb-app.mjs",
+    "predev": "node scripts/sync-orb-app.mjs",
+    "prebuild": "node scripts/sync-orb-app.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

@@ -132,6 +132,16 @@ export function MobileOrbOverlay({ variant = "fab" }: MobileOrbOverlayProps) {
     setMounted(true);
   }, []);
 
+  const [useSharedOrbApp, setUseSharedOrbApp] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px), (pointer: coarse)");
+    const pick = () => setUseSharedOrbApp(mq.matches);
+    pick();
+    mq.addEventListener("change", pick);
+    return () => mq.removeEventListener("change", pick);
+  }, []);
+
   function orbTurnOpts() {
     const opts: { thread_id?: string; session_id?: string; surface?: string } = {
       surface: "mobile",
@@ -817,6 +827,29 @@ export function MobileOrbOverlay({ variant = "fab" }: MobileOrbOverlayProps) {
       </div>
     </div>
   ) : null;
+
+  if (useSharedOrbApp) {
+    return (
+      <a
+        href="/orb"
+        className={`jarvis-fab${pending.length > 0 ? " has-pending" : ""}`}
+        aria-label={
+          pending.length > 0
+            ? `Briefly orb — ${pending.length} new update${pending.length > 1 ? "s" : ""}`
+            : "Open Briefly orb"
+        }
+        title="Briefly orb"
+      >
+        <JarvisOrbCanvas mode="idle" size="fab" className="jarvis-fab-canvas" />
+        <span className="jarvis-fab-glow" aria-hidden />
+        {pending.length > 0 && (
+          <span className="jarvis-fab-badge" aria-hidden>
+            {pending.length > 9 ? "9+" : pending.length}
+          </span>
+        )}
+      </a>
+    );
+  }
 
   return (
     <div className={`mob-orb-wrap${isStandalone ? " mob-orb-standalone" : ""}`}>

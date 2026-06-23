@@ -4,6 +4,16 @@
 // browser, where we fall back gracefully for dev/preview).
 const TAURI = window.__TAURI__ || null;
 const DEFAULT_APP_BASE = "https://www.sendbriefly.app";
+const WEB_SESSION_KEY = "briefly_token";
+const IS_MOBILE_WEB =
+  !TAURI &&
+  (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 768px) and (pointer: coarse)").matches));
+
+function orbSurface() {
+  return IS_MOBILE_WEB ? "mobile" : "desktop";
+}
 
 // ── Persistent settings ────────────────────────────────────────────────────
 const store = {
@@ -170,6 +180,10 @@ function pollForBrowserConnect() {
 }
 
 function connectPageUrl(relayPort) {
+  if (IS_MOBILE_WEB) {
+    const base = `${window.location.origin.replace(/\/$/, "")}/login?next=${encodeURIComponent("/orb")}`;
+    return relayPort ? base : base;
+  }
   const base =
     store.apiBase.includes("localhost")
       ? "http://localhost:3000/desktop/connect"
@@ -178,7 +192,49 @@ function connectPageUrl(relayPort) {
   return `${base}?relay_port=${relayPort}`;
 }
 
+/** On mobile web, mint a capture token from the logged-in web session (same origin). */
+async function bridgeWebSessionToOrb() {
+  if (TAURI) return true;
+  if (store.token) {
+    await refreshLinkState();
+    return state.linkVerified;
+  }
+  const webToken = localStorage.getItem(WEB_SESSION_KEY);
+  if (!webToken) {
+    window.location.replace(`/login?next=${encodeURIComponent("/orb")}`);
+    return false;
+  }
+  try {
+    const res = await apiFetch(`${store.apiBase}/api/v1/capture/tokens`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + webToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: `Mobile Orb (${navigator.platform || "mobile"})`,
+        platform: "mobile",
+      }),
+    });
+    if (!res.ok) throw new Error("token create failed");
+    const data = await res.json();
+    if (!data?.token) throw new Error("no token");
+    store.token = data.token;
+    state.linkVerified = true;
+    updateLinkStatus();
+    return true;
+  } catch (_) {
+    flashCaption("Could not link account — sign in again.", 3200);
+    window.location.replace(`/login?next=${encodeURIComponent("/orb")}`);
+    return false;
+  }
+}
+
 async function openBrieflyConnect() {
+  if (IS_MOBILE_WEB) {
+    window.location.href = `/login?next=${encodeURIComponent("/orb")}`;
+    return;
+  }
   if (store.token && !state.linkVerified) {
     store.token = "";
     state.linkVerified = false;
@@ -253,7 +309,7 @@ function updateLinkStatus() {
 function appendTurnFormFields(form) {
   if (store.threadId) form.append("thread_id", store.threadId);
   if (store.sessionId) form.append("session_id", store.sessionId);
-  form.append("surface", "desktop");
+  form.append("surface", orbSurface());
 }
 
 function applyTurnMeta(turn) {
@@ -281,6 +337,10 @@ async function showWindowQuiet() {
 }
 
 async function hideWindow() {
+  if (IS_MOBILE_WEB) {
+    window.location.href = "/dashboard";
+    return;
+  }
   try {
     if (TAURI?.window) await TAURI.window.getCurrentWindow().hide();
   } catch (_) {}
@@ -313,7 +373,7 @@ function turnJsonBody(extra = {}) {
   return {
     thread_id: store.threadId || null,
     session_id: store.sessionId || null,
-    surface: "desktop",
+    surface: orbSurface(),
     ...extra,
   };
 }
@@ -362,7 +422,7 @@ async function ensureOrbSession() {
       },
       body: JSON.stringify({
         thread_id: store.threadId || null,
-        surface: "desktop",
+        surface: orbSurface(),
       }),
     });
     if (!res.ok) return;
@@ -648,7 +708,7 @@ async function verifyDeviceToken() {
         Authorization: "Bearer " + token,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ surface: "desktop" }),
+      body: JSON.stringify({ surface: orbSurface() }),
     });
     if (res.status === 401) return { ok: false, reason: "rejected" };
     if (!res.ok) return { ok: false, reason: "http_" + res.status };
@@ -1327,7 +1387,7 @@ async function initLiveSession() {
     getToken: () => store.token,
     getSessionId: () => store.sessionId,
     getThreadId: () => store.threadId,
-    surface: "desktop",
+    surface: orbSurface(),
     setSessionId: (id) => { store.sessionId = id; },
     setThreadId: (id) => { store.threadId = id; },
   });
@@ -1377,6 +1437,10 @@ async function initLiveSession() {
 }
 
 function init() {
+  if (IS_MOBILE_WEB) {
+    document.documentElement.classList.add("mobile-web");
+    document.body.classList.add("mobile-web");
+  }
   initOrb();
   setMode("idle");
   void ensureOrbSession();
@@ -1500,7 +1564,13 @@ function init() {
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("DOMContentLoaded", () => {
+    void bridgeWebSessionToOrb().then((ok) => {
+      if (ok !== false) init();
+    });
+  });
 } else {
-  init();
+  void bridgeWebSessionToOrb().then((ok) => {
+    if (ok !== false) init();
+  });
 }

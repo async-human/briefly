@@ -60,6 +60,25 @@ desktop/
    - **macOS**: nothing extra.
    - **Linux**: `webkit2gtk` + `libayatana-appindicator` (see Tauri's Linux setup).
 
+## Mobile (same orb, one tap)
+
+The **exact same orb app** (`desktop/src`) runs on phones via the web:
+
+1. Open **https://www.sendbriefly.app/orb** (or add to home screen — the PWA opens `/orb`).
+2. Sign in once; the orb mints a mobile capture token from your web session automatically.
+3. You get the **same UI and features** as desktop: wake word (mic + server STT), tap-to-talk, proactive voice, settings, text composer, VAD.
+
+The frontend build copies `desktop/src` → `frontend/public/orb-app` (`npm run sync-orb` runs automatically before `dev`/`build`). **Edit orb code only in `desktop/src`** — never fork the mobile UI.
+
+### Add to home screen
+
+- **iPhone:** Safari → `/orb` → Share → **Add to Home Screen**
+- **Android:** Chrome → `/orb` → **Install app**
+
+### Native iOS/Android (optional, later)
+
+Tauri v2 supports mobile builds (`tauri android init` / `tauri ios init`) using the same `desktop/src` bundle and existing Android/iOS icons under `src-tauri/icons/`. The tray, always-on-top window, and global hotkeys are desktop-only; mobile uses the full-screen web layout (`body.mobile-web`).
+
 ## First run
 
 ```bash
