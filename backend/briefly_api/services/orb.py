@@ -25,15 +25,18 @@ import json
 import logging
 import re
 import time
+import uuid
+from datetime import datetime, timezone
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.db.engine import SessionLocal
 
 from briefly_api.agent import AgentRuntime, ToolContext, ToolRegistry, from_orb_tool
 from briefly_api.config import get_settings
-from briefly_api.db.models import User
+from briefly_api.db.models import FollowUpThread, User
 from briefly_api.llm.adapter import Message, get_llm_adapter
 from briefly_api.services.ask_briefly import ask_briefly
 from briefly_api.services.orb_router import route_transcript
@@ -123,6 +126,73 @@ def _tool_trace(tool_outputs: list[dict]) -> list[dict]:
         }
         for out in tool_outputs
     ]
+
+
+async def _thread_message_count(
+    db: AsyncSession,
+    user_id: str,
+    thread_id: str | None,
+) -> int:
+    if not thread_id:
+        return 0
+    result = await db.execute(
+        select(FollowUpThread).where(
+            FollowUpThread.id == thread_id,
+            FollowUpThread.user_id == user_id,
+        )
+    )
+    thread = result.scalar_one_or_none()
+    if not thread:
+        return 0
+    return len(thread.messages or [])
+
+
+async def _persist_orb_exchange(
+    db: AsyncSession,
+    user_id: str,
+    thread_id: str | None,
+    user_text: str,
+    assistant_text: str,
+    *,
+    citations: list | None = None,
+) -> str | None:
+    """Append a voice turn to FollowUpThread so follow-ups retain context."""
+    answer = (assistant_text or "").strip()
+    question = (user_text or "").strip()
+    if not answer or not question:
+        return thread_id
+
+    now = datetime.now(timezone.utc).isoformat()
+    thread: FollowUpThread | None = None
+    if thread_id:
+        result = await db.execute(
+            select(FollowUpThread).where(
+                FollowUpThread.id == thread_id,
+                FollowUpThread.user_id == user_id,
+            )
+        )
+        thread = result.scalar_one_or_none()
+
+    if thread is None:
+        thread = FollowUpThread(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            messages=[],
+        )
+        db.add(thread)
+
+    thread.messages = list(thread.messages or []) + [
+        {"role": "user", "content": question, "timestamp": now},
+        {
+            "role": "assistant",
+            "content": answer,
+            "citations": citations or [],
+            "timestamp": now,
+        },
+    ]
+    await db.commit()
+    await db.refresh(thread)
+    return thread.id
 
 
 def _single_result(transcript: str, out: dict) -> dict:
@@ -434,9 +504,14 @@ async def run_orb_turn(
         stt = get_stt_adapter()
         context_prompt = None
         if db is not None and getattr(user, "id", None):
-            from briefly_api.stt.profile_context import transcription_prompt_for_user
+            from briefly_api.stt.profile_context import transcription_prompt_for_orb_turn
 
-            context_prompt = await transcription_prompt_for_user(db, user.id)
+            context_prompt = await transcription_prompt_for_orb_turn(
+                db,
+                user.id,
+                session=session,
+                thread_id=thread_id or (session.thread_id if session else None),
+            )
         try:
             transcript = (
                 await stt.transcribe(
@@ -463,16 +538,28 @@ async def run_orb_turn(
     route_started = time.monotonic()
     # ── Routing ──────────────────────────────────────────────────────────────
     if db is not None and getattr(user, "id", None):
-        decision = await route_transcript(transcript)
+        resolved_thread = thread_id or (session.thread_id if session else None)
+        thread_msg_count = await _thread_message_count(db, user.id, resolved_thread)
+        decision = await route_transcript(transcript, thread_message_count=thread_msg_count)
         timings["route_ms"] = int((time.monotonic() - route_started) * 1000)
 
         if decision.kind == "direct" and len(decision.tools) == 1:
             agent_started = time.monotonic()
             out = await _exec_tool(
-                decision.tools[0], db, user, transcript, thread_id, content_id
+                decision.tools[0], db, user, transcript, resolved_thread, content_id
             )
             timings["agent_ms"] = int((time.monotonic() - agent_started) * 1000)
             result = _single_result(transcript, out)
+            persisted = await _persist_orb_exchange(
+                db,
+                user.id,
+                out.get("thread_id") or resolved_thread,
+                transcript,
+                result.get("answer", ""),
+                citations=result.get("citations") or [],
+            )
+            if persisted:
+                result["thread_id"] = persisted
             result["session_id"] = session.session_id if session else None
             result["timings"] = timings
             if session:

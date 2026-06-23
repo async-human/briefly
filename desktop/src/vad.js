@@ -1,25 +1,25 @@
 "use strict";
 
 /**
- * Speech endpointer — hysteresis, hangover, peak-relative trailing silence, and
- * hard timeouts so listening never hangs after the user stops talking.
+ * Speech endpointer — hysteresis, hangover, adaptive silence, and hard caps so
+ * turns end reliably without cutting off mid-sentence.
  */
 class SpeechEndpointer {
   constructor(options = {}) {
     this.pollMs = options.pollMs ?? 48;
-    this.baseSilenceMs = options.baseSilenceMs ?? 1300;
-    this.maxAdaptiveSilenceMs = options.maxAdaptiveSilenceMs ?? 750;
-    this.minSpeechMs = options.minSpeechMs ?? 380;
-    this.hangoverMs = options.hangoverMs ?? 420;
-    this.calibrateMs = options.calibrateMs ?? 480;
-    this.minListenMs = options.minListenMs ?? 650;
-    this.maxListenMs = options.maxListenMs ?? 45000;
-    this.maxListenNoSpeechMs = options.maxListenNoSpeechMs ?? 12000;
-    this.startMultiplier = options.startMultiplier ?? 3.2;
-    this.continueMultiplier = options.continueMultiplier ?? 2.0;
-    this.minSpeechRms = options.minSpeechRms ?? 0.009;
-    this.trailingRatio = options.trailingRatio ?? 0.11;
-    this.trailingSilenceMs = options.trailingSilenceMs ?? 1100;
+    this.baseSilenceMs = options.baseSilenceMs ?? 1600;
+    this.maxAdaptiveSilenceMs = options.maxAdaptiveSilenceMs ?? 1000;
+    this.minSpeechMs = options.minSpeechMs ?? 320;
+    this.hangoverMs = options.hangoverMs ?? 500;
+    this.calibrateMs = options.calibrateMs ?? 600;
+    this.minListenMs = options.minListenMs ?? 700;
+    this.maxListenMs = options.maxListenMs ?? 60000;
+    this.maxListenNoSpeechMs = options.maxListenNoSpeechMs ?? 15000;
+    this.maxPostSpeechSilenceMs = options.maxPostSpeechSilenceMs ?? 3200;
+    this.startMultiplier = options.startMultiplier ?? 3.0;
+    this.continueMultiplier = options.continueMultiplier ?? 1.75;
+    this.minSpeechRms = options.minSpeechRms ?? 0.008;
+    this.speechStartFrames = options.speechStartFrames ?? 3;
 
     this.noiseFloor = 0.004;
     this.calibratingUntil = 0;
@@ -31,7 +31,6 @@ class SpeechEndpointer {
     this.peakRms = 0;
     this.consecutiveSilentFrames = 0;
     this.consecutiveSpeechFrames = 0;
-    this.trailingSilentSince = 0;
   }
 
   begin(now) {
@@ -44,7 +43,6 @@ class SpeechEndpointer {
     this.peakRms = 0;
     this.consecutiveSilentFrames = 0;
     this.consecutiveSpeechFrames = 0;
-    this.trailingSilentSince = 0;
     this.noiseFloor = 0.004;
   }
 
@@ -53,19 +51,14 @@ class SpeechEndpointer {
   }
 
   _continueThreshold() {
-    return Math.max(this.minSpeechRms * 0.68, this.noiseFloor * this.continueMultiplier);
+    return Math.max(this.minSpeechRms * 0.62, this.noiseFloor * this.continueMultiplier);
   }
 
   _adaptiveSilenceMs() {
     if (!this.hasSpeech) return this.baseSilenceMs;
     const speechMs = Math.max(0, this.lastSpeechAt - this.speechStartedAt);
-    const extra = Math.min(this.maxAdaptiveSilenceMs, speechMs * 0.12);
+    const extra = Math.min(this.maxAdaptiveSilenceMs, speechMs * 0.14);
     return this.baseSilenceMs + extra;
-  }
-
-  _trailingThreshold() {
-    if (this.peakRms <= this.minSpeechRms) return this._continueThreshold();
-    return Math.max(this._continueThreshold(), this.peakRms * this.trailingRatio);
   }
 
   _shouldEndUtterance(now) {
@@ -90,12 +83,8 @@ class SpeechEndpointer {
       return "silence";
     }
 
-    const trailThreshold = this._trailingThreshold();
-    if (this.trailingSilentSince > 0) {
-      const trailMs = now - this.trailingSilentSince;
-      if (trailMs >= this.trailingSilenceMs && silenceMs >= this.hangoverMs) {
-        return "trailing";
-      }
+    if (this.hasSpeech && silenceMs >= this.maxPostSpeechSilenceMs) {
+      return "post_speech_cap";
     }
 
     return null;
@@ -118,11 +107,10 @@ class SpeechEndpointer {
     if (speaking) {
       this.consecutiveSilentFrames = 0;
       this.consecutiveSpeechFrames += 1;
-      this.trailingSilentSince = 0;
       this.peakRms = Math.max(this.peakRms, rms);
       this.noiseFloor = this.noiseFloor * 0.93 + rms * 0.07;
 
-      if (!this.inSpeech && this.consecutiveSpeechFrames >= 2) {
+      if (!this.inSpeech && this.consecutiveSpeechFrames >= this.speechStartFrames) {
         this.inSpeech = true;
         this.hasSpeech = true;
         this.speechStartedAt = now;
@@ -137,12 +125,6 @@ class SpeechEndpointer {
         this.noiseFloor = this.noiseFloor * 0.96 + rms * 0.04;
       } else {
         this.consecutiveSilentFrames += 1;
-        const trailThreshold = this._trailingThreshold();
-        if (rms <= trailThreshold) {
-          if (!this.trailingSilentSince) this.trailingSilentSince = now;
-        } else {
-          this.trailingSilentSince = 0;
-        }
       }
     }
 

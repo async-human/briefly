@@ -34,7 +34,7 @@ from briefly_api.auth.deps import get_capture_user
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import User
 from briefly_api.services import orb as orb_service
-from briefly_api.services.orb_session import create_session
+from briefly_api.services.orb_session import resolve_session
 from briefly_api.tts.adapter import TTSError, get_tts_adapter
 
 log = logging.getLogger(__name__)
@@ -67,8 +67,9 @@ async def orb_create_session(
     body: OrbSessionIn,
     user: User = Depends(get_capture_user),
 ) -> OrbSessionOut:
-    state = await create_session(
+    state = await resolve_session(
         user.id,
+        session_id=body.session_id,
         thread_id=body.thread_id,
         surface=body.surface or "desktop",
     )

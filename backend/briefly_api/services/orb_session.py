@@ -126,7 +126,7 @@ async def resolve_session(
     if session_id:
         existing = await get_session(user_id, session_id)
         if existing is not None:
-            if thread_id and not existing.thread_id:
+            if thread_id:
                 existing.thread_id = thread_id
             return existing
     return await create_session(user_id, thread_id=thread_id, surface=surface)

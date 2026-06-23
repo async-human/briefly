@@ -70,19 +70,23 @@ const PROACTIVE_POLL_MS = 90000;
 // Voice activity detection — client-side endpointing (always on; server STT is optional).
 const VAD = {
   POLL_MS: 48,
-  BASE_SILENCE_MS: 1300,
-  MAX_ADAPTIVE_SILENCE_MS: 750,
-  MIN_SPEECH_MS: 380,
-  HANGOVER_MS: 420,
-  CALIBRATE_MS: 480,
-  MIN_LISTEN_MS: 650,
-  MAX_LISTEN_MS: 45000,
-  MAX_LISTEN_NO_SPEECH_MS: 12000,
-  TRAILING_SILENCE_MS: 1100,
+  BASE_SILENCE_MS: 1600,
+  MAX_ADAPTIVE_SILENCE_MS: 1000,
+  MIN_SPEECH_MS: 320,
+  HANGOVER_MS: 500,
+  CALIBRATE_MS: 600,
+  MIN_LISTEN_MS: 700,
+  MAX_LISTEN_MS: 60000,
+  MAX_LISTEN_NO_SPEECH_MS: 15000,
+  MAX_POST_SPEECH_SILENCE_MS: 3200,
+  SPEECH_START_FRAMES: 3,
 };
 
 /** Pause before reopening the mic after the agent speaks (avoids echo + gives you time to start). */
 const LISTEN_REOPEN_DELAY_MS = 900;
+
+/** If speech was heard but VAD never endpointed, force-send after this silence. */
+const LISTEN_STUCK_SILENCE_MS = 3600;
 
 const state = {
   mode: "idle", // idle | listening | thinking | speaking
@@ -120,6 +124,7 @@ const state = {
   connecting: false,
   conversationActive: false,
   conversationMuted: false,
+  lastAssistantAnswer: "",
 };
 
 function isAccountLinked() {
@@ -320,6 +325,8 @@ function appendTurnFormFields(form) {
 function applyTurnMeta(turn) {
   if (turn?.thread_id) store.threadId = turn.thread_id;
   if (turn?.session_id) store.sessionId = turn.session_id;
+  const answer = (turn?.answer || "").trim();
+  if (answer) state.lastAssistantAnswer = answer.slice(0, 500);
 }
 
 // ── Window helpers (Tauri) ──────────────────────────────────────────────────
@@ -417,7 +424,7 @@ async function apiPostJson(path, payload) {
 }
 
 async function ensureOrbSession() {
-  if (store.sessionId || !store.token) return;
+  if (!store.token || store.sessionId) return;
   try {
     const res = await apiFetch(store.apiBase + "/api/v1/orb/session", {
       method: "POST",
@@ -426,6 +433,7 @@ async function ensureOrbSession() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        session_id: store.sessionId || null,
         thread_id: store.threadId || null,
         surface: orbSurface(),
       }),
@@ -672,7 +680,8 @@ function startVadMonitor(stream) {
     minListenMs: VAD.MIN_LISTEN_MS,
     maxListenMs: VAD.MAX_LISTEN_MS,
     maxListenNoSpeechMs: VAD.MAX_LISTEN_NO_SPEECH_MS,
-    trailingSilenceMs: VAD.TRAILING_SILENCE_MS,
+    maxPostSpeechSilenceMs: VAD.MAX_POST_SPEECH_SILENCE_MS,
+    speechStartFrames: VAD.SPEECH_START_FRAMES,
   });
   state.endpointer.begin(Date.now());
 
@@ -688,6 +697,15 @@ function startVadMonitor(stream) {
 
     if (state.endpointer.speechActive) {
       bumpEnergy();
+    }
+
+    if (
+      state.endpointer.speechDetected &&
+      state.endpointer.lastSpeechAt > 0 &&
+      now - state.endpointer.lastSpeechAt >= LISTEN_STUCK_SILENCE_MS
+    ) {
+      void stopListeningAndSend();
+      return;
     }
 
     if (result === "end") {
@@ -723,7 +741,7 @@ async function ensureMic() {
     audio: {
       echoCancellation: true,
       noiseSuppression: true,
-      autoGainControl: false,
+      autoGainControl: true,
     },
   });
   return state.micStream;
@@ -739,7 +757,11 @@ async function verifyDeviceToken() {
         Authorization: "Bearer " + token,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ surface: orbSurface() }),
+      body: JSON.stringify({
+        session_id: store.sessionId || null,
+        thread_id: store.threadId || null,
+        surface: orbSurface(),
+      }),
     });
     if (res.status === 401) return { ok: false, reason: "rejected" };
     if (!res.ok) return { ok: false, reason: "http_" + res.status };
@@ -880,6 +902,9 @@ async function stopListeningAndSend() {
   if (elapsed < 120 || !blob || blob.size < 600) {
     setMode("idle");
     flashCaption("Didn't catch that — try again.", 1400);
+    if (state.conversationActive && !state.conversationMuted) {
+      await continueConversationAfterSpeak();
+    }
     return;
   }
 
@@ -947,6 +972,9 @@ async function applyVoiceCommand(cmd) {
     case "end_conversation":
       state.conversationActive = false;
       state.conversationMuted = false;
+      state.lastAssistantAnswer = "";
+      store.threadId = "";
+      store.sessionId = "";
       stopCurrentTurn();
       flashCaption("Got it. Say \"hey briefly\" when you need me.", 2800);
       return;
@@ -1022,6 +1050,9 @@ async function executeTurn(turnFactory) {
       flashCaption("Can't reach API — check connection.", 2800);
     } else {
       flashCaption(truncateStatus(msg, 72), 2800);
+    }
+    if (state.conversationActive && !state.conversationMuted) {
+      await continueConversationAfterSpeak();
     }
   }
 }

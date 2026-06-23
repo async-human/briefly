@@ -61,13 +61,34 @@ async def _ensure_tool_embeddings() -> dict[str, list[float]]:
     return _TOOL_EMBEDDINGS
 
 
-async def route_transcript(transcript: str) -> RouteDecision:
+async def route_transcript(
+    transcript: str,
+    *,
+    thread_message_count: int = 0,
+) -> RouteDecision:
     """Decide how to handle a spoken/typed orb turn."""
     text = (transcript or "").strip()
     if not text:
         return RouteDecision(kind="ask_briefly", reason="empty")
 
     matched = regex_matches(text)
+
+    # Active voice thread — route follow-ups through ask_briefly unless an explicit
+    # command regex matches (e.g. "read my brief", "what's on my calendar").
+    if thread_message_count > 0:
+        if len(matched) == 1:
+            return RouteDecision(
+                kind="direct",
+                tools=(matched[0],),
+                confidence=1.0,
+                reason="regex_single_in_thread",
+            )
+        return RouteDecision(
+            kind="ask_briefly",
+            confidence=1.0,
+            reason="active_thread",
+        )
+
     if len(matched) == 1:
         return RouteDecision(kind="direct", tools=(matched[0],), confidence=1.0, reason="regex_single")
     if len(matched) >= 2:

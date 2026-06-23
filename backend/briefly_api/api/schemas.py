@@ -599,6 +599,7 @@ class OrbTurnOut(BaseModel):
 
 
 class OrbSessionIn(BaseModel):
+    session_id: str | None = None
     thread_id: str | None = None
     surface: str = "desktop"
 
