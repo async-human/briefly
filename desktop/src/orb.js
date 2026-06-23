@@ -57,16 +57,18 @@ const store = {
 // How often the idle orb checks whether Briefly has something to say.
 const PROACTIVE_POLL_MS = 90000;
 
-// Voice activity detection — tuned for natural pauses (realtime-style endpointing).
+// Voice activity detection — client-side endpointing (always on; server STT is optional).
 const VAD = {
   POLL_MS: 48,
-  BASE_SILENCE_MS: 2200,
-  MAX_ADAPTIVE_SILENCE_MS: 900,
-  MIN_SPEECH_MS: 700,
-  HANGOVER_MS: 520,
-  CALIBRATE_MS: 650,
-  MIN_LISTEN_MS: 900,
-  MAX_LISTEN_MS: 60000,
+  BASE_SILENCE_MS: 850,
+  MAX_ADAPTIVE_SILENCE_MS: 450,
+  MIN_SPEECH_MS: 380,
+  HANGOVER_MS: 280,
+  CALIBRATE_MS: 380,
+  MIN_LISTEN_MS: 550,
+  MAX_LISTEN_MS: 45000,
+  MAX_LISTEN_NO_SPEECH_MS: 12000,
+  TRAILING_SILENCE_MS: 520,
 };
 
 const state = {
@@ -525,13 +527,10 @@ function stopVadMonitor() {
   state.vadAnalyser = null;
 }
 
-function shouldUseServerEndpointing() {
-  if (!state.liveClient?.ready || !state.serverStreamingStt) return false;
-  try {
-    return localStorage.getItem("briefly.serverEndpointing") !== "0";
-  } catch (_) {
-    return true;
-  }
+function shouldStreamPcmToServer() {
+  // Client VAD + HTTP upload is the reliable turn path. Streaming PCM in parallel
+  // can duplicate turns when both client and Deepgram utterance-end fire.
+  return false;
 }
 
 function stopListeningOnly() {
@@ -553,29 +552,23 @@ function startVadMonitor(stream) {
   const source = ctx.createMediaStreamSource(stream);
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048;
-  analyser.smoothingTimeConstant = 0.82;
+  analyser.smoothingTimeConstant = 0.55;
   source.connect(analyser);
 
   state.vadAudioCtx = ctx;
   state.vadAnalyser = analyser;
-  state.useServerEndpointing = shouldUseServerEndpointing();
+  state.useServerEndpointing = false;
 
-  if (state.useServerEndpointing && typeof float32ToInt16PCM === "function") {
+  if (shouldStreamPcmToServer() && typeof float32ToInt16PCM === "function") {
     const pcmNode = ctx.createScriptProcessor(4096, 1, 1);
     pcmNode.onaudioprocess = (ev) => {
       if (state.mode !== "listening" || !state.liveClient?.ready) return;
       const input = ev.inputBuffer.getChannelData(0);
-      const pcm = float32ToInt16PCM(input);
-      state.liveClient.sendAudio(pcm);
+      state.liveClient.sendAudio(float32ToInt16PCM(input));
     };
     source.connect(pcmNode);
     pcmNode.connect(ctx.destination);
     state.pcmNode = pcmNode;
-  }
-
-  if (state.useServerEndpointing) {
-    state.vadHasSpeech = false;
-    return;
   }
 
   state.endpointer = new SpeechEndpointer({
@@ -586,6 +579,9 @@ function startVadMonitor(stream) {
     hangoverMs: VAD.HANGOVER_MS,
     calibrateMs: VAD.CALIBRATE_MS,
     minListenMs: VAD.MIN_LISTEN_MS,
+    maxListenMs: VAD.MAX_LISTEN_MS,
+    maxListenNoSpeechMs: VAD.MAX_LISTEN_NO_SPEECH_MS,
+    trailingSilenceMs: VAD.TRAILING_SILENCE_MS,
   });
   state.endpointer.begin(Date.now());
 
@@ -608,9 +604,8 @@ function startVadMonitor(stream) {
       return;
     }
 
-    const listenMs = now - state.listeningStartedAt;
-    if (listenMs >= VAD.MAX_LISTEN_MS && state.vadHasSpeech) {
-      void stopListeningAndSend();
+    if (result === "cancel") {
+      void cancelListening();
     }
   }, VAD.POLL_MS);
 }
@@ -772,7 +767,7 @@ async function startListening() {
 
 async function stopListeningAndSend() {
   if (state.mode !== "listening" || state.sendingUtterance || state.wsTurnActive) return;
-  if (!state.useServerEndpointing && state.endpointer && !state.endpointer.speechDetected) {
+  if (state.endpointer && !state.endpointer.speechDetected) {
     void cancelListening();
     return;
   }
@@ -921,7 +916,6 @@ function toggleTalk() {
   }
   if (state.mode === "listening") {
     const hasSpeech =
-      state.useServerEndpointing ||
       state.vadHasSpeech ||
       (state.endpointer && state.endpointer.speechDetected);
     if (hasSpeech) {
@@ -1366,8 +1360,9 @@ async function initLiveSession() {
     else setMode("idle");
   };
   state.liveClient.onSpeechFinal = () => {
-    // Server confirmed end-of-utterance; keep listening until turn_start.
+    if (state.mode !== "listening" || state.wsTurnActive) return;
     setStatusForMode("listening", "Processing…");
+    stopListeningOnly();
   };
   state.liveClient.onError = (message) => {
     if (String(message || "").toLowerCase().includes("unauthorized")) {

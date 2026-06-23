@@ -1,22 +1,25 @@
 "use strict";
 
 /**
- * Robust speech endpointer — hysteresis, hangover, adaptive silence, and
- * consecutive-frame gating. Modeled after realtime API turn detection (wait
- * for a real pause, not a brief dip between words).
+ * Speech endpointer — hysteresis, hangover, peak-relative trailing silence, and
+ * hard timeouts so listening never hangs after the user stops talking.
  */
 class SpeechEndpointer {
   constructor(options = {}) {
     this.pollMs = options.pollMs ?? 48;
-    this.baseSilenceMs = options.baseSilenceMs ?? 2200;
-    this.maxAdaptiveSilenceMs = options.maxAdaptiveSilenceMs ?? 900;
-    this.minSpeechMs = options.minSpeechMs ?? 700;
-    this.hangoverMs = options.hangoverMs ?? 520;
-    this.calibrateMs = options.calibrateMs ?? 650;
-    this.minListenMs = options.minListenMs ?? 900;
-    this.startMultiplier = options.startMultiplier ?? 3.6;
-    this.continueMultiplier = options.continueMultiplier ?? 2.15;
-    this.minSpeechRms = options.minSpeechRms ?? 0.011;
+    this.baseSilenceMs = options.baseSilenceMs ?? 850;
+    this.maxAdaptiveSilenceMs = options.maxAdaptiveSilenceMs ?? 450;
+    this.minSpeechMs = options.minSpeechMs ?? 380;
+    this.hangoverMs = options.hangoverMs ?? 280;
+    this.calibrateMs = options.calibrateMs ?? 380;
+    this.minListenMs = options.minListenMs ?? 550;
+    this.maxListenMs = options.maxListenMs ?? 45000;
+    this.maxListenNoSpeechMs = options.maxListenNoSpeechMs ?? 12000;
+    this.startMultiplier = options.startMultiplier ?? 3.2;
+    this.continueMultiplier = options.continueMultiplier ?? 2.0;
+    this.minSpeechRms = options.minSpeechRms ?? 0.009;
+    this.trailingRatio = options.trailingRatio ?? 0.16;
+    this.trailingSilenceMs = options.trailingSilenceMs ?? 520;
 
     this.noiseFloor = 0.004;
     this.calibratingUntil = 0;
@@ -28,8 +31,7 @@ class SpeechEndpointer {
     this.peakRms = 0;
     this.consecutiveSilentFrames = 0;
     this.consecutiveSpeechFrames = 0;
-    this.minSpeechFrames = Math.ceil(this.minSpeechMs / this.pollMs);
-    this.framesRequiredForEnd = Math.ceil(this.baseSilenceMs / this.pollMs);
+    this.trailingSilentSince = 0;
   }
 
   begin(now) {
@@ -42,6 +44,7 @@ class SpeechEndpointer {
     this.peakRms = 0;
     this.consecutiveSilentFrames = 0;
     this.consecutiveSpeechFrames = 0;
+    this.trailingSilentSince = 0;
     this.noiseFloor = 0.004;
   }
 
@@ -50,23 +53,58 @@ class SpeechEndpointer {
   }
 
   _continueThreshold() {
-    return Math.max(this.minSpeechRms * 0.72, this.noiseFloor * this.continueMultiplier);
+    return Math.max(this.minSpeechRms * 0.68, this.noiseFloor * this.continueMultiplier);
   }
 
   _adaptiveSilenceMs() {
     if (!this.hasSpeech) return this.baseSilenceMs;
     const speechMs = Math.max(0, this.lastSpeechAt - this.speechStartedAt);
-    // Longer utterances tolerate longer mid-sentence pauses (realtime-style).
-    const extra = Math.min(this.maxAdaptiveSilenceMs, speechMs * 0.18);
+    const extra = Math.min(this.maxAdaptiveSilenceMs, speechMs * 0.12);
     return this.baseSilenceMs + extra;
   }
 
+  _trailingThreshold() {
+    if (this.peakRms <= this.minSpeechRms) return this._continueThreshold();
+    return Math.max(this._continueThreshold(), this.peakRms * this.trailingRatio);
+  }
+
+  _shouldEndUtterance(now) {
+    const listenMs = now - this.listeningStartedAt;
+    if (listenMs >= this.maxListenMs && this.hasSpeech) return "timeout";
+
+    if (!this.hasSpeech && listenMs >= this.maxListenNoSpeechMs) {
+      return "no_speech";
+    }
+
+    if (!this.inSpeech || listenMs < this.minListenMs) return null;
+
+    const speechMs = this.lastSpeechAt - this.speechStartedAt;
+    if (speechMs < this.minSpeechMs) return null;
+
+    const silenceMs = now - this.lastSpeechAt;
+    if (silenceMs < this.hangoverMs) return null;
+
+    const requiredSilence = this._adaptiveSilenceMs();
+    const framesRequired = Math.ceil(requiredSilence / this.pollMs);
+    if (this.consecutiveSilentFrames >= framesRequired && silenceMs >= requiredSilence) {
+      return "silence";
+    }
+
+    const trailThreshold = this._trailingThreshold();
+    if (this.trailingSilentSince > 0) {
+      const trailMs = now - this.trailingSilentSince;
+      if (trailMs >= this.trailingSilenceMs) return "trailing";
+    }
+
+    return null;
+  }
+
   /**
-   * @returns {"continue"|"end"|"calibrating"}
+   * @returns {"continue"|"end"|"cancel"|"calibrating"}
    */
   feed(rms, now) {
     if (now < this.calibratingUntil) {
-      this.noiseFloor = this.noiseFloor * 0.82 + rms * 0.18;
+      this.noiseFloor = this.noiseFloor * 0.8 + rms * 0.2;
       return "calibrating";
     }
 
@@ -78,8 +116,9 @@ class SpeechEndpointer {
     if (speaking) {
       this.consecutiveSilentFrames = 0;
       this.consecutiveSpeechFrames += 1;
+      this.trailingSilentSince = 0;
       this.peakRms = Math.max(this.peakRms, rms);
-      this.noiseFloor = this.noiseFloor * 0.94 + rms * 0.06;
+      this.noiseFloor = this.noiseFloor * 0.93 + rms * 0.07;
 
       if (!this.inSpeech && this.consecutiveSpeechFrames >= 2) {
         this.inSpeech = true;
@@ -89,44 +128,25 @@ class SpeechEndpointer {
       if (this.inSpeech) {
         this.lastSpeechAt = now;
       }
-      return "continue";
+    } else {
+      this.consecutiveSpeechFrames = 0;
+
+      if (!this.inSpeech) {
+        this.noiseFloor = this.noiseFloor * 0.96 + rms * 0.04;
+      } else {
+        this.consecutiveSilentFrames += 1;
+        const trailThreshold = this._trailingThreshold();
+        if (rms <= trailThreshold) {
+          if (!this.trailingSilentSince) this.trailingSilentSince = now;
+        } else {
+          this.trailingSilentSince = 0;
+        }
+      }
     }
 
-    this.consecutiveSpeechFrames = 0;
-
-    if (!this.inSpeech) {
-      this.noiseFloor = this.noiseFloor * 0.97 + rms * 0.03;
-      return "continue";
-    }
-
-    // Hangover: brief dips between words still count as speech.
-    if (now - this.lastSpeechAt < this.hangoverMs) {
-      return "continue";
-    }
-
-    this.consecutiveSilentFrames += 1;
-
-    const listenMs = now - this.listeningStartedAt;
-    if (listenMs < this.minListenMs) {
-      return "continue";
-    }
-
-    const speechMs = this.lastSpeechAt - this.speechStartedAt;
-    if (speechMs < this.minSpeechMs) {
-      return "continue";
-    }
-
-    const silenceMs = now - this.lastSpeechAt;
-    const requiredSilence = this._adaptiveSilenceMs();
-    const framesRequired = Math.ceil(requiredSilence / this.pollMs);
-
-    if (
-      this.consecutiveSilentFrames >= framesRequired &&
-      silenceMs >= requiredSilence
-    ) {
-      return "end";
-    }
-
+    const endReason = this._shouldEndUtterance(now);
+    if (endReason === "no_speech") return "cancel";
+    if (endReason) return "end";
     return "continue";
   }
 
