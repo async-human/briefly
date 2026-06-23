@@ -209,22 +209,23 @@ async function openBrieflyConnect() {
 
 function updateLinkStatus() {
   const el = document.getElementById("linkStatus");
+  const label = el?.querySelector(".link-label");
   const btn = document.getElementById("connect");
   const hint = document.querySelector("#settings .hint");
   const linked = state.linkVerified && !state.connecting;
 
-  if (el) {
+  if (el && label) {
     if (state.connecting) {
-      el.textContent = "Connecting via browser…";
+      label.textContent = "Connecting via browser…";
       el.classList.remove("linked");
     } else if (state.linkVerified) {
-      el.textContent = "Connected to Briefly";
+      label.textContent = "Connected to Briefly";
       el.classList.add("linked");
     } else if (store.token) {
-      el.textContent = "Account link invalid — click Connect";
+      label.textContent = "Account link invalid — click Connect";
       el.classList.remove("linked");
     } else {
-      el.textContent = "Not connected";
+      label.textContent = "Not connected";
       el.classList.remove("linked");
     }
   }
@@ -1271,9 +1272,36 @@ function initOrb() {
 }
 
 // ── Settings panel ──────────────────────────────────────────────────────────
+const ORB_WINDOW = { width: 220, compact: 318, settings: 348, advanced: 430 };
+
+async function setOrbWindowHeight(height) {
+  if (!TAURI?.window) return;
+  try {
+    const win = TAURI.window.getCurrentWindow();
+    const LogicalSize = TAURI.dpi?.LogicalSize;
+    if (LogicalSize) {
+      await win.setSize(new LogicalSize(ORB_WINDOW.width, height));
+    } else {
+      await win.setSize({ width: ORB_WINDOW.width, height });
+    }
+  } catch (_) {}
+}
+
+function settingsPanelHeight() {
+  const details = document.querySelector(".advanced-settings");
+  if (details?.open) return ORB_WINDOW.advanced;
+  return ORB_WINDOW.settings;
+}
+
+async function syncOrbWindowForSettings(open) {
+  await setOrbWindowHeight(open ? settingsPanelHeight() : ORB_WINDOW.compact);
+}
+
 function openSettings(open) {
   const panel = document.getElementById("settings");
-  if (!panel) return;
+  const footerMain = document.getElementById("footerMain");
+  const gear = document.getElementById("gear");
+  if (!panel || !footerMain) return;
   const willOpen = open ?? panel.classList.contains("hidden");
   if (willOpen) {
     document.getElementById("apiBase").value = store.apiBase;
@@ -1283,8 +1311,16 @@ function openSettings(open) {
       void refreshLinkState();
     }
     panel.classList.remove("hidden");
+    footerMain.classList.add("hidden");
+    document.body.classList.add("settings-open");
+    gear?.classList.add("active");
+    void syncOrbWindowForSettings(true);
   } else {
     panel.classList.add("hidden");
+    footerMain.classList.remove("hidden");
+    document.body.classList.remove("settings-open");
+    gear?.classList.remove("active");
+    void syncOrbWindowForSettings(false);
   }
 }
 
@@ -1369,6 +1405,11 @@ function init() {
   });
   document.getElementById("proactive").addEventListener("click", () => toggleProactive());
   document.getElementById("gear").addEventListener("click", () => openSettings());
+  document.getElementById("settingsClose").addEventListener("click", () => openSettings(false));
+  document.querySelector(".advanced-settings")?.addEventListener("toggle", () => {
+    if (!document.body.classList.contains("settings-open")) return;
+    void syncOrbWindowForSettings(true);
+  });
   document.getElementById("connect").addEventListener("click", () => {
     void openBrieflyConnect();
   });
