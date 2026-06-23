@@ -618,3 +618,14 @@ class OrbWakeCheckIn(BaseModel):
     content_type: str = "audio/webm"
     filename: str = "wake.webm"
 
+
+class OrbTurnJsonIn(BaseModel):
+    audio_base64: str | None = None
+    text: str | None = None
+    thread_id: str | None = None
+    session_id: str | None = None
+    surface: str = "desktop"
+    content_id: str | None = None
+    content_type: str = "audio/webm"
+    filename: str = "turn.webm"
+

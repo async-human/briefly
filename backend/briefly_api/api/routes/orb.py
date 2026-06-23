@@ -24,6 +24,7 @@ from briefly_api.api.schemas import (
     OrbSessionIn,
     OrbSessionOut,
     OrbSpeakIn,
+    OrbTurnJsonIn,
     OrbTurnOut,
     OrbWakeCheckIn,
     OrbWakeCheckOut,
@@ -98,6 +99,37 @@ async def orb_turn(
             session_id=session_id,
             surface=surface or "desktop",
             content_id=content_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return OrbTurnOut(**result)
+
+
+@router.post("/orb/turn/json", response_model=OrbTurnOut)
+async def orb_turn_json(
+    body: OrbTurnJsonIn,
+    user: User = Depends(get_capture_user),
+    db: AsyncSession = Depends(get_db),
+) -> OrbTurnOut:
+    """Voice turn via JSON + base64 audio — reliable for Tauri desktop (no multipart)."""
+    audio_bytes: bytes | None = None
+    if body.audio_base64:
+        try:
+            audio_bytes = base64.b64decode(body.audio_base64, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid audio_base64") from exc
+    try:
+        result = await orb_service.run_orb_turn(
+            db,
+            user,
+            audio_bytes=audio_bytes,
+            filename=body.filename or "turn.webm",
+            content_type=body.content_type or "audio/webm",
+            text=body.text,
+            thread_id=body.thread_id,
+            session_id=body.session_id,
+            surface=body.surface or "desktop",
+            content_id=body.content_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

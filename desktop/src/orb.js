@@ -139,12 +139,29 @@ async function hideWindow() {
 
 // ── API ─────────────────────────────────────────────────────────────────────
 function apiFetch(url, options = {}) {
-  // Multipart uploads go through the WebView fetch — Tauri HTTP can mishandle FormData.
-  if (options.body instanceof FormData) {
-    return window.fetch(url, options);
+  // Tauri WebView: JSON POST works; multipart FormData often fails ("Failed to fetch").
+  return window.fetch(url, options);
+}
+
+function turnJsonBody(extra = {}) {
+  return {
+    thread_id: store.threadId || null,
+    session_id: store.sessionId || null,
+    surface: "desktop",
+    ...extra,
+  };
+}
+
+async function parseApiJson(res, label) {
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const payload = await res.json();
+      detail = payload?.detail ? String(payload.detail) : "";
+    } catch (_) {}
+    throw new Error(detail ? `${label}: HTTP ${res.status} — ${detail}` : `${label}: HTTP ${res.status}`);
   }
-  const doFetch = TAURI?.http?.fetch || window.fetch;
-  return doFetch(url, options);
+  return await res.json();
 }
 
 async function apiGet(path) {
@@ -191,32 +208,35 @@ async function ensureOrbSession() {
 
 async function apiTurn(audioBlob, signal) {
   await ensureOrbSession();
-  const form = new FormData();
-  form.append("audio", audioBlob, "turn.webm");
-  appendTurnFormFields(form);
-  const res = await apiFetch(store.apiBase + "/api/v1/orb/turn", {
+  const mime = audioBlob.type || "audio/webm";
+  const res = await apiFetch(store.apiBase + "/api/v1/orb/turn/json", {
     method: "POST",
-    headers: { Authorization: "Bearer " + store.token },
-    body: form,
+    headers: {
+      Authorization: "Bearer " + store.token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(turnJsonBody({
+      audio_base64: await blobToBase64(audioBlob),
+      content_type: mime,
+      filename: mime.includes("mp4") ? "turn.m4a" : "turn.webm",
+    })),
     signal,
   });
-  if (!res.ok) throw new Error("Turn failed: HTTP " + res.status);
-  return await res.json();
+  return await parseApiJson(res, "Turn failed");
 }
 
 async function apiTurnText(text, signal) {
   await ensureOrbSession();
-  const form = new FormData();
-  form.append("text", text);
-  appendTurnFormFields(form);
-  const res = await apiFetch(store.apiBase + "/api/v1/orb/turn", {
+  const res = await apiFetch(store.apiBase + "/api/v1/orb/turn/json", {
     method: "POST",
-    headers: { Authorization: "Bearer " + store.token },
-    body: form,
+    headers: {
+      Authorization: "Bearer " + store.token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(turnJsonBody({ text })),
     signal,
   });
-  if (!res.ok) throw new Error("Turn failed: HTTP " + res.status);
-  return await res.json();
+  return await parseApiJson(res, "Turn failed");
 }
 
 async function apiSpeakToBlob(text, signal) {
@@ -640,7 +660,12 @@ async function executeTurn(turnFactory) {
   } catch (err) {
     if (turnAbort.signal.aborted) return;
     setMode("idle");
-    flashCaption(err instanceof Error ? err.message : "Turn failed.", 2800);
+    const msg = err instanceof Error ? err.message : "Turn failed.";
+    if (/failed to fetch|networkerror/i.test(msg)) {
+      flashCaption("Can't reach API — check connection.", 2800);
+    } else {
+      flashCaption(truncateStatus(msg, 72), 2800);
+    }
   }
 }
 
@@ -1122,7 +1147,16 @@ async function initLiveSession() {
     // Server confirmed end-of-utterance; keep listening until turn_start.
     setStatusForMode("listening", "Processing…");
   };
-  await state.liveClient.connect();
+  state.liveClient.onError = (message) => {
+    if (String(message || "").toLowerCase().includes("unauthorized")) {
+      try { localStorage.setItem("briefly.orbLiveSession", "0"); } catch (_) {}
+    }
+  };
+  const connected = await state.liveClient.connect();
+  if (!connected) {
+    state.serverStreamingStt = false;
+    state.useServerEndpointing = false;
+  }
 }
 
 function init() {
