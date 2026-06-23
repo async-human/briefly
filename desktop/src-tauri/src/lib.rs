@@ -197,7 +197,8 @@ pub fn run() {
     // Single-instance MUST be the first plugin registered. It keeps exactly one
     // orb alive and forwards a second launch's argv (which carries the
     // briefly:// auth deep link on Windows/Linux) into the running instance.
-    #[cfg(desktop)]
+    // Skip in debug builds so `npm run dev` can restart cleanly.
+    #[cfg(all(desktop, not(debug_assertions)))]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
@@ -235,9 +236,11 @@ pub fn run() {
                     handle_auth_deep_link(&dl_handle, url.as_str());
                 }
             });
-            // Register to launch on login — this is the "always on" behaviour.
-            // Safe to call every launch; it's a no-op once registered.
-            let _ = app.autolaunch().enable();
+            // Register to launch on login — production only (avoid dev autostart).
+            #[cfg(not(debug_assertions))]
+            {
+                let _ = app.autolaunch().enable();
+            }
 
             // ── System-tray icon + menu ───────────────────────────────────────
             let speak_i =

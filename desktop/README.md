@@ -143,6 +143,17 @@ npm run icons          # one-time, generates app/tray icons
 npm run dev            # compiles Rust, launches the floating orb
 ```
 
+If `npm run dev` returns to the prompt immediately, a **stale orb** is probably
+still running (tray icon only — it hides from the taskbar). Kill it, then retry:
+
+```powershell
+Stop-Process -Name briefly-orb -Force -ErrorAction SilentlyContinue
+npm run dev
+```
+
+Look for the **Briefly tray icon** near the clock; left-click toggles the orb,
+right-click opens Push to talk / Show / Quit.
+
 Then confirm each capability:
 
 1. **Voice task** — click the orb (or say "hey briefly", or Ctrl+Shift+Space),
