@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from briefly_api.db.models import CaptureToken, User
 
@@ -102,7 +103,9 @@ async def resolve_user(db: AsyncSession, credential: str) -> User | None:
         return None
 
     user_result = await db.execute(
-        select(User).where(User.id == record.user_id, User.is_active.is_(True))
+        select(User)
+        .options(selectinload(User.profile))
+        .where(User.id == record.user_id, User.is_active.is_(True))
     )
     user = user_result.scalar_one_or_none()
     if not user:

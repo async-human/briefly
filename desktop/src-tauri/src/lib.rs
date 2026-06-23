@@ -14,7 +14,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 
 const DASHBOARD_URL: &str = "https://app.sendbriefly.app/dashboard";
 
-#[derive(serde::Serialize)]
+#[derive(Clone, serde::Serialize)]
 struct DesktopAuthPayload {
     token: String,
     api_base: Option<String>,
