@@ -3,7 +3,7 @@
 // Tauri globals (present when running inside the desktop app; absent in a plain
 // browser, where we fall back gracefully for dev/preview).
 const TAURI = window.__TAURI__ || null;
-const DEFAULT_APP_BASE = "https://app.sendbriefly.app";
+const DEFAULT_APP_BASE = "https://www.sendbriefly.app";
 
 // ── Persistent settings ────────────────────────────────────────────────────
 const store = {

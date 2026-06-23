@@ -14,8 +14,8 @@ use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_deep_link::DeepLinkExt;
 
-const DASHBOARD_URL: &str = "https://app.sendbriefly.app/dashboard";
-const CONNECT_URL: &str = "https://app.sendbriefly.app/desktop/connect";
+const DASHBOARD_URL: &str = "https://www.sendbriefly.app/dashboard";
+const CONNECT_URL: &str = "https://www.sendbriefly.app/desktop/connect";
 
 #[derive(Clone, serde::Serialize)]
 struct DesktopAuthPayload {

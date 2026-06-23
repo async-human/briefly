@@ -39,7 +39,7 @@ export function desktopConnectPageUrl(): string {
   const app =
     process.env.NEXT_PUBLIC_APP_URL ??
     process.env.NEXT_PUBLIC_DASHBOARD_URL ??
-    "https://app.sendbriefly.app";
+    "https://www.sendbriefly.app";
   return `${app.replace(/\/$/, "")}/desktop/connect`;
 }
 
