@@ -115,6 +115,8 @@ const state = {
   linkVerified: false,
   connectPollTimer: null,
   connecting: false,
+  conversationActive: false,
+  conversationMuted: false,
 };
 
 function isAccountLinked() {
@@ -853,6 +855,7 @@ async function stopListeningAndSend() {
     return;
   }
 
+  state.conversationActive = true;
   await executeTurn(async (signal) => apiTurn(blob, signal));
 }
 
@@ -860,7 +863,97 @@ async function cancelListening() {
   if (state.mode !== "listening") return;
   stopListening();
   setMode("idle");
-  flashCaption("Cancelled.", 900);
+  const rearm = state.conversationActive && !state.conversationMuted;
+  flashCaption(rearm ? "Still here — listening." : "Cancelled.", 900);
+  if (rearm) {
+    await continueConversationAfterSpeak();
+  }
+}
+
+function normalizeCommandText(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^\w\s']/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Local voice commands — obey immediately without waiting for the LLM. */
+function matchVoiceCommand(text) {
+  const n = normalizeCommandText(text);
+  if (!n) return null;
+  if (/\b(that s all|thats all|we re done|we are done|goodbye|bye briefly|stop listening|go away|leave me alone)\b/.test(n)) {
+    return "end_conversation";
+  }
+  if (/\b(mute|be quiet|keep quiet|stay quiet|silence|stop talking|quiet down|shut up|don t speak|do not speak|hold on|hold your tongue)\b/.test(n)) {
+    return "mute";
+  }
+  if (/\b(unmute|start listening|listen again|you can talk|speak again)\b/.test(n)) {
+    return "unmute";
+  }
+  if (/\b(cancel|never mind|nevermind|forget it|stop that|scratch that)\b/.test(n)) {
+    return "cancel";
+  }
+  if (/\b(mute wake|turn off wake|disable wake|stop wake word)\b/.test(n)) {
+    return "mute_wake";
+  }
+  if (/\b(mute proactive|stop interrupting|don t interrupt|no interruptions)\b/.test(n)) {
+    return "mute_proactive";
+  }
+  return null;
+}
+
+async function applyVoiceCommand(cmd) {
+  switch (cmd) {
+    case "end_conversation":
+      state.conversationActive = false;
+      state.conversationMuted = false;
+      stopCurrentTurn();
+      flashCaption("Got it. Say \"hey briefly\" when you need me.", 2800);
+      return;
+    case "mute":
+      state.conversationMuted = true;
+      store.proactiveEnabled = false;
+      updateProactiveStatus();
+      stopCurrentTurn();
+      flashCaption("Quiet mode — I won't speak unless you ask.", 3200);
+      return;
+    case "unmute":
+      state.conversationMuted = false;
+      store.proactiveEnabled = true;
+      updateProactiveStatus();
+      state.conversationActive = true;
+      flashCaption("Back on — I'm listening.", 2200);
+      await startListening();
+      return;
+    case "cancel":
+      stopCurrentTurn();
+      flashCaption("Cancelled.", 900);
+      if (state.conversationActive && !state.conversationMuted) {
+        await continueConversationAfterSpeak();
+      }
+      return;
+    case "mute_wake":
+      store.wakeMuted = true;
+      stopWakeWord();
+      updateWakeStatus();
+      flashCaption("Wake word muted.", 2000);
+      return;
+    case "mute_proactive":
+      store.proactiveEnabled = false;
+      updateProactiveStatus();
+      flashCaption("Proactive voice off.", 2000);
+      return;
+    default:
+      return;
+  }
+}
+
+async function continueConversationAfterSpeak(turn) {
+  if (state.conversationMuted) return;
+  if (!state.conversationActive) state.conversationActive = true;
+  flashCaption("Listening…", 900);
+  await startListening();
 }
 
 async function executeTurn(turnFactory) {
@@ -871,6 +964,12 @@ async function executeTurn(turnFactory) {
     const turn = await turnFactory(turnAbort.signal);
     state.turnAbort = null;
     applyTurnMeta(turn);
+    const transcript = (turn?.transcript || "").trim();
+    const voiceCmd = matchVoiceCommand(transcript);
+    if (voiceCmd) {
+      await applyVoiceCommand(voiceCmd);
+      return;
+    }
     const answer = (turn && turn.answer ? String(turn.answer) : "").trim();
     if (!answer) throw new Error("No answer");
     const trace = Array.isArray(turn?.tool_trace) ? turn.tool_trace : [];
@@ -878,11 +977,14 @@ async function executeTurn(turnFactory) {
       const names = trace.map((t) => String(t.tool || "")).filter(Boolean).join(" + ");
       if (names) setStatusForMode("thinking", truncateStatus(`Using ${names}`, 48));
     }
+    if (state.conversationMuted) {
+      setMode("idle");
+      flashCaption("Muted — say \"unmute\" or tap to talk.", 2800);
+      return;
+    }
     await playTts(answer);
     if (turnAbort.signal.aborted) return;
-    if (turn?.expects_reply) {
-      await startListening();
-    }
+    await continueConversationAfterSpeak(turn);
   } catch (err) {
     if (turnAbort.signal.aborted) return;
     setMode("idle");
@@ -1057,10 +1159,12 @@ function onWakePhraseHeard() {
   if (state.mode === "speaking" || state.mode === "thinking") {
     stopCurrentTurn();
     flashCaption("Interrupted — listening.", 1200);
+    state.conversationActive = true;
     void startListening();
     return;
   }
   if (state.mode !== "idle") return;
+  state.conversationActive = true;
   flashCaption("Wake word heard.", 900);
   void startListening();
 }
@@ -1413,6 +1517,13 @@ async function initLiveSession() {
       setStatusForMode("listening", truncateStatus(text, 48));
       return;
     }
+    if (isFinal && (state.mode === "speaking" || state.mode === "thinking")) {
+      const cmd = matchVoiceCommand(text);
+      if (cmd) {
+        void applyVoiceCommand(cmd);
+        return;
+      }
+    }
     if (
       (state.mode === "idle" || state.mode === "speaking" || state.mode === "thinking") &&
       store.wakeEnabled &&
@@ -1429,14 +1540,25 @@ async function initLiveSession() {
   };
   state.liveClient.onTurnResult = async (turn) => {
     applyTurnMeta(turn);
+    const transcript = (turn?.transcript || "").trim();
+    const voiceCmd = matchVoiceCommand(transcript);
+    if (voiceCmd) {
+      await applyVoiceCommand(voiceCmd);
+      return;
+    }
     const answer = (turn && turn.answer ? String(turn.answer) : "").trim();
-    if (answer) await playTts(answer);
+    if (answer && !state.conversationMuted) await playTts(answer);
+    else setMode("idle");
   };
   state.liveClient.onTurnEnd = (frame) => {
     state.wsTurnActive = false;
     state.sendingUtterance = false;
-    if (frame.expects_reply) void startListening();
-    else setMode("idle");
+    if (state.conversationMuted) {
+      setMode("idle");
+      return;
+    }
+    state.conversationActive = true;
+    void continueConversationAfterSpeak({ expects_reply: frame?.expects_reply !== false });
   };
   state.liveClient.onSpeechFinal = () => {
     if (state.mode !== "listening" || state.wsTurnActive) return;
@@ -1528,7 +1650,13 @@ function init() {
       return;
     }
     input.value = "";
+    const cmd = matchVoiceCommand(text);
+    if (cmd) {
+      void applyVoiceCommand(cmd);
+      return;
+    }
     stopCurrentTurn();
+    state.conversationActive = true;
     void executeTurn(async (signal) => apiTurnText(text, signal));
   });
   document.addEventListener("keydown", (e) => {
