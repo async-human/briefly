@@ -94,6 +94,56 @@ def _parse_json(text: str) -> dict:
         return {}
 
 
+_ANSWERABILITY_SYSTEM = (
+    "You decide whether a body of CONTEXT can support an email INSTRUCTION using ONLY "
+    "facts present in the context, with no outside knowledge. Be strict: if the context "
+    "is missing the specific facts the instruction needs (figures, a topic it never "
+    "mentions, etc.), it CANNOT answer. Respond in STRICT JSON only."
+)
+
+_GAP_SYSTEM = (
+    "The user's CONTEXT does NOT contain the information their instruction needs. Write a "
+    "short, honest email IN THE USER'S VOICE that says what you can from the context and "
+    "CLEARLY notes the missing piece isn't in their sources yet / asks them to provide it. "
+    "Do NOT invent any facts, figures, names, quotes, links, or analysis — not even "
+    "plausible ones. First person, plain text, under 120 words. "
+    'Return STRICT JSON only: {"to_hint": string, "subject": string, "body": string, '
+    '"rationale": string}.'
+)
+
+_EMPTY_MARKERS = ("", "(no recent brief found)", "(none)")
+
+
+async def _assess_answerability(instruction: str, context: str, *, user_id: str | None = None) -> dict:
+    """Pre-flight gate: can the context support this instruction without invention?
+    Returns {"can_answer": bool, "missing": str}. Fails OPEN (assume answerable) on
+    error so it never blocks a normal draft."""
+    ctx = (context or "").strip()
+    if ctx in _EMPTY_MARKERS:
+        return {"can_answer": False, "missing": "there's no brief content to draw on"}
+
+    s = get_settings()
+    llm = get_llm_adapter()
+    prompt = (
+        f"INSTRUCTION:\n{instruction.strip()}\n\nCONTEXT:\n{ctx}\n\n"
+        'Return JSON: {"can_answer": <true|false>, "missing": "<if false, what specific '
+        'fact/topic the context lacks>"}.'
+    )
+    try:
+        data = await llm.complete_json(
+            [Message(role="user", content=prompt)],
+            system=_ANSWERABILITY_SYSTEM,
+            model=(getattr(s, "eval_judge_model", "") or None),  # prefer a cheap model
+            user_id=user_id,
+            agent="email_answerability",
+        )
+        if isinstance(data, dict) and "can_answer" in data:
+            return {"can_answer": bool(data.get("can_answer")), "missing": str(data.get("missing") or "")}
+    except Exception:
+        log.debug("answerability check failed — failing open", exc_info=True)
+    return {"can_answer": True, "missing": ""}
+
+
 async def compose_from_context(
     instruction: str,
     context: str,
@@ -103,19 +153,36 @@ async def compose_from_context(
 ) -> dict:
     """Pure grounded composition: (instruction, context, name) → parsed draft fields.
 
-    Shared by the live draft path AND the eval harness so we measure exactly what
-    ships. Returns {subject, body, rationale, to_hint}. Raises on LLM failure.
+    Structural grounding gate: a pre-flight answerability check decides whether the
+    context can support the ask. If not, we compose in a constrained "gap mode" that
+    acknowledges what's missing instead of fabricating — enforcement, not a polite
+    request. Shared by the live draft path AND the eval harness so we measure exactly
+    what ships. Returns {subject, body, rationale, to_hint}. Raises on LLM failure.
     """
-    user_prompt = (
-        f"User's name: {name or 'the user'}\n"
-        f"Instruction: {instruction.strip()}\n\n"
-        f"Context — things the user has read:\n{context or '(no recent brief found)'}\n\n"
-        "Draft the email now as strict JSON."
-    )
+    gap = await _assess_answerability(instruction, context, user_id=user_id)
+
+    if not gap["can_answer"]:
+        system = _GAP_SYSTEM
+        user_prompt = (
+            f"User's name: {name or 'the user'}\n"
+            f"Instruction: {instruction.strip()}\n\n"
+            f"Context — things the user has read:\n{context or '(no recent brief found)'}\n\n"
+            f"What's missing: {gap['missing']}\n\n"
+            "Write the honest gap email now as strict JSON."
+        )
+    else:
+        system = _SYSTEM
+        user_prompt = (
+            f"User's name: {name or 'the user'}\n"
+            f"Instruction: {instruction.strip()}\n\n"
+            f"Context — things the user has read:\n{context or '(no recent brief found)'}\n\n"
+            "Draft the email now as strict JSON."
+        )
+
     llm = get_llm_adapter()
     response = await llm.complete(
         [Message(role="user", content=user_prompt)],
-        system=_SYSTEM,
+        system=system,
         temperature=0.4,
         max_tokens=700,
         user_id=user_id,
