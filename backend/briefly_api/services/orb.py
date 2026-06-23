@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -326,6 +327,65 @@ async def _run_agent(
 
 
 # ── Public entrypoint ────────────────────────────────────────────────────────
+
+
+def transcript_matches_wake_phrase(transcript: str) -> bool:
+    """True when STT output contains the orb wake phrase (with common mis-hears)."""
+    norm = re.sub(r"[^\w\s]", " ", (transcript or "").lower())
+    norm = " ".join(norm.split())
+    if not norm:
+        return False
+    phrases = (
+        "hey briefly",
+        "hi briefly",
+        "hay briefly",
+        "a briefly",
+        "hey brief",
+        "hi brief",
+        "hey briefley",
+        "hey brieflee",
+        "hey breifly",
+    )
+    if any(p in norm for p in phrases):
+        return True
+    words = norm.split()
+    for i, word in enumerate(words):
+        if word in ("hey", "hi", "hay", "a") and "briefly" in words[i : i + 4]:
+            return True
+    return False
+
+
+async def check_wake_phrase(
+    db: AsyncSession | None,
+    user: User,
+    *,
+    audio_bytes: bytes,
+    filename: str = "wake.webm",
+    content_type: str = "audio/webm",
+) -> dict:
+    """Transcribe a short wake clip; STT only — no agent turn."""
+    stt = get_stt_adapter()
+    context_prompt = (
+        'The user may say "hey briefly" or "hi briefly" to wake a voice assistant.'
+    )
+    if db is not None and getattr(user, "id", None):
+        from briefly_api.stt.profile_context import transcription_prompt_for_user
+
+        profile = await transcription_prompt_for_user(db, user.id)
+        if profile:
+            context_prompt = f"{context_prompt} {profile}"
+    transcript = (
+        await stt.transcribe(
+            audio_bytes,
+            filename=filename,
+            content_type=content_type,
+            context_prompt=context_prompt,
+        )
+    ).strip()
+    return {
+        "transcript": transcript,
+        "wake": transcript_matches_wake_phrase(transcript),
+    }
 
 
 async def run_orb_turn(

@@ -26,6 +26,7 @@ class StreamTranscriptEvent:
     text: str
     is_final: bool
     speech_final: bool = False
+    utterance_end: bool = False
 
 
 class DeepgramStreamSession:
@@ -47,10 +48,14 @@ class DeepgramStreamSession:
         params = {
             "model": self._settings.stt_model or "nova-2",
             "language": self._language,
+            "encoding": "linear16",
+            "sample_rate": "16000",
+            "channels": "1",
             "punctuate": "true",
             "interim_results": "true",
-            "endpointing": str(self._settings.deepgram_endpointing_ms),
-            "utterance_end_ms": str(max(1000, self._settings.deepgram_endpointing_ms)),
+            "endpointing": str(max(300, self._settings.deepgram_endpointing_ms)),
+            "utterance_end_ms": str(max(1600, self._settings.deepgram_utterance_end_ms)),
+            "vad_events": "true",
             "smart_format": "true",
         }
         url = f"{DEEPGRAM_WS}?{urlencode(params)}"
@@ -69,7 +74,14 @@ class DeepgramStreamSession:
                 except json.JSONDecodeError:
                     continue
                 if payload.get("type") == "UtteranceEnd":
-                    await self._queue.put(StreamTranscriptEvent(text="", is_final=True, speech_final=True))
+                    await self._queue.put(
+                        StreamTranscriptEvent(
+                            text="",
+                            is_final=True,
+                            speech_final=False,
+                            utterance_end=True,
+                        )
+                    )
                     continue
                 channel = payload.get("channel") or {}
                 alts = channel.get("alternatives") or []

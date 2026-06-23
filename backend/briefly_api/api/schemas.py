@@ -607,3 +607,8 @@ class OrbSessionOut(BaseModel):
     session_id: str
     thread_id: str | None = None
 
+
+class OrbWakeCheckOut(BaseModel):
+    transcript: str
+    wake: bool
+

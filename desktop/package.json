@@ -4,10 +4,10 @@
   "private": true,
   "description": "Briefly desktop orb — an always-on floating assistant that speaks your morning briefing",
   "scripts": {
-    "tauri": "tauri",
-    "dev": "tauri dev",
-    "build": "tauri build",
-    "icons": "tauri icon ../extension/icons/icon128.png"
+    "tauri": "node ./node_modules/@tauri-apps/cli/tauri.js",
+    "dev": "node ./node_modules/@tauri-apps/cli/tauri.js dev",
+    "build": "node ./node_modules/@tauri-apps/cli/tauri.js build",
+    "icons": "node ./node_modules/@tauri-apps/cli/tauri.js icon ../extension/icons/icon128.png"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

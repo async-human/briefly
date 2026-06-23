@@ -20,6 +20,14 @@ def _patch_ask(monkeypatch, capture):
     monkeypatch.setattr(orb, "ask_briefly", fake_ask)
 
 
+def test_wake_phrase_matching():
+    assert orb.transcript_matches_wake_phrase("Hey Briefly")
+    assert orb.transcript_matches_wake_phrase("hi briefly there")
+    assert orb.transcript_matches_wake_phrase("hey brief")
+    assert not orb.transcript_matches_wake_phrase("hello world")
+    assert not orb.transcript_matches_wake_phrase("")
+
+
 def test_text_turn_goes_straight_to_ask(monkeypatch):
     cap = {}
     _patch_ask(monkeypatch, cap)

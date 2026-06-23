@@ -11,7 +11,10 @@ class OrbSessionClient {
     this.ready = false;
     this.onPartialTranscript = null;
     this.onTurnResult = null;
+    this.onTurnStart = null;
     this.onTurnEnd = null;
+    this.onSpeechFinal = null;
+    this.onSessionReady = null;
     this.onError = null;
   }
 
@@ -62,11 +65,20 @@ class OrbSessionClient {
             this.ready = true;
             if (frame.session_id) this.deps.setSessionId(frame.session_id);
             if (frame.thread_id) this.deps.setThreadId(frame.thread_id);
+            if (this.onSessionReady) this.onSessionReady(frame);
             resolve(true);
             return;
           }
           if (frame.type === "partial_transcript" || frame.type === "transcript") {
             if (this.onPartialTranscript) this.onPartialTranscript(frame.text, frame.is_final);
+            return;
+          }
+          if (frame.type === "speech_final") {
+            if (this.onSpeechFinal) this.onSpeechFinal(frame.text);
+            return;
+          }
+          if (frame.type === "turn_start") {
+            if (this.onTurnStart) this.onTurnStart();
             return;
           }
           if (frame.type === "turn_result") {

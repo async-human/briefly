@@ -114,17 +114,23 @@ async def _handle_stt_event(
         )
         if ev.is_final:
             finals.append(ev.text)
-    if ev.speech_final:
-        transcript = " ".join(finals).strip()
-        finals.clear()
-        if not transcript:
-            return
-        await _send(ws, {"type": "speech_final", "text": transcript})
-        _cancel_turn(session.session_id)
-        tts_cancel = asyncio.Event()
-        tts_cancel_holder[:] = [tts_cancel]
-        task = asyncio.create_task(_run_turn(ws, user, session, transcript, tts_cancel))
-        _ACTIVE_TURNS[session.session_id] = task
+
+    # Only end the user's turn on Deepgram UtteranceEnd — not on speech_final
+    # between phrases (that caused premature "thinking" mid-sentence).
+    if not ev.utterance_end:
+        return
+
+    transcript = " ".join(finals).strip()
+    finals.clear()
+    if len(transcript) < 4:
+        return
+
+    await _send(ws, {"type": "speech_final", "text": transcript})
+    _cancel_turn(session.session_id)
+    tts_cancel = asyncio.Event()
+    tts_cancel_holder[:] = [tts_cancel]
+    task = asyncio.create_task(_run_turn(ws, user, session, transcript, tts_cancel))
+    _ACTIVE_TURNS[session.session_id] = task
 
 
 @router.websocket("/orb/session/live")
@@ -181,6 +187,7 @@ async def orb_session_live(ws: WebSocket) -> None:
                             "type": "session_ready",
                             "session_id": session.session_id,
                             "thread_id": session.thread_id,
+                            "streaming_stt": stt_session is not None,
                         },
                     )
                     continue

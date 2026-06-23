@@ -31,7 +31,11 @@ To run the native worker in local dev, set:
 ```bash
 BRIEFLY_WAKEWORD_EXE=python
 BRIEFLY_WAKEWORD_ARGS="desktop/wake/openwakeword_worker.py"
+BRIEFLY_WAKEWORD_MODEL=path/to/hey_briefly.onnx
 ```
+
+Without `BRIEFLY_WAKEWORD_MODEL`, the orb uses **mic + server STT** wake detection
+(`POST /orb/wake-check`) — works in the Tauri app without a custom ONNX model.
 
 ```
 desktop/

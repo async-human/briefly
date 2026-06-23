@@ -118,6 +118,10 @@ fn position_bottom_right(window: &tauri::WebviewWindow) {
 
 fn wakeword_exe_and_args() -> Option<(String, Vec<String>)> {
     let exe = std::env::var("BRIEFLY_WAKEWORD_EXE").ok()?;
+    // Require a trained wake model — the default openWakeWord bundle has no "hey briefly".
+    if std::env::var("BRIEFLY_WAKEWORD_MODEL").ok().filter(|v| !v.is_empty()).is_none() {
+        return None;
+    }
     let args = std::env::var("BRIEFLY_WAKEWORD_ARGS")
         .ok()
         .map(|v| v.split_whitespace().map(|s| s.to_string()).collect())

@@ -8,24 +8,32 @@ Protocol:
 Expected runtime:
 - BRIEFLY_WAKEWORD_EXE=python
 - BRIEFLY_WAKEWORD_ARGS="desktop/wake/openwakeword_worker.py"
+- BRIEFLY_WAKEWORD_MODEL=path/to/hey_briefly.onnx
 """
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 
 
 def main() -> int:
+    model_path = os.environ.get("BRIEFLY_WAKEWORD_MODEL", "").strip()
+    if not model_path:
+        return 1
+
     try:
         from openwakeword.model import Model  # type: ignore
         import pyaudio  # type: ignore
     except Exception:
-        # Missing deps: keep process alive briefly so parent can fall back gracefully.
-        time.sleep(1.0)
         return 1
 
-    model = Model(wakeword_models=[])
+    try:
+        model = Model(wakeword_models=[model_path])
+    except Exception:
+        return 1
+
     pa = pyaudio.PyAudio()
     stream = pa.open(
         format=pyaudio.paInt16,
@@ -57,4 +65,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

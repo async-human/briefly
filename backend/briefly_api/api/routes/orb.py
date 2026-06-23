@@ -23,6 +23,7 @@ from briefly_api.api.schemas import (
     OrbSessionOut,
     OrbSpeakIn,
     OrbTurnOut,
+    OrbWakeCheckOut,
     ProactiveEventOut,
 )
 from briefly_api.auth.deps import get_capture_user
@@ -78,6 +79,29 @@ async def orb_turn(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return OrbTurnOut(**result)
+
+
+@router.post("/orb/wake-check", response_model=OrbWakeCheckOut)
+async def orb_wake_check(
+    audio: UploadFile = File(...),
+    user: User = Depends(get_capture_user),
+    db: AsyncSession = Depends(get_db),
+) -> OrbWakeCheckOut:
+    """STT-only wake phrase check for always-on desktop orb listening."""
+    audio_bytes = await audio.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty audio.")
+    try:
+        result = await orb_service.check_wake_phrase(
+            db,
+            user,
+            audio_bytes=audio_bytes,
+            filename=audio.filename or "wake.webm",
+            content_type=audio.content_type or "audio/webm",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return OrbWakeCheckOut(**result)
 
 
 @router.post("/orb/speak")

@@ -56,16 +56,16 @@ const store = {
 // How often the idle orb checks whether Briefly has something to say.
 const PROACTIVE_POLL_MS = 90000;
 
-// Voice activity detection — auto-detect end of speech so the user never has
-// to click again to send. Tuned for typical desktop mic + WebView2 on Windows.
+// Voice activity detection — tuned for natural pauses (realtime-style endpointing).
 const VAD = {
   POLL_MS: 48,
-  CALIBRATE_MS: 320,
-  SPEECH_MARGIN: 2.8,
-  MIN_SPEECH_RMS: 0.012,
-  SILENCE_MS: 1100,
-  MIN_SPEECH_MS: 380,
-  MAX_LISTEN_MS: 45000,
+  BASE_SILENCE_MS: 2200,
+  MAX_ADAPTIVE_SILENCE_MS: 900,
+  MIN_SPEECH_MS: 700,
+  HANGOVER_MS: 520,
+  CALIBRATE_MS: 650,
+  MIN_LISTEN_MS: 900,
+  MAX_LISTEN_MS: 60000,
 };
 
 const state = {
@@ -81,6 +81,7 @@ const state = {
   wakeRestartTimer: null,
   wakeBackend: "none",
   wakeEventUnlisten: null,
+  micWakeMonitor: null,
   vadAudioCtx: null,
   vadAnalyser: null,
   vadPollTimer: null,
@@ -91,6 +92,11 @@ const state = {
   vadCalibratingUntil: 0,
   sendingUtterance: false,
   liveClient: null,
+  endpointer: null,
+  pcmNode: null,
+  useServerEndpointing: false,
+  serverStreamingStt: false,
+  wsTurnActive: false,
 };
 
 function appendTurnFormFields(form) {
@@ -259,6 +265,10 @@ function updateWakeStatus() {
     el.textContent = "Wake word muted";
   } else if (state.wakeBackend === "native") {
     el.textContent = 'Wake word local: "hey briefly"';
+  } else if (state.wakeBackend === "mic") {
+    el.textContent = store.token
+      ? 'Wake word listening: say "hey briefly"'
+      : 'Wake word needs a device token (settings)';
   } else if (state.wakeBackend === "web") {
     el.textContent = 'Wake word beta: "hey briefly"';
   } else {
@@ -307,15 +317,41 @@ function stopVadMonitor() {
     clearInterval(state.vadPollTimer);
     state.vadPollTimer = null;
   }
+  state.endpointer = null;
   state.vadHasSpeech = false;
   state.vadSpeechStartedAt = 0;
   state.vadLastSpeechAt = 0;
   state.vadCalibratingUntil = 0;
+  if (state.pcmNode) {
+    try {
+      state.pcmNode.disconnect();
+      state.pcmNode.onaudioprocess = null;
+    } catch (_) {}
+    state.pcmNode = null;
+  }
   if (state.vadAudioCtx) {
     try { state.vadAudioCtx.close(); } catch (_) {}
     state.vadAudioCtx = null;
   }
   state.vadAnalyser = null;
+}
+
+function shouldUseServerEndpointing() {
+  if (!state.liveClient?.ready || !state.serverStreamingStt) return false;
+  try {
+    return localStorage.getItem("briefly.serverEndpointing") !== "0";
+  } catch (_) {
+    return true;
+  }
+}
+
+function stopListeningOnly() {
+  stopVadMonitor();
+  const rec = state.mediaRecorder;
+  if (rec && rec.state !== "inactive") {
+    try { rec.stop(); } catch (_) {}
+  }
+  state.mediaRecorder = null;
 }
 
 function startVadMonitor(stream) {
@@ -328,61 +364,63 @@ function startVadMonitor(stream) {
   const source = ctx.createMediaStreamSource(stream);
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048;
-  analyser.smoothingTimeConstant = 0.55;
+  analyser.smoothingTimeConstant = 0.82;
   source.connect(analyser);
 
   state.vadAudioCtx = ctx;
   state.vadAnalyser = analyser;
-  state.vadNoiseFloor = 0.004;
-  state.vadHasSpeech = false;
-  state.vadCalibratingUntil = Date.now() + VAD.CALIBRATE_MS;
+  state.useServerEndpointing = shouldUseServerEndpointing();
+
+  if (state.useServerEndpointing && typeof float32ToInt16PCM === "function") {
+    const pcmNode = ctx.createScriptProcessor(4096, 1, 1);
+    pcmNode.onaudioprocess = (ev) => {
+      if (state.mode !== "listening" || !state.liveClient?.ready) return;
+      const input = ev.inputBuffer.getChannelData(0);
+      const pcm = float32ToInt16PCM(input);
+      state.liveClient.sendAudio(pcm);
+    };
+    source.connect(pcmNode);
+    pcmNode.connect(ctx.destination);
+    state.pcmNode = pcmNode;
+  }
+
+  if (state.useServerEndpointing) {
+    state.vadHasSpeech = false;
+    return;
+  }
+
+  state.endpointer = new SpeechEndpointer({
+    pollMs: VAD.POLL_MS,
+    baseSilenceMs: VAD.BASE_SILENCE_MS,
+    maxAdaptiveSilenceMs: VAD.MAX_ADAPTIVE_SILENCE_MS,
+    minSpeechMs: VAD.MIN_SPEECH_MS,
+    hangoverMs: VAD.HANGOVER_MS,
+    calibrateMs: VAD.CALIBRATE_MS,
+    minListenMs: VAD.MIN_LISTEN_MS,
+  });
+  state.endpointer.begin(Date.now());
 
   state.vadPollTimer = setInterval(() => {
-    if (state.mode !== "listening" || !state.vadAnalyser) return;
+    if (state.mode !== "listening" || !state.vadAnalyser || !state.endpointer) return;
 
     const now = Date.now();
     const rms = measureMicRms(state.vadAnalyser);
+    const result = state.endpointer.feed(rms, now);
+    state.vadHasSpeech = state.endpointer.speechDetected;
 
-    if (now < state.vadCalibratingUntil) {
-      state.vadNoiseFloor = state.vadNoiseFloor * 0.85 + rms * 0.15;
-      return;
-    }
+    if (result === "calibrating") return;
 
-    const threshold = Math.max(
-      VAD.MIN_SPEECH_RMS,
-      state.vadNoiseFloor * VAD.SPEECH_MARGIN
-    );
-    const speaking = rms > threshold;
-
-    if (speaking) {
-      if (!state.vadHasSpeech) {
-        state.vadHasSpeech = true;
-        state.vadSpeechStartedAt = now;
-      }
-      state.vadLastSpeechAt = now;
-      state.vadNoiseFloor = state.vadNoiseFloor * 0.92 + rms * 0.08;
+    if (state.endpointer.speechActive) {
       bumpEnergy();
-      return;
     }
 
-    if (!state.vadHasSpeech) {
-      state.vadNoiseFloor = state.vadNoiseFloor * 0.97 + rms * 0.03;
-      return;
-    }
-
-    const speechMs = state.vadLastSpeechAt - state.vadSpeechStartedAt;
-    const silenceMs = now - state.vadLastSpeechAt;
-    const listenMs = now - state.listeningStartedAt;
-
-    if (
-      silenceMs >= VAD.SILENCE_MS &&
-      speechMs >= VAD.MIN_SPEECH_MS
-    ) {
+    if (result === "end") {
       void stopListeningAndSend();
       return;
     }
 
-    if (listenMs >= VAD.MAX_LISTEN_MS) {
+    const listenMs = now - state.listeningStartedAt;
+    if (listenMs >= VAD.MAX_LISTEN_MS && state.vadHasSpeech) {
       void stopListeningAndSend();
     }
   }, VAD.POLL_MS);
@@ -404,29 +442,29 @@ function stopCurrentTurn() {
   updateWakeStatus();
 }
 
-function normalizeTranscript(v) {
-  return String(v || "")
-    .toLowerCase()
-    .replace(/[^\w\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function transcriptMatchesWakePhrase(text) {
-  const norm = normalizeTranscript(text);
-  return norm.includes("hey briefly") || norm.includes("hi briefly");
-}
-
 async function ensureMic() {
   if (state.micStream) return state.micStream;
   state.micStream = await navigator.mediaDevices.getUserMedia({
     audio: {
       echoCancellation: true,
       noiseSuppression: true,
-      autoGainControl: true,
+      autoGainControl: false,
     },
   });
   return state.micStream;
+}
+
+async function apiWakeCheck(audioBlob) {
+  const form = new FormData();
+  form.append("audio", audioBlob, "wake.webm");
+  const doFetch = TAURI?.http?.fetch || window.fetch;
+  const res = await doFetch(store.apiBase + "/api/v1/orb/wake-check", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + store.token },
+    body: form,
+  });
+  if (!res.ok) throw new Error("Wake check failed: HTTP " + res.status);
+  return await res.json();
 }
 
 function chooseMimeType() {
@@ -469,7 +507,11 @@ async function startListening() {
 }
 
 async function stopListeningAndSend() {
-  if (state.mode !== "listening" || state.sendingUtterance) return;
+  if (state.mode !== "listening" || state.sendingUtterance || state.wsTurnActive) return;
+  if (!state.useServerEndpointing && state.endpointer && !state.endpointer.speechDetected) {
+    void cancelListening();
+    return;
+  }
   state.sendingUtterance = true;
   stopVadMonitor();
   const recorder = state.mediaRecorder;
@@ -609,7 +651,11 @@ function toggleTalk() {
     return;
   }
   if (state.mode === "listening") {
-    if (state.vadHasSpeech) {
+    const hasSpeech =
+      state.useServerEndpointing ||
+      state.vadHasSpeech ||
+      (state.endpointer && state.endpointer.speechDetected);
+    if (hasSpeech) {
       void stopListeningAndSend();
     } else {
       void cancelListening();
@@ -641,6 +687,10 @@ async function registerGlobalHotkey() {
 }
 
 function stopWakeWord() {
+  if (state.micWakeMonitor) {
+    state.micWakeMonitor.stop();
+    state.micWakeMonitor = null;
+  }
   if (state.wakeEventUnlisten) {
     try { state.wakeEventUnlisten(); } catch (_) {}
     state.wakeEventUnlisten = null;
@@ -662,6 +712,39 @@ function stopWakeWord() {
     TAURI.core.invoke("wakeword_stop").catch(() => {});
   }
   state.wakeBackend = "none";
+}
+
+function onWakePhraseHeard() {
+  if (state.mode !== "idle") return;
+  flashCaption("Wake word heard.", 900);
+  void startListening();
+}
+
+async function startMicWakeWord() {
+  state.wakeBackend = "none";
+  stopWakeWord();
+  if (!store.wakeEnabled || store.wakeMuted) {
+    updateWakeStatus();
+    return;
+  }
+  if (!store.token) {
+    state.wakeBackend = "mic";
+    updateWakeStatus();
+    return;
+  }
+  state.micWakeMonitor = new MicWakeMonitor({
+    getStream: ensureMic,
+    checkWake: apiWakeCheck,
+    onWake: onWakePhraseHeard,
+    isIdle: () => state.mode === "idle" && store.wakeEnabled && !store.wakeMuted,
+    measureRms: measureMicRms,
+    chooseMimeType,
+  });
+  await state.micWakeMonitor.start();
+  if (state.micWakeMonitor.active) {
+    state.wakeBackend = "mic";
+  }
+  updateWakeStatus();
 }
 
 function startWebWakeWord() {
@@ -688,8 +771,7 @@ function startWebWakeWord() {
       transcript += event.results[i][0]?.transcript || "";
     }
     if (!transcriptMatchesWakePhrase(transcript)) return;
-    flashCaption("Wake word heard.", 900);
-    void startListening();
+    onWakePhraseHeard();
   };
   rec.onerror = () => {
     state.wakeRestartTimer = setTimeout(() => startWakeWord(), 1500);
@@ -721,9 +803,7 @@ async function startWakeWord() {
         state.wakeBackend = "native";
         if (TAURI?.event) {
           state.wakeEventUnlisten = await TAURI.event.listen("wake-detected", () => {
-            if (state.mode !== "idle") return;
-            flashCaption("Wake word heard.", 900);
-            void startListening();
+            onWakePhraseHeard();
           });
         }
         updateWakeStatus();
@@ -731,6 +811,8 @@ async function startWakeWord() {
       }
     } catch (_) {}
   }
+  await startMicWakeWord();
+  if (state.wakeBackend === "mic") return;
   startWebWakeWord();
 }
 
@@ -886,16 +968,31 @@ async function initLiveSession() {
     setSessionId: (id) => { store.sessionId = id; },
     setThreadId: (id) => { store.threadId = id; },
   });
+  state.liveClient.onSessionReady = (frame) => {
+    state.serverStreamingStt = !!frame.streaming_stt;
+  };
   state.liveClient.onPartialTranscript = (text) => {
     if (state.mode === "listening") setStatusForMode("listening", truncateStatus(text, 48));
   };
-  state.liveClient.onTurnResult = (turn) => {
-    applyTurnMeta(turn);
+  state.liveClient.onTurnStart = () => {
+    state.wsTurnActive = true;
+    stopListeningOnly();
     setMode("thinking");
   };
+  state.liveClient.onTurnResult = async (turn) => {
+    applyTurnMeta(turn);
+    const answer = (turn && turn.answer ? String(turn.answer) : "").trim();
+    if (answer) await playTts(answer);
+  };
   state.liveClient.onTurnEnd = (frame) => {
+    state.wsTurnActive = false;
+    state.sendingUtterance = false;
     if (frame.expects_reply) void startListening();
     else setMode("idle");
+  };
+  state.liveClient.onSpeechFinal = () => {
+    // Server confirmed end-of-utterance; keep listening until turn_start.
+    setStatusForMode("listening", "Processing…");
   };
   await state.liveClient.connect();
 }
@@ -931,6 +1028,7 @@ function init() {
     store.token = document.getElementById("token").value.trim();
     openSettings(false);
     flashCaption("Saved.", 1600);
+    void startWakeWord();
   });
   document.getElementById("composer").addEventListener("submit", (e) => {
     e.preventDefault();
