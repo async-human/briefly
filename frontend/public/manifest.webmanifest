@@ -3,7 +3,7 @@
   "name": "Briefly — your morning briefing",
   "short_name": "Briefly",
   "description": "Your personal AI briefing — read it, or talk to it. Open Briefly and hear what matters today.",
-  "start_url": "/dashboard",
+  "start_url": "/orb",
   "display": "standalone",
   "background_color": "#07070b",
   "theme_color": "#5e6ad2",
@@ -40,9 +40,14 @@
   },
   "shortcuts": [
     {
+      "name": "Talk to Briefly",
+      "url": "/orb",
+      "description": "Open the voice orb — tap and speak"
+    },
+    {
       "name": "Open dashboard",
       "url": "/dashboard",
-      "description": "Your briefing and the Briefly assistant"
+      "description": "Your briefing and saved articles"
     },
     {
       "name": "Save a link",

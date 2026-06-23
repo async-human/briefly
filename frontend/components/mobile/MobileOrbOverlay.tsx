@@ -87,8 +87,14 @@ function splitSentences(text: string): string[] {
   return out.length ? out : [text.trim()];
 }
 
-export function MobileOrbOverlay() {
-  const [open, setOpen] = useState(false);
+type MobileOrbOverlayProps = {
+  /** fab = dashboard floating button; standalone = full-screen mobile orb app at /orb */
+  variant?: "fab" | "standalone";
+};
+
+export function MobileOrbOverlay({ variant = "fab" }: MobileOrbOverlayProps) {
+  const isStandalone = variant === "standalone";
+  const [open, setOpen] = useState(isStandalone);
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<Mode>("idle");
   const [caption, setCaption] = useState("How can I help you today?");
@@ -202,6 +208,11 @@ export function MobileOrbOverlay() {
 
   function closeOverlay() {
     if (mode !== "idle") interrupt();
+    if (isStandalone) {
+      setComposeOpen(false);
+      router.push("/dashboard");
+      return;
+    }
     setOpen(false);
     setComposeOpen(false);
   }
@@ -484,16 +495,17 @@ export function MobileOrbOverlay() {
   }, [interrupt]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open && !isStandalone) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (mode !== "idle") interrupt();
-        else setOpen(false);
+        else if (!isStandalone) setOpen(false);
+        else router.push("/dashboard");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, mode, interrupt]);
+  }, [open, mode, interrupt, isStandalone, router]);
 
   useEffect(() => {
     if (mode !== "speaking" || spokenWordIndex < 0) return;
@@ -618,10 +630,18 @@ export function MobileOrbOverlay() {
     </div>
   );
 
-  const overlay = open && mounted ? (
-    <div className="jarvis-overlay" role="dialog" aria-modal aria-label="Briefly assistant">
-      <button type="button" className="jarvis-backdrop" onClick={closeOverlay} aria-label="Close assistant" />
-      <div className={`jarvis-shell mode-${mode}`}>
+  const overlayVisible = mounted && (isStandalone || open);
+  const overlay = overlayVisible ? (
+    <div
+      className={`jarvis-overlay${isStandalone ? " jarvis-overlay--standalone" : ""}`}
+      role="dialog"
+      aria-modal={!isStandalone}
+      aria-label="Briefly assistant"
+    >
+      {!isStandalone ? (
+        <button type="button" className="jarvis-backdrop" onClick={closeOverlay} aria-label="Close assistant" />
+      ) : null}
+      <div className={`jarvis-shell mode-${mode}${isStandalone ? " jarvis-shell--standalone" : ""}`}>
         <header className="jarvis-header">
           <div className="jarvis-header-copy">
             <p className="jarvis-eyebrow">Voice assistant</p>
@@ -799,28 +819,30 @@ export function MobileOrbOverlay() {
   ) : null;
 
   return (
-    <div className="mob-orb-wrap">
-      <button
-        type="button"
-        className={`jarvis-fab${open ? " is-active" : ""}${!open && pending.length > 0 ? " has-pending" : ""}`}
-        onClick={() => (open ? closeOverlay() : openOrb())}
-        aria-expanded={open}
-        aria-label={
-          !open && pending.length > 0
-            ? `Briefly assistant — ${pending.length} new update${pending.length > 1 ? "s" : ""}`
-            : "Open Briefly assistant"
-        }
-        title="Briefly assistant"
-      >
-        <JarvisOrbCanvas mode={open ? mode : "idle"} size="fab" className="jarvis-fab-canvas" />
-        <span className="jarvis-fab-glow" aria-hidden />
-        {!open && pending.length > 0 && (
-          <span className="jarvis-fab-badge" aria-hidden>
-            {pending.length > 9 ? "9+" : pending.length}
-          </span>
-        )}
-      </button>
-      {mounted && overlay ? createPortal(overlay, document.body) : null}
+    <div className={`mob-orb-wrap${isStandalone ? " mob-orb-standalone" : ""}`}>
+      {!isStandalone ? (
+        <button
+          type="button"
+          className={`jarvis-fab${open ? " is-active" : ""}${!open && pending.length > 0 ? " has-pending" : ""}`}
+          onClick={() => (open ? closeOverlay() : openOrb())}
+          aria-expanded={open}
+          aria-label={
+            !open && pending.length > 0
+              ? `Briefly assistant — ${pending.length} new update${pending.length > 1 ? "s" : ""}`
+              : "Open Briefly assistant"
+          }
+          title="Briefly assistant"
+        >
+          <JarvisOrbCanvas mode={open ? mode : "idle"} size="fab" className="jarvis-fab-canvas" />
+          <span className="jarvis-fab-glow" aria-hidden />
+          {!open && pending.length > 0 && (
+            <span className="jarvis-fab-badge" aria-hidden>
+              {pending.length > 9 ? "9+" : pending.length}
+            </span>
+          )}
+        </button>
+      ) : null}
+      {overlay ? createPortal(overlay, document.body) : null}
     </div>
   );
 }
