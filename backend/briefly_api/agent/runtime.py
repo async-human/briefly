@@ -37,7 +37,10 @@ _PLANNER_SYSTEM = (
 _PLANNER_INSTRUCTIONS = (
     'Return JSON: {"thought": string, "tool": string, "args": object, "final": string}. '
     'Set "tool" to one of the tool names to run it (with "args"), and leave "final" empty. '
-    'When done, set "tool" to "" and put the answer to the user in "final".'
+    'When done, set "tool" to "" and put the answer to the user in "final". '
+    "If a tool's observation is a clarifying question or shows that required information "
+    "is missing to finish the task, STOP and return that question to the user as \"final\" "
+    "(do not guess or invent the missing details)."
 )
 
 _MAX_OBS_CHARS = 600
@@ -79,6 +82,7 @@ class AgentResult:
     citations: list[dict] = field(default_factory=list)
     tools_used: list[str] = field(default_factory=list)
     stopped_reason: str = "final"  # "final" | "max_steps" | "needs_confirmation" | "error"
+    thread_id: str | None = None   # carried from tools (e.g. ask_briefly) for conversation continuity
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -86,6 +90,7 @@ class AgentResult:
             "stopped_reason": self.stopped_reason,
             "tools_used": self.tools_used,
             "citations": self.citations,
+            "thread_id": self.thread_id,
             "steps": [s.to_dict() for s in self.steps],
         }
 
@@ -138,6 +143,7 @@ class AgentRuntime:
         citations: list[dict] = []
         tools_used: list[str] = []
         history: list[str] = []
+        resolved_thread_id = ctx.thread_id
 
         for n in range(1, self.max_steps + 1):
             plan = await self._plan(ctx, history)
@@ -149,7 +155,7 @@ class AgentRuntime:
             # Planner chose to finish.
             if not tool_name:
                 answer = final or self._fallback_answer(history)
-                return AgentResult(answer, steps, citations, tools_used, "final")
+                return AgentResult(answer, steps, citations, tools_used, "final", thread_id=resolved_thread_id)
 
             tool = self.registry.get(tool_name)
             if tool is None:
@@ -165,7 +171,7 @@ class AgentRuntime:
                     "Approve it and I'll proceed."
                 )
                 steps.append(AgentStep(n, thought, tool_name, args, "blocked: needs confirmation", ok=False))
-                return AgentResult(msg, steps, citations, tools_used, "needs_confirmation")
+                return AgentResult(msg, steps, citations, tools_used, "needs_confirmation", thread_id=resolved_thread_id)
 
             # Execute — a crash becomes an observation so the agent can recover.
             try:
@@ -175,6 +181,9 @@ class AgentRuntime:
                 result = ToolResult(summary=f"Tool error: {exc!r}", ok=False, error=repr(exc))
 
             tools_used.append(tool_name)
+            tid = (result.data or {}).get("thread_id")
+            if tid:
+                resolved_thread_id = tid
             if result.citations:
                 citations.extend(result.citations)
             obs = (result.summary or "")[:_MAX_OBS_CHARS]
@@ -188,6 +197,7 @@ class AgentRuntime:
             citations,
             tools_used,
             "max_steps",
+            thread_id=resolved_thread_id,
         )
 
     @staticmethod

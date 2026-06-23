@@ -26,6 +26,8 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from briefly_api.agent import AgentRuntime, ToolContext, ToolRegistry, from_orb_tool
+from briefly_api.config import get_settings
 from briefly_api.db.models import User
 from briefly_api.llm.adapter import Message, get_llm_adapter
 from briefly_api.services.ask_briefly import ask_briefly
@@ -228,6 +230,50 @@ async def _llm_plan_and_execute(
     }
 
 
+# ── Agent runtime (the live brain for tasks) ─────────────────────────────────
+# A task — any act/write tool or a compound multi-tool goal — runs through the
+# plan→execute→observe loop: it picks tools, chains them, and asks the user a
+# follow-up only when information is genuinely missing. Quick single reads skip
+# this (they go direct) so voice latency stays low.
+
+
+def _agent_registry() -> ToolRegistry:
+    return ToolRegistry([from_orb_tool(t) for t in REGISTRY])
+
+
+async def _run_agent(
+    db: AsyncSession,
+    user: User,
+    transcript: str,
+    *,
+    thread_id: str | None,
+    content_id: str | None,
+) -> dict | None:
+    runtime = AgentRuntime(_agent_registry(), max_steps=4, allow_writes=True)
+    ctx = ToolContext(
+        db=db,
+        user=user,
+        settings=get_settings(),
+        goal=transcript,
+        thread_id=thread_id,
+        content_id=content_id,
+    )
+    try:
+        result = await runtime.run(ctx)
+    except Exception:
+        log.exception("orb agent runtime failed — falling back")
+        return None
+    answer = (result.answer or "").strip()
+    if not answer:
+        return None
+    return {
+        "thread_id": result.thread_id or thread_id,
+        "answer": answer,
+        "citations": result.citations,
+        "tool_trace": [{"tool": s.tool, "ok": s.ok} for s in result.steps if s.tool],
+    }
+
+
 # ── Public entrypoint ────────────────────────────────────────────────────────
 
 
@@ -257,19 +303,31 @@ async def run_orb_turn(
     if not transcript:
         raise ValueError("No speech detected — try again.")
 
-    # ── Fast routing — no planner LLM call unless intent is genuinely mixed ──
+    # ── Routing ──────────────────────────────────────────────────────────────
     if db is not None and getattr(user, "id", None):
         matched = [t for t in DATA_TOOLS if t.matches(transcript)]
-        if len(matched) >= 2:
+
+        # A single READ tool is a cheap, unambiguous lookup — run it directly so
+        # voice latency stays low (no planner hop).
+        if len(matched) == 1 and matched[0].side_effect == "read":
+            out = await _exec_tool(matched[0], db, user, transcript, thread_id, content_id)
+            return _single_result(transcript, out)
+
+        # A task — an act/write tool, or a compound multi-tool goal — runs through
+        # the agent runtime: it plans, executes, chains tools, and asks a follow-up
+        # only when information is missing.
+        if matched:
+            planned = await _run_agent(
+                db, user, transcript, thread_id=thread_id, content_id=content_id
+            )
+            if planned is not None:
+                return {"transcript": transcript, **planned}
+            # Runtime unavailable → legacy one-shot planner, then the brain.
             planned = await _llm_plan_and_execute(
                 db, user, transcript, thread_id=thread_id, content_id=content_id
             )
             if planned is not None:
                 return {"transcript": transcript, **planned}
-            # planner unavailable → fall through to the brain
-        elif len(matched) == 1:
-            out = await _exec_tool(matched[0], db, user, transcript, thread_id, content_id)
-            return _single_result(transcript, out)
 
     # ── Default: straight to the brain (open questions, no context, fallthrough)
     result = await ask_briefly(db, user, transcript, thread_id=thread_id, content_id=content_id)
