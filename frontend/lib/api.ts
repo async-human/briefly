@@ -1467,5 +1467,6 @@ export type EmailDraft = {
   status: string;
   source_content_ids: string[];
   source_headlines?: string[];
+  sources?: { title: string; url: string }[];
   created_at: string | null;
 };

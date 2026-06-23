@@ -10565,6 +10565,20 @@ a.saved-capture-title:hover {
   color: var(--app-ink-2, #475569);
 }
 
+.emaildraft-sources-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: var(--app-ink-2, #475569);
+  cursor: pointer;
+}
+
+.emaildraft-sources-toggle input {
+  cursor: pointer;
+}
+
 .emaildraft-hitl {
   margin: 8px 0 0;
   font-size: 0.75rem;

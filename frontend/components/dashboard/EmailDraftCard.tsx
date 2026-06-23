@@ -5,6 +5,9 @@ import { api, type EmailDraft } from "@/lib/api";
 
 type Stage = "compose" | "loading" | "review";
 
+// Marker that delimits the optional, deterministic sources footer in the body.
+const SOURCES_MARKER = "\n\n—\nSources:\n";
+
 export function EmailDraftCard({
   open,
   onClose,
@@ -26,6 +29,7 @@ export function EmailDraftCard({
   const [busy, setBusy] = useState(false);
   const [canSend, setCanSend] = useState(false);
   const [canCreateDraft, setCanCreateDraft] = useState(false);
+  const [includeSources, setIncludeSources] = useState(false);
 
   if (!open) return null;
 
@@ -38,6 +42,20 @@ export function EmailDraftCard({
     setBody("");
     setError("");
     setBusy(false);
+    setIncludeSources(false);
+  }
+
+  // Append/strip a deterministic "Sources" footer built from REAL corpus links
+  // (never LLM-generated). The body stays editable; toggling off removes it.
+  function toggleSources(on: boolean) {
+    setIncludeSources(on);
+    const list = draft?.sources ?? [];
+    setBody((prev) => {
+      const idx = prev.indexOf(SOURCES_MARKER);
+      const base = idx >= 0 ? prev.slice(0, idx) : prev;
+      if (!on || list.length === 0) return base;
+      return base + SOURCES_MARKER + list.map((s) => `- ${s.title}: ${s.url}`).join("\n");
+    });
   }
 
   function close() {
@@ -233,6 +251,19 @@ export function EmailDraftCard({
               value={body}
               onChange={(e) => setBody(e.target.value)}
             />
+
+            {(draft?.sources?.length ?? 0) > 0 && (
+              <label className="emaildraft-sources-toggle">
+                <input
+                  type="checkbox"
+                  checked={includeSources}
+                  onChange={(e) => toggleSources(e.target.checked)}
+                />
+                <span>
+                  Add sources ({draft?.sources?.length}) as links at the end
+                </span>
+              </label>
+            )}
 
             <p className="emaildraft-hitl">
               {canCreateDraft

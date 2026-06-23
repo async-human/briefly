@@ -51,6 +51,11 @@ class EditIn(BaseModel):
     body: str | None = None
 
 
+class SourceRef(BaseModel):
+    title: str
+    url: str
+
+
 class EmailDraftOut(BaseModel):
     id: str
     to_email: str | None
@@ -60,11 +65,13 @@ class EmailDraftOut(BaseModel):
     rationale: str | None
     status: str
     source_content_ids: list[str]
-    source_headlines: list[str] = []  # citations: what this draft was grounded in
+    source_headlines: list[str] = []        # citations shown on the review card
+    sources: list[SourceRef] = []           # grounding items that have a real URL (for the footer)
     created_at: str | None
 
 
-def _serialize(d: EmailDraft, source_headlines: list[str] | None = None) -> EmailDraftOut:
+def _serialize(d: EmailDraft, resolved: list[dict] | None = None) -> EmailDraftOut:
+    resolved = resolved or []
     return EmailDraftOut(
         id=d.id,
         to_email=d.to_email,
@@ -74,30 +81,34 @@ def _serialize(d: EmailDraft, source_headlines: list[str] | None = None) -> Emai
         rationale=d.rationale,
         status=d.status,
         source_content_ids=list(d.source_content_ids or []),
-        source_headlines=source_headlines or [],
+        source_headlines=[r["title"] for r in resolved],
+        sources=[SourceRef(title=r["title"], url=r["url"]) for r in resolved if r.get("url")],
         created_at=d.created_at.isoformat() if d.created_at else None,
     )
 
 
-async def _resolve_headlines(db: AsyncSession, content_ids: list[str]) -> list[str]:
-    """Best-effort: map a draft's grounding content_ids back to titles so the review
-    card can show 'grounded in …' citations — the trust proof. Resolves from
-    RawContent so it covers both today's-brief and whole-corpus (Stage 2) items."""
+async def _resolve_sources(db: AsyncSession, content_ids: list[str]) -> list[dict]:
+    """Map a draft's grounding content_ids back to (title, url) from RawContent —
+    the trust proof on the card AND the real links for the optional sources footer.
+    URLs come from stored metadata, never the LLM, so they can't be fabricated."""
     if not content_ids:
         return []
     rows = (
         await db.execute(
-            select(RawContent.title)
+            select(RawContent.title, RawContent.url)
             .where(RawContent.id.in_(content_ids))
             .limit(8)
         )
     ).all()
-    seen: list[str] = []
-    for (title,) in rows:
+    out: list[dict] = []
+    seen: set[str] = set()
+    for title, url in rows:
         t = (title or "").strip()
-        if t and t not in seen:
-            seen.append(t)
-    return seen
+        if not t or t in seen:
+            continue
+        seen.add(t)
+        out.append({"title": t, "url": (url or "").strip() or None})
+    return out
 
 
 async def _get_owned(db: AsyncSession, user_id: str, draft_id: str) -> EmailDraft:
@@ -120,8 +131,8 @@ async def compose(
     if not body.instruction.strip():
         raise HTTPException(status_code=400, detail="Instruction is required.")
     draft = await compose_email_draft(db, user, body.instruction, content_id=body.content_id)
-    headlines = await _resolve_headlines(db, list(draft.source_content_ids or []))
-    return _serialize(draft, headlines)
+    resolved = await _resolve_sources(db, list(draft.source_content_ids or []))
+    return _serialize(draft, resolved)
 
 
 @router.get("", response_model=list[EmailDraftOut])
@@ -162,8 +173,8 @@ async def get_draft(
     db: AsyncSession = Depends(get_db),
 ) -> EmailDraftOut:
     draft = await _get_owned(db, user.id, draft_id)
-    headlines = await _resolve_headlines(db, list(draft.source_content_ids or []))
-    return _serialize(draft, headlines)
+    resolved = await _resolve_sources(db, list(draft.source_content_ids or []))
+    return _serialize(draft, resolved)
 
 
 @router.patch("/{draft_id}", response_model=EmailDraftOut)
@@ -245,8 +256,8 @@ async def draft_to_gmail(
     draft.sent_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(draft)
-    headlines = await _resolve_headlines(db, list(draft.source_content_ids or []))
-    return _serialize(draft, headlines)
+    resolved = await _resolve_sources(db, list(draft.source_content_ids or []))
+    return _serialize(draft, resolved)
 
 
 @router.post("/{draft_id}/send", response_model=EmailDraftOut)
