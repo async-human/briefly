@@ -1,8 +1,13 @@
 use std::{
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Read, Write},
+    net::{TcpListener, TcpStream},
     process::{Child, Command, Stdio},
-    sync::Mutex,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     thread,
+    time::{Duration, Instant},
 };
 use tauri::{
     menu::{Menu, MenuItem},
@@ -26,6 +31,11 @@ struct DesktopAuthPayload {
 #[derive(Default)]
 struct WakewordState {
     child: Mutex<Option<Child>>,
+}
+
+#[derive(Default)]
+struct AuthRelayState {
+    cancel: Mutex<Option<Arc<AtomicBool>>>,
 }
 
 #[derive(serde::Serialize)]
@@ -70,18 +80,177 @@ fn parse_auth_deep_link(arg: &str) -> Option<DesktopAuthPayload> {
     })
 }
 
+/// Hand the token to the orb UI and reveal the window.
+fn deliver_auth_payload(app: &tauri::AppHandle, payload: DesktopAuthPayload) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit("desktop-auth", payload);
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 /// Parse a `briefly://auth?...` arg and, if valid, hand the token to the orb UI
 /// and reveal the window. Returns true if the arg was an auth deep link.
 fn handle_auth_deep_link(app: &tauri::AppHandle, arg: &str) -> bool {
     let Some(payload) = parse_auth_deep_link(arg) else {
         return false;
     };
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.emit("desktop-auth", payload);
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
+    deliver_auth_payload(app, payload);
     true
+}
+
+fn cors_header(origin: &str) -> String {
+    const ALLOWED: &[&str] = &[
+        "https://www.sendbriefly.app",
+        "https://sendbriefly.app",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ];
+    let allow = if ALLOWED.contains(&origin) {
+        origin.to_string()
+    } else {
+        "https://www.sendbriefly.app".to_string()
+    };
+    format!(
+        "Access-Control-Allow-Origin: {allow}\r\nAccess-Control-Allow-Methods: POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\n"
+    )
+}
+
+fn write_http_response(stream: &mut TcpStream, status: u16, status_text: &str, cors: &str, body: &str) {
+    let response = format!(
+        "HTTP/1.1 {status} {status_text}\r\n{cors}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len(),
+        body = body
+    );
+    let _ = stream.write_all(response.as_bytes());
+    let _ = stream.flush();
+}
+
+fn handle_relay_connection(mut stream: TcpStream, app: &tauri::AppHandle) -> bool {
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(8)));
+    let mut reader = BufReader::new(&stream);
+    let mut request_line = String::new();
+    if reader.read_line(&mut request_line).is_err() {
+        return false;
+    }
+    let mut origin = String::new();
+    let mut content_length: usize = 0;
+    loop {
+        let mut line = String::new();
+        if reader.read_line(&mut line).is_err() {
+            break;
+        }
+        if line == "\r\n" || line == "\n" {
+            break;
+        }
+        let lower = line.to_lowercase();
+        if let Some(v) = lower.strip_prefix("origin:") {
+            origin = v.trim().to_string();
+        }
+        if let Some(v) = lower.strip_prefix("content-length:") {
+            content_length = v.trim().parse().unwrap_or(0);
+        }
+    }
+    let cors = cors_header(&origin);
+    let method = request_line.split_whitespace().next().unwrap_or("");
+    let path = request_line.split_whitespace().nth(1).unwrap_or("");
+
+    if method == "OPTIONS" {
+        write_http_response(&mut stream, 204, "No Content", &cors, "");
+        return false;
+    }
+    if method != "POST" || path != "/auth" {
+        write_http_response(&mut stream, 404, "Not Found", &cors, r#"{"ok":false}"#);
+        return false;
+    }
+    if content_length == 0 || content_length > 8192 {
+        write_http_response(&mut stream, 400, "Bad Request", &cors, r#"{"ok":false}"#);
+        return false;
+    }
+    let mut body = vec![0u8; content_length];
+    if Read::read_exact(&mut reader, &mut body).is_err() {
+        write_http_response(&mut stream, 400, "Bad Request", &cors, r#"{"ok":false}"#);
+        return false;
+    }
+    let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&body) else {
+        write_http_response(&mut stream, 400, "Bad Request", &cors, r#"{"ok":false}"#);
+        return false;
+    };
+    let token = parsed
+        .get("token")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if token.is_empty() {
+        write_http_response(&mut stream, 400, "Bad Request", &cors, r#"{"ok":false}"#);
+        return false;
+    }
+    let api_base = parsed
+        .get("api_base")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().trim_end_matches('/').to_string())
+        .filter(|s| !s.is_empty());
+    deliver_auth_payload(
+        app,
+        DesktopAuthPayload { token, api_base },
+    );
+    write_http_response(&mut stream, 200, "OK", &cors, r#"{"ok":true}"#);
+    true
+}
+
+fn start_auth_relay(app: tauri::AppHandle, relay_state: &AuthRelayState) -> Result<u16, String> {
+    if let Ok(mut guard) = relay_state.cancel.lock() {
+        if let Some(prev) = guard.take() {
+            prev.store(true, Ordering::Relaxed);
+        }
+    }
+    let stop = Arc::new(AtomicBool::new(false));
+    if let Ok(mut guard) = relay_state.cancel.lock() {
+        *guard = Some(stop.clone());
+    }
+
+    let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+    let app_handle = app.clone();
+    thread::spawn(move || {
+        let deadline = Instant::now() + Duration::from_secs(300);
+        while Instant::now() < deadline && !stop.load(Ordering::Relaxed) {
+            if listener.set_nonblocking(true).is_err() {
+                break;
+            }
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    if handle_relay_connection(stream, &app_handle) {
+                        break;
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(80));
+                }
+                Err(_) => break,
+            }
+        }
+    });
+    Ok(port)
+}
+
+fn open_connect_in_browser(app: &tauri::AppHandle) {
+    use tauri_plugin_opener::OpenerExt;
+    let relay_state = app.state::<AuthRelayState>();
+    let url = match start_auth_relay(app.clone(), &relay_state) {
+        Ok(port) => format!("{CONNECT_URL}?relay_port={port}"),
+        Err(_) => CONNECT_URL.to_string(),
+    };
+    let _ = app.opener().open_url(&url, None::<&str>);
+}
+
+#[tauri::command]
+fn start_auth_relay_cmd(
+    app: tauri::AppHandle,
+    relay_state: tauri::State<'_, AuthRelayState>,
+) -> Result<u16, String> {
+    start_auth_relay(app, &relay_state)
 }
 
 /// Toggle the floating orb window visibility.
@@ -218,11 +387,12 @@ pub fn run() {
 
     attach_single_instance(tauri::Builder::default())
         .manage(WakewordState::default())
+        .manage(AuthRelayState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![wakeword_start, wakeword_stop])
+        .invoke_handler(tauri::generate_handler![wakeword_start, wakeword_stop, start_auth_relay_cmd])
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             None,
@@ -267,10 +437,7 @@ pub fn run() {
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "speak" => trigger_speak(app),
                     "show" => toggle_orb(app),
-                    "connect" => {
-                        use tauri_plugin_opener::OpenerExt;
-                        let _ = app.opener().open_url(CONNECT_URL, None::<&str>);
-                    }
+                    "connect" => open_connect_in_browser(app),
                     "open" => {
                         use tauri_plugin_opener::OpenerExt;
                         let _ = app.opener().open_url(DASHBOARD_URL, None::<&str>);

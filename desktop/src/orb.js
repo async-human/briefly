@@ -102,6 +102,7 @@ const state = {
   wakeErrorShownAt: 0,
   linkVerified: false,
   connectPollTimer: null,
+  connecting: false,
 };
 
 function isAccountLinked() {
@@ -136,6 +137,8 @@ async function refreshLinkState(options = {}) {
 
 function onAccountLinkedSuccess() {
   stopConnectPoll();
+  state.connecting = false;
+  updateLinkStatus();
   void primeWakeListening();
   void startWakeWord();
   void initLiveSession();
@@ -149,6 +152,8 @@ function pollForBrowserConnect() {
     attempts += 1;
     if (attempts > 30) {
       stopConnectPoll();
+      state.connecting = false;
+      updateLinkStatus();
       return;
     }
     void refreshLinkState({ announce: false }).then((ok) => {
@@ -162,15 +167,31 @@ function pollForBrowserConnect() {
   }, 2000);
 }
 
-function connectPageUrl() {
-  if (store.apiBase.includes("localhost")) {
-    return "http://localhost:3000/desktop/connect";
-  }
-  return `${DEFAULT_APP_BASE}/desktop/connect`;
+function connectPageUrl(relayPort) {
+  const base =
+    store.apiBase.includes("localhost")
+      ? "http://localhost:3000/desktop/connect"
+      : `${DEFAULT_APP_BASE}/desktop/connect`;
+  if (!relayPort) return base;
+  return `${base}?relay_port=${relayPort}`;
 }
 
 async function openBrieflyConnect() {
-  const url = connectPageUrl();
+  if (store.token && !state.linkVerified) {
+    store.token = "";
+    state.linkVerified = false;
+  }
+  state.connecting = true;
+  updateLinkStatus();
+
+  let relayPort = null;
+  if (TAURI?.core?.invoke) {
+    try {
+      relayPort = await TAURI.core.invoke("start_auth_relay_cmd");
+    } catch (_) {}
+  }
+
+  const url = connectPageUrl(relayPort);
   try {
     if (TAURI?.opener?.openUrl) {
       await TAURI.opener.openUrl(url);
@@ -180,6 +201,8 @@ async function openBrieflyConnect() {
     flashCaption("Sign in in your browser to connect.", 3200);
     pollForBrowserConnect();
   } catch (_) {
+    state.connecting = false;
+    updateLinkStatus();
     flashCaption("Open " + url + " in your browser.", 4000);
   }
 }
@@ -187,6 +210,11 @@ async function openBrieflyConnect() {
 function updateLinkStatus() {
   const el = document.getElementById("linkStatus");
   if (!el) return;
+  if (state.connecting) {
+    el.textContent = "Connecting via browser…";
+    el.classList.remove("linked");
+    return;
+  }
   if (state.linkVerified) {
     el.textContent = "Connected to Briefly";
     el.classList.add("linked");
@@ -891,6 +919,7 @@ function handleDesktopAuth(payload) {
   if (!token) return;
   if (apiBase) store.apiBase = apiBase;
   store.token = token;
+  state.connecting = false;
   openSettings(false);
   stopConnectPoll();
   void refreshLinkState({ announce: true }).then((ok) => {

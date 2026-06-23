@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { getToken, setAuthNext } from "@/lib/auth";
@@ -9,9 +9,12 @@ import { openDesktopOrbLink } from "@/lib/orbDesktopLink";
 
 function ConnectHandler() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const relayPort = searchParams.get("relay_port");
   const started = useRef(false);
   const [status, setStatus] = useState<"pending" | "working" | "success" | "error">("pending");
   const [message, setMessage] = useState("Preparing desktop connection…");
+  const [delivery, setDelivery] = useState<"relay" | "deeplink" | null>(null);
 
   const linkOrb = useCallback(async () => {
     setStatus("working");
@@ -22,10 +25,13 @@ function ConnectHandler() {
         platform: "desktop",
       });
       if (!created?.token) throw new Error("No token returned");
-      openDesktopOrbLink(created.token);
+      const mode = await openDesktopOrbLink(created.token, relayPort);
+      setDelivery(mode);
       setStatus("success");
       setMessage(
-        "Connected! Switch back to the Briefly orb on your desktop — you're ready to talk.",
+        mode === "relay"
+          ? "Connected! Switch back to the Briefly orb on your desktop — you're ready to talk."
+          : "Connected! If the orb did not update, click connect again while the orb app is open.",
       );
     } catch {
       setStatus("error");
@@ -33,7 +39,7 @@ function ConnectHandler() {
         "Could not connect automatically. Make sure the orb app is running and try again.",
       );
     }
-  }, []);
+  }, [relayPort]);
 
   useEffect(() => {
     if (started.current) return;
@@ -55,9 +61,9 @@ function ConnectHandler() {
           Desktop orb
         </h1>
         <p className={status === "error" ? "auth-error" : "auth-loading"}>{message}</p>
-        {status === "success" && (
+        {status === "success" && delivery === "deeplink" && (
           <p className="auth-loading" style={{ marginTop: 12, fontSize: 14 }}>
-            If the orb did not update,{" "}
+            Keep the orb running, then{" "}
             <button
               type="button"
               className="btn-primary"
@@ -67,6 +73,11 @@ function ConnectHandler() {
               connect again
             </button>
             .
+          </p>
+        )}
+        {status === "success" && delivery === "relay" && (
+          <p className="auth-loading" style={{ marginTop: 12, fontSize: 14 }}>
+            The orb should show &quot;Connected to Briefly&quot; now.
           </p>
         )}
         {status === "error" && (

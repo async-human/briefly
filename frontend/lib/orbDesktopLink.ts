@@ -17,7 +17,7 @@ function markAttempt(): void {
   localStorage.setItem(LAST_ATTEMPT_KEY, String(Date.now()));
 }
 
-function openDesktopLink(token: string): void {
+function openDesktopDeepLink(token: string): void {
   const deepLink =
     `briefly://auth?token=${encodeURIComponent(token)}&api_base=${encodeURIComponent(API_URL)}`;
   // Use location for reliability plus hidden iframe for browsers that block
@@ -30,9 +30,43 @@ function openDesktopLink(token: string): void {
   setTimeout(() => iframe.remove(), 3000);
 }
 
+async function postToDesktopRelay(token: string, relayPort: string): Promise<boolean> {
+  try {
+    const port = Number.parseInt(relayPort, 10);
+    if (!Number.isFinite(port) || port <= 0 || port > 65535) return false;
+    const res = await fetch(`http://127.0.0.1:${port}/auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, api_base: API_URL }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Deliver a desktop capture token to the orb. Prefer localhost relay (reliable on
+ * Windows dev); fall back to briefly:// deep link.
+ */
+export async function deliverDesktopOrbToken(
+  token: string,
+  relayPort?: string | null,
+): Promise<"relay" | "deeplink"> {
+  if (relayPort) {
+    const relayOk = await postToDesktopRelay(token, relayPort);
+    if (relayOk) return "relay";
+  }
+  openDesktopDeepLink(token);
+  return "deeplink";
+}
+
 /** Public helper for the desktop connect page (manual link flow). */
-export function openDesktopOrbLink(token: string): void {
-  openDesktopLink(token);
+export async function openDesktopOrbLink(
+  token: string,
+  relayPort?: string | null,
+): Promise<"relay" | "deeplink"> {
+  return deliverDesktopOrbToken(token, relayPort);
 }
 
 export function desktopConnectPageUrl(): string {
@@ -54,9 +88,8 @@ export async function ensureDesktopOrbLinked(): Promise<void> {
       platform: "desktop",
     });
     if (!created?.token) return;
-    openDesktopLink(created.token);
+    await deliverDesktopOrbToken(created.token);
   } catch {
     // Silent: desktop linking is opportunistic and should never block login.
   }
 }
-
