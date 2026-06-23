@@ -247,10 +247,18 @@ export type BriefLanguage = "en" | "hi";
 export type OrbTurnResult = {
   transcript: string;
   thread_id: string | null;
+  session_id?: string | null;
   answer: string;
   citations: Array<Record<string, unknown>>;
   tool_trace?: Array<Record<string, unknown>>;
   expects_reply?: boolean;
+  display?: string | null;
+  timings?: Record<string, number>;
+};
+
+export type OrbSessionResult = {
+  session_id: string;
+  thread_id: string | null;
 };
 
 export type Profile = {
@@ -1330,29 +1338,48 @@ export const api = {
   orbTurn: (
     blob: Blob,
     filename = "turn.webm",
-    opts?: { thread_id?: string; content_id?: string },
+    opts?: { thread_id?: string; session_id?: string; content_id?: string; surface?: string },
     signal?: AbortSignal,
   ) => {
     const form = new FormData();
     form.append("audio", blob, filename);
     if (opts?.thread_id) form.append("thread_id", opts.thread_id);
+    if (opts?.session_id) form.append("session_id", opts.session_id);
     if (opts?.content_id) form.append("content_id", opts.content_id);
+    if (opts?.surface) form.append("surface", opts.surface);
     return requestFormData<OrbTurnResult>("/api/v1/orb/turn", form, signal);
   },
   orbTurnText: (
     text: string,
-    opts?: { thread_id?: string; content_id?: string },
+    opts?: { thread_id?: string; session_id?: string; content_id?: string; surface?: string },
     signal?: AbortSignal,
   ) => {
     const form = new FormData();
     form.append("text", text);
     if (opts?.thread_id) form.append("thread_id", opts.thread_id);
+    if (opts?.session_id) form.append("session_id", opts.session_id);
     if (opts?.content_id) form.append("content_id", opts.content_id);
+    if (opts?.surface) form.append("surface", opts.surface);
     return requestFormData<OrbTurnResult>("/api/v1/orb/turn", form, signal);
   },
+  orbCreateSession: (body?: { thread_id?: string; surface?: string }) =>
+    request<OrbSessionResult>("/api/v1/orb/session", {
+      method: "POST",
+      body: JSON.stringify({ surface: "mobile", ...body }),
+    }),
   orbSpeak: (text: string, voice?: string, signal?: AbortSignal) =>
     requestBlob(
       "/api/v1/orb/speak",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, voice }),
+      },
+      signal,
+    ),
+  orbSpeakStream: (text: string, voice?: string, signal?: AbortSignal) =>
+    requestBlob(
+      "/api/v1/orb/speak/stream",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

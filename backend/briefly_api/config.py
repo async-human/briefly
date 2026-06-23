@@ -221,10 +221,19 @@ class Settings(BaseSettings):
     # Agent runtime: per-task budget — the max plan→execute steps a single agentic
     # task may take. Bounds tool/LLM calls so multi-step agents can't burn runaway
     # tokens. The primary cost cap for the act layer.
-    agent_max_steps: int = 4
+    agent_max_steps: int = 6
     calendar_scopes: str = (
         "https://www.googleapis.com/auth/calendar.readonly openid email"
     )
+
+    # ── Voice orb session / routing / streaming ───────────────────────────────
+    orb_session_ttl_seconds: int = 86400
+    orb_semantic_route_threshold: float = 0.72
+    orb_semantic_route_medium_threshold: float = 0.58
+    orb_streaming_stt_enabled: bool = False
+    orb_ws_enabled: bool = True
+    deepgram_endpointing_ms: int = 1100
+    orb_plugin_modules: str = ""
 
     # ── Continuous enrichment worker ──────────────────────────────────────────
     # Runs every N hours; pre-computes memory connections + contradiction flags

@@ -224,6 +224,136 @@ async def web_search_handler(
     return {"answer": " ".join(lines), "citations": cites}
 
 
+    return {"answer": " ".join(lines), "citations": cites}
+
+
+async def calendar_upcoming_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    from briefly_api.services.calendar_briefing import load_upcoming_meetings
+
+    briefing = await load_upcoming_meetings(db, user.id)
+    if not briefing:
+        return {
+            "answer": "I couldn't access your calendar. Connect Google Calendar in settings first.",
+            "citations": [],
+        }
+    summary = (briefing.get("summary_text") or "").strip()
+    if not summary:
+        return {"answer": "Your calendar looks clear for today and tomorrow.", "citations": []}
+    return {"answer": summary, "citations": []}
+
+
+async def meeting_prep_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    from briefly_api.services.calendar_briefing import load_upcoming_meetings
+
+    briefing = await load_upcoming_meetings(db, user.id)
+    if not briefing:
+        return {
+            "answer": "I couldn't prep your meetings — connect Google Calendar in settings.",
+            "citations": [],
+        }
+    summary = (briefing.get("summary_text") or "").strip()
+    if not summary:
+        return {"answer": "You don't have upcoming meetings that need prep right now.", "citations": []}
+    return {
+        "answer": f"Here's your meeting prep. {summary}",
+        "citations": [],
+    }
+
+
+async def capture_thought_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    from briefly_api.services.brain_dump import process_text_dump
+
+    note = ((args or {}).get("note") or transcript or "").strip()
+    if not note:
+        return {"answer": "What would you like me to remember?", "citations": [], "expects_reply": True}
+    result = await process_text_dump(db, user.id, note)
+    preview = (result.tomorrow_brief_preview or result.clean_summary or result.title).strip()
+    return {
+        "answer": f"Got it — saved as {result.title}. {preview}",
+        "citations": [],
+        "expects_reply": False,
+    }
+
+
+async def recent_notes_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    from briefly_api.services.brain_dump import list_recent_dumps
+
+    dumps = await list_recent_dumps(db, user.id, limit=5)
+    if not dumps:
+        return {"answer": "You haven't saved any voice notes recently.", "citations": []}
+    lines = ["Here are your recent notes:"]
+    for i, d in enumerate(dumps, start=1):
+        lines.append(f"{i}. {d.title}")
+    return {"answer": " ".join(lines), "citations": []}
+
+
+async def start_research_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    from briefly_api.services.background_jobs import enqueue_background_job
+    from briefly_api.services.orb_research import extract_research_goal
+
+    goal = extract_research_goal(transcript, args)
+    if not goal:
+        return {
+            "answer": "What should I research for you?",
+            "citations": [],
+            "expects_reply": True,
+        }
+    job_id = await enqueue_background_job(
+        "research_task",
+        {"user_id": user.id, "goal": goal, "thread_id": thread_id},
+        idempotency_key=f"research:{user.id}:{hash(goal) & 0xFFFFFFFF}",
+    )
+    if not job_id:
+        return {
+            "answer": "I'm already working on a similar research task. I'll tell you when it's ready.",
+            "citations": [],
+        }
+    return {
+        "answer": f"On it — I'll research {goal} and speak up when I have something for you.",
+        "citations": [],
+    }
+
+
 async def draft_email_handler(
     db: AsyncSession,
     user: User,
@@ -270,6 +400,7 @@ async def draft_email_handler(
         ),
         "citations": [{"title": t} for t in titles],
         "expects_reply": True,
+        "draft_id": draft.id,
     }
 
 
@@ -628,5 +759,59 @@ DATA_TOOLS: list[OrbTool] = [
             re.compile(r"^\s*send it\s*$", re.IGNORECASE),
             re.compile(r"\b(cancel|don'?t send|do not send|never\s?mind)\b", re.IGNORECASE),
         ),
+    ),
+    OrbTool(
+        name="calendar_upcoming",
+        description="Read the user's calendar for today and tomorrow — upcoming meetings and schedule.",
+        handler=calendar_upcoming_handler,
+        fast_patterns=(
+            re.compile(r"(?:my\s+)?(?:calendar|schedule)", re.IGNORECASE),
+            re.compile(r"(?:upcoming|next)\s+meetings?", re.IGNORECASE),
+            re.compile(r"what(?:'s| is)\s+on\s+(?:my\s+)?calendar", re.IGNORECASE),
+        ),
+    ),
+    OrbTool(
+        name="meeting_prep",
+        description="Prepare the user for upcoming meetings with context from their brief and sources.",
+        handler=meeting_prep_handler,
+        fast_patterns=(
+            re.compile(r"prep(?:are)?\s+(?:me\s+)?(?:for\s+)?(?:my\s+)?meetings?", re.IGNORECASE),
+            re.compile(r"meeting\s+prep", re.IGNORECASE),
+            re.compile(r"brief\s+me\s+(?:before|on)\s+(?:my\s+)?(?:meeting|call)", re.IGNORECASE),
+        ),
+    ),
+    OrbTool(
+        name="capture_thought",
+        description="Save a voice note or brain dump — remember something the user said for later.",
+        handler=capture_thought_handler,
+        side_effect="write",
+        fast_patterns=(
+            re.compile(r"\b(remember|note|capture|brain\s*dump|jot\s+down)\b", re.IGNORECASE),
+            re.compile(r"\bnote\s+to\s+self\b", re.IGNORECASE),
+        ),
+        args_schema={"note": "the thought or note to save"},
+    ),
+    OrbTool(
+        name="recent_notes",
+        description="List the user's recent brain dumps and voice notes.",
+        handler=recent_notes_handler,
+        fast_patterns=(
+            re.compile(r"\b(recent|my)\s+(?:notes|brain\s*dumps?|thoughts)\b", re.IGNORECASE),
+            re.compile(r"what\s+did\s+i\s+(?:note|capture|remember)", re.IGNORECASE),
+        ),
+    ),
+    OrbTool(
+        name="start_research",
+        description=(
+            "Start a background research task on the open web. The orb will speak up when done. "
+            "Use when the user asks to research something and tell them later."
+        ),
+        handler=start_research_handler,
+        side_effect="write",
+        fast_patterns=(
+            re.compile(r"\bresearch\b.{0,40}\b(and|then)\b.{0,20}\b(tell|let)\b", re.IGNORECASE),
+            re.compile(r"\blook\s+into\b.{0,30}\b(and|then)\b", re.IGNORECASE),
+        ),
+        args_schema={"goal": "what to research"},
     ),
 ]

@@ -104,6 +104,7 @@ export function MobileOrbOverlay() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const threadIdRef = useRef<string | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
   const router = useRouter();
   const [hasConversation, setHasConversation] = useState(false);
   const [pending, setPending] = useState<ProactiveEvent[]>([]);
@@ -124,6 +125,29 @@ export function MobileOrbOverlay() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  function orbTurnOpts() {
+    const opts: { thread_id?: string; session_id?: string; surface?: string } = {
+      surface: "mobile",
+    };
+    if (threadIdRef.current) opts.thread_id = threadIdRef.current;
+    if (sessionIdRef.current) opts.session_id = sessionIdRef.current;
+    return opts;
+  }
+
+  useEffect(() => {
+    if (!open || sessionIdRef.current) return;
+    void api
+      .orbCreateSession({
+        thread_id: threadIdRef.current ?? undefined,
+        surface: "mobile",
+      })
+      .then((s) => {
+        sessionIdRef.current = s.session_id;
+        if (s.thread_id) threadIdRef.current = s.thread_id;
+      })
+      .catch(() => {});
+  }, [open]);
 
   // Poll for high-priority items the orb can surface proactively. Best-effort,
   // background only — it never opens, speaks, or interrupts on its own.
@@ -268,7 +292,7 @@ export function MobileOrbOverlay() {
       const turn = await api.orbTurn(
         blob,
         "mobile-orb.webm",
-        threadIdRef.current ? { thread_id: threadIdRef.current } : undefined,
+        orbTurnOpts(),
         ctl.signal,
       );
       setHeardText((turn.transcript || "").trim());
@@ -350,6 +374,9 @@ export function MobileOrbOverlay() {
       threadIdRef.current = turn.thread_id;
       setHasConversation(true);
     }
+    if (turn.session_id) {
+      sessionIdRef.current = turn.session_id;
+    }
     const trace = Array.isArray(turn.tool_trace) ? turn.tool_trace : [];
     const tools = trace.map((t) => String(t.tool || "")).filter(Boolean);
     setToolMode(tools.length ? tools.join(" · ") : "");
@@ -413,11 +440,7 @@ export function MobileOrbOverlay() {
     const ctl = new AbortController();
     abortRef.current = ctl;
     try {
-      const turn = await api.orbTurnText(
-        text,
-        threadIdRef.current ? { thread_id: threadIdRef.current } : undefined,
-        ctl.signal,
-      );
+      const turn = await api.orbTurnText(text, orbTurnOpts(), ctl.signal);
       setHeardText((turn.transcript || text).trim());
       if (!turn.answer?.trim()) {
         setMode("idle");

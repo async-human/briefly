@@ -19,6 +19,8 @@ from briefly_api.api.schemas import (
     OrbProactiveSeenIn,
     OrbProactiveSnoozeIn,
     OrbProactiveVoiceOut,
+    OrbSessionIn,
+    OrbSessionOut,
     OrbSpeakIn,
     OrbTurnOut,
     ProactiveEventOut,
@@ -27,6 +29,7 @@ from briefly_api.auth.deps import get_capture_user
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import User
 from briefly_api.services import orb as orb_service
+from briefly_api.services.orb_session import create_session
 from briefly_api.tts.adapter import TTSError, get_tts_adapter
 
 log = logging.getLogger(__name__)
@@ -34,11 +37,26 @@ log = logging.getLogger(__name__)
 router = APIRouter(tags=["orb"])
 
 
+@router.post("/orb/session", response_model=OrbSessionOut)
+async def orb_create_session(
+    body: OrbSessionIn,
+    user: User = Depends(get_capture_user),
+) -> OrbSessionOut:
+    state = await create_session(
+        user.id,
+        thread_id=body.thread_id,
+        surface=body.surface or "desktop",
+    )
+    return OrbSessionOut(session_id=state.session_id, thread_id=state.thread_id)
+
+
 @router.post("/orb/turn", response_model=OrbTurnOut)
 async def orb_turn(
     audio: UploadFile | None = File(default=None),
     text: str | None = Form(default=None),
     thread_id: str | None = Form(default=None),
+    session_id: str | None = Form(default=None),
+    surface: str | None = Form(default=None),
     content_id: str | None = Form(default=None),
     user: User = Depends(get_capture_user),
     db: AsyncSession = Depends(get_db),
@@ -53,6 +71,8 @@ async def orb_turn(
             content_type=(audio.content_type if audio else "audio/webm") or "audio/webm",
             text=text,
             thread_id=thread_id,
+            session_id=session_id,
+            surface=surface or "desktop",
             content_id=content_id,
         )
     except ValueError as exc:
@@ -84,6 +104,31 @@ async def orb_speak(
             detail="TTS backend unavailable. Check TTS_PROVIDER/TTS_BASE_URL settings.",
         ) from exc
     return Response(content=audio, media_type=tts.content_type())
+
+
+@router.post("/orb/speak/stream")
+async def orb_speak_stream(
+    body: OrbSpeakIn,
+    user: User = Depends(get_capture_user),
+    db: AsyncSession = Depends(get_db),  # noqa: ARG001
+) -> StreamingResponse:
+    tts = get_tts_adapter()
+    if not tts.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="TTS is disabled (set TTS_PROVIDER).",
+        )
+
+    async def _stream():
+        try:
+            async for chunk in tts.synthesize_stream(body.text, voice=body.voice):
+                if chunk:
+                    yield chunk
+        except (TTSError, httpx.HTTPError) as exc:
+            log.warning("orb_speak_stream failed: %s", exc)
+            return
+
+    return StreamingResponse(_stream(), media_type=tts.content_type())
 
 
 @router.get("/orb/proactive", response_model=list[ProactiveEventOut])

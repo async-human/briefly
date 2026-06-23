@@ -34,6 +34,12 @@ from briefly_api.config import get_settings
 from briefly_api.db.models import User
 from briefly_api.llm.adapter import Message, get_llm_adapter
 from briefly_api.services.ask_briefly import ask_briefly
+from briefly_api.services.orb_router import route_transcript
+from briefly_api.services.orb_session import (
+    OrbSessionState,
+    resolve_session,
+    update_session_after_turn,
+)
 from briefly_api.services.orb_tools import DATA_TOOLS, OrbTool
 from briefly_api.stt.adapter import get_stt_adapter
 
@@ -243,7 +249,11 @@ async def _llm_plan_and_execute(
 
 
 def _agent_registry() -> ToolRegistry:
-    return ToolRegistry([from_orb_tool(t) for t in REGISTRY])
+    registry = ToolRegistry([from_orb_tool(t) for t in REGISTRY])
+    from briefly_api.agent.plugins import load_plugin_tools
+
+    load_plugin_tools(registry)
+    return registry
 
 
 async def _persist_agent_run(
@@ -328,56 +338,126 @@ async def run_orb_turn(
     text: str | None = None,
     thread_id: str | None = None,
     content_id: str | None = None,
+    session_id: str | None = None,
+    surface: str = "desktop",
 ) -> dict:
     """
     One voice turn. Provide either spoken `audio_bytes` (transcribed first) or
     typed `text`. Returns the transcript plus a grounded answer + citations.
     """
+    timings: dict[str, int] = {}
+    started = time.monotonic()
+    session: OrbSessionState | None = None
+    if db is not None and getattr(user, "id", None):
+        session = await resolve_session(
+            user.id,
+            session_id=session_id,
+            thread_id=thread_id,
+            surface=surface,
+        )
+        if session.thread_id and not thread_id:
+            thread_id = session.thread_id
+
     transcript = (text or "").strip()
 
     if audio_bytes:
+        stt_started = time.monotonic()
         stt = get_stt_adapter()
+        context_prompt = None
+        if db is not None and getattr(user, "id", None):
+            from briefly_api.stt.profile_context import transcription_prompt_for_user
+
+            context_prompt = await transcription_prompt_for_user(db, user.id)
         transcript = (
-            await stt.transcribe(audio_bytes, filename=filename, content_type=content_type)
+            await stt.transcribe(
+                audio_bytes,
+                filename=filename,
+                content_type=content_type,
+                context_prompt=context_prompt,
+            )
         ).strip()
+        timings["stt_ms"] = int((time.monotonic() - stt_started) * 1000)
 
     if not transcript:
         raise ValueError("No speech detected — try again.")
 
+    route_started = time.monotonic()
     # ── Routing ──────────────────────────────────────────────────────────────
     if db is not None and getattr(user, "id", None):
-        matched = [t for t in DATA_TOOLS if t.matches(transcript)]
+        decision = await route_transcript(transcript)
+        timings["route_ms"] = int((time.monotonic() - route_started) * 1000)
 
-        # A single clear intent (read OR act) → run the handler directly. No planner
-        # hop, so it's fast AND the handler's own conversational reply (e.g. the
-        # draft read-back + "want changes or should I send it?") reaches the user
-        # intact. Most turns take this path.
-        if len(matched) == 1:
-            out = await _exec_tool(matched[0], db, user, transcript, thread_id, content_id)
-            return _single_result(transcript, out)
+        if decision.kind == "direct" and len(decision.tools) == 1:
+            agent_started = time.monotonic()
+            out = await _exec_tool(
+                decision.tools[0], db, user, transcript, thread_id, content_id
+            )
+            timings["agent_ms"] = int((time.monotonic() - agent_started) * 1000)
+            result = _single_result(transcript, out)
+            result["session_id"] = session.session_id if session else None
+            result["timings"] = timings
+            if session:
+                await update_session_after_turn(
+                    session,
+                    thread_id=result.get("thread_id"),
+                    transcript=transcript,
+                    draft_id=out.get("draft_id"),
+                )
+            return result
 
-        # Genuinely compound/ambiguous goal (2+ tools) → the agent runtime plans,
-        # chains tools, and asks a follow-up only when information is missing.
-        if len(matched) >= 2:
+        if decision.kind == "agent":
+            agent_started = time.monotonic()
             planned = await _run_agent(
                 db, user, transcript, thread_id=thread_id, content_id=content_id
             )
+            timings["agent_ms"] = int((time.monotonic() - agent_started) * 1000)
             if planned is not None:
-                return {"transcript": transcript, **planned}
-            # Runtime unavailable → legacy one-shot planner, then the brain.
+                payload = {"transcript": transcript, **planned}
+                payload["session_id"] = session.session_id if session else None
+                payload["timings"] = timings
+                if session:
+                    await update_session_after_turn(
+                        session,
+                        thread_id=payload.get("thread_id"),
+                        transcript=transcript,
+                    )
+                return payload
             planned = await _llm_plan_and_execute(
                 db, user, transcript, thread_id=thread_id, content_id=content_id
             )
             if planned is not None:
-                return {"transcript": transcript, **planned}
+                payload = {"transcript": transcript, **planned}
+                payload["session_id"] = session.session_id if session else None
+                payload["timings"] = timings
+                if session:
+                    await update_session_after_turn(
+                        session,
+                        thread_id=payload.get("thread_id"),
+                        transcript=transcript,
+                    )
+                return payload
 
     # ── Default: straight to the brain (open questions, no context, fallthrough)
-    result = await ask_briefly(db, user, transcript, thread_id=thread_id, content_id=content_id)
-    assistant = result.get("assistant", {}) if isinstance(result, dict) else {}
-    return {
+    agent_started = time.monotonic()
+    result_data = await ask_briefly(db, user, transcript, thread_id=thread_id, content_id=content_id)
+    timings["agent_ms"] = int((time.monotonic() - agent_started) * 1000)
+    assistant = result_data.get("assistant", {}) if isinstance(result_data, dict) else {}
+    answer = assistant.get("content", "")
+    payload = {
         "transcript": transcript,
-        "thread_id": result.get("thread_id") if isinstance(result, dict) else None,
-        "answer": assistant.get("content", ""),
+        "thread_id": result_data.get("thread_id") if isinstance(result_data, dict) else None,
+        "answer": answer,
         "citations": assistant.get("citations", []),
         "tool_trace": [{"tool": "ask_briefly"}],
+        "expects_reply": bool(str(answer).strip().endswith("?")),
+        "session_id": session.session_id if session else None,
+        "timings": timings,
     }
+    timings["total_ms"] = int((time.monotonic() - started) * 1000)
+    if session:
+        await update_session_after_turn(
+            session,
+            thread_id=payload.get("thread_id"),
+            transcript=transcript,
+        )
+    return payload

@@ -37,6 +37,20 @@ const store = {
   set proactiveEnabled(v) {
     localStorage.setItem("briefly.proactiveEnabled", v ? "1" : "0");
   },
+  get sessionId() {
+    return localStorage.getItem("briefly.orbSessionId") || "";
+  },
+  set sessionId(v) {
+    if (v) localStorage.setItem("briefly.orbSessionId", v);
+    else localStorage.removeItem("briefly.orbSessionId");
+  },
+  get threadId() {
+    return localStorage.getItem("briefly.orbThreadId") || "";
+  },
+  set threadId(v) {
+    if (v) localStorage.setItem("briefly.orbThreadId", v);
+    else localStorage.removeItem("briefly.orbThreadId");
+  },
 };
 
 // How often the idle orb checks whether Briefly has something to say.
@@ -76,7 +90,19 @@ const state = {
   vadLastSpeechAt: 0,
   vadCalibratingUntil: 0,
   sendingUtterance: false,
+  liveClient: null,
 };
+
+function appendTurnFormFields(form) {
+  if (store.threadId) form.append("thread_id", store.threadId);
+  if (store.sessionId) form.append("session_id", store.sessionId);
+  form.append("surface", "desktop");
+}
+
+function applyTurnMeta(turn) {
+  if (turn?.thread_id) store.threadId = turn.thread_id;
+  if (turn?.session_id) store.sessionId = turn.session_id;
+}
 
 // ── Window helpers (Tauri) ──────────────────────────────────────────────────
 async function showWindow() {
@@ -127,9 +153,33 @@ async function apiPostJson(path, payload) {
   return res;
 }
 
+async function ensureOrbSession() {
+  if (store.sessionId || !store.token) return;
+  try {
+    const doFetch = TAURI?.http?.fetch || window.fetch;
+    const res = await doFetch(store.apiBase + "/api/v1/orb/session", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + store.token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        thread_id: store.threadId || null,
+        surface: "desktop",
+      }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.session_id) store.sessionId = data.session_id;
+    if (data.thread_id) store.threadId = data.thread_id;
+  } catch (_) {}
+}
+
 async function apiTurn(audioBlob, signal) {
+  await ensureOrbSession();
   const form = new FormData();
   form.append("audio", audioBlob, "turn.webm");
+  appendTurnFormFields(form);
   const doFetch = TAURI?.http?.fetch || window.fetch;
   const res = await doFetch(store.apiBase + "/api/v1/orb/turn", {
     method: "POST",
@@ -142,8 +192,10 @@ async function apiTurn(audioBlob, signal) {
 }
 
 async function apiTurnText(text, signal) {
+  await ensureOrbSession();
   const form = new FormData();
   form.append("text", text);
+  appendTurnFormFields(form);
   const doFetch = TAURI?.http?.fetch || window.fetch;
   const res = await doFetch(store.apiBase + "/api/v1/orb/turn", {
     method: "POST",
@@ -345,6 +397,7 @@ function stopCurrentTurn() {
     state.speakAbort.abort();
     state.speakAbort = null;
   }
+  if (state.liveClient) state.liveClient.interrupt();
   stopListening();
   stopSpeaking();
   setCaption("");
@@ -456,6 +509,7 @@ async function executeTurn(turnFactory) {
   try {
     const turn = await turnFactory(turnAbort.signal);
     state.turnAbort = null;
+    applyTurnMeta(turn);
     const answer = (turn && turn.answer ? String(turn.answer) : "").trim();
     if (!answer) throw new Error("No answer");
     const trace = Array.isArray(turn?.tool_trace) ? turn.tool_trace : [];
@@ -479,17 +533,12 @@ async function playTts(text) {
   const speakAbort = new AbortController();
   state.speakAbort = speakAbort;
   setMode("speaking");
-  const audioBlob = await apiSpeakToBlob(text, speakAbort.signal);
-  if (speakAbort.signal.aborted) return;
-  const url = URL.createObjectURL(audioBlob);
-  await new Promise((resolve) => {
-    const audio = new Audio(url);
-    state.ttsAudio = audio;
-    audio.onended = resolve;
-    audio.onerror = resolve;
-    audio.play().catch(() => resolve());
+  await playSentencePipeline({
+    text,
+    speakFn: apiSpeakToBlob,
+    signal: speakAbort.signal,
+    prefetch: 2,
   });
-  URL.revokeObjectURL(url);
   if (!speakAbort.signal.aborted) {
     setMode("idle");
   }
@@ -826,9 +875,36 @@ function openSettings(open) {
 }
 
 // ── Wire-up ─────────────────────────────────────────────────────────────────
+async function initLiveSession() {
+  if (typeof OrbSessionClient === "undefined") return;
+  state.liveClient = new OrbSessionClient({
+    apiBase: store.apiBase,
+    token: store.token,
+    sessionId: store.sessionId,
+    threadId: store.threadId,
+    surface: "desktop",
+    setSessionId: (id) => { store.sessionId = id; },
+    setThreadId: (id) => { store.threadId = id; },
+  });
+  state.liveClient.onPartialTranscript = (text) => {
+    if (state.mode === "listening") setStatusForMode("listening", truncateStatus(text, 48));
+  };
+  state.liveClient.onTurnResult = (turn) => {
+    applyTurnMeta(turn);
+    setMode("thinking");
+  };
+  state.liveClient.onTurnEnd = (frame) => {
+    if (frame.expects_reply) void startListening();
+    else setMode("idle");
+  };
+  await state.liveClient.connect();
+}
+
 function init() {
   initOrb();
   setMode("idle");
+  void ensureOrbSession();
+  void initLiveSession();
 
   document.getElementById("orb-hit").addEventListener("click", (e) => {
     e.preventDefault();

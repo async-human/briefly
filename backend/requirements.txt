@@ -36,3 +36,4 @@ supertonic
 faster-whisper 
 kokoro 
 soundfile
+websockets>=12.0

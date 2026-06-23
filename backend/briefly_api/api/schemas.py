@@ -585,6 +585,7 @@ class OrbProactiveSnoozeIn(BaseModel):
 class OrbTurnOut(BaseModel):
     transcript: str
     thread_id: str | None = None
+    session_id: str | None = None
     answer: str
     citations: list[dict] = Field(default_factory=list)
     tool_trace: list[dict] = Field(default_factory=list)
@@ -594,4 +595,15 @@ class OrbTurnOut(BaseModel):
     # Optional concise text for the SCREEN (distinct from the spoken `answer`). Used
     # by the ambient orb so it shows a tidy line, not the whole spoken body.
     display: str | None = None
+    timings: dict[str, int] = Field(default_factory=dict)
+
+
+class OrbSessionIn(BaseModel):
+    thread_id: str | None = None
+    surface: str = "desktop"
+
+
+class OrbSessionOut(BaseModel):
+    session_id: str
+    thread_id: str | None = None
 

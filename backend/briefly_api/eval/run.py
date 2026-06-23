@@ -19,11 +19,12 @@ import json
 import sys
 
 from briefly_api.eval.harness import run_suite
-from briefly_api.eval.suites import grounded_email
+from briefly_api.eval.suites import grounded_email, orb_voice
 
 # Register suites here as we add workflows (research_report, composite, …).
 _SUITES = {
     grounded_email.SUITE: grounded_email.build,
+    orb_voice.SUITE: orb_voice.build,
 }
 
 

@@ -72,6 +72,12 @@ async def _account_deletion_cleanup(payload: dict[str, Any]) -> None:
         await db.commit()
 
 
+async def _research_task(payload: dict[str, Any]) -> None:
+    from briefly_api.services.orb_research import run_research_task
+
+    await run_research_task(payload)
+
+
 def register_all_job_handlers() -> None:
     register_job_handler("post_pipeline_agents", _post_pipeline)
     register_job_handler("footprint_scan", _footprint)
@@ -81,3 +87,4 @@ def register_all_job_handlers() -> None:
     register_job_handler("imminent_meeting_prep", _imminent_meeting_prep)
     register_job_handler("weekly_reports", _weekly_reports)
     register_job_handler("account_deletion_cleanup", _account_deletion_cleanup)
+    register_job_handler("research_task", _research_task)

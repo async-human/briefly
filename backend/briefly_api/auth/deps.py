@@ -80,5 +80,26 @@ async def get_capture_user(
     return user
 
 
+async def resolve_capture_user_from_token(db: AsyncSession, token: str) -> User | None:
+    """Resolve a user from a capture token or session JWT (for WebSocket auth)."""
+    from briefly_api.services import capture_tokens
+
+    raw = (token or "").strip()
+    if not raw:
+        return None
+    if capture_tokens.looks_like_capture_token(raw):
+        return await capture_tokens.resolve_user(db, raw)
+    settings = get_settings()
+    user_id = decode_access_token(raw, settings)
+    if not user_id:
+        return None
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.profile))
+        .where(User.id == user_id, User.is_active.is_(True))
+    )
+    return result.scalar_one_or_none()
+
+
 def generate_email_token() -> str:
     return secrets.token_hex(16)
