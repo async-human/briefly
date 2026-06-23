@@ -55,6 +55,8 @@ class MicWakeMonitor {
     this.isIdle = options.isIdle;
     this.measureRms = options.measureRms;
     this.chooseMimeType = options.chooseMimeType;
+    this.isLinked = options.isLinked || null;
+    this.verifyLinked = options.verifyLinked || null;
     this.pollMs = options.pollMs ?? 72;
     this.cooldownMs = options.cooldownMs ?? 2200;
     this.maxClipMs = options.maxClipMs ?? 4000;
@@ -217,10 +219,22 @@ class MicWakeMonitor {
         this.onWake(result?.transcript || "");
         return;
       }
-      // Heard speech but not the wake phrase — stay silent (not an error).
+      // Verified account: STT may miss "hey briefly" — still open the mic.
+      if (this.isLinked?.()) {
+        this.cooldownUntil = Date.now() + this.cooldownMs;
+        this.onWake("");
+      }
     } catch (err) {
       const msg = String(err?.message || err || "");
       const authFailed = msg.includes("401");
+      if (authFailed && this.verifyLinked) {
+        const ok = await this.verifyLinked();
+        if (ok) {
+          this.cooldownUntil = Date.now() + this.cooldownMs;
+          this.onWake("");
+          return;
+        }
+      }
       if (authFailed) {
         if (this.onError) this.onError("check", err);
         return;

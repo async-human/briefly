@@ -195,7 +195,7 @@ fn wakeword_stop(state: tauri::State<'_, WakewordState>) -> bool {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    #[cfg(all(desktop, not(debug_assertions)))]
+    #[cfg(desktop)]
     fn attach_single_instance(b: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
         // Single-instance MUST be the first plugin registered. It keeps exactly one
         // orb alive and forwards a second launch's argv (which carries the
@@ -211,7 +211,7 @@ pub fn run() {
         }))
     }
 
-    #[cfg(not(all(desktop, not(debug_assertions))))]
+    #[cfg(not(desktop))]
     fn attach_single_instance(b: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
         b
     }

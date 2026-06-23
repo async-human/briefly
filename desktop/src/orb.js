@@ -100,10 +100,66 @@ const state = {
   wsTurnActive: false,
   wakePrimed: false,
   wakeErrorShownAt: 0,
+  linkVerified: false,
+  connectPollTimer: null,
 };
 
 function isAccountLinked() {
-  return !!store.token;
+  return state.linkVerified;
+}
+
+function stopConnectPoll() {
+  if (state.connectPollTimer) {
+    clearInterval(state.connectPollTimer);
+    state.connectPollTimer = null;
+  }
+}
+
+async function refreshLinkState(options = {}) {
+  const { announce = false } = options;
+  if (!store.token) {
+    state.linkVerified = false;
+    updateLinkStatus();
+    return false;
+  }
+  const check = await verifyDeviceToken();
+  state.linkVerified = check.ok;
+  updateLinkStatus();
+  if (check.ok && announce) {
+    flashCaption("Briefly account connected.", 2200);
+  }
+  if (!check.ok && check.reason === "rejected") {
+    state.linkVerified = false;
+  }
+  return check.ok;
+}
+
+function onAccountLinkedSuccess() {
+  stopConnectPoll();
+  void primeWakeListening();
+  void startWakeWord();
+  void initLiveSession();
+}
+
+function pollForBrowserConnect() {
+  stopConnectPoll();
+  const tokenAtStart = store.token;
+  let attempts = 0;
+  state.connectPollTimer = setInterval(() => {
+    attempts += 1;
+    if (attempts > 30) {
+      stopConnectPoll();
+      return;
+    }
+    void refreshLinkState({ announce: false }).then((ok) => {
+      if (!ok) return;
+      const changed = store.token !== tokenAtStart;
+      if (changed || attempts <= 3) {
+        flashCaption("Briefly account connected.", 2200);
+      }
+      onAccountLinkedSuccess();
+    });
+  }, 2000);
 }
 
 function connectPageUrl() {
@@ -122,6 +178,7 @@ async function openBrieflyConnect() {
       window.open(url, "_blank", "noopener");
     }
     flashCaption("Sign in in your browser to connect.", 3200);
+    pollForBrowserConnect();
   } catch (_) {
     flashCaption("Open " + url + " in your browser.", 4000);
   }
@@ -130,9 +187,12 @@ async function openBrieflyConnect() {
 function updateLinkStatus() {
   const el = document.getElementById("linkStatus");
   if (!el) return;
-  if (isAccountLinked()) {
+  if (state.linkVerified) {
     el.textContent = "Connected to Briefly";
     el.classList.add("linked");
+  } else if (store.token) {
+    el.textContent = "Account link invalid — click Connect";
+    el.classList.remove("linked");
   } else {
     el.textContent = "Not connected — click Connect below";
     el.classList.remove("linked");
@@ -346,7 +406,7 @@ function updateWakeStatus() {
   } else if (state.wakeBackend === "native") {
     el.textContent = 'Wake word local: "hey briefly"';
   } else if (state.wakeBackend === "mic") {
-    el.textContent = store.token
+    el.textContent = isAccountLinked()
       ? 'Wake word listening: say "hey briefly"'
       : "Connect account to enable wake word";
   } else if (state.wakeBackend === "web") {
@@ -622,10 +682,19 @@ function chooseMimeType() {
 }
 
 async function startListening() {
-  if (!store.token) {
-    flashCaption("Connect your Briefly account first (gear icon).", 2800);
-    openSettings(true);
-    return;
+  if (!isAccountLinked()) {
+    if (store.token) {
+      const ok = await refreshLinkState();
+      if (!ok) {
+        flashCaption("Session expired — click Connect in settings.", 3200);
+        openSettings(true);
+        return;
+      }
+    } else {
+      flashCaption("Connect your Briefly account first (gear icon).", 2800);
+      openSettings(true);
+      return;
+    }
   }
   if (state.mode === "listening") return;
   stopCurrentTurn();
@@ -823,11 +892,10 @@ function handleDesktopAuth(payload) {
   if (apiBase) store.apiBase = apiBase;
   store.token = token;
   openSettings(false);
-  updateLinkStatus();
-  flashCaption("Briefly account connected.", 2200);
-  void primeWakeListening();
-  void startWakeWord();
-  void initLiveSession();
+  stopConnectPoll();
+  void refreshLinkState({ announce: true }).then((ok) => {
+    if (ok) onAccountLinkedSuccess();
+  });
 }
 
 async function registerGlobalHotkey() {
@@ -889,6 +957,7 @@ function onWakeMonitorError(kind, err) {
     return;
   }
   if (msg.includes("401") || msg.includes("rejected")) {
+    if (isAccountLinked()) return;
     flashCaption("Connect your Briefly account (gear → Connect).", 3600);
     return;
   }
@@ -911,7 +980,7 @@ async function primeWakeListening() {
     await state.micWakeMonitor.ensureAudioRunning();
     return;
   }
-  if (store.wakeEnabled && !store.wakeMuted && store.token) {
+  if (store.wakeEnabled && !store.wakeMuted && isAccountLinked()) {
     await startMicWakeWord();
   }
 }
@@ -923,7 +992,7 @@ async function startMicWakeWord() {
     updateWakeStatus();
     return;
   }
-  if (!store.token) {
+  if (!isAccountLinked()) {
     state.wakeBackend = "mic";
     updateWakeStatus();
     return;
@@ -933,6 +1002,8 @@ async function startMicWakeWord() {
     checkWake: apiWakeCheck,
     onWake: onWakePhraseHeard,
     onError: onWakeMonitorError,
+    isLinked: isAccountLinked,
+    verifyLinked: async () => refreshLinkState(),
     isIdle: () => state.mode === "idle" && store.wakeEnabled && !store.wakeMuted,
     measureRms: measureMicRms,
     chooseMimeType,
@@ -1249,26 +1320,23 @@ function init() {
     store.apiBase = document.getElementById("apiBase").value.trim().replace(/\/$/, "");
     store.token = document.getElementById("token").value.trim();
     if (!store.token) {
+      state.linkVerified = false;
       openSettings(false);
       updateLinkStatus();
       flashCaption("Saved.", 1600);
       return;
     }
-    const check = await verifyDeviceToken();
+    const ok = await refreshLinkState();
     openSettings(false);
-    updateLinkStatus();
-    if (!check.ok) {
+    if (!ok) {
       const reason =
-        check.reason === "rejected" ? "Account link failed — use Connect button instead" :
-        check.reason === "network" ? "Could not reach API to verify" :
-        "Account link failed (" + check.reason + ")";
+        !store.token ? "No token saved" :
+        "Account link failed — use Connect button instead";
       flashCaption(reason, 3800);
       return;
     }
     flashCaption("Connected.", 2000);
-    void primeWakeListening();
-    void startWakeWord();
-    await initLiveSession();
+    onAccountLinkedSuccess();
   });
   document.getElementById("composer").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -1308,19 +1376,28 @@ function init() {
     TAURI.event.listen("ptt-stop", () => { void stopListeningAndSend(); });
   }
 
+  window.addEventListener("storage", (e) => {
+    if (e.key === "briefly.token" && e.newValue) {
+      void refreshLinkState({ announce: true }).then((ok) => {
+        if (ok) onAccountLinkedSuccess();
+      });
+    }
+  });
+
   void registerGlobalHotkey();
   if (store.token) {
-    void verifyDeviceToken().then((check) => {
-      updateLinkStatus();
-      if (!check.ok && check.reason === "rejected") {
+    void refreshLinkState().then((ok) => {
+      if (!ok) {
         flashCaption("Session expired — click Connect in settings.", 4200);
         openSettings(true);
+      } else {
+        void startWakeWord();
       }
     });
   } else {
     updateLinkStatus();
+    void startWakeWord();
   }
-  void startWakeWord();
   updateWakeStatus();
   updateProactiveStatus();
   startProactiveLoop();
