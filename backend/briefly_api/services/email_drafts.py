@@ -13,6 +13,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from briefly_api.config import get_settings
 from briefly_api.db.models import Digest, DigestItem, EmailDraft, User
 from briefly_api.llm.adapter import Message, get_llm_adapter
 
