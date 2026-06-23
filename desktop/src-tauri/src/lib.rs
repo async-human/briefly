@@ -9,7 +9,9 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager,
 };
-use tauri_plugin_autostart::{ManagerExt, MacosLauncher};
+use tauri_plugin_autostart::MacosLauncher;
+#[cfg(not(debug_assertions))]
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_deep_link::DeepLinkExt;
 
 const DASHBOARD_URL: &str = "https://app.sendbriefly.app/dashboard";
@@ -192,15 +194,12 @@ fn wakeword_stop(state: tauri::State<'_, WakewordState>) -> bool {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default();
-
-    // Single-instance MUST be the first plugin registered. It keeps exactly one
-    // orb alive and forwards a second launch's argv (which carries the
-    // briefly:// auth deep link on Windows/Linux) into the running instance.
-    // Skip in debug builds so `npm run dev` can restart cleanly.
     #[cfg(all(desktop, not(debug_assertions)))]
-    {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+    fn attach_single_instance(b: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
+        // Single-instance MUST be the first plugin registered. It keeps exactly one
+        // orb alive and forwards a second launch's argv (which carries the
+        // briefly:// auth deep link on Windows/Linux) into the running instance.
+        b.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.set_focus();
@@ -208,10 +207,15 @@ pub fn run() {
             for arg in argv.iter() {
                 handle_auth_deep_link(app, arg);
             }
-        }));
+        }))
     }
 
-    builder
+    #[cfg(not(all(desktop, not(debug_assertions))))]
+    fn attach_single_instance(b: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
+        b
+    }
+
+    attach_single_instance(tauri::Builder::default())
         .manage(WakewordState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
