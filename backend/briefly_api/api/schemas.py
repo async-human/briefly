@@ -588,4 +588,7 @@ class OrbTurnOut(BaseModel):
     answer: str
     citations: list[dict] = Field(default_factory=list)
     tool_trace: list[dict] = Field(default_factory=list)
+    # True when the agent asked something and is waiting on the user — the client
+    # re-opens the mic so it's a back-and-forth, not tap-to-talk.
+    expects_reply: bool = False
 

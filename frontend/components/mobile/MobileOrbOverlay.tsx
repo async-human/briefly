@@ -277,8 +277,8 @@ export function MobileOrbOverlay() {
         setCaption("I couldn't form a response. Try again.");
         return;
       }
-      await handleTurnResponse(turn, ctl.signal);
-      setMode("idle");
+      const listening = await handleTurnResponse(turn, ctl.signal);
+      if (!listening) setMode("idle");
     } catch {
       setMode("idle");
       setCaption("Connection interrupted.");
@@ -337,11 +337,14 @@ export function MobileOrbOverlay() {
     }
   }
 
-  async function handleTurnResponse(turn: Awaited<ReturnType<typeof api.orbTurn>>, signal?: AbortSignal) {
+  async function handleTurnResponse(
+    turn: Awaited<ReturnType<typeof api.orbTurn>>,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
     if (!turn.answer?.trim()) {
       setMode("idle");
       setCaption("I couldn't form a response. Try again.");
-      return;
+      return false;
     }
     if (turn.thread_id) {
       threadIdRef.current = turn.thread_id;
@@ -389,6 +392,14 @@ export function MobileOrbOverlay() {
     if (allWords.length > 0) {
       setSpokenWordIndex(allWords.length - 1);
     }
+
+    // Conversational turn-taking: if the agent asked something, re-open the mic so
+    // the user can just reply — a back-and-forth instead of tap-to-talk.
+    if (turn.expects_reply && !signal?.aborted && enabled) {
+      await beginListening();
+      return true;
+    }
+    return false;
   }
 
   async function sendTextQuery(textOverride?: string) {
@@ -413,8 +424,8 @@ export function MobileOrbOverlay() {
         setCaption("I couldn't form a response. Try again.");
         return;
       }
-      await handleTurnResponse(turn, ctl.signal);
-      setMode("idle");
+      const listening = await handleTurnResponse(turn, ctl.signal);
+      if (!listening) setMode("idle");
     } catch {
       setMode("idle");
       setCaption("Connection interrupted.");

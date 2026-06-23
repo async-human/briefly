@@ -250,6 +250,7 @@ export type OrbTurnResult = {
   answer: string;
   citations: Array<Record<string, unknown>>;
   tool_trace?: Array<Record<string, unknown>>;
+  expects_reply?: boolean;
 };
 
 export type Profile = {

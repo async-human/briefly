@@ -28,7 +28,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from briefly_api.db.models import Digest, DigestItem, User
+from briefly_api.db.models import Digest, DigestItem, RawContent, User
 from briefly_api.services.browser_capture import list_recent_captures
 from briefly_api.utils.dates import local_date_string
 
@@ -242,12 +242,28 @@ async def draft_email_handler(
         return {"answer": "What should the email say, and who's it for?", "citations": []}
 
     draft = await compose_email_draft(db, user, instruction, content_id=content_id)
+
+    # What it was grounded in — for spoken context + citations the orb can show.
+    titles: list[str] = []
+    ids = list(draft.source_content_ids or [])
+    if ids:
+        rows = (
+            await db.execute(select(RawContent.title).where(RawContent.id.in_(ids)).limit(5))
+        ).all()
+        titles = [(t or "").strip() for (t,) in rows if t and t.strip()]
+    grounded = (
+        f" I based it on {len(titles)} thing{'s' if len(titles) != 1 else ''} you've read."
+        if titles
+        else ""
+    )
+
     return {
         "answer": (
-            f"Here's a draft. Subject: {draft.subject}. {draft.body} "
-            "Want me to change anything, save it to your Gmail drafts, or send it to someone?"
+            f'Here\'s a draft, subject "{draft.subject}".{grounded} {draft.body} '
+            "Want me to change anything, or should I send it?"
         ),
-        "citations": [],
+        "citations": [{"title": t} for t in titles],
+        "expects_reply": True,
     }
 
 
@@ -268,15 +284,17 @@ async def revise_email_handler(
         return {
             "answer": "I don't have a recent draft open to change. Want me to draft an email first?",
             "citations": [],
+            "expects_reply": True,
         }
     revision = ((args or {}).get("revision") or transcript or "").strip()
     draft = await revise_email_draft(db, user, draft, revision)
     return {
         "answer": (
             f"Updated. Subject: {draft.subject}. {draft.body} "
-            "Anything else, or should I save it to your Gmail drafts?"
+            "Anything else, or should I send it?"
         ),
         "citations": [],
+        "expects_reply": True,
     }
 
 
@@ -382,7 +400,7 @@ async def send_email_handler(
 
     if not to_email:
         if not name:
-            return {"answer": "Who should I send it to? Say a name from your contacts.", "citations": []}
+            return {"answer": "Who should I send it to? Say a name from your contacts.", "citations": [], "expects_reply": True}
         try:
             token = await refresh_gmail_access_token(conn, get_settings())
             match = await search_contact_email(token, name)
@@ -392,6 +410,7 @@ async def send_email_handler(
             return {
                 "answer": f"I couldn't find an email for {name} in your Gmail. Say the address, or try another name.",
                 "citations": [],
+                "expects_reply": True,
             }
         to_email, to_name = match[0], (match[1] or name)
 
@@ -403,6 +422,7 @@ async def send_email_handler(
     return {
         "answer": f"I'll send this to {who} at {to_email}. Say 'confirm' to send, or 'cancel'.",
         "citations": [],
+        "expects_reply": True,
     }
 
 

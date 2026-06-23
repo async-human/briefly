@@ -124,6 +124,7 @@ def _single_result(transcript: str, out: dict) -> dict:
         "answer": out.get("answer", ""),
         "citations": out.get("citations", []),
         "tool_trace": _tool_trace([out]),
+        "expects_reply": bool(out.get("expects_reply")),
     }
 
 
@@ -302,11 +303,14 @@ async def _run_agent(
     answer = (result.answer or "").strip()
     if not answer:
         return None
+    # The agent is waiting on the user if it asked a question or paused for confirmation.
+    expects_reply = answer.endswith("?") or result.stopped_reason == "needs_confirmation"
     return {
         "thread_id": result.thread_id or thread_id,
         "answer": answer,
         "citations": result.citations,
         "tool_trace": [{"tool": s.tool, "ok": s.ok} for s in result.steps if s.tool],
+        "expects_reply": expects_reply,
     }
 
 
@@ -343,16 +347,17 @@ async def run_orb_turn(
     if db is not None and getattr(user, "id", None):
         matched = [t for t in DATA_TOOLS if t.matches(transcript)]
 
-        # A single READ tool is a cheap, unambiguous lookup — run it directly so
-        # voice latency stays low (no planner hop).
-        if len(matched) == 1 and matched[0].side_effect == "read":
+        # A single clear intent (read OR act) → run the handler directly. No planner
+        # hop, so it's fast AND the handler's own conversational reply (e.g. the
+        # draft read-back + "want changes or should I send it?") reaches the user
+        # intact. Most turns take this path.
+        if len(matched) == 1:
             out = await _exec_tool(matched[0], db, user, transcript, thread_id, content_id)
             return _single_result(transcript, out)
 
-        # A task — an act/write tool, or a compound multi-tool goal — runs through
-        # the agent runtime: it plans, executes, chains tools, and asks a follow-up
-        # only when information is missing.
-        if matched:
+        # Genuinely compound/ambiguous goal (2+ tools) → the agent runtime plans,
+        # chains tools, and asks a follow-up only when information is missing.
+        if len(matched) >= 2:
             planned = await _run_agent(
                 db, user, transcript, thread_id=thread_id, content_id=content_id
             )
