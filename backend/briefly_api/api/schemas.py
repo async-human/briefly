@@ -591,4 +591,7 @@ class OrbTurnOut(BaseModel):
     # True when the agent asked something and is waiting on the user — the client
     # re-opens the mic so it's a back-and-forth, not tap-to-talk.
     expects_reply: bool = False
+    # Optional concise text for the SCREEN (distinct from the spoken `answer`). Used
+    # by the ambient orb so it shows a tidy line, not the whole spoken body.
+    display: str | None = None
 

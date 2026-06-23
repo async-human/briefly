@@ -125,6 +125,7 @@ def _single_result(transcript: str, out: dict) -> dict:
         "citations": out.get("citations", []),
         "tool_trace": _tool_trace([out]),
         "expects_reply": bool(out.get("expects_reply")),
+        "display": out.get("display"),
     }
 
 

@@ -10,12 +10,14 @@
     <div id="app">
       <div class="orb-wrap" data-tauri-drag-region>
         <canvas id="orb" width="180" height="180"></canvas>
-        <button id="orb-hit" class="orb-hit" title="Click to talk" aria-label="Click to talk"></button>
+        <button id="orb-hit" class="orb-hit" title="Tap to talk" aria-label="Tap to talk"></button>
       </div>
 
-      <p id="caption" class="caption"></p>
-      <p id="wakeStatus" class="wake-status"></p>
-      <p id="modeChip" class="mode-chip">Idle</p>
+      <div class="status-strip">
+        <p id="modeChip" class="mode-chip">Idle</p>
+        <p id="caption" class="caption"></p>
+        <p id="wakeStatus" class="wake-status"></p>
+      </div>
 
       <div class="controls">
         <button id="replay" class="ctl" title="Push to talk" aria-label="Push to talk">

@@ -257,10 +257,16 @@ async def draft_email_handler(
         else ""
     )
 
+    src_note = f" · based on {len(titles)} source{'s' if len(titles) != 1 else ''}" if titles else ""
     return {
         "answer": (
             f'Here\'s a draft, subject "{draft.subject}".{grounded} {draft.body} '
             "Want me to change anything, or should I send it?"
+        ),
+        # Concise, actionable line for the screen — not the whole body.
+        "display": (
+            f'Draft ready — "{draft.subject}"{src_note}.\n'
+            "Say “send it”, “make changes”, or “save to drafts”."
         ),
         "citations": [{"title": t} for t in titles],
         "expects_reply": True,
@@ -292,6 +298,10 @@ async def revise_email_handler(
         "answer": (
             f"Updated. Subject: {draft.subject}. {draft.body} "
             "Anything else, or should I send it?"
+        ),
+        "display": (
+            f'Updated — "{draft.subject}".\n'
+            "Say “send it”, “make more changes”, or “save to drafts”."
         ),
         "citations": [],
         "expects_reply": True,
@@ -421,6 +431,7 @@ async def send_email_handler(
     who = to_name or to_email
     return {
         "answer": f"I'll send this to {who} at {to_email}. Say 'confirm' to send, or 'cancel'.",
+        "display": f"Send to {who}?\n{to_email}\nSay “confirm” or “cancel”.",
         "citations": [],
         "expects_reply": True,
     }

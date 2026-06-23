@@ -42,6 +42,18 @@ const store = {
 // How often the idle orb checks whether Briefly has something to say.
 const PROACTIVE_POLL_MS = 90000;
 
+// Voice activity detection — auto-detect end of speech so the user never has
+// to click again to send. Tuned for typical desktop mic + WebView2 on Windows.
+const VAD = {
+  POLL_MS: 48,
+  CALIBRATE_MS: 320,
+  SPEECH_MARGIN: 2.8,
+  MIN_SPEECH_RMS: 0.012,
+  SILENCE_MS: 1100,
+  MIN_SPEECH_MS: 380,
+  MAX_LISTEN_MS: 45000,
+};
+
 const state = {
   mode: "idle", // idle | listening | thinking | speaking
   mediaRecorder: null,
@@ -55,6 +67,15 @@ const state = {
   wakeRestartTimer: null,
   wakeBackend: "none",
   wakeEventUnlisten: null,
+  vadAudioCtx: null,
+  vadAnalyser: null,
+  vadPollTimer: null,
+  vadNoiseFloor: 0.004,
+  vadHasSpeech: false,
+  vadSpeechStartedAt: 0,
+  vadLastSpeechAt: 0,
+  vadCalibratingUntil: 0,
+  sendingUtterance: false,
 };
 
 // ── Window helpers (Tauri) ──────────────────────────────────────────────────
@@ -166,6 +187,11 @@ function setMode(mode) {
     mode === "thinking" ? 0.46 :
     mode === "speaking" ? 0.68 :
     0.08;
+  if (mode === "idle") {
+    updateWakeStatus();
+  } else {
+    setStatusForMode(mode);
+  }
 }
 
 function wakeStatusEl() {
@@ -209,10 +235,105 @@ function stopSpeaking() {
 }
 
 function stopListening() {
+  stopVadMonitor();
   const rec = state.mediaRecorder;
   if (!rec) return;
   if (rec.state !== "inactive") rec.stop();
   state.mediaRecorder = null;
+}
+
+function measureMicRms(analyser) {
+  const buf = new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(buf);
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+  return Math.sqrt(sum / buf.length);
+}
+
+function stopVadMonitor() {
+  if (state.vadPollTimer) {
+    clearInterval(state.vadPollTimer);
+    state.vadPollTimer = null;
+  }
+  state.vadHasSpeech = false;
+  state.vadSpeechStartedAt = 0;
+  state.vadLastSpeechAt = 0;
+  state.vadCalibratingUntil = 0;
+  if (state.vadAudioCtx) {
+    try { state.vadAudioCtx.close(); } catch (_) {}
+    state.vadAudioCtx = null;
+  }
+  state.vadAnalyser = null;
+}
+
+function startVadMonitor(stream) {
+  stopVadMonitor();
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+
+  const ctx = new AudioCtx();
+  if (ctx.state === "suspended") void ctx.resume();
+  const source = ctx.createMediaStreamSource(stream);
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.55;
+  source.connect(analyser);
+
+  state.vadAudioCtx = ctx;
+  state.vadAnalyser = analyser;
+  state.vadNoiseFloor = 0.004;
+  state.vadHasSpeech = false;
+  state.vadCalibratingUntil = Date.now() + VAD.CALIBRATE_MS;
+
+  state.vadPollTimer = setInterval(() => {
+    if (state.mode !== "listening" || !state.vadAnalyser) return;
+
+    const now = Date.now();
+    const rms = measureMicRms(state.vadAnalyser);
+
+    if (now < state.vadCalibratingUntil) {
+      state.vadNoiseFloor = state.vadNoiseFloor * 0.85 + rms * 0.15;
+      return;
+    }
+
+    const threshold = Math.max(
+      VAD.MIN_SPEECH_RMS,
+      state.vadNoiseFloor * VAD.SPEECH_MARGIN
+    );
+    const speaking = rms > threshold;
+
+    if (speaking) {
+      if (!state.vadHasSpeech) {
+        state.vadHasSpeech = true;
+        state.vadSpeechStartedAt = now;
+      }
+      state.vadLastSpeechAt = now;
+      state.vadNoiseFloor = state.vadNoiseFloor * 0.92 + rms * 0.08;
+      bumpEnergy();
+      return;
+    }
+
+    if (!state.vadHasSpeech) {
+      state.vadNoiseFloor = state.vadNoiseFloor * 0.97 + rms * 0.03;
+      return;
+    }
+
+    const speechMs = state.vadLastSpeechAt - state.vadSpeechStartedAt;
+    const silenceMs = now - state.vadLastSpeechAt;
+    const listenMs = now - state.listeningStartedAt;
+
+    if (
+      silenceMs >= VAD.SILENCE_MS &&
+      speechMs >= VAD.MIN_SPEECH_MS
+    ) {
+      void stopListeningAndSend();
+      return;
+    }
+
+    if (listenMs >= VAD.MAX_LISTEN_MS) {
+      void stopListeningAndSend();
+    }
+  }, VAD.POLL_MS);
 }
 
 function stopCurrentTurn() {
@@ -227,6 +348,7 @@ function stopCurrentTurn() {
   stopListening();
   stopSpeaking();
   setCaption("");
+  updateWakeStatus();
 }
 
 function normalizeTranscript(v) {
@@ -264,14 +386,13 @@ function chooseMimeType() {
 
 async function startListening() {
   if (!store.token) {
-    setCaption("Add a device token in settings first.");
+    flashCaption("Add a device token in settings first.", 2500);
     openSettings(true);
     return;
   }
   if (state.mode === "listening") return;
   stopCurrentTurn();
   await showWindow();
-  setCaption("Listening… click again to send");
   setMode("listening");
   state.audioChunks = [];
   state.listeningStartedAt = Date.now();
@@ -285,19 +406,23 @@ async function startListening() {
     recorder.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) state.audioChunks.push(e.data);
     };
-    recorder.start();
+    recorder.start(250);
     state.mediaRecorder = recorder;
+    startVadMonitor(stream);
   } catch (_) {
     setMode("idle");
-    setCaption("Microphone access was blocked.");
+    flashCaption("Microphone access was blocked.", 2500);
   }
 }
 
 async function stopListeningAndSend() {
-  if (state.mode !== "listening") return;
+  if (state.mode !== "listening" || state.sendingUtterance) return;
+  state.sendingUtterance = true;
+  stopVadMonitor();
   const recorder = state.mediaRecorder;
   const elapsed = Date.now() - state.listeningStartedAt;
   if (!recorder) {
+    state.sendingUtterance = false;
     setMode("idle");
     return;
   }
@@ -306,20 +431,26 @@ async function stopListeningAndSend() {
     recorder.stop();
   });
   state.mediaRecorder = null;
+  state.sendingUtterance = false;
 
   if (elapsed < 120 || !blob || blob.size === 0) {
     setMode("idle");
-    setCaption("Click the orb and start talking.");
-    setTimeout(() => setCaption(""), 1200);
+    flashCaption("Didn't catch that — try again.", 1400);
     return;
   }
 
   await executeTurn(async (signal) => apiTurn(blob, signal));
 }
 
+async function cancelListening() {
+  if (state.mode !== "listening") return;
+  stopListening();
+  setMode("idle");
+  flashCaption("Cancelled.", 900);
+}
+
 async function executeTurn(turnFactory) {
   setMode("thinking");
-  setCaption("Thinking…");
   const turnAbort = new AbortController();
   state.turnAbort = turnAbort;
   try {
@@ -330,16 +461,17 @@ async function executeTurn(turnFactory) {
     const trace = Array.isArray(turn?.tool_trace) ? turn.tool_trace : [];
     if (trace.length) {
       const names = trace.map((t) => String(t.tool || "")).filter(Boolean).join(" + ");
-      const ws = wakeStatusEl();
-      if (ws && names) ws.textContent = `Mode: ${names}`;
+      if (names) setStatusForMode("thinking", truncateStatus(`Using ${names}`, 48));
     }
-    setCaption(answer);
     await playTts(answer);
+    if (turnAbort.signal.aborted) return;
+    if (turn?.expects_reply) {
+      await startListening();
+    }
   } catch (err) {
     if (turnAbort.signal.aborted) return;
     setMode("idle");
-    setCaption(err instanceof Error ? err.message : "Turn failed.");
-    setTimeout(() => setCaption(""), 3000);
+    flashCaption(err instanceof Error ? err.message : "Turn failed.", 2800);
   }
 }
 
@@ -383,7 +515,6 @@ async function pollProactive() {
   if (state.mode !== "idle") return; // re-check: user may have started talking
 
   await showWindowQuiet();
-  setCaption(res.script);
   try {
     await playTts(res.script);
   } catch (_) {
@@ -409,8 +540,10 @@ function updateProactiveStatus() {
 function toggleProactive() {
   store.proactiveEnabled = !store.proactiveEnabled;
   updateProactiveStatus();
-  setCaption(store.proactiveEnabled ? "Briefly will reach out by voice." : "Proactive voice off.");
-  setTimeout(() => setCaption(""), 1800);
+  flashCaption(
+    store.proactiveEnabled ? "Proactive voice on." : "Proactive voice off.",
+    1600
+  );
   if (store.proactiveEnabled) void pollProactive();
 }
 
@@ -423,12 +556,15 @@ function startProactiveLoop() {
 function toggleTalk() {
   if (state.mode === "speaking" || state.mode === "thinking") {
     stopCurrentTurn();
-    setCaption("Interrupted");
-    setTimeout(() => setCaption(""), 900);
+    flashCaption("Interrupted", 900);
     return;
   }
   if (state.mode === "listening") {
-    void stopListeningAndSend();
+    if (state.vadHasSpeech) {
+      void stopListeningAndSend();
+    } else {
+      void cancelListening();
+    }
     return;
   }
   void startListening();
@@ -441,8 +577,7 @@ function handleDesktopAuth(payload) {
   if (apiBase) store.apiBase = apiBase;
   store.token = token;
   openSettings(false);
-  setCaption("Desktop orb linked. Click to talk.");
-  setTimeout(() => setCaption(""), 2500);
+  flashCaption("Desktop orb linked.", 2200);
 }
 
 async function registerGlobalHotkey() {
@@ -452,8 +587,7 @@ async function registerGlobalHotkey() {
     await TAURI.globalShortcut.register("Ctrl+Shift+Space", () => {
       toggleTalk();
     });
-    setCaption("Hotkey ready: Ctrl+Shift+Space");
-    setTimeout(() => setCaption(""), 1200);
+    flashCaption("Hotkey ready: Ctrl+Shift+Space", 1200);
   } catch (_) {}
 }
 
@@ -505,9 +639,8 @@ function startWebWakeWord() {
       transcript += event.results[i][0]?.transcript || "";
     }
     if (!transcriptMatchesWakePhrase(transcript)) return;
-    setCaption("Wake word heard.");
-    setTimeout(() => setCaption(""), 1000);
-    toggleTalk();
+    flashCaption("Wake word heard.", 900);
+    void startListening();
   };
   rec.onerror = () => {
     state.wakeRestartTimer = setTimeout(() => startWakeWord(), 1500);
@@ -540,9 +673,8 @@ async function startWakeWord() {
         if (TAURI?.event) {
           state.wakeEventUnlisten = await TAURI.event.listen("wake-detected", () => {
             if (state.mode !== "idle") return;
-            setCaption("Wake word heard.");
-            setTimeout(() => setCaption(""), 1000);
-            toggleTalk();
+            flashCaption("Wake word heard.", 900);
+            void startListening();
           });
         }
         updateWakeStatus();
@@ -553,13 +685,44 @@ async function startWakeWord() {
   startWebWakeWord();
 }
 
-// ── Caption ─────────────────────────────────────────────────────────────────
+// ── Status line (short, single-line hints — not full agent responses) ─────
+const STATUS = {
+  idle: "",
+  listening: "Listening…",
+  thinking: "Thinking…",
+  speaking: "Speaking…",
+};
+
+function truncateStatus(text, maxLen = 72) {
+  const s = String(text || "").replace(/\s+/g, " ").trim();
+  if (!s) return "";
+  if (s.length <= maxLen) return s;
+  return s.slice(0, maxLen - 1).trimEnd() + "…";
+}
+
 const captionEl = () => document.getElementById("caption");
 function setCaption(text) {
   const el = captionEl();
   if (!el) return;
-  el.textContent = text || "";
-  el.classList.toggle("show", !!text);
+  const trimmed = truncateStatus(text);
+  el.textContent = trimmed;
+  el.classList.toggle("show", !!trimmed);
+}
+
+function setStatusForMode(mode, hint) {
+  if (hint) {
+    setCaption(hint);
+    return;
+  }
+  setCaption(STATUS[mode] || "");
+}
+
+function flashCaption(text, ms = 1400) {
+  setCaption(text);
+  setTimeout(() => {
+    if (state.mode === "idle") setCaption("");
+    else setStatusForMode(state.mode);
+  }, ms);
 }
 
 // ── Orb animation ───────────────────────────────────────────────────────────
@@ -691,8 +854,7 @@ function init() {
     store.apiBase = document.getElementById("apiBase").value.trim();
     store.token = document.getElementById("token").value.trim();
     openSettings(false);
-    setCaption("Saved. Click orb to talk.");
-    setTimeout(() => setCaption(""), 3500);
+    flashCaption("Saved.", 1600);
   });
   document.getElementById("composer").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -700,7 +862,7 @@ function init() {
     const text = (input.value || "").trim();
     if (!text) return;
     if (!store.token) {
-      setCaption("Add a device token in settings first.");
+      flashCaption("Add a device token in settings first.", 2500);
       openSettings(true);
       return;
     }
