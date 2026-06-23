@@ -242,14 +242,239 @@ async def draft_email_handler(
         return {"answer": "What should the email say, and who's it for?", "citations": []}
 
     draft = await compose_email_draft(db, user, instruction, content_id=content_id)
-    subject = draft.subject or "your email"
     return {
         "answer": (
-            f'I\'ve drafted an email — "{subject}". I won\'t send anything on my own: '
-            "open Draft email on your dashboard to review, edit the recipient, and send it."
+            f"Here's a draft. Subject: {draft.subject}. {draft.body} "
+            "Want me to change anything, save it to your Gmail drafts, or send it to someone?"
         ),
         "citations": [],
     }
+
+
+async def revise_email_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    """Revise the in-progress draft by voice ('make it shorter', 'add a line about X')."""
+    from briefly_api.services.email_drafts import get_active_draft, revise_email_draft
+
+    draft = await get_active_draft(db, user.id)
+    if not draft:
+        return {
+            "answer": "I don't have a recent draft open to change. Want me to draft an email first?",
+            "citations": [],
+        }
+    revision = ((args or {}).get("revision") or transcript or "").strip()
+    draft = await revise_email_draft(db, user, draft, revision)
+    return {
+        "answer": (
+            f"Updated. Subject: {draft.subject}. {draft.body} "
+            "Anything else, or should I save it to your Gmail drafts?"
+        ),
+        "citations": [],
+    }
+
+
+async def save_email_to_gmail_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    """Drop the in-progress draft into the user's Gmail drafts (never sends)."""
+    from datetime import datetime, timezone
+
+    from briefly_api.auth.gmail import (
+        GmailAccessError,
+        create_gmail_draft,
+        get_gmail_connection,
+        gmail_connection_can_create_draft,
+    )
+    from briefly_api.config import get_settings
+    from briefly_api.services.email_drafts import get_active_draft
+
+    draft = await get_active_draft(db, user.id)
+    if not draft:
+        return {"answer": "I don't have a draft ready to save. Want me to draft one?", "citations": []}
+
+    conn = await get_gmail_connection(db, user.id)
+    if not gmail_connection_can_create_draft(conn):
+        return {
+            "answer": (
+                "I can write the draft, but to drop it into your Gmail you'll need to "
+                "connect Gmail once in Briefly settings."
+            ),
+            "citations": [],
+        }
+    try:
+        await create_gmail_draft(
+            conn,
+            get_settings(),
+            to=draft.to_email,
+            subject=draft.subject,
+            body=draft.body,
+            from_email=conn.account_email,
+        )
+    except GmailAccessError:
+        return {"answer": "I couldn't save it to Gmail — you may need to reconnect Gmail in settings.", "citations": []}
+
+    draft.status = "drafted_to_gmail"
+    draft.sent_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"answer": "Done — it's in your Gmail drafts, ready for you to review and send.", "citations": []}
+
+
+def _extract_recipient(transcript: str) -> tuple[str, str | None]:
+    """Pull a recipient from a spoken send command. Returns (name, explicit_email)."""
+    text = transcript or ""
+    email_match = re.search(r"[\w.+-]+@[\w.-]+\.\w+", text)
+    if email_match:
+        return "", email_match.group(0)
+    m = re.search(r"\b(?:to|for)\s+([A-Za-z][\w.'-]*(?:\s+[A-Za-z][\w.'-]*)?)", text, re.IGNORECASE)
+    name = m.group(1).strip() if m else ""
+    # Drop trailing filler so "to John about pricing" → "John".
+    name = re.sub(r"\s+(about|regarding|saying|that|and|with)\b.*$", "", name, flags=re.IGNORECASE).strip()
+    return name, None
+
+
+async def send_email_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    """Resolve a named recipient from Gmail history and stage the send. Does NOT
+    send — it sets up an explicit spoken confirmation (human-in-the-loop)."""
+    from briefly_api.auth.gmail import (
+        get_gmail_connection,
+        gmail_connection_can_send,
+        refresh_gmail_access_token,
+        search_contact_email,
+    )
+    from briefly_api.config import get_settings
+    from briefly_api.services.email_drafts import get_active_draft
+
+    draft = await get_active_draft(db, user.id)
+    if not draft:
+        return {"answer": "I don't have a draft ready to send. Want me to draft one first?", "citations": []}
+
+    conn = await get_gmail_connection(db, user.id)
+    if not gmail_connection_can_send(conn):
+        return {
+            "answer": "To send on your behalf you'll need to connect Gmail once in Briefly settings.",
+            "citations": [],
+        }
+
+    requested = ((args or {}).get("recipient") or transcript or "").strip()
+    name, explicit_email = _extract_recipient(requested)
+    to_email, to_name = explicit_email, (name or None)
+
+    if not to_email:
+        if not name:
+            return {"answer": "Who should I send it to? Say a name from your contacts.", "citations": []}
+        try:
+            token = await refresh_gmail_access_token(conn, get_settings())
+            match = await search_contact_email(token, name)
+        except Exception:
+            match = None
+        if not match:
+            return {
+                "answer": f"I couldn't find an email for {name} in your Gmail. Say the address, or try another name.",
+                "citations": [],
+            }
+        to_email, to_name = match[0], (match[1] or name)
+
+    draft.to_email = to_email
+    draft.to_name = to_name
+    draft.status = "pending_send"
+    await db.commit()
+    who = to_name or to_email
+    return {
+        "answer": f"I'll send this to {who} at {to_email}. Say 'confirm' to send, or 'cancel'.",
+        "citations": [],
+    }
+
+
+async def confirm_send_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    """Confirm or cancel the email awaiting send. The actual send happens HERE, only
+    after the user's explicit confirmation — the human-in-the-loop gate."""
+    from datetime import datetime as _dt
+    from datetime import timezone as _tz
+
+    from sqlalchemy import func
+
+    from briefly_api.auth.gmail import (
+        GmailAccessError,
+        gmail_connection_can_send,
+        get_gmail_connection,
+        send_gmail_message,
+    )
+    from briefly_api.config import get_settings
+    from briefly_api.db.models import EmailDraft
+    from briefly_api.services.email_drafts import get_pending_send_draft
+
+    draft = await get_pending_send_draft(db, user.id)
+    if not draft:
+        return {"answer": "There's nothing waiting to send right now.", "citations": []}
+
+    if re.search(r"\b(cancel|don'?t send|do not send|never\s?mind|stop|hold on)\b", transcript, re.IGNORECASE):
+        draft.status = "draft"
+        await db.commit()
+        return {"answer": "Okay, I won't send it. It's still here if you want to change it.", "citations": []}
+
+    s = get_settings()
+    conn = await get_gmail_connection(db, user.id)
+    if not gmail_connection_can_send(conn):
+        return {"answer": "I can't send — Gmail isn't connected for sending.", "citations": []}
+
+    today = _dt.now(_tz.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    sent_today = (
+        await db.execute(
+            select(func.count())
+            .select_from(EmailDraft)
+            .where(
+                EmailDraft.user_id == user.id,
+                EmailDraft.status == "sent",
+                EmailDraft.sent_at >= today,
+            )
+        )
+    ).scalar() or 0
+    if sent_today >= s.act_email_daily_cap:
+        return {
+            "answer": f"You've hit today's send limit of {s.act_email_daily_cap} emails. Try again tomorrow.",
+            "citations": [],
+        }
+
+    try:
+        await send_gmail_message(
+            conn, s, to=draft.to_email, subject=draft.subject, body=draft.body, from_email=conn.account_email
+        )
+    except GmailAccessError:
+        return {"answer": "I couldn't send it — you may need to reconnect Gmail in settings.", "citations": []}
+
+    draft.status = "sent"
+    draft.sent_at = _dt.now(_tz.utc)
+    await db.commit()
+    return {"answer": f"Sent to {draft.to_name or draft.to_email}.", "citations": []}
 
 
 # ── Registry of orb tools ─────────────────────────────────────────────────────
@@ -300,15 +525,77 @@ DATA_TOOLS: list[OrbTool] = [
         name="draft_email",
         description=(
             "Draft an email/note/reply on the user's behalf, grounded in what they've "
-            "read. Use when the user asks to write, draft, compose, or send an email, "
-            "note, or message to someone. Creates a reviewable draft — it never sends."
+            "read. Use when the user asks to write, draft, or compose an email, note, or "
+            "message to someone. Creates a reviewable draft and reads it back; never sends."
         ),
         handler=draft_email_handler,
         side_effect="write",
         fast_patterns=(
-            re.compile(r"\b(draft|write|compose|send)\b.{0,30}\b(e-?mail|note|message|reply)\b", re.IGNORECASE),
+            re.compile(r"\b(draft|write|compose)\b.{0,30}\b(e-?mail|note|message|reply)\b", re.IGNORECASE),
             re.compile(r"\be-?mail\s+(to|him|her|them|my|the|a)\b", re.IGNORECASE),
         ),
         args_schema={"instruction": "what the email should say and to whom"},
+    ),
+    OrbTool(
+        name="revise_email",
+        description=(
+            "Revise the email draft currently in progress — shorten, reword, change tone, "
+            "or add/remove a point. Use when the user asks to change/edit the draft they "
+            "just made (it operates on their most recent draft)."
+        ),
+        handler=revise_email_handler,
+        side_effect="write",
+        fast_patterns=(
+            re.compile(r"\b(make|keep)\s+it\b.{0,30}\b(short|shorter|brief|briefer|concise|long|longer|formal|casual|friendly|warm|direct|punchy)\b", re.IGNORECASE),
+            re.compile(r"\b(shorten|reword|rephrase|rewrite|simplify|tighten)\b", re.IGNORECASE),
+            re.compile(r"\b(change|edit|revise|tweak|adjust|fix)\b.{0,20}\b(it|the\s+(e-?mail|draft|message|note|wording|tone|subject|line))\b", re.IGNORECASE),
+            re.compile(r"\b(add|remove|drop|take\s+out|include|mention)\b.{0,40}\b(line|sentence|paragraph|part|point|bit)\b", re.IGNORECASE),
+            re.compile(r"^\s*(shorter|longer|more\s+(formal|casual|concise|friendly|direct))\s*$", re.IGNORECASE),
+        ),
+        args_schema={"revision": "what to change about the draft"},
+    ),
+    OrbTool(
+        name="save_email_to_gmail",
+        description=(
+            "Save the in-progress email draft into the user's Gmail drafts so they can "
+            "send it from Gmail. Use for 'save it', 'put it in my drafts', 'add to Gmail'."
+        ),
+        handler=save_email_to_gmail_handler,
+        side_effect="write",
+        fast_patterns=(
+            re.compile(r"\b(save|put|drop|add|stick)\b.{0,25}\b(draft|drafts|gmail)\b", re.IGNORECASE),
+            re.compile(r"\bsave\s+it\b", re.IGNORECASE),
+        ),
+    ),
+    OrbTool(
+        name="send_email",
+        description=(
+            "Stage sending the in-progress draft to a named recipient (resolved from the "
+            "user's Gmail history). Sets up a spoken confirmation — it does NOT send until "
+            "the user confirms. Use for 'send it to <name>', 'email this to <name>'."
+        ),
+        handler=send_email_handler,
+        side_effect="write",
+        fast_patterns=(
+            re.compile(r"\bsend\b.{0,40}\bto\b\s+[A-Za-z@]", re.IGNORECASE),
+            re.compile(r"\b(send|e-?mail|shoot)\b.{0,25}\b(it|this|that|the\s+(e-?mail|draft|message))\b.{0,15}\bto\b", re.IGNORECASE),
+        ),
+        args_schema={"recipient": "name or email address to send to"},
+    ),
+    OrbTool(
+        name="confirm_send",
+        description=(
+            "Confirm or cancel the email that is pending the user's send-confirmation. The "
+            "actual send happens here. Use for 'confirm', 'send it now', 'go ahead', "
+            "'cancel', 'don't send'."
+        ),
+        handler=confirm_send_handler,
+        side_effect="write",
+        fast_patterns=(
+            re.compile(r"\bconfirm\b", re.IGNORECASE),
+            re.compile(r"\b(go ahead|send it now|send now|yes,?\s+send)\b", re.IGNORECASE),
+            re.compile(r"^\s*send it\s*$", re.IGNORECASE),
+            re.compile(r"\b(cancel|don'?t send|do not send|never\s?mind)\b", re.IGNORECASE),
+        ),
     ),
 ]

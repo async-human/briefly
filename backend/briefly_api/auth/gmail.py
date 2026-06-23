@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
+from email.utils import getaddresses
 from urllib.parse import urlencode
 
 import httpx
@@ -11,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.auth.google import GOOGLE_TOKEN_URL, generate_oauth_state
-from briefly_api.config import Settings
+from briefly_api.config import Settings, get_settings
 from briefly_api.db.models import OAuthConnection, User
 from briefly_api.security.oauth_tokens import (
     oauth_access_token,
@@ -210,6 +211,50 @@ async def create_gmail_draft(
         raise classify_gmail_http_error(resp)
     resp.raise_for_status()
     return (resp.json() or {}).get("id", "")
+
+
+async def search_contact_email(access_token: str, name: str) -> tuple[str, str] | None:
+    """Resolve a person's name to an email address from the user's Gmail history
+    (no extra scope beyond gmail.readonly). Returns (email, display_name) for the
+    first message participant whose name/address matches all tokens of `name`, or
+    None. The voice flow reads the address back for confirmation, so a wrong match
+    is caught before anything sends."""
+    name = (name or "").strip()
+    if not name:
+        return None
+    tokens = [t for t in name.lower().split() if t]
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        listing = await client.get(
+            f"{GMAIL_API}/messages",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params={"q": name, "maxResults": 10},
+        )
+        if listing.status_code in {401, 403}:
+            raise classify_gmail_http_error(listing)
+        if listing.status_code != 200:
+            return None
+        message_ids = [m["id"] for m in (listing.json().get("messages") or [])]
+
+        for mid in message_ids:
+            meta = await client.get(
+                f"{GMAIL_API}/messages/{mid}",
+                headers={"Authorization": f"Bearer {access_token}"},
+                params={"format": "metadata", "metadataHeaders": ["From", "To", "Cc"]},
+            )
+            if meta.status_code != 200:
+                continue
+            headers = (meta.json().get("payload") or {}).get("headers") or []
+            for header in headers:
+                if header.get("name") not in ("From", "To", "Cc"):
+                    continue
+                for display, addr in getaddresses([header.get("value", "")]):
+                    if not addr or "@" not in addr:
+                        continue
+                    haystack = f"{display} {addr}".lower()
+                    if all(tok in haystack for tok in tokens):
+                        return addr, (display.strip() or addr)
+    return None
 
 
 async def send_gmail_message(

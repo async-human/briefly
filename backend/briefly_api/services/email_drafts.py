@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -320,6 +321,91 @@ async def compose_email_draft(
         status="draft",
     )
     db.add(draft)
+    await db.commit()
+    await db.refresh(draft)
+    return draft
+
+
+# ── Conversational (voice) editing ────────────────────────────────────────────
+
+_REVISE_SYSTEM = (
+    "You revise an EXISTING email draft per the user's spoken instruction. Apply ONLY "
+    "the requested change. Do NOT introduce new facts, figures, names, quotes, or links "
+    "that aren't already in the draft — keep it grounded. Preserve the user's voice; "
+    "plain text, no markdown. "
+    'Return STRICT JSON only: {"subject": string, "body": string} — the FULL revised email.'
+)
+
+
+async def get_active_draft(
+    db: AsyncSession, user_id: str, *, within_minutes: int = 60
+) -> EmailDraft | None:
+    """The draft the user is currently working on by voice — their most recent
+    unsent draft, created within the window (so stale drafts aren't picked up)."""
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=within_minutes)
+    return (
+        await db.execute(
+            select(EmailDraft)
+            .where(
+                EmailDraft.user_id == user_id,
+                EmailDraft.status.in_(("draft", "pending_send")),
+                EmailDraft.created_at >= cutoff,
+            )
+            .order_by(EmailDraft.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
+async def get_pending_send_draft(
+    db: AsyncSession, user_id: str, *, within_minutes: int = 60
+) -> EmailDraft | None:
+    """The draft awaiting the user's spoken send-confirmation (recipient already set)."""
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=within_minutes)
+    return (
+        await db.execute(
+            select(EmailDraft)
+            .where(
+                EmailDraft.user_id == user_id,
+                EmailDraft.status == "pending_send",
+                EmailDraft.created_at >= cutoff,
+            )
+            .order_by(EmailDraft.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
+async def revise_email_draft(
+    db: AsyncSession, user: User, draft: EmailDraft, revision: str
+) -> EmailDraft:
+    """Apply a spoken revision ('make it shorter', 'add a line about pricing') to an
+    existing draft, grounded in the draft's current content. Persists and returns it."""
+    revision = (revision or "").strip()
+    if not revision:
+        return draft
+
+    prompt = (
+        f"Current subject: {draft.subject}\n"
+        f"Current body:\n{draft.body}\n\n"
+        f"Revision requested: {revision}\n\n"
+        "Return the full revised email as strict JSON."
+    )
+    resp = await get_llm_adapter().complete(
+        [Message(role="user", content=prompt)],
+        system=_REVISE_SYSTEM,
+        temperature=0.4,
+        max_tokens=700,
+        user_id=user.id,
+        agent="email_revise",
+    )
+    parsed = _parse_json(resp.content)
+    new_body = (parsed.get("body") or "").strip()
+    new_subject = (parsed.get("subject") or "").strip()
+    if new_body:
+        draft.body = new_body
+    if new_subject:
+        draft.subject = new_subject
     await db.commit()
     await db.refresh(draft)
     return draft
