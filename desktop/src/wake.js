@@ -2,8 +2,7 @@
 
 /**
  * Mic-based wake phrase detection for the Tauri desktop orb.
- * Web Speech API is unavailable in WebView2, so we listen via RMS VAD,
- * record a short clip, and verify the phrase server-side (STT only).
+ * Records audio *while* speech is detected, then verifies via server STT.
  */
 
 function normalizeWakeTranscript(text) {
@@ -38,17 +37,27 @@ function transcriptMatchesWakePhrase(text) {
   return false;
 }
 
+async function resumeAudioContext(ctx) {
+  if (!ctx || ctx.state === "closed") return;
+  if (ctx.state === "suspended") {
+    try {
+      await ctx.resume();
+    } catch (_) {}
+  }
+}
+
 class MicWakeMonitor {
   constructor(options) {
     this.getStream = options.getStream;
     this.checkWake = options.checkWake;
     this.onWake = options.onWake;
+    this.onError = options.onError || null;
     this.isIdle = options.isIdle;
     this.measureRms = options.measureRms;
     this.chooseMimeType = options.chooseMimeType;
     this.pollMs = options.pollMs ?? 72;
     this.cooldownMs = options.cooldownMs ?? 2200;
-    this.maxClipMs = options.maxClipMs ?? 3200;
+    this.maxClipMs = options.maxClipMs ?? 4000;
 
     this.active = false;
     this.pollTimer = null;
@@ -60,27 +69,37 @@ class MicWakeMonitor {
     this.speechStartedAt = 0;
     this.lastSpeechAt = 0;
     this.noiseFloor = 0.004;
+    this.recorder = null;
+    this.recordChunks = [];
+    this.micStream = null;
+  }
+
+  async ensureAudioRunning() {
+    await resumeAudioContext(this.monitorCtx);
   }
 
   async start() {
     this.stop();
     this.active = true;
     try {
-      const stream = await this.getStream();
+      this.micStream = await this.getStream();
       this.monitorCtx = new AudioContext();
-      const source = this.monitorCtx.createMediaStreamSource(stream);
+      await resumeAudioContext(this.monitorCtx);
+      const source = this.monitorCtx.createMediaStreamSource(this.micStream);
       this.monitorAnalyser = this.monitorCtx.createAnalyser();
       this.monitorAnalyser.fftSize = 512;
       source.connect(this.monitorAnalyser);
       this.noiseFloor = 0.004;
       this.pollTimer = setInterval(() => this._poll(), this.pollMs);
-    } catch (_) {
+    } catch (err) {
       this.active = false;
+      if (this.onError) this.onError("mic", err);
     }
   }
 
   stop() {
     this.active = false;
+    this._stopRecording();
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
@@ -92,20 +111,62 @@ class MicWakeMonitor {
     this.monitorAnalyser = null;
     this.speechActive = false;
     this.busy = false;
+    this.micStream = null;
   }
 
   _startThreshold() {
-    return Math.max(0.012, this.noiseFloor * 3.4);
+    return Math.max(0.009, this.noiseFloor * 2.8);
   }
 
   _continueThreshold() {
-    return Math.max(0.009, this.noiseFloor * 2.2);
+    return Math.max(0.007, this.noiseFloor * 1.9);
+  }
+
+  _beginRecording() {
+    if (!this.micStream || (this.recorder && this.recorder.state === "recording")) return;
+    this.recordChunks = [];
+    const opts = {};
+    const mimeType = this.chooseMimeType();
+    if (mimeType) opts.mimeType = mimeType;
+    try {
+      this.recorder = new MediaRecorder(this.micStream, opts);
+      this.recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) this.recordChunks.push(e.data);
+      };
+      this.recorder.start(120);
+    } catch (err) {
+      this.recorder = null;
+      if (this.onError) this.onError("record", err);
+    }
+  }
+
+  _stopRecording() {
+    const rec = this.recorder;
+    this.recorder = null;
+    if (!rec || rec.state === "inactive") {
+      return Promise.resolve(null);
+    }
+    return new Promise((resolve) => {
+      rec.onstop = () => {
+        const blob = new Blob(this.recordChunks, { type: rec.mimeType || "audio/webm" });
+        this.recordChunks = [];
+        resolve(blob.size > 0 ? blob : null);
+      };
+      try {
+        rec.stop();
+      } catch (_) {
+        resolve(null);
+      }
+    });
   }
 
   _poll() {
     if (!this.active || this.busy || !this.monitorAnalyser) return;
     if (!this.isIdle()) {
-      this.speechActive = false;
+      if (this.speechActive) {
+        this.speechActive = false;
+        void this._stopRecording();
+      }
       return;
     }
     if (Date.now() < this.cooldownUntil) return;
@@ -119,9 +180,14 @@ class MicWakeMonitor {
       if (!this.speechActive) {
         this.speechActive = true;
         this.speechStartedAt = now;
+        this._beginRecording();
       }
       this.lastSpeechAt = now;
       this.noiseFloor = this.noiseFloor * 0.92 + rms * 0.08;
+      if (now - this.speechStartedAt >= this.maxClipMs) {
+        this.speechActive = false;
+        void this._finishRecordingAndCheck();
+      }
       return;
     }
 
@@ -132,86 +198,27 @@ class MicWakeMonitor {
 
     const silenceMs = now - this.lastSpeechAt;
     const speechMs = this.lastSpeechAt - this.speechStartedAt;
-    const elapsed = now - this.speechStartedAt;
-    const ended =
-      (silenceMs >= 520 && speechMs >= 280) ||
-      elapsed >= this.maxClipMs;
-
-    if (!ended) return;
-
-    this.speechActive = false;
-    void this._captureAndCheck();
+    if (silenceMs >= 480 && speechMs >= 240) {
+      this.speechActive = false;
+      void this._finishRecordingAndCheck();
+    }
   }
 
-  async _captureAndCheck() {
+  async _finishRecordingAndCheck() {
     if (this.busy || !this.active || !this.isIdle()) return;
     this.busy = true;
     try {
-      const stream = await this.getStream();
-      const blob = await this._recordClip(stream);
-      if (!blob || blob.size < 700) return;
+      const blob = await this._stopRecording();
+      if (!blob || blob.size < 600) return;
       const result = await this.checkWake(blob);
       if (result?.wake || transcriptMatchesWakePhrase(result?.transcript)) {
         this.cooldownUntil = Date.now() + this.cooldownMs;
         this.onWake(result?.transcript || "");
       }
-    } catch (_) {
-      // Mic or network hiccup — keep listening.
+    } catch (err) {
+      if (this.onError) this.onError("check", err);
     } finally {
       this.busy = false;
     }
-  }
-
-  async _recordClip(stream) {
-    return new Promise((resolve) => {
-      const chunks = [];
-      const opts = {};
-      const mimeType = this.chooseMimeType();
-      if (mimeType) opts.mimeType = mimeType;
-      const recorder = new MediaRecorder(stream, opts);
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunks.push(e.data);
-      };
-
-      const ctx = new AudioContext();
-      const source = ctx.createMediaStreamSource(stream);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      source.connect(analyser);
-
-      const endpointer = new SpeechEndpointer({
-        pollMs: 64,
-        baseSilenceMs: 520,
-        minSpeechMs: 260,
-        minListenMs: 300,
-        hangoverMs: 260,
-        calibrateMs: 350,
-        minSpeechRms: 0.01,
-      });
-
-      const startedAt = Date.now();
-      endpointer.begin(startedAt);
-      recorder.start(120);
-
-      const timer = setInterval(() => {
-        const now = Date.now();
-        if (now - startedAt > this.maxClipMs) {
-          finish();
-          return;
-        }
-        const action = endpointer.feed(this.measureRms(analyser), now);
-        if (action === "end") finish();
-      }, 64);
-
-      const finish = () => {
-        clearInterval(timer);
-        recorder.onstop = () => {
-          try { ctx.close(); } catch (_) {}
-          resolve(new Blob(chunks, { type: recorder.mimeType || "audio/webm" }));
-        };
-        if (recorder.state !== "inactive") recorder.stop();
-        else resolve(null);
-      };
-    });
   }
 }

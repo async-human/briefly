@@ -97,6 +97,8 @@ const state = {
   useServerEndpointing: false,
   serverStreamingStt: false,
   wsTurnActive: false,
+  wakePrimed: false,
+  wakeErrorShownAt: 0,
 };
 
 function appendTurnFormFields(form) {
@@ -136,18 +138,25 @@ async function hideWindow() {
 }
 
 // ── API ─────────────────────────────────────────────────────────────────────
+function apiFetch(url, options = {}) {
+  // Multipart uploads go through the WebView fetch — Tauri HTTP can mishandle FormData.
+  if (options.body instanceof FormData) {
+    return window.fetch(url, options);
+  }
+  const doFetch = TAURI?.http?.fetch || window.fetch;
+  return doFetch(url, options);
+}
+
 async function apiGet(path) {
   const url = store.apiBase + path;
   const headers = { Authorization: "Bearer " + store.token };
-  const doFetch = TAURI?.http?.fetch || window.fetch;
-  const res = await doFetch(url, { method: "GET", headers });
+  const res = await apiFetch(url, { method: "GET", headers });
   if (!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
 }
 
 async function apiPostJson(path, payload) {
-  const doFetch = TAURI?.http?.fetch || window.fetch;
-  const res = await doFetch(store.apiBase + path, {
+  const res = await apiFetch(store.apiBase + path, {
     method: "POST",
     headers: {
       Authorization: "Bearer " + store.token,
@@ -162,8 +171,7 @@ async function apiPostJson(path, payload) {
 async function ensureOrbSession() {
   if (store.sessionId || !store.token) return;
   try {
-    const doFetch = TAURI?.http?.fetch || window.fetch;
-    const res = await doFetch(store.apiBase + "/api/v1/orb/session", {
+    const res = await apiFetch(store.apiBase + "/api/v1/orb/session", {
       method: "POST",
       headers: {
         Authorization: "Bearer " + store.token,
@@ -186,8 +194,7 @@ async function apiTurn(audioBlob, signal) {
   const form = new FormData();
   form.append("audio", audioBlob, "turn.webm");
   appendTurnFormFields(form);
-  const doFetch = TAURI?.http?.fetch || window.fetch;
-  const res = await doFetch(store.apiBase + "/api/v1/orb/turn", {
+  const res = await apiFetch(store.apiBase + "/api/v1/orb/turn", {
     method: "POST",
     headers: { Authorization: "Bearer " + store.token },
     body: form,
@@ -202,8 +209,7 @@ async function apiTurnText(text, signal) {
   const form = new FormData();
   form.append("text", text);
   appendTurnFormFields(form);
-  const doFetch = TAURI?.http?.fetch || window.fetch;
-  const res = await doFetch(store.apiBase + "/api/v1/orb/turn", {
+  const res = await apiFetch(store.apiBase + "/api/v1/orb/turn", {
     method: "POST",
     headers: { Authorization: "Bearer " + store.token },
     body: form,
@@ -214,8 +220,7 @@ async function apiTurnText(text, signal) {
 }
 
 async function apiSpeakToBlob(text, signal) {
-  const doFetch = TAURI?.http?.fetch || window.fetch;
-  const res = await doFetch(store.apiBase + "/api/v1/orb/speak", {
+  const res = await apiFetch(store.apiBase + "/api/v1/orb/speak", {
     method: "POST",
     headers: {
       Authorization: "Bearer " + store.token,
@@ -457,12 +462,14 @@ async function ensureMic() {
 async function apiWakeCheck(audioBlob) {
   const form = new FormData();
   form.append("audio", audioBlob, "wake.webm");
-  const doFetch = TAURI?.http?.fetch || window.fetch;
-  const res = await doFetch(store.apiBase + "/api/v1/orb/wake-check", {
+  const res = await apiFetch(store.apiBase + "/api/v1/orb/wake-check", {
     method: "POST",
     headers: { Authorization: "Bearer " + store.token },
     body: form,
   });
+  if (res.status === 404) {
+    throw new Error("Wake API missing — deploy latest backend");
+  }
   if (!res.ok) throw new Error("Wake check failed: HTTP " + res.status);
   return await res.json();
 }
@@ -720,6 +727,35 @@ function onWakePhraseHeard() {
   void startListening();
 }
 
+function onWakeMonitorError(kind, err) {
+  const now = Date.now();
+  if (now - state.wakeErrorShownAt < 8000) return;
+  state.wakeErrorShownAt = now;
+  const msg = String(err?.message || err || "");
+  if (kind === "mic") {
+    flashCaption("Mic blocked — allow access for wake word.", 2800);
+    return;
+  }
+  if (msg.includes("404") || msg.includes("Wake API missing")) {
+    flashCaption("Wake API not deployed yet — use tap-to-talk.", 3200);
+    return;
+  }
+  if (kind === "check" && msg) {
+    flashCaption("Wake check failed — try tap-to-talk.", 2200);
+  }
+}
+
+async function primeWakeListening() {
+  state.wakePrimed = true;
+  if (state.micWakeMonitor) {
+    await state.micWakeMonitor.ensureAudioRunning();
+    return;
+  }
+  if (store.wakeEnabled && !store.wakeMuted && store.token) {
+    await startMicWakeWord();
+  }
+}
+
 async function startMicWakeWord() {
   state.wakeBackend = "none";
   stopWakeWord();
@@ -736,11 +772,15 @@ async function startMicWakeWord() {
     getStream: ensureMic,
     checkWake: apiWakeCheck,
     onWake: onWakePhraseHeard,
+    onError: onWakeMonitorError,
     isIdle: () => state.mode === "idle" && store.wakeEnabled && !store.wakeMuted,
     measureRms: measureMicRms,
     chooseMimeType,
   });
   await state.micWakeMonitor.start();
+  if (state.wakePrimed) {
+    await state.micWakeMonitor.ensureAudioRunning();
+  }
   if (state.micWakeMonitor.active) {
     state.wakeBackend = "mic";
   }
@@ -1005,6 +1045,7 @@ function init() {
 
   document.getElementById("orb-hit").addEventListener("click", (e) => {
     e.preventDefault();
+    void primeWakeListening();
     toggleTalk();
   });
   document.getElementById("replay").addEventListener("click", () => toggleTalk());
@@ -1013,6 +1054,7 @@ function init() {
     if (store.wakeMuted) {
       stopWakeWord();
     } else {
+      void primeWakeListening();
       void startWakeWord();
     }
     updateWakeStatus();
@@ -1028,6 +1070,7 @@ function init() {
     store.token = document.getElementById("token").value.trim();
     openSettings(false);
     flashCaption("Saved.", 1600);
+    void primeWakeListening();
     void startWakeWord();
   });
   document.getElementById("composer").addEventListener("submit", (e) => {

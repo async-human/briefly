@@ -101,6 +101,7 @@ async def orb_wake_check(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    log.info("orb_wake_check user=%s wake=%s transcript=%r", user.id, result["wake"], result["transcript"][:80])
     return OrbWakeCheckOut(**result)
 
 
