@@ -39,6 +39,12 @@ def normalize_upload(content_type: str, filename: str) -> tuple[str, str]:
     return ct, name
 
 
+def input_suffix_for(content_type: str, filename: str) -> str:
+    ct, name = normalize_upload(content_type, filename)
+    ext = MIME_TO_EXT.get(ct) or Path(name).suffix or ".webm"
+    return ext if ext.startswith(".") else f".{ext}"
+
+
 def convert_to_wav(audio_bytes: bytes, *, input_suffix: str = ".webm") -> bytes | None:
     """
     Convert arbitrary audio to 16kHz mono WAV via ffmpeg.
@@ -57,6 +63,8 @@ def convert_to_wav(audio_bytes: bytes, *, input_suffix: str = ".webm") -> bytes 
                 [
                     ffmpeg,
                     "-y",
+                    "-fflags", "+genpts+discardcorrupt",
+                    "-err_detect", "ignore_err",
                     "-i", str(src),
                     "-af", "highpass=f=80,lowpass=f=8000,volume=1.2",
                     "-ac", "1",

@@ -7,19 +7,19 @@
 class SpeechEndpointer {
   constructor(options = {}) {
     this.pollMs = options.pollMs ?? 48;
-    this.baseSilenceMs = options.baseSilenceMs ?? 850;
-    this.maxAdaptiveSilenceMs = options.maxAdaptiveSilenceMs ?? 450;
+    this.baseSilenceMs = options.baseSilenceMs ?? 1300;
+    this.maxAdaptiveSilenceMs = options.maxAdaptiveSilenceMs ?? 750;
     this.minSpeechMs = options.minSpeechMs ?? 380;
-    this.hangoverMs = options.hangoverMs ?? 280;
-    this.calibrateMs = options.calibrateMs ?? 380;
-    this.minListenMs = options.minListenMs ?? 550;
+    this.hangoverMs = options.hangoverMs ?? 420;
+    this.calibrateMs = options.calibrateMs ?? 480;
+    this.minListenMs = options.minListenMs ?? 650;
     this.maxListenMs = options.maxListenMs ?? 45000;
     this.maxListenNoSpeechMs = options.maxListenNoSpeechMs ?? 12000;
     this.startMultiplier = options.startMultiplier ?? 3.2;
     this.continueMultiplier = options.continueMultiplier ?? 2.0;
     this.minSpeechRms = options.minSpeechRms ?? 0.009;
-    this.trailingRatio = options.trailingRatio ?? 0.16;
-    this.trailingSilenceMs = options.trailingSilenceMs ?? 520;
+    this.trailingRatio = options.trailingRatio ?? 0.11;
+    this.trailingSilenceMs = options.trailingSilenceMs ?? 1100;
 
     this.noiseFloor = 0.004;
     this.calibratingUntil = 0;
@@ -93,7 +93,9 @@ class SpeechEndpointer {
     const trailThreshold = this._trailingThreshold();
     if (this.trailingSilentSince > 0) {
       const trailMs = now - this.trailingSilentSince;
-      if (trailMs >= this.trailingSilenceMs) return "trailing";
+      if (trailMs >= this.trailingSilenceMs && silenceMs >= this.hangoverMs) {
+        return "trailing";
+      }
     }
 
     return null;

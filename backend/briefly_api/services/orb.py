@@ -26,6 +26,7 @@ import logging
 import re
 import time
 
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.db.engine import SessionLocal
@@ -427,6 +428,8 @@ async def run_orb_turn(
     transcript = (text or "").strip()
 
     if audio_bytes:
+        if len(audio_bytes) < 400:
+            raise ValueError("Recording too short — try again.")
         stt_started = time.monotonic()
         stt = get_stt_adapter()
         context_prompt = None
@@ -434,14 +437,24 @@ async def run_orb_turn(
             from briefly_api.stt.profile_context import transcription_prompt_for_user
 
             context_prompt = await transcription_prompt_for_user(db, user.id)
-        transcript = (
-            await stt.transcribe(
-                audio_bytes,
-                filename=filename,
-                content_type=content_type,
-                context_prompt=context_prompt,
+        try:
+            transcript = (
+                await stt.transcribe(
+                    audio_bytes,
+                    filename=filename,
+                    content_type=content_type,
+                    context_prompt=context_prompt,
+                )
+            ).strip()
+        except httpx.HTTPStatusError as exc:
+            log.warning(
+                "orb STT failed user=%s status=%s bytes=%d type=%s",
+                getattr(user, "id", None),
+                exc.response.status_code,
+                len(audio_bytes),
+                content_type,
             )
-        ).strip()
+            raise ValueError("Couldn't process that audio — please try again.") from exc
         timings["stt_ms"] = int((time.monotonic() - stt_started) * 1000)
 
     if not transcript:

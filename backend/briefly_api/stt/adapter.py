@@ -22,7 +22,7 @@ import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from briefly_api.config import Settings, get_settings
-from briefly_api.stt.audio_utils import convert_to_wav, normalize_upload
+from briefly_api.stt.audio_utils import convert_to_wav, input_suffix_for, normalize_upload
 from briefly_api.stt.prompts import build_transcription_prompt
 
 log = logging.getLogger(__name__)
@@ -272,8 +272,17 @@ class STTAdapter:
                 "DEEPGRAM_API_KEY not set (required for SPEECH_TO_TEXT_PROVIDER=deepgram)",
             )
 
-        suffix = "." + filename.rsplit(".", 1)[-1] if "." in filename else ".webm"
+        suffix = input_suffix_for(content_type, filename)
         ct = (content_type or "").split(";")[0].strip().lower()
+
+        browser_cts = {"audio/webm", "video/webm", "audio/mp4", "audio/m4a", "audio/ogg", "audio/opus"}
+        browser_suffixes = {".webm", ".m4a", ".mp4", ".ogg", ".opus"}
+        if ct in browser_cts or suffix in browser_suffixes:
+            wav_bytes = convert_to_wav(audio_bytes, input_suffix=suffix)
+            if wav_bytes:
+                return await self._deepgram_request(
+                    wav_bytes, "recording.wav", "audio/wav", model, language, prompt,
+                )
 
         try:
             return await self._deepgram_request(
@@ -282,13 +291,12 @@ class STTAdapter:
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code != 400:
                 raise
-            if ct in {"audio/webm", "video/webm"} or suffix == ".webm":
-                wav_bytes = convert_to_wav(audio_bytes, input_suffix=suffix)
-                if wav_bytes:
-                    log.info("STT: Deepgram rejected WebM, retrying with ffmpeg WAV")
-                    return await self._deepgram_request(
-                        wav_bytes, "recording.wav", "audio/wav", model, language, prompt,
-                    )
+            wav_bytes = convert_to_wav(audio_bytes, input_suffix=suffix)
+            if wav_bytes:
+                log.info("STT: Deepgram rejected raw audio, retrying with ffmpeg WAV")
+                return await self._deepgram_request(
+                    wav_bytes, "recording.wav", "audio/wav", model, language, prompt,
+                )
             raise
 
     async def _deepgram_request(

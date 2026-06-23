@@ -70,16 +70,19 @@ const PROACTIVE_POLL_MS = 90000;
 // Voice activity detection — client-side endpointing (always on; server STT is optional).
 const VAD = {
   POLL_MS: 48,
-  BASE_SILENCE_MS: 850,
-  MAX_ADAPTIVE_SILENCE_MS: 450,
+  BASE_SILENCE_MS: 1300,
+  MAX_ADAPTIVE_SILENCE_MS: 750,
   MIN_SPEECH_MS: 380,
-  HANGOVER_MS: 280,
-  CALIBRATE_MS: 380,
-  MIN_LISTEN_MS: 550,
+  HANGOVER_MS: 420,
+  CALIBRATE_MS: 480,
+  MIN_LISTEN_MS: 650,
   MAX_LISTEN_MS: 45000,
   MAX_LISTEN_NO_SPEECH_MS: 12000,
-  TRAILING_SILENCE_MS: 520,
+  TRAILING_SILENCE_MS: 1100,
 };
+
+/** Pause before reopening the mic after the agent speaks (avoids echo + gives you time to start). */
+const LISTEN_REOPEN_DELAY_MS = 900;
 
 const state = {
   mode: "idle", // idle | listening | thinking | speaking
@@ -550,11 +553,34 @@ function stopSpeaking() {
 }
 
 function stopListening() {
-  stopVadMonitor();
   const rec = state.mediaRecorder;
-  if (!rec) return;
-  if (rec.state !== "inactive") rec.stop();
   state.mediaRecorder = null;
+  if (rec && rec.state !== "inactive") {
+    try {
+      if (rec.state === "recording") rec.requestData();
+      rec.stop();
+    } catch (_) {}
+  }
+  stopVadMonitor();
+}
+
+/** Flush and stop MediaRecorder before tearing down the VAD AudioContext (same mic stream). */
+function finalizeMediaRecording(recorder, chunks) {
+  if (!recorder || recorder.state === "inactive") {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+      resolve(blob.size > 0 ? blob : null);
+    };
+    try {
+      if (recorder.state === "recording") recorder.requestData();
+      recorder.stop();
+    } catch (_) {
+      resolve(null);
+    }
+  });
 }
 
 function measureMicRms(analyser) {
@@ -596,12 +622,15 @@ function shouldStreamPcmToServer() {
 }
 
 function stopListeningOnly() {
-  stopVadMonitor();
   const rec = state.mediaRecorder;
-  if (rec && rec.state !== "inactive") {
-    try { rec.stop(); } catch (_) {}
-  }
   state.mediaRecorder = null;
+  if (rec && rec.state !== "inactive") {
+    try {
+      if (rec.state === "recording") rec.requestData();
+      rec.stop();
+    } catch (_) {}
+  }
+  stopVadMonitor();
 }
 
 function startVadMonitor(stream) {
@@ -614,7 +643,7 @@ function startVadMonitor(stream) {
   const source = ctx.createMediaStreamSource(stream);
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048;
-  analyser.smoothingTimeConstant = 0.55;
+  analyser.smoothingTimeConstant = 0.62;
   source.connect(analyser);
 
   state.vadAudioCtx = ctx;
@@ -834,22 +863,21 @@ async function stopListeningAndSend() {
     return;
   }
   state.sendingUtterance = true;
-  stopVadMonitor();
   const recorder = state.mediaRecorder;
+  const chunks = state.audioChunks;
+  state.mediaRecorder = null;
   const elapsed = Date.now() - state.listeningStartedAt;
   if (!recorder) {
     state.sendingUtterance = false;
+    stopVadMonitor();
     setMode("idle");
     return;
   }
-  const blob = await new Promise((resolve) => {
-    recorder.onstop = () => resolve(new Blob(state.audioChunks, { type: recorder.mimeType || "audio/webm" }));
-    recorder.stop();
-  });
-  state.mediaRecorder = null;
+  const blob = await finalizeMediaRecording(recorder, chunks);
+  stopVadMonitor();
   state.sendingUtterance = false;
 
-  if (elapsed < 120 || !blob || blob.size === 0) {
+  if (elapsed < 120 || !blob || blob.size < 600) {
     setMode("idle");
     flashCaption("Didn't catch that — try again.", 1400);
     return;
@@ -863,11 +891,22 @@ async function cancelListening() {
   if (state.mode !== "listening") return;
   stopListening();
   setMode("idle");
-  const rearm = state.conversationActive && !state.conversationMuted;
-  flashCaption(rearm ? "Still here — listening." : "Cancelled.", 900);
-  if (rearm) {
-    await continueConversationAfterSpeak();
+  flashCaption("Cancelled.", 900);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function continueConversationAfterSpeak(turn) {
+  if (state.conversationMuted) return;
+  if (!state.conversationActive) state.conversationActive = true;
+  if (LISTEN_REOPEN_DELAY_MS > 0) {
+    await sleep(LISTEN_REOPEN_DELAY_MS);
+    if (state.mode !== "idle" || state.conversationMuted) return;
   }
+  flashCaption("Listening…", 900);
+  await startListening();
 }
 
 function normalizeCommandText(text) {
@@ -929,9 +968,6 @@ async function applyVoiceCommand(cmd) {
     case "cancel":
       stopCurrentTurn();
       flashCaption("Cancelled.", 900);
-      if (state.conversationActive && !state.conversationMuted) {
-        await continueConversationAfterSpeak();
-      }
       return;
     case "mute_wake":
       store.wakeMuted = true;
@@ -947,13 +983,6 @@ async function applyVoiceCommand(cmd) {
     default:
       return;
   }
-}
-
-async function continueConversationAfterSpeak(turn) {
-  if (state.conversationMuted) return;
-  if (!state.conversationActive) state.conversationActive = true;
-  flashCaption("Listening…", 900);
-  await startListening();
 }
 
 async function executeTurn(turnFactory) {
@@ -1543,24 +1572,25 @@ async function initLiveSession() {
     const transcript = (turn?.transcript || "").trim();
     const voiceCmd = matchVoiceCommand(transcript);
     if (voiceCmd) {
+      state.wsTurnActive = false;
+      state.sendingUtterance = false;
       await applyVoiceCommand(voiceCmd);
       return;
     }
     const answer = (turn && turn.answer ? String(turn.answer) : "").trim();
     if (answer && !state.conversationMuted) await playTts(answer);
     else setMode("idle");
-  };
-  state.liveClient.onTurnEnd = (frame) => {
     state.wsTurnActive = false;
     state.sendingUtterance = false;
-    if (state.conversationMuted) {
-      setMode("idle");
-      return;
-    }
+    if (state.conversationMuted) return;
     state.conversationActive = true;
-    void continueConversationAfterSpeak({ expects_reply: frame?.expects_reply !== false });
+    await continueConversationAfterSpeak(turn);
+  };
+  state.liveClient.onTurnEnd = () => {
+    /* turn lifecycle finished on server; mic reopens after TTS in onTurnResult */
   };
   state.liveClient.onSpeechFinal = () => {
+    if (!shouldStreamPcmToServer()) return;
     if (state.mode !== "listening" || state.wsTurnActive) return;
     setStatusForMode("listening", "Processing…");
     stopListeningOnly();
