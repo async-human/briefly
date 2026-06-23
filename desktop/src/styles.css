@@ -323,9 +323,11 @@ body:not([data-mode="idle"]) .composer {
 }
 
 .link-status {
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--text-dim);
   margin-bottom: 8px;
+  text-align: center;
 }
 
 .link-status.linked {
@@ -343,6 +345,15 @@ body:not([data-mode="idle"]) .composer {
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
+}
+
+.connect-btn.connecting {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+.connect-btn[hidden] {
+  display: none;
 }
 
 .advanced-settings {

@@ -209,21 +209,41 @@ async function openBrieflyConnect() {
 
 function updateLinkStatus() {
   const el = document.getElementById("linkStatus");
-  if (!el) return;
-  if (state.connecting) {
-    el.textContent = "Connecting via browser…";
-    el.classList.remove("linked");
-    return;
+  const btn = document.getElementById("connect");
+  const hint = document.querySelector("#settings .hint");
+  const linked = state.linkVerified && !state.connecting;
+
+  if (el) {
+    if (state.connecting) {
+      el.textContent = "Connecting via browser…";
+      el.classList.remove("linked");
+    } else if (state.linkVerified) {
+      el.textContent = "Connected to Briefly";
+      el.classList.add("linked");
+    } else if (store.token) {
+      el.textContent = "Account link invalid — click Connect";
+      el.classList.remove("linked");
+    } else {
+      el.textContent = "Not connected";
+      el.classList.remove("linked");
+    }
   }
-  if (state.linkVerified) {
-    el.textContent = "Connected to Briefly";
-    el.classList.add("linked");
-  } else if (store.token) {
-    el.textContent = "Account link invalid — click Connect";
-    el.classList.remove("linked");
-  } else {
-    el.textContent = "Not connected — click Connect below";
-    el.classList.remove("linked");
+
+  if (btn) {
+    if (linked) {
+      btn.hidden = true;
+      btn.disabled = false;
+      btn.classList.remove("connecting");
+    } else {
+      btn.hidden = false;
+      btn.textContent = state.connecting ? "Connecting…" : "Connect Briefly account";
+      btn.disabled = state.connecting;
+      btn.classList.toggle("connecting", state.connecting);
+    }
+  }
+
+  if (hint) {
+    hint.hidden = linked;
   }
 }
 
@@ -920,10 +940,18 @@ function handleDesktopAuth(payload) {
   if (apiBase) store.apiBase = apiBase;
   store.token = token;
   state.connecting = false;
+  state.linkVerified = true;
+  updateLinkStatus();
+  updateWakeStatus();
   openSettings(false);
   stopConnectPoll();
   void refreshLinkState({ announce: true }).then((ok) => {
-    if (ok) onAccountLinkedSuccess();
+    if (ok) {
+      onAccountLinkedSuccess();
+    } else {
+      state.linkVerified = !!store.token;
+      updateLinkStatus();
+    }
   });
 }
 
@@ -1251,6 +1279,9 @@ function openSettings(open) {
     document.getElementById("apiBase").value = store.apiBase;
     document.getElementById("token").value = store.token;
     updateLinkStatus();
+    if (store.token) {
+      void refreshLinkState();
+    }
     panel.classList.remove("hidden");
   } else {
     panel.classList.add("hidden");
