@@ -139,8 +139,25 @@ async function hideWindow() {
 
 // ── API ─────────────────────────────────────────────────────────────────────
 function apiFetch(url, options = {}) {
-  // Tauri WebView: JSON POST works; multipart FormData often fails ("Failed to fetch").
+  // Prefer Tauri native HTTP — bypasses WebView CORS (tauri.localhost is not on API allowlist).
+  if (TAURI?.http?.fetch) {
+    return TAURI.http.fetch(url, options);
+  }
   return window.fetch(url, options);
+}
+
+async function readResponseBlob(res, fallbackType = "audio/mpeg") {
+  if (typeof res.blob === "function") {
+    try {
+      return await res.blob();
+    } catch (_) {}
+  }
+  const buf = await res.arrayBuffer();
+  let type = fallbackType;
+  try {
+    type = res.headers?.get?.("content-type") || res.headers?.["content-type"] || fallbackType;
+  } catch (_) {}
+  return new Blob([buf], { type });
 }
 
 function turnJsonBody(extra = {}) {
@@ -250,7 +267,7 @@ async function apiSpeakToBlob(text, signal) {
     signal,
   });
   if (!res.ok) throw new Error("Speak failed: HTTP " + res.status);
-  return await res.blob();
+  return await readResponseBlob(res);
 }
 
 function setMode(mode) {
@@ -484,7 +501,7 @@ async function verifyDeviceToken() {
   if (!token) return { ok: false, reason: "missing" };
   if (!token.startsWith("bcap_")) return { ok: false, reason: "format" };
   try {
-    const res = await window.fetch(store.apiBase + "/api/v1/orb/session", {
+    const res = await apiFetch(store.apiBase + "/api/v1/orb/session", {
       method: "POST",
       headers: {
         Authorization: "Bearer " + token,
@@ -551,8 +568,7 @@ async function apiWakeCheck(audioBlob) {
     filename: mime.includes("mp4") ? "wake.m4a" : "wake.webm",
   });
 
-  // Same transport as tap-to-talk (WebView fetch) — avoids Tauri HTTP header quirks.
-  const res = await window.fetch(store.apiBase + "/api/v1/orb/wake-check/json", {
+  const res = await apiFetch(store.apiBase + "/api/v1/orb/wake-check/json", {
     method: "POST",
     headers,
     body,

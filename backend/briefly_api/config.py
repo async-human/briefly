@@ -30,7 +30,11 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     frontend_url: str = "http://localhost:3000"
     backend_url: str = "http://localhost:8000"
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = (
+        "http://localhost:3000,"
+        "https://tauri.localhost,http://tauri.localhost,"
+        "https://asset.localhost,http://asset.localhost"
+    )
 
     # ── Database ─────────────────────────────────────────────────────────────
     database_url: str = "postgresql+asyncpg://briefly:briefly@localhost:5432/briefly"
