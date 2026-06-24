@@ -434,7 +434,7 @@ async function streamOrbTurnAndSpeak({
   if (streamError) throw streamError;
   if (!completeTurn) throw new Error("Incomplete stream");
 
-  if (!spoke && completeTurn.answer) {
+  if (!spoke && completeTurn.answer && !signal?.aborted) {
     await playAnswerTts({
       text: completeTurn.answer,
       speakFn,
@@ -570,7 +570,7 @@ function createDeltaStreamingSpeaker({
       enqueueNewSentences();
       finished = true;
       await drainPromise;
-      if (!spoke && completeTurn?.answer) {
+      if (!spoke && completeTurn?.answer && !aborted && !signal?.aborted) {
         await playAnswerTts({
           text: completeTurn.answer,
           speakFn,
@@ -589,6 +589,9 @@ function createDeltaStreamingSpeaker({
       finished = true;
       sentenceQueue.length = 0;
       prefetch.clear();
+      if (signal && !signal.aborted) {
+        try { signal.abort(); } catch (_) {}
+      }
       stopAllPlayback();
     },
   };

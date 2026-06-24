@@ -85,10 +85,16 @@ const VAD = {
 /** Pause before reopening the mic after the agent speaks (avoids echo). */
 const LISTEN_REOPEN_DELAY_MS = 150;
 
-/** Barge-in while agent speaks — STT-confirmed (not RMS-only). Tap/hotkey always works. */
+/** Barge-in — STT-confirmed primary; RMS backup if live STT unavailable. */
 const BARGE_IN = {
-  GRACE_AFTER_SPEAK_MS: 450,
-  COOLDOWN_MS: 900,
+  GRACE_AFTER_SPEAK_MS: 350,
+  COOLDOWN_MS: 800,
+  RMS_POLL_MS: 80,
+  RMS_CALIBRATE_MS: 400,
+  RMS_NOISE_MULT: 3.8,
+  RMS_MIN_ABS: 0.028,
+  RMS_SUSTAIN_MS: 380,
+  RMS_DECAY_MS: 45,
 };
 
 /** If speech was heard but VAD never endpointed, force-send after this silence. */
@@ -193,10 +199,15 @@ function looksLikeUserBargeIn(text, isFinal) {
   if (matchVoiceCommand(text)) return true;
   if (wakePhraseMatched(text)) return true;
   const norm = normalizeCommandText(text);
+  if (!norm) return false;
   const words = norm.split(/\s+/).filter(Boolean);
+  const oneWordBarge = new Set([
+    "stop", "wait", "hold", "no", "mute", "pause", "hey", "briefly", "shh", "quiet",
+  ]);
+  if (words.length === 1 && oneWordBarge.has(words[0])) return true;
   if (words.length >= 2) return true;
-  if (isFinal && words.length >= 1 && norm.length >= 5) return true;
-  if (!isFinal && norm.length >= 8) return true;
+  if (isFinal && norm.length >= 4) return true;
+  if (!isFinal && norm.length >= 6) return true;
   return false;
 }
 
@@ -234,7 +245,8 @@ function startAuxPcmStream(mode) {
       if (state.liveListenMode !== "wake" || state.mode !== "idle") return;
       if (!store.wakeEnabled || store.wakeMuted) return;
     } else if (mode === "barge_in") {
-      if (state.liveListenMode !== "barge_in" || state.mode !== "speaking") return;
+      if (state.liveListenMode !== "barge_in") return;
+      if (state.mode !== "speaking" && state.mode !== "thinking") return;
       if (Date.now() - state.speakingStartedAt < BARGE_IN.GRACE_AFTER_SPEAK_MS) return;
     } else {
       return;
@@ -267,13 +279,21 @@ function stopWakeListenStream() {
 }
 
 async function startSemanticBargeIn() {
-  if (state.mode !== "speaking" || !state.liveClient?.ready || !state.serverStreamingStt) return;
+  if (state.mode !== "speaking" && state.mode !== "thinking") return;
+  if (!state.liveClient?.ready) {
+    startBargeInMonitor();
+    return;
+  }
   try {
     await ensureMic();
     const ok = await state.liveClient.prepareBargeIn();
-    if (!ok || state.mode !== "speaking") return;
-    startAuxPcmStream("barge_in");
+    if (state.mode !== "speaking" && state.mode !== "thinking") return;
+    if (ok) {
+      startAuxPcmStream("barge_in");
+      return;
+    }
   } catch (_) {}
+  startBargeInMonitor();
 }
 
 function stopSemanticBargeIn() {
@@ -843,7 +863,7 @@ function setMode(mode) {
   } else {
     stopWakeListenStream();
     setStatusForMode(mode);
-    if (mode === "speaking") {
+    if (mode === "speaking" || mode === "thinking") {
       state.speakingStartedAt = Date.now();
       state.bargeInCooldownUntil = 0;
       void ensureMic().then(() => startSemanticBargeIn()).catch(() => {});
@@ -923,16 +943,16 @@ function hardStopSpeech() {
   state.wsTurnActive = false;
   state.agentSpokenText = "";
   clearWsTurnWatchdog();
+  if (typeof stopAllPlayback === "function") stopAllPlayback();
   abortHttpTurn("user");
   if (state.speakAbort) {
-    state.speakAbort.abort();
+    try { state.speakAbort.abort(); } catch (_) {}
     state.speakAbort = null;
   }
   if (state.wsTurnSpeaker) {
     state.wsTurnSpeaker.abort();
     state.wsTurnSpeaker = null;
   }
-  if (typeof stopAllPlayback === "function") stopAllPlayback();
   if (state.ttsAudio) {
     try {
       state.ttsAudio.pause();
@@ -942,9 +962,12 @@ function hardStopSpeech() {
     } catch (_) {}
     state.ttsAudio = null;
   }
-  if (state.liveClient) state.liveClient.interrupt();
   stopBargeInMonitor();
   stopSemanticBargeIn();
+  if (state.liveClient?.ready) {
+    const client = state.liveClient;
+    setTimeout(() => { client.interrupt(); }, 0);
+  }
 }
 
 function stopSpeaking() {
@@ -963,7 +986,8 @@ function stopBargeInMonitor() {
 
 function startBargeInMonitor() {
   stopBargeInMonitor();
-  if (!state.micStream || state.conversationMuted || state.mode !== "speaking") return;
+  if (!state.micStream || state.conversationMuted) return;
+  if (state.mode !== "speaking" && state.mode !== "thinking") return;
 
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx) return;
@@ -980,10 +1004,10 @@ function startBargeInMonitor() {
   state.bargeInAnalyser = analyser;
   state.bargeInSpeechMs = 0;
   state.bargeInNoiseFloor = 0.008;
-  state.bargeInCalibratingUntil = Date.now() + BARGE_IN.CALIBRATE_MS;
+  state.bargeInCalibratingUntil = Date.now() + BARGE_IN.RMS_CALIBRATE_MS;
 
   state.bargeInTimer = setInterval(() => {
-    if (state.mode !== "speaking") {
+    if (state.mode !== "speaking" && state.mode !== "thinking") {
       stopBargeInMonitor();
       return;
     }
@@ -998,25 +1022,26 @@ function startBargeInMonitor() {
     }
 
     const threshold = Math.max(
-      BARGE_IN.MIN_ABS_RMS,
-      state.bargeInNoiseFloor * BARGE_IN.NOISE_MULT,
+      BARGE_IN.RMS_MIN_ABS,
+      state.bargeInNoiseFloor * BARGE_IN.RMS_NOISE_MULT,
     );
 
     if (rms >= threshold) {
-      state.bargeInSpeechMs += BARGE_IN.POLL_MS;
-      if (state.bargeInSpeechMs >= BARGE_IN.SUSTAIN_MS) {
+      state.bargeInSpeechMs += BARGE_IN.RMS_POLL_MS;
+      if (state.bargeInSpeechMs >= BARGE_IN.RMS_SUSTAIN_MS) {
         state.bargeInSpeechMs = 0;
         state.bargeInCooldownUntil = now + BARGE_IN.COOLDOWN_MS;
         interruptAndListen();
       }
     } else {
-      state.bargeInSpeechMs = Math.max(0, state.bargeInSpeechMs - BARGE_IN.DECAY_MS);
+      state.bargeInSpeechMs = Math.max(0, state.bargeInSpeechMs - BARGE_IN.RMS_DECAY_MS);
     }
-  }, BARGE_IN.POLL_MS);
+  }, BARGE_IN.RMS_POLL_MS);
 }
 
 function interruptAndListen() {
-  if (state.interruptInFlight || state.mode === "listening") return;
+  if (state.mode === "listening") return;
+  if (state.interruptInFlight) return;
   state.interruptInFlight = true;
   state.conversationActive = true;
   hardStopSpeech();
@@ -2186,7 +2211,7 @@ async function initLiveSession() {
   };
 
   state.liveClient.onBargeInPartial = (text, isFinal) => {
-    if (state.mode !== "speaking") return;
+    if (state.mode !== "speaking" && state.mode !== "thinking") return;
     if (Date.now() - state.speakingStartedAt < BARGE_IN.GRACE_AFTER_SPEAK_MS) return;
     if (Date.now() < state.bargeInCooldownUntil) return;
     if (!looksLikeUserBargeIn(text, isFinal)) return;
@@ -2195,7 +2220,7 @@ async function initLiveSession() {
   };
 
   state.liveClient.onBargeInDetected = (text) => {
-    if (state.mode !== "speaking") return;
+    if (state.mode !== "speaking" && state.mode !== "thinking") return;
     if (Date.now() < state.bargeInCooldownUntil) return;
     if (!looksLikeUserBargeIn(text, true)) return;
     state.bargeInCooldownUntil = Date.now() + BARGE_IN.COOLDOWN_MS;
@@ -2215,7 +2240,7 @@ async function initLiveSession() {
       setStatusForMode("listening", truncateStatus(text, 48));
       return;
     }
-    if (state.mode === "speaking") {
+    if (state.mode === "speaking" || state.mode === "thinking") {
       if (looksLikeUserBargeIn(text, isFinal)) {
         if (Date.now() >= state.bargeInCooldownUntil
             && Date.now() - state.speakingStartedAt >= BARGE_IN.GRACE_AFTER_SPEAK_MS) {
@@ -2258,6 +2283,8 @@ async function initLiveSession() {
     const turnEpoch = state.currentTurnEpoch;
     state.wsTurnActive = true;
     state.sendingUtterance = false;
+    state.agentSpokenText = "";
+    state.speakingStartedAt = Date.now();
     stopListeningOnly();
     if (typeof stopAllPlayback === "function") stopAllPlayback();
     if (state.wsTurnSpeaker) {
@@ -2311,6 +2338,16 @@ async function initLiveSession() {
     }
     try {
       if (
+        turnEpoch !== state.activeTurnEpoch ||
+        turnEpoch !== state.currentTurnEpoch
+      ) {
+        if (state.wsTurnSpeaker) {
+          state.wsTurnSpeaker.abort();
+          state.wsTurnSpeaker = null;
+        }
+        return;
+      }
+      if (
         turnEpoch === state.currentTurnEpoch &&
         state.wsTurnSpeaker &&
         !state.conversationMuted &&
@@ -2323,6 +2360,7 @@ async function initLiveSession() {
         setMode("idle");
       }
     } catch (_) {
+      if (turnEpoch !== state.activeTurnEpoch) return;
       if (turnEpoch === state.currentTurnEpoch && turn?.answer && !state.conversationMuted) {
         await playTts(turn.answer);
       }
