@@ -33,6 +33,10 @@ _KEYTERM_STOPWORDS = frozenset({
     "a", "an", "and", "are", "as", "at", "be", "briefly", "by", "for", "from",
     "ignore", "in", "is", "it", "of", "on", "only", "or", "primary", "speaker",
     "that", "the", "this", "to", "transcribe", "with", "your",
+    "user", "may", "say", "hey", "wake", "voice", "assistant", "spoken", "english",
+    "accurately", "proper", "punctuation", "capitalization", "paragraph", "breaks",
+    "bullet", "points", "when", "lists", "expected", "vocabulary", "conversation",
+    "context", "accurate", "transcription", "follow", "ups", "previous", "utterance",
 })
 
 
@@ -283,6 +287,12 @@ class STTAdapter:
                 return await self._deepgram_request(
                     wav_bytes, "recording.wav", "audio/wav", model, language, prompt,
                 )
+            log.warning(
+                "STT: ffmpeg could not decode browser audio (%d bytes, %s) — not sending raw to Deepgram",
+                len(audio_bytes),
+                suffix,
+            )
+            raise ValueError("Couldn't decode that recording — please try again.")
 
         try:
             return await self._deepgram_request(
@@ -373,16 +383,28 @@ def _parse_deepgram_transcript(body: object) -> str:
 
 
 def _deepgram_keyterms_from_prompt(prompt: str, *, limit: int = 12) -> list[str]:
-    """Extract vocabulary hints for Deepgram keyterm boosting."""
-    words = re.findall(r"\b[A-Za-z][A-Za-z0-9_-]{2,}\b", prompt)
-    seen: set[str] = set()
+    """Extract vocabulary hints from the Expected vocabulary section of STT prompts."""
+    text = prompt or ""
+    vocab_section = ""
+    marker = "Expected vocabulary:"
+    if marker in text:
+        vocab_section = text.split(marker, 1)[1]
+    else:
+        vocab_section = text
+
     terms: list[str] = []
-    for word in words:
-        key = word.lower()
+    seen: set[str] = set()
+    for chunk in re.split(r"[,.\n;]", vocab_section):
+        token = chunk.strip()
+        if not token or len(token) < 2:
+            continue
+        key = token.lower()
         if key in _KEYTERM_STOPWORDS or key in seen:
             continue
+        if len(token) > 48:
+            token = token[:48]
         seen.add(key)
-        terms.append(word)
+        terms.append(token)
         if len(terms) >= limit:
             break
     return terms

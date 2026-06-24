@@ -23,15 +23,24 @@ DEEPGRAM_WS = "wss://api.deepgram.com/v1/listen"
 
 
 def _keywords_from_prompt(context_prompt: str | None) -> list[str]:
-    """Extract vocabulary hints for Deepgram keyword boosting."""
+    """Extract vocabulary hints from the Expected vocabulary section."""
     if not context_prompt:
         return []
+    text = context_prompt
+    marker = "Expected vocabulary:"
+    if marker in text:
+        text = text.split(marker, 1)[1]
+
+    stop = {
+        "expected", "vocabulary", "transcribe", "spoken", "english", "accurately",
+        "proper", "punctuation", "conversation", "context", "previous", "utterance",
+    }
     terms: list[str] = []
-    for chunk in re.split(r"[,.\n;]", context_prompt):
+    for chunk in re.split(r"[,.\n;]", text):
         token = chunk.strip()
         if not token or len(token) < 2:
             continue
-        if token.lower().startswith(("expected vocabulary", "conversation context", "transcribe")):
+        if token.lower() in stop:
             continue
         if len(token) > 48:
             token = token[:48]

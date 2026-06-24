@@ -26,6 +26,22 @@ MIME_TO_EXT = {
     "audio/opus": ".ogg",
 }
 
+_WAV_OUTPUT_ARGS = [
+    "-af", "highpass=f=80,lowpass=f=8000,volume=1.2",
+    "-ac", "1",
+    "-ar", "16000",
+    "-f", "wav",
+]
+
+# Browser MediaRecorder often yields truncated WebM — try several decode strategies.
+_FFMPEG_INPUT_STRATEGIES: list[list[str]] = [
+    ["-fflags", "+genpts+discardcorrupt", "-err_detect", "ignore_err"],
+    ["-probesize", "32M", "-analyzeduration", "32M", "-fflags", "+discardcorrupt"],
+    ["-f", "webm", "-fflags", "+discardcorrupt"],
+    ["-f", "matroska,webm", "-fflags", "+discardcorrupt"],
+    ["-err_detect", "ignore_err"],
+]
+
 
 def normalize_upload(content_type: str, filename: str) -> tuple[str, str]:
     """Map browser MIME quirks to STT-friendly type + filename."""
@@ -45,48 +61,88 @@ def input_suffix_for(content_type: str, filename: str) -> str:
     return ext if ext.startswith(".") else f".{ext}"
 
 
+def _looks_like_webm(audio_bytes: bytes) -> bool:
+    return len(audio_bytes) >= 4 and audio_bytes[:4] == b"\x1aE\xdf\xa3"
+
+
+def _ffmpeg_to_wav(
+    ffmpeg: str,
+    src: Path,
+    dst: Path,
+    input_args: list[str],
+) -> bytes | None:
+    try:
+        proc = subprocess.run(
+            [ffmpeg, "-y", *input_args, "-i", str(src), *_WAV_OUTPUT_ARGS, str(dst)],
+            capture_output=True,
+            timeout=120,
+            check=False,
+        )
+        if proc.returncode != 0 or not dst.exists():
+            return None
+        out = dst.read_bytes()
+        # WAV header is 44 bytes; require some PCM payload.
+        if len(out) < 128:
+            return None
+        return out
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        log.debug("ffmpeg attempt failed: %s", exc)
+        return None
+
+
 def convert_to_wav(audio_bytes: bytes, *, input_suffix: str = ".webm") -> bytes | None:
     """
     Convert arbitrary audio to 16kHz mono WAV via ffmpeg.
     Returns None if ffmpeg is unavailable or conversion fails.
     """
+    if len(audio_bytes) < 400:
+        log.debug("convert_to_wav: input too small (%d bytes)", len(audio_bytes))
+        return None
+
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         return None
 
+    suffix = input_suffix if input_suffix.startswith(".") else f".{input_suffix}"
+    if suffix == ".webm" and not _looks_like_webm(audio_bytes):
+        log.warning(
+            "convert_to_wav: missing WebM header (bytes=%d, head=%r)",
+            len(audio_bytes),
+            audio_bytes[:8],
+        )
+
     with tempfile.TemporaryDirectory() as tmp:
-        src = Path(tmp) / f"input{input_suffix}"
+        src = Path(tmp) / f"input{suffix}"
         dst = Path(tmp) / "output.wav"
         src.write_bytes(audio_bytes)
-        try:
-            proc = subprocess.run(
-                [
-                    ffmpeg,
-                    "-y",
-                    "-fflags", "+genpts+discardcorrupt",
-                    "-err_detect", "ignore_err",
-                    "-i", str(src),
-                    "-af", "highpass=f=80,lowpass=f=8000,volume=1.2",
-                    "-ac", "1",
-                    "-ar", "16000",
-                    "-f", "wav",
-                    str(dst),
-                ],
-                capture_output=True,
-                timeout=120,
-                check=False,
-            )
-            if proc.returncode != 0 or not dst.exists():
-                log.warning(
-                    "ffmpeg conversion failed (code=%s): %s",
-                    proc.returncode,
-                    proc.stderr.decode("utf-8", errors="replace")[:500],
+
+        last_code: int | None = None
+        last_stderr = ""
+        for input_args in _FFMPEG_INPUT_STRATEGIES:
+            dst.unlink(missing_ok=True)
+            try:
+                proc = subprocess.run(
+                    [ffmpeg, "-y", *input_args, "-i", str(src), *_WAV_OUTPUT_ARGS, str(dst)],
+                    capture_output=True,
+                    timeout=120,
+                    check=False,
                 )
-                return None
-            return dst.read_bytes()
-        except (subprocess.TimeoutExpired, OSError) as exc:
-            log.warning("ffmpeg conversion error: %s", exc)
-            return None
+                last_code = proc.returncode
+                last_stderr = proc.stderr.decode("utf-8", errors="replace")
+                if proc.returncode == 0 and dst.exists():
+                    out = dst.read_bytes()
+                    if len(out) >= 128:
+                        return out
+            except (subprocess.TimeoutExpired, OSError) as exc:
+                log.debug("ffmpeg strategy %s error: %s", input_args[:2], exc)
+
+        log.warning(
+            "ffmpeg conversion failed (code=%s, bytes=%d): %s",
+            last_code,
+            len(audio_bytes),
+            last_stderr[:500],
+        )
+        return None
 
 
 def convert_to_ogg_opus(audio_bytes: bytes, *, input_suffix: str = ".mp3") -> bytes | None:

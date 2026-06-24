@@ -1189,8 +1189,24 @@ async function stopListeningAndSend() {
         if (state.mode === "idle") return;
         setMode("idle");
         flashCaption("Didn't catch that — try again.", 2000);
+        if (state.conversationActive && !state.conversationMuted) {
+          void continueConversationAfterSpeak();
+        }
       }
     }, 28000);
+    return;
+  }
+
+  // Prefer live STT — don't upload a corrupt batch recording if WS is up but STT isn't ready yet.
+  if (state.liveClient?.ready && state.serverStreamingStt === false) {
+    state.sendingUtterance = false;
+    flashCaption("Reconnecting live speech…", 1600);
+    void state.liveClient.prepareListen().then((ok) => {
+      state.serverStreamingStt = !!ok;
+      if (ok && state.conversationActive) void startListening();
+    });
+    stopListeningOnly();
+    setMode("idle");
     return;
   }
 
@@ -1213,7 +1229,8 @@ async function stopListeningAndSend() {
   stopVadMonitor();
   state.sendingUtterance = false;
 
-  if (elapsed < 120 || !blob || blob.size < 600) {
+  if (elapsed < 120 || !blob || blob.size < 800) {
+    state.sendingUtterance = false;
     setMode("idle");
     flashCaption("Didn't catch that — try again.", 1400);
     if (state.conversationActive && !state.conversationMuted) {

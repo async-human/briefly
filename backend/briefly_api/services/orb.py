@@ -524,14 +524,23 @@ async def run_orb_turn(
                     context_prompt=context_prompt,
                 )
             ).strip()
-        except httpx.HTTPStatusError as exc:
-            log.warning(
-                "orb STT failed user=%s status=%s bytes=%d type=%s",
-                getattr(user, "id", None),
-                exc.response.status_code,
-                len(audio_bytes),
-                content_type,
-            )
+        except (httpx.HTTPStatusError, ValueError) as exc:
+            if isinstance(exc, httpx.HTTPStatusError):
+                log.warning(
+                    "orb STT failed user=%s status=%s bytes=%d type=%s",
+                    getattr(user, "id", None),
+                    exc.response.status_code,
+                    len(audio_bytes),
+                    content_type,
+                )
+            else:
+                log.warning(
+                    "orb STT failed user=%s decode bytes=%d type=%s: %s",
+                    getattr(user, "id", None),
+                    len(audio_bytes),
+                    content_type,
+                    exc,
+                )
             raise ValueError("Couldn't process that audio — please try again.") from exc
         timings["stt_ms"] = int((time.monotonic() - stt_started) * 1000)
 
@@ -819,12 +828,19 @@ async def stream_orb_turn(
                     context_prompt=context_prompt,
                 )
             ).strip()
-        except httpx.HTTPStatusError as exc:
-            log.warning(
-                "orb stream STT failed user=%s status=%s",
-                getattr(user, "id", None),
-                exc.response.status_code,
-            )
+        except (httpx.HTTPStatusError, ValueError) as exc:
+            if isinstance(exc, httpx.HTTPStatusError):
+                log.warning(
+                    "orb stream STT failed user=%s status=%s",
+                    getattr(user, "id", None),
+                    exc.response.status_code,
+                )
+            else:
+                log.warning(
+                    "orb stream STT failed user=%s decode: %s",
+                    getattr(user, "id", None),
+                    exc,
+                )
             raise ValueError("Couldn't process that audio — please try again.") from exc
         timings["stt_ms"] = int((time.monotonic() - stt_started) * 1000)
 

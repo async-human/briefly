@@ -29,10 +29,18 @@ router = APIRouter(tags=["orb"])
 _ACTIVE_TURNS: dict[str, asyncio.Task] = {}
 
 
-def _cancel_turn(session_id: str) -> None:
+async def _await_turn_cancel(session_id: str) -> None:
+    """Cancel an in-flight turn and wait for DB/session cleanup."""
     task = _ACTIVE_TURNS.pop(session_id, None)
-    if task and not task.done():
-        task.cancel()
+    if not task or task.done():
+        return
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    except Exception:
+        log.debug("turn task ended with error during cancel", exc_info=True)
 
 
 async def _send(ws: WebSocket, payload: dict[str, Any]) -> None:
@@ -154,7 +162,7 @@ async def _run_turn_stream(
             await stt_runtime.restart(ws, user, session, cancel_holder)
 
 
-def _schedule_turn(
+async def _schedule_turn(
     ws: WebSocket,
     user: User,
     session: OrbSessionState,
@@ -162,7 +170,7 @@ def _schedule_turn(
     cancel_holder: list[asyncio.Event],
     stt_runtime: SttRuntime,
 ) -> None:
-    _cancel_turn(session.session_id)
+    await _await_turn_cancel(session.session_id)
     cancel = asyncio.Event()
     cancel_holder[:] = [cancel]
     task = asyncio.create_task(
@@ -232,7 +240,7 @@ async def _handle_stt_event(
         return
 
     await _send(ws, {"type": "speech_final", "text": transcript})
-    _schedule_turn(ws, user, session, transcript, cancel_holder, stt_runtime)
+    await _schedule_turn(ws, user, session, transcript, cancel_holder, stt_runtime)
 
 
 @router.websocket("/orb/session/live")
@@ -296,7 +304,7 @@ async def orb_session_live(ws: WebSocket) -> None:
 
                 if ftype == "interrupt" and session:
                     cancel_holder[0].set()
-                    _cancel_turn(session.session_id)
+                    await _await_turn_cancel(session.session_id)
                     await _send(ws, {"type": "interrupted"})
                     continue
 
@@ -305,7 +313,7 @@ async def orb_session_live(ws: WebSocket) -> None:
                     continue
 
                 if ftype == "text_turn" and user and session:
-                    _schedule_turn(
+                    await _schedule_turn(
                         ws,
                         user,
                         session,
@@ -322,5 +330,5 @@ async def orb_session_live(ws: WebSocket) -> None:
         pass
     finally:
         if session:
-            _cancel_turn(session.session_id)
+            await _await_turn_cancel(session.session_id)
         await stt_runtime.stop()
