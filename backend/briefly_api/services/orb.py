@@ -419,6 +419,8 @@ def transcript_matches_wake_phrase(transcript: str) -> bool:
         "hey briefley",
         "hey brieflee",
         "hey breifly",
+        "hey bri",
+        "hi bri",
     )
     if any(p in norm for p in phrases):
         return True
@@ -426,6 +428,27 @@ def transcript_matches_wake_phrase(transcript: str) -> bool:
     for i, word in enumerate(words):
         if word in ("hey", "hi", "hay", "a") and "briefly" in words[i : i + 4]:
             return True
+        if word in ("hey", "hi", "hay") and i + 1 < len(words) and words[i + 1].startswith("bri"):
+            return True
+    return False
+
+
+def transcript_likely_wake_phrase(transcript: str) -> bool:
+    """Fuzzy wake match for partial STT — avoids missing clipped wake phrases."""
+    if transcript_matches_wake_phrase(transcript):
+        return True
+    norm = re.sub(r"[^\w\s]", " ", (transcript or "").lower())
+    norm = " ".join(norm.split())
+    if not norm or len(norm) > 32:
+        return False
+    if norm in ("briefly", "brieflee", "breifly", "briefley"):
+        return True
+    if norm.startswith("briefly ") and len(norm.split()) <= 3:
+        return True
+    if re.match(r"^(hey|hi|hay|a)\s+bri", norm):
+        return True
+    if "briefly" in norm.split() and len(norm.split()) <= 4:
+        return True
     return False
 
 
@@ -440,16 +463,10 @@ async def check_wake_phrase(
     """Transcribe a short wake clip; STT only — no agent turn."""
     if not audio_bytes or len(audio_bytes) < 200:
         return {"transcript": "", "wake": False}
-    stt = get_stt_adapter()
-    context_prompt = (
-        'The user may say "hey briefly" or "hi briefly" to wake a voice assistant.'
-    )
-    if db is not None and getattr(user, "id", None):
-        from briefly_api.stt.profile_context import transcription_prompt_for_user
+    from briefly_api.stt.wake_context import WAKE_STT_PROMPT
 
-        profile = await transcription_prompt_for_user(db, user.id)
-        if profile:
-            context_prompt = f"{context_prompt} {profile}"
+    stt = get_stt_adapter()
+    context_prompt = WAKE_STT_PROMPT
     try:
         transcript = (
             await stt.transcribe(
@@ -462,9 +479,12 @@ async def check_wake_phrase(
     except Exception as exc:
         log.warning("wake phrase STT failed: %s", exc)
         return {"transcript": "", "wake": False}
+    wake = transcript_matches_wake_phrase(transcript) or transcript_likely_wake_phrase(
+        transcript
+    )
     return {
         "transcript": transcript,
-        "wake": transcript_matches_wake_phrase(transcript),
+        "wake": wake,
     }
 
 

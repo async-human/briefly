@@ -9,8 +9,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from contextlib import aclosing
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -21,10 +22,21 @@ from briefly_api.services import orb as orb_service
 from briefly_api.services.orb_session import OrbSessionState, resolve_session
 from briefly_api.stt.profile_context import transcription_prompt_for_orb_turn
 from briefly_api.stt.streaming import DeepgramStreamSession, StreamTranscriptEvent, open_streaming_stt
+from briefly_api.stt.wake_context import (
+    BARGE_IN_ENDPOINTING_MS,
+    BARGE_IN_STT_PROMPT,
+    BARGE_IN_UTTERANCE_END_MS,
+    WAKE_ENDPOINTING_MS,
+    WAKE_KEYTERMS,
+    WAKE_STT_PROMPT,
+    WAKE_UTTERANCE_END_MS,
+)
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["orb"])
+
+ListenMode = Literal["conversation", "wake", "barge_in"]
 
 _ACTIVE_TURNS: dict[str, asyncio.Task] = {}
 
@@ -54,12 +66,30 @@ async def _send(ws: WebSocket, payload: dict[str, Any]) -> None:
     await ws.send_text(json.dumps(payload))
 
 
+def _looks_like_barge_in(transcript: str) -> bool:
+    norm = re.sub(r"[^\w\s]", " ", (transcript or "").lower())
+    norm = " ".join(norm.split())
+    if len(norm) < 4:
+        return False
+    words = norm.split()
+    if len(words) >= 2:
+        return True
+    return len(words) == 1 and len(norm) >= 5
+
+
+def _wake_match(transcript: str) -> bool:
+    return orb_service.transcript_matches_wake_phrase(
+        transcript
+    ) or orb_service.transcript_likely_wake_phrase(transcript)
+
+
 class SttRuntime:
-    """Manage Deepgram live STT lifecycle — active only while client is listening."""
+    """Manage Deepgram live STT lifecycle — mode-aware (conversation / wake / barge-in)."""
 
     def __init__(self) -> None:
         self.session: DeepgramStreamSession | None = None
         self.task: asyncio.Task | None = None
+        self.mode: ListenMode = "conversation"
         self._lock = asyncio.Lock()
 
     @property
@@ -80,12 +110,46 @@ class SttRuntime:
         if session is not None:
             await session.close()
 
+    async def _open_session(self, mode: ListenMode, user_id: str, session: OrbSessionState) -> bool:
+        settings = get_settings()
+        if not settings.orb_streaming_stt_enabled:
+            return False
+
+        if mode == "wake":
+            stt = await open_streaming_stt(
+                context_prompt=WAKE_STT_PROMPT,
+                extra_keywords=list(WAKE_KEYTERMS),
+                endpointing_ms=WAKE_ENDPOINTING_MS,
+                utterance_end_ms=WAKE_UTTERANCE_END_MS,
+            )
+        elif mode == "barge_in":
+            stt = await open_streaming_stt(
+                context_prompt=BARGE_IN_STT_PROMPT,
+                endpointing_ms=BARGE_IN_ENDPOINTING_MS,
+                utterance_end_ms=BARGE_IN_UTTERANCE_END_MS,
+            )
+        else:
+            async with SessionLocal() as db:
+                prompt = await transcription_prompt_for_orb_turn(
+                    db,
+                    user_id,
+                    session=session,
+                    thread_id=session.thread_id,
+                )
+            stt = await open_streaming_stt(context_prompt=prompt)
+
+        self.session = stt
+        self.mode = mode
+        return True
+
     async def start(
         self,
         ws: WebSocket,
         user_id: str,
         session: OrbSessionState,
         cancel_holder: list[asyncio.Event],
+        *,
+        mode: ListenMode = "conversation",
     ) -> bool:
         settings = get_settings()
         if not settings.orb_streaming_stt_enabled:
@@ -93,21 +157,15 @@ class SttRuntime:
         async with self._lock:
             await self.stop()
             try:
-                async with SessionLocal() as db:
-                    prompt = await transcription_prompt_for_orb_turn(
-                        db,
-                        user_id,
-                        session=session,
-                        thread_id=session.thread_id,
-                    )
-                stt = await open_streaming_stt(context_prompt=prompt)
-                self.session = stt
+                ok = await self._open_session(mode, user_id, session)
+                if not ok or self.session is None:
+                    return False
                 self.task = asyncio.create_task(
-                    _stt_listener(ws, stt, user_id, session, cancel_holder, self)
+                    _stt_listener(ws, self.session, user_id, session, cancel_holder, self)
                 )
                 return True
             except Exception as exc:
-                log.debug("streaming stt unavailable: %s", exc)
+                log.debug("streaming stt unavailable (%s): %s", mode, exc)
                 return False
 
     async def restart(
@@ -116,9 +174,15 @@ class SttRuntime:
         user_id: str,
         session: OrbSessionState,
         cancel_holder: list[asyncio.Event],
+        *,
+        mode: ListenMode | None = None,
     ) -> bool:
-        ok = await self.start(ws, user_id, session, cancel_holder)
-        await _send(ws, {"type": "stt_ready", "streaming_stt": ok})
+        listen_mode = mode or self.mode or "conversation"
+        ok = await self.start(ws, user_id, session, cancel_holder, mode=listen_mode)
+        await _send(
+            ws,
+            {"type": "stt_ready", "streaming_stt": ok, "listen_mode": listen_mode},
+        )
         return ok
 
 
@@ -220,6 +284,55 @@ async def _handle_stt_event(
     cancel_holder: list[asyncio.Event],
     stt_runtime: SttRuntime,
 ) -> None:
+    mode = stt_runtime.mode
+
+    if mode == "wake":
+        if ev.text:
+            if _wake_match(ev.text):
+                await _send(ws, {"type": "wake_detected", "text": ev.text})
+                await stt_runtime.stop()
+                return
+            await _send(
+                ws,
+                {
+                    "type": "partial_transcript" if not ev.is_final else "transcript",
+                    "text": ev.text,
+                    "is_final": ev.is_final,
+                },
+            )
+            if ev.is_final:
+                finals.append(ev.text)
+        if not ev.utterance_end:
+            return
+        transcript = " ".join(finals).strip()
+        finals.clear()
+        if transcript and _wake_match(transcript):
+            await _send(ws, {"type": "wake_detected", "text": transcript})
+        await stt_runtime.stop()
+        return
+
+    if mode == "barge_in":
+        if ev.text and len(ev.text.strip()) >= 3:
+            await _send(
+                ws,
+                {
+                    "type": "barge_in_partial",
+                    "text": ev.text,
+                    "is_final": ev.is_final,
+                },
+            )
+            if ev.is_final:
+                finals.append(ev.text)
+        if not ev.utterance_end:
+            return
+        transcript = " ".join(finals).strip()
+        finals.clear()
+        if _looks_like_barge_in(transcript):
+            await _send(ws, {"type": "barge_in_detected", "text": transcript})
+        await stt_runtime.stop()
+        return
+
+    # conversation mode
     if ev.text:
         await _send(
             ws,
@@ -238,7 +351,7 @@ async def _handle_stt_event(
     transcript = " ".join(finals).strip()
     finals.clear()
     if len(transcript) < 3:
-        await stt_runtime.restart(ws, user_id, session, cancel_holder)
+        await stt_runtime.restart(ws, user_id, session, cancel_holder, mode="conversation")
         return
 
     await _send(ws, {"type": "speech_final", "text": transcript})
@@ -300,7 +413,21 @@ async def orb_session_live(ws: WebSocket) -> None:
                     continue
 
                 if ftype == "prepare_listen" and user_id and session:
-                    await stt_runtime.restart(ws, user_id, session, cancel_holder)
+                    await stt_runtime.restart(
+                        ws, user_id, session, cancel_holder, mode="conversation"
+                    )
+                    continue
+
+                if ftype == "prepare_wake_listen" and user_id and session:
+                    await stt_runtime.restart(
+                        ws, user_id, session, cancel_holder, mode="wake"
+                    )
+                    continue
+
+                if ftype == "prepare_barge_in" and user_id and session:
+                    await stt_runtime.restart(
+                        ws, user_id, session, cancel_holder, mode="barge_in"
+                    )
                     continue
 
                 if ftype == "interrupt" and session:

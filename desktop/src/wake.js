@@ -26,14 +26,29 @@ function transcriptMatchesWakePhrase(text) {
     "hey briefley",
     "hey brieflee",
     "hey breifly",
+    "hey bri",
+    "hi bri",
   ];
   if (phrases.some((p) => norm.includes(p))) return true;
   const words = norm.split(" ");
   for (let i = 0; i < words.length; i += 1) {
     if (["hey", "hi", "hay", "a"].includes(words[i])) {
       if (words.slice(i, i + 4).includes("briefly")) return true;
+      if (words[i + 1] && words[i + 1].startsWith("bri")) return true;
     }
   }
+  return false;
+}
+
+/** Partial / clipped STT — e.g. "hey bri", "briefly" alone after silence. */
+function transcriptLikelyWakePhrase(text) {
+  if (transcriptMatchesWakePhrase(text)) return true;
+  const norm = normalizeWakeTranscript(text);
+  if (!norm || norm.length > 32) return false;
+  if (["briefly", "brieflee", "breifly", "briefley"].includes(norm)) return true;
+  if (norm.startsWith("briefly ") && norm.split(" ").length <= 3) return true;
+  if (/^(hey|hi|hay|a)\s+bri/.test(norm)) return true;
+  if (norm.split(" ").includes("briefly") && norm.split(" ").length <= 4) return true;
   return false;
 }
 
@@ -57,9 +72,9 @@ class MicWakeMonitor {
     this.chooseMimeType = options.chooseMimeType;
     this.isLinked = options.isLinked || null;
     this.verifyLinked = options.verifyLinked || null;
-    this.pollMs = options.pollMs ?? 72;
-    this.cooldownMs = options.cooldownMs ?? 2200;
-    this.maxClipMs = options.maxClipMs ?? 4000;
+    this.pollMs = options.pollMs ?? 56;
+    this.cooldownMs = options.cooldownMs ?? 1200;
+    this.maxClipMs = options.maxClipMs ?? 3500;
 
     this.active = false;
     this.pollTimer = null;
@@ -117,11 +132,11 @@ class MicWakeMonitor {
   }
 
   _startThreshold() {
-    return Math.max(0.009, this.noiseFloor * 2.8);
+    return Math.max(0.007, this.noiseFloor * 2.4);
   }
 
   _continueThreshold() {
-    return Math.max(0.007, this.noiseFloor * 1.9);
+    return Math.max(0.006, this.noiseFloor * 1.75);
   }
 
   _beginRecording() {
@@ -201,7 +216,7 @@ class MicWakeMonitor {
 
     const silenceMs = now - this.lastSpeechAt;
     const speechMs = this.lastSpeechAt - this.speechStartedAt;
-    if (silenceMs >= 480 && speechMs >= 240) {
+    if (silenceMs >= 360 && speechMs >= 180) {
       this.speechActive = false;
       void this._finishRecordingAndCheck();
     }
@@ -214,7 +229,7 @@ class MicWakeMonitor {
       const blob = await this._stopRecording();
       if (!blob || blob.size < 600) return;
       const result = await this.checkWake(blob);
-      if (result?.wake || transcriptMatchesWakePhrase(result?.transcript)) {
+      if (result?.wake || transcriptMatchesWakePhrase(result?.transcript) || transcriptLikelyWakePhrase(result?.transcript)) {
         this.cooldownUntil = Date.now() + this.cooldownMs;
         this.onWake(result?.transcript || "");
       }

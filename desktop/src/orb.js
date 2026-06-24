@@ -85,16 +85,10 @@ const VAD = {
 /** Pause before reopening the mic after the agent speaks (avoids echo). */
 const LISTEN_REOPEN_DELAY_MS = 150;
 
-/** Barge-in while agent speaks — tap orb always works; voice barge uses strict VAD. */
+/** Barge-in while agent speaks — STT-confirmed (not RMS-only). Tap/hotkey always works. */
 const BARGE_IN = {
-  POLL_MS: 80,
-  CALIBRATE_MS: 500,
-  GRACE_AFTER_SPEAK_MS: 2000,
-  NOISE_MULT: 4.2,
-  MIN_ABS_RMS: 0.032,
-  SUSTAIN_MS: 520,
-  DECAY_MS: 50,
-  COOLDOWN_MS: 1400,
+  GRACE_AFTER_SPEAK_MS: 450,
+  COOLDOWN_MS: 900,
 };
 
 /** If speech was heard but VAD never endpointed, force-send after this silence. */
@@ -162,11 +156,137 @@ const state = {
   bargeInCtx: null,
   bargeInSpeechMs: 0,
   bargeInCooldownUntil: 0,
-  bargeInNoiseFloor: 0.008,
-  bargeInCalibratingUntil: 0,
   speakingStartedAt: 0,
   interruptInFlight: false,
+  liveListenMode: null,
+  auxPcmCtx: null,
+  auxPcmNode: null,
+  agentSpokenText: "",
+  wakeListenActive: false,
+  bargeListenActive: false,
 };
+
+function wakePhraseMatched(transcript) {
+  return transcriptMatchesWakePhrase(transcript)
+    || (typeof transcriptLikelyWakePhrase === "function" && transcriptLikelyWakePhrase(transcript));
+}
+
+function isEchoOfAgentSpeech(text) {
+  const norm = normalizeCommandText(text);
+  if (!norm || !state.agentSpokenText) return false;
+  const agent = normalizeCommandText(state.agentSpokenText);
+  if (!agent) return false;
+  if (agent.includes(norm) && norm.length >= 4) return true;
+  const tail = agent.slice(-Math.min(agent.length, 48));
+  if (tail && norm.length >= 5 && tail.includes(norm)) return true;
+  const agentWords = agent.split(/\s+/).filter(Boolean);
+  const userWords = norm.split(/\s+/).filter(Boolean);
+  if (userWords.length >= 2 && agentWords.length >= 2) {
+    const overlap = userWords.filter((w) => agentWords.includes(w)).length;
+    if (overlap >= Math.min(userWords.length, 3)) return true;
+  }
+  return false;
+}
+
+function looksLikeUserBargeIn(text, isFinal) {
+  if (!text || isEchoOfAgentSpeech(text)) return false;
+  if (matchVoiceCommand(text)) return true;
+  if (wakePhraseMatched(text)) return true;
+  const norm = normalizeCommandText(text);
+  const words = norm.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return true;
+  if (isFinal && words.length >= 1 && norm.length >= 5) return true;
+  if (!isFinal && norm.length >= 8) return true;
+  return false;
+}
+
+function stopAuxPcmStream() {
+  if (state.auxPcmNode) {
+    try {
+      state.auxPcmNode.onaudioprocess = null;
+      state.auxPcmNode.disconnect();
+    } catch (_) {}
+    state.auxPcmNode = null;
+  }
+  state.wakeListenActive = false;
+  state.bargeListenActive = false;
+  state.liveListenMode = null;
+}
+
+function startAuxPcmStream(mode) {
+  stopAuxPcmStream();
+  if (!state.micStream || !state.liveClient?.ready || typeof float32To16kPcm !== "function") {
+    return;
+  }
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  if (!state.auxPcmCtx || state.auxPcmCtx.state === "closed") {
+    state.auxPcmCtx = new AudioCtx();
+  }
+  const ctx = state.auxPcmCtx;
+  if (ctx.state === "suspended") void ctx.resume();
+  const source = ctx.createMediaStreamSource(state.micStream);
+  const pcmNode = ctx.createScriptProcessor(2048, 1, 1);
+  const inputRate = ctx.sampleRate || 48000;
+  pcmNode.onaudioprocess = (ev) => {
+    if (!state.liveClient?.ready) return;
+    if (mode === "wake") {
+      if (state.liveListenMode !== "wake" || state.mode !== "idle") return;
+      if (!store.wakeEnabled || store.wakeMuted) return;
+    } else if (mode === "barge_in") {
+      if (state.liveListenMode !== "barge_in" || state.mode !== "speaking") return;
+      if (Date.now() - state.speakingStartedAt < BARGE_IN.GRACE_AFTER_SPEAK_MS) return;
+    } else {
+      return;
+    }
+    const input = ev.inputBuffer.getChannelData(0);
+    state.liveClient.sendAudio(float32To16kPcm(input, inputRate));
+  };
+  source.connect(pcmNode);
+  pcmNode.connect(ctx.destination);
+  state.auxPcmNode = pcmNode;
+  state.liveListenMode = mode;
+  if (mode === "wake") state.wakeListenActive = true;
+  if (mode === "barge_in") state.bargeListenActive = true;
+}
+
+async function startWakeListenStream() {
+  if (!store.wakeEnabled || store.wakeMuted || !isAccountLinked()) return;
+  if (state.mode !== "idle" || state.conversationActive) return;
+  if (!state.liveClient?.ready || !state.serverStreamingStt) return;
+  try {
+    await ensureMic();
+    const ok = await state.liveClient.prepareWakeListen();
+    if (!ok || state.mode !== "idle") return;
+    startAuxPcmStream("wake");
+  } catch (_) {}
+}
+
+function stopWakeListenStream() {
+  if (state.liveListenMode === "wake") stopAuxPcmStream();
+}
+
+async function startSemanticBargeIn() {
+  if (state.mode !== "speaking" || !state.liveClient?.ready || !state.serverStreamingStt) return;
+  try {
+    await ensureMic();
+    const ok = await state.liveClient.prepareBargeIn();
+    if (!ok || state.mode !== "speaking") return;
+    startAuxPcmStream("barge_in");
+  } catch (_) {}
+}
+
+function stopSemanticBargeIn() {
+  if (state.liveListenMode === "barge_in") stopAuxPcmStream();
+}
+
+function scheduleWakeListenRestart(delayMs = 400) {
+  setTimeout(() => {
+    if (state.mode === "idle" && store.wakeEnabled && !store.wakeMuted && !state.conversationActive) {
+      void startWakeListenStream();
+    }
+  }, delayMs);
+}
 
 function isAccountLinked() {
   return state.linkVerified;
@@ -715,14 +835,21 @@ function setMode(mode) {
     0.08;
   if (mode === "idle") {
     stopBargeInMonitor();
+    stopSemanticBargeIn();
     updateWakeStatus();
+    if (store.wakeEnabled && !store.wakeMuted && !state.conversationActive) {
+      void startWakeListenStream();
+    }
   } else {
+    stopWakeListenStream();
     setStatusForMode(mode);
     if (mode === "speaking") {
       state.speakingStartedAt = Date.now();
-      // Voice barge-in disabled — tap/hotkey only (background noise was false-triggering).
+      state.bargeInCooldownUntil = 0;
+      void ensureMic().then(() => startSemanticBargeIn()).catch(() => {});
     } else {
       stopBargeInMonitor();
+      stopSemanticBargeIn();
     }
   }
 }
@@ -794,6 +921,7 @@ function hardStopSpeech() {
   state.activeTurnEpoch += 1;
   state.sendingUtterance = false;
   state.wsTurnActive = false;
+  state.agentSpokenText = "";
   clearWsTurnWatchdog();
   abortHttpTurn("user");
   if (state.speakAbort) {
@@ -816,6 +944,7 @@ function hardStopSpeech() {
   }
   if (state.liveClient) state.liveClient.interrupt();
   stopBargeInMonitor();
+  stopSemanticBargeIn();
 }
 
 function stopSpeaking() {
@@ -1186,6 +1315,8 @@ async function startListening(options = {}) {
   const soft = !!options.soft;
   if (state.mode === "listening" && !afterInterrupt) return;
 
+  stopWakeListenStream();
+  stopSemanticBargeIn();
   if (soft) {
     stopListening();
   } else if (!afterInterrupt) {
@@ -1375,6 +1506,7 @@ async function applyVoiceCommand(cmd) {
       store.sessionId = "";
       stopCurrentTurn();
       flashCaption("Got it. Say \"hey briefly\" when you need me.", 2800);
+      scheduleWakeListenRestart(500);
       return;
     case "mute":
       state.conversationMuted = true;
@@ -1675,17 +1807,19 @@ function stopWakeWord() {
     TAURI.core.invoke("wakeword_stop").catch(() => {});
   }
   state.wakeBackend = "none";
+  stopWakeListenStream();
 }
 
 function onWakePhraseHeard(transcript) {
   if (state.mode === "listening") return;
-  const matched = transcriptMatchesWakePhrase(transcript);
+  const matched = wakePhraseMatched(transcript);
   if (state.mode === "speaking" || state.mode === "thinking") {
     if (matched) interruptAndListen();
     return;
   }
   if (state.mode !== "idle") return;
   if (!matched && transcript) return;
+  stopWakeListenStream();
   state.conversationActive = true;
   flashCaption("Wake word heard.", 900);
   void startListening();
@@ -1755,6 +1889,7 @@ async function startMicWakeWord() {
     isIdle: () => {
       if (!store.wakeEnabled || store.wakeMuted) return false;
       if (state.mode !== "idle") return false;
+      if (state.wakeListenActive) return false;
       return true;
     },
     measureRms: measureMicRms,
@@ -1767,6 +1902,7 @@ async function startMicWakeWord() {
   if (state.micWakeMonitor.active) {
     state.wakeBackend = "mic";
   }
+  void startWakeListenStream();
   updateWakeStatus();
 }
 
@@ -2034,10 +2170,36 @@ async function initLiveSession() {
 
   state.liveClient.onSessionReady = (frame) => {
     state.serverStreamingStt = !!frame.streaming_stt;
+    if (state.mode === "idle" && store.wakeEnabled && !store.wakeMuted) {
+      void startWakeListenStream();
+    }
   };
 
   state.liveClient.onSttReady = (frame) => {
     state.serverStreamingStt = !!frame.streaming_stt;
+    state.liveListenMode = frame.listen_mode || state.liveListenMode;
+  };
+
+  state.liveClient.onWakeDetected = (text) => {
+    onWakePhraseHeard(text || "hey briefly");
+    scheduleWakeListenRestart(600);
+  };
+
+  state.liveClient.onBargeInPartial = (text, isFinal) => {
+    if (state.mode !== "speaking") return;
+    if (Date.now() - state.speakingStartedAt < BARGE_IN.GRACE_AFTER_SPEAK_MS) return;
+    if (Date.now() < state.bargeInCooldownUntil) return;
+    if (!looksLikeUserBargeIn(text, isFinal)) return;
+    state.bargeInCooldownUntil = Date.now() + BARGE_IN.COOLDOWN_MS;
+    interruptAndListen();
+  };
+
+  state.liveClient.onBargeInDetected = (text) => {
+    if (state.mode !== "speaking") return;
+    if (Date.now() < state.bargeInCooldownUntil) return;
+    if (!looksLikeUserBargeIn(text, true)) return;
+    state.bargeInCooldownUntil = Date.now() + BARGE_IN.COOLDOWN_MS;
+    interruptAndListen();
   };
 
   state.liveClient.onDisconnected = () => {
@@ -2053,7 +2215,17 @@ async function initLiveSession() {
       setStatusForMode("listening", truncateStatus(text, 48));
       return;
     }
-    if (isFinal && (state.mode === "speaking" || state.mode === "thinking")) {
+    if (state.mode === "speaking") {
+      if (looksLikeUserBargeIn(text, isFinal)) {
+        if (Date.now() >= state.bargeInCooldownUntil
+            && Date.now() - state.speakingStartedAt >= BARGE_IN.GRACE_AFTER_SPEAK_MS) {
+          state.bargeInCooldownUntil = Date.now() + BARGE_IN.COOLDOWN_MS;
+          interruptAndListen();
+        }
+      }
+      return;
+    }
+    if (isFinal && state.mode === "thinking") {
       const cmd = matchVoiceCommand(text);
       if (cmd) {
         void applyVoiceCommand(cmd);
@@ -2061,11 +2233,10 @@ async function initLiveSession() {
       }
     }
     if (
-      state.mode !== "speaking" &&
-      (state.mode === "idle" || state.mode === "thinking") &&
+      state.mode === "idle" &&
       store.wakeEnabled &&
       !store.wakeMuted &&
-      transcriptMatchesWakePhrase(text)
+      wakePhraseMatched(text)
     ) {
       onWakePhraseHeard(text);
     }
@@ -2113,6 +2284,7 @@ async function initLiveSession() {
   };
 
   state.liveClient.onTurnDelta = (content) => {
+    if (content) state.agentSpokenText += content;
     if (state.wsTurnSpeaker && content && state.currentTurnEpoch === state.activeTurnEpoch) {
       state.wsTurnSpeaker.pushDelta(content);
     }

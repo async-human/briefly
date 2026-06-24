@@ -62,10 +62,21 @@ class StreamTranscriptEvent:
 class DeepgramStreamSession:
     """Deepgram live transcription session with an async event queue."""
 
-    def __init__(self, *, language: str = "en-US", context_prompt: str | None = None):
+    def __init__(
+        self,
+        *,
+        language: str = "en-US",
+        context_prompt: str | None = None,
+        extra_keywords: list[str] | None = None,
+        endpointing_ms: int | None = None,
+        utterance_end_ms: int | None = None,
+    ):
         self._settings = get_settings()
         self._language = language
         self._context_prompt = context_prompt
+        self._extra_keywords = extra_keywords or []
+        self._endpointing_ms = endpointing_ms
+        self._utterance_end_ms = utterance_end_ms
         self._ws = None
         self._queue: asyncio.Queue[StreamTranscriptEvent | None] = asyncio.Queue()
         self._reader_task: asyncio.Task | None = None
@@ -75,6 +86,9 @@ class DeepgramStreamSession:
             raise RuntimeError("DEEPGRAM_API_KEY is required for streaming STT")
         import websockets
 
+        endpointing = self._endpointing_ms or max(300, self._settings.deepgram_endpointing_ms)
+        utterance_end = self._utterance_end_ms or max(1600, self._settings.deepgram_utterance_end_ms)
+
         params: list[tuple[str, str]] = [
             ("model", self._settings.stt_model or "nova-2"),
             ("language", self._language),
@@ -83,13 +97,18 @@ class DeepgramStreamSession:
             ("channels", "1"),
             ("punctuate", "true"),
             ("interim_results", "true"),
-            ("endpointing", str(max(300, self._settings.deepgram_endpointing_ms))),
-            ("utterance_end_ms", str(max(1600, self._settings.deepgram_utterance_end_ms))),
+            ("endpointing", str(endpointing)),
+            ("utterance_end_ms", str(utterance_end)),
             ("vad_events", "true"),
             ("smart_format", "true"),
         ]
-        for term in _keywords_from_prompt(self._context_prompt):
-            params.append(("keywords", f"{quote(term, safe='')}:1.5"))
+        seen: set[str] = set()
+        for term in self._extra_keywords + _keywords_from_prompt(self._context_prompt):
+            key = term.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            params.append(("keywords", f"{quote(term, safe='')}:2.0"))
         url = f"{DEEPGRAM_WS}?{urlencode(params)}"
         self._ws = await websockets.connect(
             url,
@@ -166,10 +185,21 @@ class DeepgramStreamSession:
             yield ev
 
 
-async def open_streaming_stt(*, context_prompt: str | None = None) -> DeepgramStreamSession:
+async def open_streaming_stt(
+    *,
+    context_prompt: str | None = None,
+    extra_keywords: list[str] | None = None,
+    endpointing_ms: int | None = None,
+    utterance_end_ms: int | None = None,
+) -> DeepgramStreamSession:
     settings = get_settings()
     if not settings.orb_streaming_stt_enabled:
         raise RuntimeError("Streaming STT is disabled")
-    session = DeepgramStreamSession(context_prompt=context_prompt)
+    session = DeepgramStreamSession(
+        context_prompt=context_prompt,
+        extra_keywords=extra_keywords,
+        endpointing_ms=endpointing_ms,
+        utterance_end_ms=utterance_end_ms,
+    )
     await session.connect()
     return session

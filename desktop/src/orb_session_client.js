@@ -10,6 +10,7 @@ class OrbSessionClient {
     this.ws = null;
     this.ready = false;
     this.streamingStt = false;
+    this.listenMode = null;
     this.reconnectAttempts = 0;
     this.reconnectTimer = null;
     this.pingTimer = null;
@@ -24,6 +25,9 @@ class OrbSessionClient {
     this.onSpeechFinal = null;
     this.onSessionReady = null;
     this.onSttReady = null;
+    this.onWakeDetected = null;
+    this.onBargeInPartial = null;
+    this.onBargeInDetected = null;
     this.onError = null;
     this.onDisconnected = null;
   }
@@ -177,10 +181,19 @@ class OrbSessionClient {
     }
     if (type === "stt_ready") {
       this.streamingStt = !!frame.streaming_stt;
+      this.listenMode = frame.listen_mode || null;
       if (this.onSttReady) this.onSttReady(frame);
       if (this._prepareListenResolve) {
         this._prepareListenResolve(this.streamingStt);
         this._prepareListenResolve = null;
+      }
+      if (this._prepareWakeResolve) {
+        this._prepareWakeResolve(this.streamingStt);
+        this._prepareWakeResolve = null;
+      }
+      if (this._prepareBargeResolve) {
+        this._prepareBargeResolve(this.streamingStt);
+        this._prepareBargeResolve = null;
       }
       return;
     }
@@ -199,6 +212,20 @@ class OrbSessionClient {
     }
     if (type === "speech_final") {
       if (this.onSpeechFinal) this.onSpeechFinal(frame.text);
+      return;
+    }
+    if (type === "wake_detected") {
+      if (this.onWakeDetected) this.onWakeDetected(frame.text || "");
+      return;
+    }
+    if (type === "barge_in_partial") {
+      if (this.onBargeInPartial) {
+        this.onBargeInPartial(frame.text || "", !!frame.is_final);
+      }
+      return;
+    }
+    if (type === "barge_in_detected") {
+      if (this.onBargeInDetected) this.onBargeInDetected(frame.text || "");
       return;
     }
     if (type === "turn_start") {
@@ -238,16 +265,27 @@ class OrbSessionClient {
   }
 
   prepareListen() {
+    return this._prepareSttMode("prepare_listen", "_prepareListenResolve");
+  }
+
+  prepareWakeListen() {
+    return this._prepareSttMode("prepare_wake_listen", "_prepareWakeResolve");
+  }
+
+  prepareBargeIn() {
+    return this._prepareSttMode("prepare_barge_in", "_prepareBargeResolve");
+  }
+
+  _prepareSttMode(messageType, resolveKey) {
     if (!this.ready) return Promise.resolve(false);
     return new Promise((resolve) => {
-      if (this._prepareListenResolve) {
-        this._prepareListenResolve(false);
-      }
-      this._prepareListenResolve = resolve;
-      this.sendJson({ type: "prepare_listen" });
+      const prior = this[resolveKey];
+      if (prior) prior(false);
+      this[resolveKey] = resolve;
+      this.sendJson({ type: messageType });
       setTimeout(() => {
-        if (this._prepareListenResolve === resolve) {
-          this._prepareListenResolve = null;
+        if (this[resolveKey] === resolve) {
+          this[resolveKey] = null;
           resolve(this.streamingStt);
         }
       }, 4000);
@@ -271,5 +309,6 @@ class OrbSessionClient {
     }
     this.ready = false;
     this.streamingStt = false;
+    this.listenMode = null;
   }
 }
