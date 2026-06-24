@@ -1024,6 +1024,7 @@ async def ask_briefly(
     thread_id: str | None = None,
     content_id: str | None = None,
     digest_item_id: str | None = None,
+    voice: bool = False,
 ) -> dict:
     prepared = await _prepare_ask(
         db,
@@ -1034,12 +1035,22 @@ async def ask_briefly(
         digest_item_id=digest_item_id,
     )
 
+    system = _ASK_SYSTEM
+    max_tokens = 1200
+    if voice:
+        system = (
+            f"{_ASK_SYSTEM}\n\n"
+            "VOICE MODE: Reply in 2–5 short spoken sentences unless the user explicitly "
+            "asked for detail. No markdown, headings, or bullet lists — natural speech only."
+        )
+        max_tokens = 480
+
     llm = get_llm_adapter()
     response = await llm.complete(
         prepared.llm_messages,
-        system=_ASK_SYSTEM,
+        system=system,
         temperature=0.35,
-        max_tokens=1200,
+        max_tokens=max_tokens,
         user_id=user.id,
         agent="ask_briefly",
     )

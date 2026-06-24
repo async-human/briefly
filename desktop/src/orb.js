@@ -79,14 +79,20 @@ const VAD = {
   MAX_LISTEN_MS: 60000,
   MAX_LISTEN_NO_SPEECH_MS: 15000,
   MAX_POST_SPEECH_SILENCE_MS: 3200,
-  SPEECH_START_FRAMES: 3,
+  SPEECH_START_FRAMES: 2,
 };
 
 /** Pause before reopening the mic after the agent speaks (avoids echo + gives you time to start). */
-const LISTEN_REOPEN_DELAY_MS = 900;
+const LISTEN_REOPEN_DELAY_MS = 700;
 
 /** If speech was heard but VAD never endpointed, force-send after this silence. */
-const LISTEN_STUCK_SILENCE_MS = 3600;
+const LISTEN_STUCK_SILENCE_MS = 3200;
+
+/** Abort a stuck turn (listen → thinking with no response). */
+const TURN_TIMEOUT_MS = 75000;
+
+/** Stop auto-reopening mic after this many consecutive turn failures. */
+const MAX_TURN_FAILURE_RETRIES = 1;
 
 const state = {
   mode: "idle", // idle | listening | thinking | speaking
@@ -125,6 +131,9 @@ const state = {
   conversationActive: false,
   conversationMuted: false,
   lastAssistantAnswer: "",
+  turnFailureCount: 0,
+  playbackCtx: null,
+  playbackUnlocked: false,
 };
 
 function isAccountLinked() {
@@ -448,6 +457,24 @@ async function ensureOrbSession() {
 async function apiTurn(audioBlob, signal) {
   await ensureOrbSession();
   const mime = audioBlob.type || "audio/webm";
+  const filename = mime.includes("mp4") ? "turn.m4a" : "turn.webm";
+
+  // Web/mobile: multipart upload avoids base64 inflation (~33% smaller, faster).
+  if (!TAURI && typeof FormData !== "undefined") {
+    const form = new FormData();
+    form.append("audio", audioBlob, filename);
+    if (store.threadId) form.append("thread_id", store.threadId);
+    if (store.sessionId) form.append("session_id", store.sessionId);
+    form.append("surface", orbSurface());
+    const res = await apiFetch(store.apiBase + "/api/v1/orb/turn", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + store.token },
+      body: form,
+      signal,
+    });
+    return await parseApiJson(res, "Turn failed");
+  }
+
   const res = await apiFetch(store.apiBase + "/api/v1/orb/turn/json", {
     method: "POST",
     headers: {
@@ -457,7 +484,7 @@ async function apiTurn(audioBlob, signal) {
     body: JSON.stringify(turnJsonBody({
       audio_base64: await blobToBase64(audioBlob),
       content_type: mime,
-      filename: mime.includes("mp4") ? "turn.m4a" : "turn.webm",
+      filename,
     })),
     signal,
   });
@@ -490,6 +517,37 @@ async function apiSpeakToBlob(text, signal) {
   });
   if (!res.ok) throw new Error("Speak failed: HTTP " + res.status);
   return await readResponseBlob(res);
+}
+
+async function apiSpeakStreamToBlob(text, signal) {
+  const res = await apiFetch(store.apiBase + "/api/v1/orb/speak/stream", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + store.token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text }),
+    signal,
+  });
+  if (!res.ok) throw new Error("Speak stream failed: HTTP " + res.status);
+  return await readResponseBlob(res);
+}
+
+/** Unlock audio output after a user gesture (required on mobile Safari). */
+async function primeAudioPlayback() {
+  if (state.playbackUnlocked) return;
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!state.playbackCtx) state.playbackCtx = new AudioCtx();
+    if (state.playbackCtx.state === "suspended") await state.playbackCtx.resume();
+    const buffer = state.playbackCtx.createBuffer(1, 1, 22050);
+    const source = state.playbackCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(state.playbackCtx.destination);
+    source.start(0);
+    state.playbackUnlocked = true;
+  } catch (_) {}
 }
 
 function setMode(mode) {
@@ -855,6 +913,7 @@ async function startListening() {
   }
   if (state.mode === "listening") return;
   stopCurrentTurn();
+  void primeAudioPlayback();
   await showWindow();
   setMode("listening");
   state.audioChunks = [];
@@ -1017,9 +1076,12 @@ async function executeTurn(turnFactory) {
   setMode("thinking");
   const turnAbort = new AbortController();
   state.turnAbort = turnAbort;
+  const timeout = setTimeout(() => turnAbort.abort(), TURN_TIMEOUT_MS);
   try {
     const turn = await turnFactory(turnAbort.signal);
+    clearTimeout(timeout);
     state.turnAbort = null;
+    state.turnFailureCount = 0;
     applyTurnMeta(turn);
     const transcript = (turn?.transcript || "").trim();
     const voiceCmd = matchVoiceCommand(transcript);
@@ -1043,16 +1105,31 @@ async function executeTurn(turnFactory) {
     if (turnAbort.signal.aborted) return;
     await continueConversationAfterSpeak(turn);
   } catch (err) {
-    if (turnAbort.signal.aborted) return;
+    clearTimeout(timeout);
+    state.turnAbort = null;
+    if (turnAbort.signal.aborted) {
+      setMode("idle");
+      flashCaption("That took too long — try again.", 2800);
+      return;
+    }
+    state.turnFailureCount += 1;
     setMode("idle");
     const msg = err instanceof Error ? err.message : "Turn failed.";
     if (/failed to fetch|networkerror/i.test(msg)) {
       flashCaption("Can't reach API — check connection.", 2800);
+    } else if (/playback|audio/i.test(msg)) {
+      flashCaption("Couldn't play audio — tap the orb and try again.", 3200);
     } else {
       flashCaption(truncateStatus(msg, 72), 2800);
     }
-    if (state.conversationActive && !state.conversationMuted) {
+    if (
+      state.conversationActive &&
+      !state.conversationMuted &&
+      state.turnFailureCount <= MAX_TURN_FAILURE_RETRIES
+    ) {
       await continueConversationAfterSpeak();
+    } else if (state.turnFailureCount > MAX_TURN_FAILURE_RETRIES) {
+      flashCaption("Tap the orb when you're ready to talk.", 2800);
     }
   }
 }
@@ -1060,16 +1137,32 @@ async function executeTurn(turnFactory) {
 async function playTts(text) {
   const speakAbort = new AbortController();
   state.speakAbort = speakAbort;
-  setMode("speaking");
-  await playSentencePipeline({
-    text,
-    speakFn: apiSpeakToBlob,
-    signal: speakAbort.signal,
-    prefetch: 2,
-    onAudio: (audio) => {
-      state.ttsAudio = audio;
-    },
-  });
+  setMode("thinking");
+  setStatusForMode("thinking", "Preparing voice…");
+  let spoke = false;
+  try {
+    await playAnswerTts({
+      text,
+      speakFn: apiSpeakToBlob,
+      speakStreamFn: apiSpeakStreamToBlob,
+      signal: speakAbort.signal,
+      prefetch: 3,
+      onAudio: (audio) => {
+        state.ttsAudio = audio;
+      },
+      onSpeakingStart: () => {
+        if (!spoke) {
+          spoke = true;
+          setMode("speaking");
+        }
+      },
+    });
+  } catch (err) {
+    if (!speakAbort.signal.aborted) {
+      setMode("idle");
+      throw err;
+    }
+  }
   if (!speakAbort.signal.aborted) {
     setMode("idle");
   }
@@ -1650,6 +1743,7 @@ function init() {
 
   document.getElementById("orb-hit").addEventListener("click", (e) => {
     e.preventDefault();
+    void primeAudioPlayback();
     void primeWakeListening();
     toggleTalk();
   });

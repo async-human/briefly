@@ -67,7 +67,9 @@ async def _ask_handler(
     content_id: str | None = None,
     args: dict | None = None,
 ) -> dict:
-    result = await ask_briefly(db, user, transcript, thread_id=thread_id, content_id=content_id)
+    result = await ask_briefly(
+        db, user, transcript, thread_id=thread_id, content_id=content_id, voice=True
+    )
     assistant = result.get("assistant", {}) if isinstance(result, dict) else {}
     return {
         "answer": assistant.get("content", ""),
@@ -605,7 +607,9 @@ async def run_orb_turn(
 
     # ── Default: straight to the brain (open questions, no context, fallthrough)
     agent_started = time.monotonic()
-    result_data = await ask_briefly(db, user, transcript, thread_id=thread_id, content_id=content_id)
+    result_data = await ask_briefly(
+        db, user, transcript, thread_id=thread_id, content_id=content_id, voice=True
+    )
     timings["agent_ms"] = int((time.monotonic() - agent_started) * 1000)
     assistant = result_data.get("assistant", {}) if isinstance(result_data, dict) else {}
     answer = assistant.get("content", "")

@@ -19,7 +19,7 @@ class SpeechEndpointer {
     this.startMultiplier = options.startMultiplier ?? 3.0;
     this.continueMultiplier = options.continueMultiplier ?? 1.75;
     this.minSpeechRms = options.minSpeechRms ?? 0.008;
-    this.speechStartFrames = options.speechStartFrames ?? 3;
+    this.speechStartFrames = options.speechStartFrames ?? 2;
 
     this.noiseFloor = 0.004;
     this.calibratingUntil = 0;
