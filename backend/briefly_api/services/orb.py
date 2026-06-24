@@ -361,6 +361,7 @@ async def run_orb_turn(
             thread_id=resolved_thread,
             content_id=content_id,
             surface=surface,
+            session=session,
         )
         timings["agent_ms"] = int((time.monotonic() - exec_started) * 1000)
         timings["total_ms"] = int((time.monotonic() - started) * 1000)
@@ -377,6 +378,8 @@ async def run_orb_turn(
                 draft_id=payload.get("draft_id"),
                 last_tool=tool_name,
                 route_kind=str(payload.get("route_kind") or decision.kind),
+                last_answer=str(payload.get("answer") or "")[:4000],
+                tool_slots=dict(session.tool_slots or {}),
             )
         persisted = await _persist_orb_exchange(
             db,

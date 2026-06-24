@@ -18,6 +18,7 @@ from briefly_api.db.engine import SessionLocal
 from briefly_api.db.models import User
 from briefly_api.services.ask_briefly import ask_briefly, iter_ask_briefly_events
 from briefly_api.services.orb_intent import classify_orb_intent
+from briefly_api.services.orb_context import load_orb_tool_context, update_tool_slots_from_turn
 from briefly_api.services.orb_persona import chunk_for_streaming, polish_spoken_answer
 from briefly_api.services.orb_router import RouteDecision
 from briefly_api.services.orb_session import OrbSessionState, update_session_after_turn
@@ -109,12 +110,37 @@ async def _exec_tool(
     thread_id: str | None,
     content_id: str | None,
     args: dict | None = None,
+    session: OrbSessionState | None = None,
 ) -> dict:
+    ctx = await load_orb_tool_context(db, str(user.id), session, thread_id)
     out = await tool.handler(
-        db, user, transcript=transcript, thread_id=thread_id, content_id=content_id, args=args
+        db,
+        user,
+        transcript=transcript,
+        thread_id=thread_id,
+        content_id=content_id,
+        args=args,
+        orb_context=ctx,
     )
     answer = polish_spoken_answer(str(out.get("answer") or ""))
     return {"tool": tool.name, **out, "answer": answer, "ok": True}
+
+
+def _merge_session_context(
+    session: OrbSessionState | None,
+    tool_name: str | None,
+    transcript: str,
+    answer: str,
+    out: dict | None = None,
+) -> None:
+    if session is None or not tool_name:
+        return
+    update_tool_slots_from_turn(session, tool_name, transcript, answer)
+    extra = (out or {}).get("tool_slots")
+    if isinstance(extra, dict):
+        merged = dict(session.tool_slots or {})
+        merged.update(extra)
+        session.tool_slots = merged
 
 
 async def execute_routed_turn(
@@ -126,6 +152,7 @@ async def execute_routed_turn(
     thread_id: str | None,
     content_id: str | None,
     surface: str,
+    session: OrbSessionState | None = None,
 ) -> dict:
     """Run a pre-classified route and return a turn payload."""
     resolved_thread = thread_id
@@ -148,9 +175,10 @@ async def execute_routed_turn(
                 "route_kind": decision.kind,
                 "route_reason": decision.reason,
             }
-        out = await _exec_tool(tool, db, user, transcript, thread_id, content_id)
+        out = await _exec_tool(tool, db, user, transcript, thread_id, content_id, session=session)
         if out.get("thread_id"):
             resolved_thread = out["thread_id"]
+        _merge_session_context(session, tool.name, transcript, out.get("answer", ""), out)
         return {
             "transcript": transcript,
             "thread_id": out.get("thread_id") or resolved_thread,
@@ -339,6 +367,7 @@ async def iter_orb_turn_events(
                 transcript=transcript,
                 last_tool=tool_name,
                 route_kind="ask_briefly",
+                last_answer=answer[:4000],
             )
             if db is not None and user is not None:
                 persisted = await _persist_orb_exchange(
@@ -362,6 +391,7 @@ async def iter_orb_turn_events(
         thread_id=resolved_thread,
         content_id=content_id,
         surface=surface,
+        session=session,
     )
     timings["agent_ms"] = int((time.monotonic() - exec_started) * 1000)
     timings["total_ms"] = int((time.monotonic() - started) * 1000)
@@ -386,6 +416,8 @@ async def iter_orb_turn_events(
             draft_id=payload.get("draft_id"),
             last_tool=tool_name,
             route_kind=str(payload.get("route_kind") or decision.kind),
+            last_answer=str(payload.get("answer") or "")[:4000],
+            tool_slots=dict(session.tool_slots or {}),
         )
     persisted = await _persist_orb_exchange(
         db,

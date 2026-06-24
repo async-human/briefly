@@ -43,19 +43,41 @@ _FOLLOW_UP_RE = re.compile(
     re.IGNORECASE,
 )
 
+_ELLIPSIS_FOLLOWUP_RE = re.compile(
+    r"\b(any chance|will it|is there a chance|could it|might it)\b",
+    re.IGNORECASE,
+)
+
+# Tools that accept short elliptical follow-ups without repeating entities.
+_ELLIPSIS_TOOLS = frozenset(
+    {"weather", "calendar_upcoming", "gmail_search", "gmail_recent", "meeting_prep"}
+)
+
 
 def _affinity_tool(session: OrbSessionState | None, transcript: str) -> OrbTool | None:
     if not session or not session.last_tool:
         return None
-    patterns = _TOOL_AFFINITY.get(session.last_tool)
-    if not patterns:
-        return None
     text = (transcript or "").strip()
     if not text:
         return None
-    if not (_FOLLOW_UP_RE.search(text) or any(re.search(p, text, re.I) for p in patterns)):
-        return None
-    return _BY_NAME.get(session.last_tool)
+
+    patterns = _TOOL_AFFINITY.get(session.last_tool)
+    if patterns and (
+        _FOLLOW_UP_RE.search(text) or any(re.search(p, text, re.I) for p in patterns)
+    ):
+        return _BY_NAME.get(session.last_tool)
+
+    # Elliptical follow-up: "any chance of rain?" after a weather turn in Pune.
+    if session.last_tool in _ELLIPSIS_TOOLS:
+        words = text.split()
+        if len(words) <= 12 and (
+            _ELLIPSIS_FOLLOWUP_RE.search(text)
+            or (_FOLLOW_UP_RE.search(text) and len(words) <= 8)
+            or (text.endswith("?") and len(words) <= 10)
+        ):
+            return _BY_NAME.get(session.last_tool)
+
+    return None
 
 
 async def classify_orb_intent(

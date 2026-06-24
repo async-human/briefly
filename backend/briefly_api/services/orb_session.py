@@ -30,6 +30,8 @@ class OrbSessionState:
     last_transcript: str | None = None
     last_tool: str | None = None
     route_kind: str | None = None
+    tool_slots: dict[str, Any] = field(default_factory=dict)
+    last_answer: str | None = None
     updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -46,6 +48,8 @@ class OrbSessionState:
             last_transcript=data.get("last_transcript"),
             last_tool=data.get("last_tool"),
             route_kind=data.get("route_kind"),
+            tool_slots=dict(data.get("tool_slots") or {}),
+            last_answer=data.get("last_answer"),
             updated_at=str(data.get("updated_at") or datetime.now(timezone.utc).isoformat()),
         )
 
@@ -144,16 +148,22 @@ async def update_session_after_turn(
     draft_id: str | None = None,
     last_tool: str | None = None,
     route_kind: str | None = None,
+    last_answer: str | None = None,
+    tool_slots: dict[str, Any] | None = None,
 ) -> OrbSessionState:
     if thread_id:
         state.thread_id = thread_id
     if transcript:
         state.last_transcript = transcript[:2000]
+    if last_answer is not None:
+        state.last_answer = last_answer[:4000]
     if draft_id:
         state.active_email_draft_id = draft_id
     if last_tool:
         state.last_tool = last_tool
     if route_kind:
         state.route_kind = route_kind
+    if tool_slots is not None:
+        state.tool_slots = tool_slots
     await save_session(state)
     return state

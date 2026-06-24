@@ -231,29 +231,43 @@ async def weather_handler(
     thread_id: str | None = None,
     content_id: str | None = None,
     args: dict | None = None,
+    orb_context=None,
 ) -> dict:
+    from briefly_api.services.orb_context import (
+        load_orb_tool_context,
+        resolve_weather_location,
+        transcript_asks_about_rain,
+    )
     from briefly_api.services.weather import (
-        extract_weather_location,
         fetch_current_weather,
         format_weather_spoken,
     )
 
     profile = await _profile_for(user, db)
     meta = dict(getattr(profile, "profile_meta", None) or {})
-    location = extract_weather_location(transcript, args, meta)
+    ctx = orb_context
+    if ctx is None:
+        ctx = await load_orb_tool_context(db, str(user.id), None, thread_id, profile_meta=meta)
+
+    location = resolve_weather_location(transcript, args, ctx)
     if not location:
         return {
             "answer": "Which city should I check the weather for?",
             "citations": [],
             "expects_reply": True,
         }
-    weather = await fetch_current_weather(location)
+    rain_focus = transcript_asks_about_rain(transcript)
+    weather = await fetch_current_weather(location, include_rain=rain_focus)
     if not weather:
         return {
             "answer": f"I couldn't find weather for {location}. Try another city name.",
             "citations": [],
         }
-    return {"answer": format_weather_spoken(weather), "citations": []}
+    return {
+        "answer": format_weather_spoken(weather, rain_focus=rain_focus),
+        "citations": [],
+        "tool_slots": {"weather": {"location": weather["place"].split(",")[0].strip()}},
+    }
 
 
 async def user_preferences_handler(

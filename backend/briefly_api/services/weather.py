@@ -80,20 +80,24 @@ async def geocode_place(name: str) -> dict | None:
     }
 
 
-async def fetch_current_weather(location: str) -> dict | None:
+async def fetch_current_weather(location: str, *, include_rain: bool = False) -> dict | None:
     place = await geocode_place(location)
     if not place:
         return None
+    params: dict[str, str | int | float] = {
+        "latitude": place["latitude"],
+        "longitude": place["longitude"],
+        "current": "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,precipitation",
+        "timezone": place["timezone"],
+    }
+    if include_rain:
+        params["daily"] = "precipitation_probability_max,weather_code"
+        params["forecast_days"] = 1
     try:
         async with httpx.AsyncClient(timeout=12.0) as client:
             resp = await client.get(
                 "https://api.open-meteo.com/v1/forecast",
-                params={
-                    "latitude": place["latitude"],
-                    "longitude": place["longitude"],
-                    "current": "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m",
-                    "timezone": place["timezone"],
-                },
+                params=params,
             )
             resp.raise_for_status()
             data = resp.json()
@@ -106,19 +110,51 @@ async def fetch_current_weather(location: str) -> dict | None:
     temp = current.get("temperature_2m")
     humidity = current.get("relative_humidity_2m")
     wind = current.get("wind_speed_10m")
+    precip = current.get("precipitation")
     place_label = place["name"]
     if place.get("country"):
         place_label = f"{place['name']}, {place['country']}"
-    return {
+    out: dict = {
         "place": place_label,
         "description": label,
         "temperature_c": temp,
         "humidity_pct": humidity,
         "wind_kmh": wind,
+        "weather_code": code,
+        "precipitation_mm": precip,
     }
+    if include_rain:
+        daily = (data.get("daily") or {})
+        probs = daily.get("precipitation_probability_max") or []
+        codes = daily.get("weather_code") or []
+        if probs:
+            out["rain_chance_pct"] = int(probs[0])
+        if codes:
+            out["daily_weather_code"] = int(codes[0])
+    return out
 
 
-def format_weather_spoken(weather: dict) -> str:
+def format_weather_spoken(weather: dict, *, rain_focus: bool = False) -> str:
+    code = int(weather.get("weather_code") or 0)
+    rain_codes = {51, 53, 55, 61, 63, 65, 80, 81, 82, 95}
+    is_rainy = code in rain_codes
+
+    if rain_focus:
+        chance = weather.get("rain_chance_pct")
+        if chance is not None:
+            if chance >= 55 or is_rainy:
+                return (
+                    f"For {weather['place']}, there's about a {chance} percent chance of rain today"
+                    f" — looks {weather['description']} right now."
+                )
+            return (
+                f"For {weather['place']}, rain looks unlikely today — about {chance} percent chance."
+                f" It's {weather['description']} currently."
+            )
+        if is_rainy:
+            return f"Yes — {weather['place']} is seeing {weather['description']} right now."
+        return f"No significant rain in {weather['place']} right now — it's {weather['description']}."
+
     parts = [f"In {weather['place']}, it's {weather['description']}"]
     if weather.get("temperature_c") is not None:
         parts.append(f"around {round(float(weather['temperature_c']))} degrees Celsius")
