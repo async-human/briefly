@@ -6,6 +6,35 @@ const activePlaybackAudios = new Set();
 const activePlaybackCancels = new Set();
 let playbackEpoch = 0;
 
+/** Pinned orb voice — loaded from GET /orb/voice-config once per session. */
+const OrbTtsState = {
+  voice: null,
+  singleMax: 900,
+};
+
+async function loadOrbTtsConfig(fetchJson) {
+  try {
+    const cfg = await fetchJson("/api/v1/orb/voice-config");
+    if (cfg?.voice) {
+      OrbTtsState.voice = cfg.voice;
+      try { localStorage.setItem("briefly.orbVoice", cfg.voice); } catch (_) {}
+    }
+    if (cfg?.single_request_max_chars) {
+      OrbTtsState.singleMax = cfg.single_request_max_chars;
+    }
+  } catch (_) {
+    try {
+      OrbTtsState.voice = localStorage.getItem("briefly.orbVoice") || null;
+    } catch (_) {}
+  }
+}
+
+function orbSpeakPayload(text) {
+  const body = { text: String(text || "").trim() };
+  if (OrbTtsState.voice) body.voice = OrbTtsState.voice;
+  return body;
+}
+
 function stopAllPlayback() {
   playbackEpoch += 1;
   for (const cancel of activePlaybackCancels) {
@@ -133,7 +162,6 @@ async function playBlobAudio(blob, opts = {}) {
 async function playAnswerTts({
   text,
   speakFn,
-  speakStreamFn,
   signal,
   prefetch = 2,
   onAudio,
@@ -141,6 +169,7 @@ async function playAnswerTts({
 }) {
   const trimmed = String(text || "").trim();
   if (!trimmed) throw new Error("Nothing to speak");
+  if (!speakFn) throw new Error("No TTS function");
 
   let spoke = false;
   const markStart = () => {
@@ -150,32 +179,19 @@ async function playAnswerTts({
     }
   };
 
-  const playOne = async (chunk, fn) => {
-    const blob = await fn(chunk, signal);
+  const playOne = async (chunk) => {
+    const blob = await speakFn(chunk, signal);
     await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
   };
 
-  const synth = speakStreamFn || speakFn;
-  if (!synth) throw new Error("No TTS function");
-
-  // Short replies: one request — avoids sentence round-trip latency.
-  if (trimmed.length <= 360) {
-    try {
-      await playOne(trimmed, synth);
-      return;
-    } catch (err) {
-      if (speakFn && speakFn !== synth) {
-        await playOne(trimmed, speakFn);
-        return;
-      }
-      throw err;
-    }
+  if (trimmed.length <= OrbTtsState.singleMax) {
+    await playOne(trimmed);
+    return;
   }
 
   await playSentencePipeline({
     text: trimmed,
-    speakFn: synth,
-    fallbackSpeakFn: speakFn !== synth ? speakFn : null,
+    speakFn,
     signal,
     prefetch,
     onAudio,
@@ -191,7 +207,6 @@ async function playAnswerTts({
 async function playSentencePipeline({
   text,
   speakFn,
-  fallbackSpeakFn,
   signal,
   prefetch = 2,
   onAudio,
@@ -225,10 +240,7 @@ async function playSentencePipeline({
     ensure(i);
     for (let j = 1; j <= prefetch; j += 1) ensure(i + j);
 
-    let blob = await jobs[i];
-    if ((!blob || blob.size < 64) && fallbackSpeakFn) {
-      blob = await fallbackSpeakFn(sentences[i], signal).catch(() => null);
-    }
+    const blob = await jobs[i];
     if (!blob || blob.size < 64 || signal?.aborted) continue;
 
     await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
@@ -296,14 +308,12 @@ async function consumeSseResponse(response, onEvent, signal) {
 async function streamOrbTurnAndSpeak({
   response,
   speakFn,
-  speakStreamFn,
   signal,
   onAudio,
   onSpeakingStart,
   onMeta,
 }) {
-  const synth = speakStreamFn || speakFn;
-  if (!synth) throw new Error("No TTS function");
+  if (!speakFn) throw new Error("No TTS function");
 
   let fullText = "";
   let spokenUpTo = 0;
@@ -329,29 +339,14 @@ async function streamOrbTurnAndSpeak({
       if (signal?.aborted) return null;
       if (blob && blob.size >= 64) return blob;
     }
-    let blob = await synth(sentence, signal).catch(() => null);
-    if (signal?.aborted) return null;
-    if ((!blob || blob.size < 64) && speakFn && speakFn !== synth) {
-      blob = await speakFn(sentence, signal).catch(() => null);
-    }
+    const blob = await speakFn(sentence, signal).catch(() => null);
     if (signal?.aborted) return null;
     return blob && blob.size >= 64 ? blob : null;
   };
 
   const schedulePrefetch = (sentence) => {
     if (!prefetch.has(sentence)) {
-      prefetch.set(
-        sentence,
-        synth(sentence, signal)
-          .then((blob) => {
-            if (blob && blob.size >= 64) return blob;
-            if (speakFn && speakFn !== synth) {
-              return speakFn(sentence, signal).catch(() => null);
-            }
-            return null;
-          })
-          .catch(() => null),
-      );
+      prefetch.set(sentence, speakFn(sentence, signal).catch(() => null));
     }
   };
 
@@ -438,7 +433,6 @@ async function streamOrbTurnAndSpeak({
     await playAnswerTts({
       text: completeTurn.answer,
       speakFn,
-      speakStreamFn,
       signal,
       prefetch: 3,
       onAudio,
@@ -456,12 +450,10 @@ async function streamOrbTurnAndSpeak({
  */
 function createDeltaStreamingSpeaker({
   speakFn,
-  speakStreamFn,
   signal,
   onAudio,
   onSpeakingStart,
 }) {
-  const synth = speakStreamFn || speakFn;
   let fullText = "";
   let spokenUpTo = 0;
   let spoke = false;
@@ -485,29 +477,14 @@ function createDeltaStreamingSpeaker({
       if (aborted || signal?.aborted) return null;
       if (blob && blob.size >= 64) return blob;
     }
-    let blob = await synth(sentence, signal).catch(() => null);
-    if (aborted || signal?.aborted) return null;
-    if ((!blob || blob.size < 64) && speakFn && speakFn !== synth) {
-      blob = await speakFn(sentence, signal).catch(() => null);
-    }
+    const blob = await speakFn(sentence, signal).catch(() => null);
     if (aborted || signal?.aborted) return null;
     return blob && blob.size >= 64 ? blob : null;
   };
 
   const schedulePrefetch = (sentence) => {
     if (aborted || signal?.aborted || prefetch.has(sentence)) return;
-    prefetch.set(
-      sentence,
-      synth(sentence, signal)
-        .then((blob) => {
-          if (blob && blob.size >= 64) return blob;
-          if (speakFn && speakFn !== synth) {
-            return speakFn(sentence, signal).catch(() => null);
-          }
-          return null;
-        })
-        .catch(() => null),
-    );
+    prefetch.set(sentence, speakFn(sentence, signal).catch(() => null));
   };
 
   function enqueueNewSentences() {
@@ -574,7 +551,6 @@ function createDeltaStreamingSpeaker({
         await playAnswerTts({
           text: completeTurn.answer,
           speakFn,
-          speakStreamFn,
           signal,
           prefetch: 3,
           onAudio,

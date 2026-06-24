@@ -596,6 +596,8 @@ class OrbTurnOut(BaseModel):
     # by the ambient orb so it shows a tidy line, not the whole spoken body.
     display: str | None = None
     timings: dict[str, int] = Field(default_factory=dict)
+    route_kind: str | None = None
+    route_reason: str | None = None
 
 
 class OrbSessionIn(BaseModel):
@@ -614,6 +616,15 @@ class OrbWelcomeOut(BaseModel):
     script: str | None = None
     open_listen: bool = False
     user_name: str | None = None
+
+
+class OrbVoiceConfigOut(BaseModel):
+    voice: str
+    provider: str
+    format: str
+    enabled: bool
+    content_type: str | None = None
+    single_request_max_chars: int = 900
 
 
 class OrbWakeCheckOut(BaseModel):

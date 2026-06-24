@@ -24,6 +24,7 @@ from briefly_api.api.schemas import (
     OrbProactiveVoiceOut,
     OrbSessionIn,
     OrbSessionOut,
+    OrbVoiceConfigOut,
     OrbWelcomeOut,
     OrbSpeakIn,
     OrbTurnJsonIn,
@@ -88,6 +89,16 @@ async def orb_welcome(
 
     payload = await build_orb_welcome(db, user.id)
     return OrbWelcomeOut(**payload)
+
+
+@router.get("/orb/voice-config", response_model=OrbVoiceConfigOut)
+async def get_orb_voice_config(
+    user: User = Depends(get_capture_user),  # noqa: ARG001
+) -> OrbVoiceConfigOut:
+    """Pinned TTS voice identity for the orb client."""
+    from briefly_api.services.orb_voice import orb_voice_config
+
+    return OrbVoiceConfigOut(**orb_voice_config())
 
 
 @router.post("/orb/turn", response_model=OrbTurnOut)

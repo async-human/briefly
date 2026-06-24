@@ -1,0 +1,22 @@
+[
+  {"transcript": "what day is it today", "expect_tool": "current_datetime"},
+  {"transcript": "what's the weather in Mumbai", "expect_tool": "weather"},
+  {"transcript": "what are my interests", "expect_tool": "user_preferences"},
+  {"transcript": "read my briefing", "expect_tool": "today_brief"},
+  {"transcript": "what's on my calendar", "expect_tool": "calendar_upcoming"},
+  {"transcript": "check my inbox", "expect_tool": "gmail_recent"},
+  {"transcript": "search my email for invoices", "expect_tool": "gmail_search"},
+  {"transcript": "search the web for OpenAI news", "expect_tool": "web_search"},
+  {"transcript": "write a report on climate tech", "expect_tool": "compose_report"},
+  {"transcript": "what have I been reading about AI agents", "expect_kind": "ask_briefly"},
+  {"transcript": "draft an email to John about the meeting", "expect_tool": "draft_email"},
+  {"transcript": "remember to call mom tomorrow", "expect_tool": "capture_thought"},
+  {"transcript": "what time is it", "expect_tool": "current_datetime"},
+  {"transcript": "how's the weather", "expect_tool": "weather"},
+  {"transcript": "prep me for my meetings", "expect_tool": "meeting_prep"},
+  {"transcript": "anything important I should know", "expect_tool": "proactive_events"},
+  {"transcript": "what's in my saved queue", "expect_tool": "saved_queue"},
+  {"transcript": "research quantum computing and tell me later", "expect_tool": "start_research"},
+  {"transcript": "what do you know about me", "expect_tool": "user_preferences"},
+  {"transcript": "summarize the latest on EU AI regulation from my library", "expect_kind": "ask_briefly"}
+]

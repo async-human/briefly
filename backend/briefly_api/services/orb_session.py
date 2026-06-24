@@ -28,6 +28,8 @@ class OrbSessionState:
     surface: str = "desktop"
     active_email_draft_id: str | None = None
     last_transcript: str | None = None
+    last_tool: str | None = None
+    route_kind: str | None = None
     updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -42,6 +44,8 @@ class OrbSessionState:
             surface=str(data.get("surface") or "desktop"),
             active_email_draft_id=data.get("active_email_draft_id"),
             last_transcript=data.get("last_transcript"),
+            last_tool=data.get("last_tool"),
+            route_kind=data.get("route_kind"),
             updated_at=str(data.get("updated_at") or datetime.now(timezone.utc).isoformat()),
         )
 
@@ -138,6 +142,8 @@ async def update_session_after_turn(
     thread_id: str | None = None,
     transcript: str | None = None,
     draft_id: str | None = None,
+    last_tool: str | None = None,
+    route_kind: str | None = None,
 ) -> OrbSessionState:
     if thread_id:
         state.thread_id = thread_id
@@ -145,5 +151,9 @@ async def update_session_after_turn(
         state.last_transcript = transcript[:2000]
     if draft_id:
         state.active_email_draft_id = draft_id
+    if last_tool:
+        state.last_tool = last_tool
+    if route_kind:
+        state.route_kind = route_kind
     await save_session(state)
     return state

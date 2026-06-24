@@ -239,6 +239,8 @@ class Settings(BaseSettings):
     deepgram_endpointing_ms: int = 280
     deepgram_utterance_end_ms: int = 1050
     orb_plugin_modules: str = ""
+    orb_voice_max_steps: int = 3
+    orb_tts_single_request_max_chars: int = 900
 
     # ── Continuous enrichment worker ──────────────────────────────────────────
     # Runs every N hours; pre-computes memory connections + contradiction flags

@@ -351,6 +351,7 @@ function onAccountLinkedSuccess() {
   void primeWakeListening();
   void startWakeWord();
   void initLiveSession().then(() => maybeWelcomeAndListen());
+  void loadOrbTtsConfig((path) => apiGet(path));
 }
 
 async function fetchOrbWelcome() {
@@ -793,7 +794,6 @@ async function runOrbTurnWithStream(payload, signal) {
     const turn = await streamOrbTurnAndSpeak({
       response: res,
       speakFn: apiSpeakToBlob,
-      speakStreamFn: apiSpeakStreamToBlob,
       signal: speakAbort.signal,
       onAudio: (audio) => {
         state.ttsAudio = audio;
@@ -837,24 +837,10 @@ async function apiSpeakToBlob(text, signal) {
       Authorization: "Bearer " + store.token,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(orbSpeakPayload(text)),
     signal,
   });
   if (!res.ok) throw new Error("Speak failed: HTTP " + res.status);
-  return await readResponseBlob(res);
-}
-
-async function apiSpeakStreamToBlob(text, signal) {
-  const res = await apiFetch(store.apiBase + "/api/v1/orb/speak/stream", {
-    method: "POST",
-    headers: {
-      Authorization: "Bearer " + store.token,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ text }),
-    signal,
-  });
-  if (!res.ok) throw new Error("Speak stream failed: HTTP " + res.status);
   return await readResponseBlob(res);
 }
 
@@ -1701,6 +1687,7 @@ async function executeTurn(turnFactory) {
     const answer = (turn && turn.answer ? String(turn.answer) : "").trim();
     if (!answer) throw new Error("No answer");
     const trace = Array.isArray(turn?.tool_trace) ? turn.tool_trace : [];
+    showToolStatus({ tool_trace: trace, route_kind: turn?.route_kind });
     if (trace.length) {
       const names = trace.map((t) => String(t.tool || "")).filter(Boolean).join(" + ");
       if (names) setStatusForMode("thinking", truncateStatus(`Using ${names}`, 48));
@@ -1762,7 +1749,6 @@ async function playTts(text) {
     await playAnswerTts({
       text,
       speakFn: apiSpeakToBlob,
-      speakStreamFn: apiSpeakStreamToBlob,
       signal: speakAbort.signal,
       prefetch: 3,
       onAudio: (audio) => {
@@ -2114,6 +2100,23 @@ function setCaption(text) {
   el.classList.toggle("show", !!trimmed);
 }
 
+function showToolStatus(meta) {
+  if (!meta) return;
+  const tools = meta.route_tools;
+  const trace = meta.tool_trace;
+  let label = "";
+  if (Array.isArray(tools) && tools.length) {
+    label = tools.map((t) => String(t).replace(/_/g, " ")).join(" + ");
+  } else if (meta.route_kind && meta.route_kind !== "ask_briefly") {
+    label = String(meta.route_kind).replace(/_/g, " ");
+  } else if (Array.isArray(trace) && trace.length) {
+    label = trace.map((t) => String(t.tool || "").replace(/_/g, " ")).filter(Boolean).join(" + ");
+  }
+  if (label) {
+    setStatusForMode(state.mode, truncateStatus(`Using ${label}`, 48));
+  }
+}
+
 function setStatusForMode(mode, hint) {
   if (hint) {
     setCaption(hint);
@@ -2381,7 +2384,6 @@ async function initLiveSession() {
     state.speakAbort = speakAbort;
     state.wsTurnSpeaker = createDeltaStreamingSpeaker({
       speakFn: apiSpeakToBlob,
-      speakStreamFn: apiSpeakStreamToBlob,
       signal: speakAbort.signal,
       onAudio: (audio) => { state.ttsAudio = audio; },
       onSpeakingStart: () => {
@@ -2392,6 +2394,7 @@ async function initLiveSession() {
 
   state.liveClient.onTurnMeta = (meta) => {
     applyTurnMeta(meta);
+    showToolStatus(meta);
   };
 
   state.liveClient.onTurnDelta = (content) => {
@@ -2410,6 +2413,7 @@ async function initLiveSession() {
     }
 
     applyTurnMeta(turn);
+    showToolStatus(turn);
     const transcript = (turn?.transcript || "").trim();
     const voiceCmd = matchVoiceCommand(transcript);
     if (voiceCmd) {
@@ -2517,6 +2521,9 @@ function init() {
   setMode("idle");
   void ensureOrbSession();
   void initLiveSession();
+  if (store.token) {
+    void loadOrbTtsConfig((path) => apiGet(path));
+  }
 
   document.getElementById("orb-hit").addEventListener("click", (e) => {
     e.preventDefault();

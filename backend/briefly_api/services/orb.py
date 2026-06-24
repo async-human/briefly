@@ -5,16 +5,9 @@ Orchestration for the voice orb. One "turn" is: audio in → STT → route to a 
 (or the Ask Briefly brain) → text answer + citations. The client plays the
 answer via /orb/speak (TTS) so playback streams independently of reasoning.
 
-Routing is fast by default. Tools are declared once in `orb_tools.py`; here we
-only decide *which* to run:
-
-  - exactly one tool's fast-pattern matches  → run it directly (no planner call)
-  - no tool matches (an open question)        → Ask Briefly directly (no planner)
-  - two or more tools match (mixed intent)    → LLM planner decides + synthesizes
-
-So the planner LLM round-trip — pure overhead on the common path — only happens
-for genuinely ambiguous multi-intent turns. STT + brain are the only LLM hops
-for the everyday "answer my question" / "read my brief" cases.
+Routing is handled by `classify_orb_intent` + `orb_turn_engine.execute_routed_turn`:
+direct tool calls for fast patterns, Ask Briefly for open questions, and a
+capped agent loop for multi-step tasks.
 
 Everything reuses provider-agnostic pieces: STT (stt.adapter), brain
 (ask_briefly), TTS (tts.adapter via the /orb/speak route).
@@ -35,12 +28,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.db.engine import SessionLocal
 
-from briefly_api.agent import AgentRuntime, ToolContext, ToolRegistry, from_orb_tool
-from briefly_api.config import get_settings
 from briefly_api.db.models import FollowUpThread, User
-from briefly_api.llm.adapter import Message, get_llm_adapter
-from briefly_api.services.ask_briefly import ask_briefly, iter_ask_briefly_events
-from briefly_api.services.orb_router import route_transcript
+from briefly_api.services.ask_briefly import ask_briefly
+from briefly_api.services.orb_intent import classify_orb_intent
 from briefly_api.services.orb_session import (
     OrbSessionState,
     resolve_session,
@@ -50,8 +40,6 @@ from briefly_api.services.orb_tools import DATA_TOOLS, OrbTool
 from briefly_api.stt.adapter import get_stt_adapter
 
 log = logging.getLogger(__name__)
-
-_MAX_TOOL_STEPS = 3
 
 
 # ── Ask Briefly as a registry tool ───────────────────────────────────────────
@@ -86,49 +74,6 @@ ASK_TOOL = OrbTool(
 )
 
 REGISTRY: list[OrbTool] = [*DATA_TOOLS, ASK_TOOL]
-_BY_NAME: dict[str, OrbTool] = {t.name: t for t in REGISTRY}
-
-
-# ── Execution helpers ────────────────────────────────────────────────────────
-
-
-async def _exec_tool(
-    tool: OrbTool,
-    db: AsyncSession,
-    user: User,
-    transcript: str,
-    thread_id: str | None,
-    content_id: str | None,
-    args: dict | None = None,
-) -> dict:
-    out = await tool.handler(
-        db, user, transcript=transcript, thread_id=thread_id, content_id=content_id, args=args
-    )
-    return {"tool": tool.name, **out}
-
-
-def _merge_citations(tool_outputs: list[dict]) -> list[dict]:
-    seen: set[tuple[str, str]] = set()
-    merged: list[dict] = []
-    for out in tool_outputs:
-        for c in out.get("citations", []) or []:
-            key = (str(c.get("content_id") or ""), str(c.get("title") or ""))
-            if key in seen:
-                continue
-            seen.add(key)
-            merged.append(c)
-    return merged
-
-
-def _tool_trace(tool_outputs: list[dict]) -> list[dict]:
-    return [
-        {
-            "tool": out.get("tool"),
-            "answer_chars": len(str(out.get("answer") or "")),
-            "citations_count": len(out.get("citations") or []),
-        }
-        for out in tool_outputs
-    ]
 
 
 async def _thread_message_count(
@@ -198,141 +143,6 @@ async def _persist_orb_exchange(
     return thread.id
 
 
-def _single_result(transcript: str, out: dict) -> dict:
-    return {
-        "transcript": transcript,
-        "thread_id": out.get("thread_id"),
-        "answer": out.get("answer", ""),
-        "citations": out.get("citations", []),
-        "tool_trace": _tool_trace([out]),
-        "expects_reply": bool(out.get("expects_reply")),
-        "display": out.get("display"),
-    }
-
-
-# ── LLM planner (only for ambiguous multi-intent turns) ──────────────────────
-
-
-async def _llm_plan_and_execute(
-    db: AsyncSession,
-    user: User,
-    transcript: str,
-    *,
-    thread_id: str | None,
-    content_id: str | None,
-) -> dict | None:
-    if db is None or not getattr(user, "id", None):
-        return None
-
-    llm = get_llm_adapter()
-    tool_lines = "\n".join(f"- {t.name}: {t.description}" for t in REGISTRY)
-    planner_system = (
-        "You are OrbPlanner. Select tools for a spoken assistant turn.\n"
-        'Return strict JSON: {"steps":[{"tool":"...","why":"..."}]}.\n'
-        f"Allowed tools: {', '.join(t.name for t in REGISTRY)}.\n"
-        "Use ask_briefly (the user's own sources) for open-ended questions — it is the default.\n"
-        "Use current_datetime for day/date/time. Use weather for weather questions.\n"
-        "Use web_search ONLY for explicit open-web requests or current external facts the corpus can't cover.\n"
-        "For multi-step goals (research + report + email), chain compose_report, draft_email, send_email.\n"
-        f"Max {_MAX_TOOL_STEPS} steps."
-    )
-    planner_user = f"User transcript: {transcript}\n\nTools:\n{tool_lines}"
-    try:
-        plan = await llm.complete_json(
-            [Message(role="user", content=planner_user)],
-            system=planner_system,
-            max_tokens=220,
-            user_id=user.id,
-            agent="orb_planner",
-        )
-    except Exception as exc:  # noqa: BLE001
-        log.debug("orb planner fallback: %s", exc)
-        return None
-
-    raw_steps = plan.get("steps") if isinstance(plan, dict) else None
-    if not isinstance(raw_steps, list) or not raw_steps:
-        return None
-
-    steps: list[tuple[str, dict | None]] = []
-    for step in raw_steps[:_MAX_TOOL_STEPS]:
-        if not isinstance(step, dict):
-            continue
-        name = str(step.get("tool") or "").strip()
-        if name in _BY_NAME:
-            args = step.get("args") if isinstance(step.get("args"), dict) else None
-            steps.append((name, args))
-    if not steps:
-        return None
-
-    tool_outputs: list[dict] = []
-    resolved_thread = thread_id
-    for name, args in steps:
-        out = await _exec_tool(_BY_NAME[name], db, user, transcript, resolved_thread, content_id, args)
-        if out.get("thread_id"):
-            resolved_thread = out["thread_id"]
-        tool_outputs.append(out)
-
-    if len(tool_outputs) == 1:
-        only = tool_outputs[0]
-        return {
-            "thread_id": only.get("thread_id") or resolved_thread,
-            "answer": only.get("answer", ""),
-            "citations": only.get("citations", []),
-            "tool_trace": _tool_trace(tool_outputs),
-        }
-
-    # Multiple tools → synthesize one concise spoken answer.
-    synthesis_system = (
-        "You are Briefly Orb. Synthesize multiple tool outputs into one concise spoken answer.\n"
-        'Return strict JSON: {"answer":"..."}. Keep it practical and direct.'
-    )
-    synthesis_payload = {
-        "user_query": transcript,
-        "tool_outputs": [
-            {"tool": o.get("tool"), "answer": o.get("answer", ""), "citations": o.get("citations", [])}
-            for o in tool_outputs
-        ],
-    }
-    final_answer = ""
-    try:
-        synth = await llm.complete_json(
-            [Message(role="user", content=json.dumps(synthesis_payload, ensure_ascii=False))],
-            system=synthesis_system,
-            max_tokens=320,
-            user_id=user.id,
-            agent="orb_synthesizer",
-        )
-        if isinstance(synth, dict):
-            final_answer = str(synth.get("answer") or "").strip()
-    except Exception as exc:  # noqa: BLE001
-        log.debug("orb synthesis fallback: %s", exc)
-    if not final_answer:
-        final_answer = " ".join(
-            part for part in (str(o.get("answer", "")).strip() for o in tool_outputs) if part
-        ).strip()
-    return {
-        "thread_id": resolved_thread,
-        "answer": final_answer,
-        "citations": _merge_citations(tool_outputs),
-        "tool_trace": _tool_trace(tool_outputs),
-    }
-
-
-# ── Agent runtime (the live brain for tasks) ─────────────────────────────────
-# A task — any act/write tool or a compound multi-tool goal — runs through the
-# plan→execute→observe loop: it picks tools, chains them, and asks the user a
-# follow-up only when information is genuinely missing. Quick single reads skip
-# this (they go direct) so voice latency stays low.
-
-
-def _agent_registry() -> ToolRegistry:
-    registry = ToolRegistry([from_orb_tool(t) for t in REGISTRY])
-    from briefly_api.agent.plugins import load_plugin_tools
-
-    load_plugin_tools(registry)
-    return registry
-
-
 async def _persist_agent_run(
     user_id: str, goal: str, result, duration_ms: int
 ) -> None:
@@ -358,48 +168,6 @@ async def _persist_agent_run(
             await session.commit()
     except Exception:
         log.exception("agent run audit persist failed for user %s", user_id)
-
-
-async def _run_agent(
-    db: AsyncSession,
-    user: User,
-    transcript: str,
-    *,
-    thread_id: str | None,
-    content_id: str | None,
-) -> dict | None:
-    settings = get_settings()
-    runtime = AgentRuntime(_agent_registry(), max_steps=settings.agent_max_steps, allow_writes=True)
-    ctx = ToolContext(
-        db=db,
-        user=user,
-        settings=settings,
-        goal=transcript,
-        thread_id=thread_id,
-        content_id=content_id,
-    )
-    started = time.monotonic()
-    try:
-        result = await runtime.run(ctx)
-    except Exception:
-        log.exception("orb agent runtime failed — falling back")
-        return None
-    duration_ms = int((time.monotonic() - started) * 1000)
-
-    await _persist_agent_run(user.id, transcript, result, duration_ms)
-
-    answer = (result.answer or "").strip()
-    if not answer:
-        return None
-    # The agent is waiting on the user if it asked a question or paused for confirmation.
-    expects_reply = answer.endswith("?") or result.stopped_reason == "needs_confirmation"
-    return {
-        "thread_id": result.thread_id or thread_id,
-        "answer": answer,
-        "citations": result.citations,
-        "tool_trace": [{"tool": s.tool, "ok": s.ok} for s in result.steps if s.tool],
-        "expects_reply": expects_reply,
-    }
 
 
 # ── Public entrypoint ────────────────────────────────────────────────────────
@@ -569,80 +337,69 @@ async def run_orb_turn(
     if not transcript:
         raise ValueError("No speech detected — try again.")
 
-    route_started = time.monotonic()
-    # ── Routing ──────────────────────────────────────────────────────────────
     if db is not None and getattr(user, "id", None):
         resolved_thread = thread_id or (session.thread_id if session else None)
         thread_msg_count = await _thread_message_count(db, user.id, resolved_thread)
-        decision = await route_transcript(
+        route_started = time.monotonic()
+        decision = await classify_orb_intent(
             transcript,
             thread_message_count=thread_msg_count,
+            session=session,
             session_thread_id=session.thread_id if session else None,
             session_has_prior_turn=bool(session and session.last_transcript),
         )
         timings["route_ms"] = int((time.monotonic() - route_started) * 1000)
 
-        if decision.kind == "direct" and len(decision.tools) == 1:
-            agent_started = time.monotonic()
-            out = await _exec_tool(
-                decision.tools[0], db, user, transcript, resolved_thread, content_id
-            )
-            timings["agent_ms"] = int((time.monotonic() - agent_started) * 1000)
-            result = _single_result(transcript, out)
-            persisted = await _persist_orb_exchange(
-                db,
-                user.id,
-                out.get("thread_id") or resolved_thread,
-                transcript,
-                result.get("answer", ""),
-                citations=result.get("citations") or [],
-            )
-            if persisted:
-                result["thread_id"] = persisted
-            result["session_id"] = session.session_id if session else None
-            result["timings"] = timings
-            if session:
-                await update_session_after_turn(
-                    session,
-                    thread_id=result.get("thread_id"),
-                    transcript=transcript,
-                    draft_id=out.get("draft_id"),
-                )
-            return result
+        from briefly_api.services.orb_turn_engine import execute_routed_turn
 
-        if decision.kind == "agent":
-            agent_started = time.monotonic()
-            planned = await _run_agent(
-                db, user, transcript, thread_id=thread_id, content_id=content_id
-            )
-            timings["agent_ms"] = int((time.monotonic() - agent_started) * 1000)
-            if planned is not None:
-                payload = {"transcript": transcript, **planned}
-                payload["session_id"] = session.session_id if session else None
-                payload["timings"] = timings
-                if session:
-                    await update_session_after_turn(
-                        session,
-                        thread_id=payload.get("thread_id"),
-                        transcript=transcript,
-                    )
-                return payload
-            planned = await _llm_plan_and_execute(
-                db, user, transcript, thread_id=thread_id, content_id=content_id
-            )
-            if planned is not None:
-                payload = {"transcript": transcript, **planned}
-                payload["session_id"] = session.session_id if session else None
-                payload["timings"] = timings
-                if session:
-                    await update_session_after_turn(
-                        session,
-                        thread_id=payload.get("thread_id"),
-                        transcript=transcript,
-                    )
-                return payload
+        exec_started = time.monotonic()
+        payload = await execute_routed_turn(
+            db,
+            user,
+            transcript,
+            decision=decision,
+            thread_id=resolved_thread,
+            content_id=content_id,
+            surface=surface,
+        )
+        timings["agent_ms"] = int((time.monotonic() - exec_started) * 1000)
+        timings["total_ms"] = int((time.monotonic() - started) * 1000)
+        payload["timings"] = timings
+        payload["session_id"] = session.session_id if session else None
 
-    # ── Default: straight to the brain (open questions, no context, fallthrough)
+        trace = payload.get("tool_trace") or []
+        tool_name = trace[0].get("tool") if trace else None
+        if session:
+            await update_session_after_turn(
+                session,
+                thread_id=payload.get("thread_id"),
+                transcript=transcript,
+                draft_id=payload.get("draft_id"),
+                last_tool=tool_name,
+                route_kind=str(payload.get("route_kind") or decision.kind),
+            )
+        persisted = await _persist_orb_exchange(
+            db,
+            user.id,
+            payload.get("thread_id") or resolved_thread,
+            transcript,
+            payload.get("answer", ""),
+            citations=payload.get("citations") or [],
+        )
+        if persisted:
+            payload["thread_id"] = persisted
+
+        log.info(
+            "orb_turn user=%s route=%s reason=%s trace=%s ms=%s",
+            user.id,
+            payload.get("route_kind"),
+            payload.get("route_reason"),
+            [t.get("tool") for t in trace],
+            timings.get("total_ms"),
+        )
+        return payload
+
+    # ── Default: straight to the brain (no db / user context)
     agent_started = time.monotonic()
     result_data = await ask_briefly(
         db, user, transcript, thread_id=thread_id, content_id=content_id, voice=True
@@ -689,148 +446,22 @@ async def iter_orb_text_turn_events(
     started: float | None = None,
 ) -> AsyncIterator[dict]:
     """Stream structured turn events after transcript is known (HTTP SSE + WS)."""
-    from briefly_api.services.ask_briefly import _load_user_for_ask
+    from briefly_api.services.orb_turn_engine import iter_orb_turn_events
 
-    timings = timings if timings is not None else {}
-    started = started if started is not None else time.monotonic()
-    resolved_thread = thread_id or (session.thread_id if session else None)
-    uid = user_id or (str(user.id) if user and getattr(user, "id", None) else None)
-
-    yield {
-        "type": "meta",
-        "transcript": transcript,
-        "session_id": session.session_id if session else session_id,
-        "thread_id": resolved_thread,
-        "timings": timings,
-    }
-
-    if session:
-        await update_session_after_turn(session, transcript=transcript)
-
-    route_started = time.monotonic()
-    stream_ask = False
-    if uid:
-        if db is not None and user is not None:
-            thread_msg_count = await _thread_message_count(db, uid, resolved_thread)
-            decision = await route_transcript(
-                transcript,
-                thread_message_count=thread_msg_count,
-                session_thread_id=session.thread_id if session else None,
-                session_has_prior_turn=bool(session and session.last_transcript),
-            )
-            timings["route_ms"] = int((time.monotonic() - route_started) * 1000)
-            stream_ask = decision.kind == "ask_briefly" or (
-                decision.kind == "direct"
-                and len(decision.tools) == 1
-                and decision.tools[0].name == "ask_briefly"
-            )
-            if not stream_ask:
-                result = await run_orb_turn(
-                    db,
-                    user,
-                    text=transcript,
-                    thread_id=resolved_thread,
-                    content_id=content_id,
-                    session_id=session.session_id if session else session_id,
-                    surface=surface,
-                )
-                timings["total_ms"] = int((time.monotonic() - started) * 1000)
-                result["timings"] = {**result.get("timings", {}), **timings}
-                yield {"type": "complete", **result}
-                return
-        else:
-            async with SessionLocal() as route_db:
-                route_user = await _load_user_for_ask(route_db, uid)
-                thread_msg_count = await _thread_message_count(route_db, uid, resolved_thread)
-                decision = await route_transcript(
-                    transcript,
-                    thread_message_count=thread_msg_count,
-                    session_thread_id=session.thread_id if session else None,
-                    session_has_prior_turn=bool(session and session.last_transcript),
-                )
-                timings["route_ms"] = int((time.monotonic() - route_started) * 1000)
-                stream_ask = decision.kind == "ask_briefly" or (
-                    decision.kind == "direct"
-                    and len(decision.tools) == 1
-                    and decision.tools[0].name == "ask_briefly"
-                )
-                if not stream_ask:
-                    result = await run_orb_turn(
-                        route_db,
-                        route_user,
-                        text=transcript,
-                        thread_id=resolved_thread,
-                        content_id=content_id,
-                        session_id=session.session_id if session else session_id,
-                        surface=surface,
-                    )
-                    timings["total_ms"] = int((time.monotonic() - started) * 1000)
-                    result["timings"] = {**result.get("timings", {}), **timings}
-                    yield {"type": "complete", **result}
-                    return
-
-    if not uid or not stream_ask:
-        raise ValueError("Voice turn unavailable.")
-
-    ask_user = user
-    if ask_user is None:
-        async with SessionLocal() as ask_db:
-            ask_user = await _load_user_for_ask(ask_db, uid)
-
-    stream_thread_id = resolved_thread
-    answer_parts: list[str] = []
-    citations: list = []
-    async for event in iter_ask_briefly_events(
-        None,
-        ask_user,
+    async for event in iter_orb_turn_events(
+        db,
+        user,
         transcript,
-        thread_id=stream_thread_id,
+        user_id=user_id,
+        thread_id=thread_id,
         content_id=content_id,
-        voice=True,
+        session=session,
+        session_id=session_id,
+        surface=surface,
+        timings=timings,
+        started=started,
     ):
-        event_type = event.get("type")
-        if event_type == "thread_id" and event.get("thread_id"):
-            stream_thread_id = event["thread_id"]
-            if session:
-                session.thread_id = stream_thread_id
-                await update_session_after_turn(session, thread_id=stream_thread_id)
-            yield {
-                "type": "meta",
-                "transcript": transcript,
-                "session_id": session.session_id if session else session_id,
-                "thread_id": stream_thread_id,
-                "timings": timings,
-            }
-        elif event_type == "delta":
-            delta = str(event.get("content") or "")
-            if delta:
-                answer_parts.append(delta)
-                yield {"type": "delta", "content": delta}
-        elif event_type == "done":
-            citations = event.get("citations") or []
-            if event.get("answer"):
-                answer_parts = [str(event["answer"])]
-
-    answer = "".join(answer_parts).strip()
-    timings["total_ms"] = int((time.monotonic() - started) * 1000)
-    complete = {
-        "type": "complete",
-        "transcript": transcript,
-        "thread_id": stream_thread_id,
-        "session_id": session.session_id if session else session_id,
-        "answer": answer,
-        "citations": citations,
-        "tool_trace": [{"tool": "ask_briefly"}],
-        "expects_reply": bool(answer.endswith("?")),
-        "timings": timings,
-    }
-    if session:
-        await update_session_after_turn(
-            session,
-            thread_id=stream_thread_id,
-            transcript=transcript,
-        )
-    yield complete
+        yield event
 
 
 async def stream_orb_turn(
