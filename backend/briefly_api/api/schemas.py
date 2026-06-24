@@ -609,6 +609,13 @@ class OrbSessionOut(BaseModel):
     thread_id: str | None = None
 
 
+class OrbWelcomeOut(BaseModel):
+    speak: bool
+    script: str | None = None
+    open_listen: bool = False
+    user_name: str | None = None
+
+
 class OrbWakeCheckOut(BaseModel):
     transcript: str
     wake: bool

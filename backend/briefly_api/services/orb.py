@@ -231,7 +231,9 @@ async def _llm_plan_and_execute(
         'Return strict JSON: {"steps":[{"tool":"...","why":"..."}]}.\n'
         f"Allowed tools: {', '.join(t.name for t in REGISTRY)}.\n"
         "Use ask_briefly (the user's own sources) for open-ended questions — it is the default.\n"
+        "Use current_datetime for day/date/time. Use weather for weather questions.\n"
         "Use web_search ONLY for explicit open-web requests or current external facts the corpus can't cover.\n"
+        "For multi-step goals (research + report + email), chain compose_report, draft_email, send_email.\n"
         f"Max {_MAX_TOOL_STEPS} steps."
     )
     planner_user = f"User transcript: {transcript}\n\nTools:\n{tool_lines}"

@@ -23,8 +23,10 @@ from __future__ import annotations
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
+import pytz
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +35,19 @@ from briefly_api.services.browser_capture import list_recent_captures
 from briefly_api.utils.dates import local_date_string
 
 ToolHandler = Callable[..., Awaitable[dict]]
+
+
+async def _profile_for(user: User, db: AsyncSession | None):
+    profile = getattr(user, "profile", None)
+    if profile is not None or db is None or not getattr(user, "id", None):
+        return profile
+    from sqlalchemy.orm import selectinload
+
+    row = await db.execute(
+        select(User).options(selectinload(User.profile)).where(User.id == user.id)
+    )
+    loaded = row.scalar_one_or_none()
+    return loaded.profile if loaded else None
 
 
 @dataclass(frozen=True)
@@ -184,6 +199,200 @@ async def proactive_handler(
     return {"answer": " ".join(lines), "citations": cites}
 
 
+async def current_datetime_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    profile = await _profile_for(user, db)
+    tz_name = getattr(profile, "digest_timezone", None) or "UTC"
+    try:
+        tz = pytz.timezone(tz_name)
+    except Exception:
+        tz = pytz.UTC
+    now = datetime.now(timezone.utc).astimezone(tz)
+    spoken = now.strftime("%A, %B %d, %Y at %I:%M %p").lstrip("0").replace(" 0", " ")
+    tz_label = tz_name.replace("_", " ")
+    return {
+        "answer": f"It's {spoken} ({tz_label}).",
+        "citations": [],
+    }
+
+
+async def weather_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    from briefly_api.services.weather import (
+        extract_weather_location,
+        fetch_current_weather,
+        format_weather_spoken,
+    )
+
+    profile = await _profile_for(user, db)
+    meta = dict(getattr(profile, "profile_meta", None) or {})
+    location = extract_weather_location(transcript, args, meta)
+    if not location:
+        return {
+            "answer": "Which city should I check the weather for?",
+            "citations": [],
+            "expects_reply": True,
+        }
+    weather = await fetch_current_weather(location)
+    if not weather:
+        return {
+            "answer": f"I couldn't find weather for {location}. Try another city name.",
+            "citations": [],
+        }
+    return {"answer": format_weather_spoken(weather), "citations": []}
+
+
+async def user_preferences_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    profile = await _profile_for(user, db)
+    if profile is None:
+        return {"answer": "I don't have your profile yet — complete onboarding in the app.", "citations": []}
+
+    parts: list[str] = ["Here's what I know about your interests:"]
+    if profile.role:
+        parts.append(f"You've said you're a {profile.role}.")
+    interests = list(profile.interests or [])[:6]
+    topics = [str(i.get("topic") or "").strip() for i in interests if i.get("topic")]
+    if topics:
+        parts.append("Top topics: " + ", ".join(topics) + ".")
+    clusters = list(profile.topic_clusters or [])[:4]
+    cluster_names = [str(c.get("cluster") or "").strip() for c in clusters if c.get("cluster")]
+    if cluster_names:
+        parts.append("You've been reading a lot about " + ", ".join(cluster_names) + ".")
+    never = list(profile.never_show or [])[:4]
+    if never:
+        parts.append("You prefer to skip " + ", ".join(str(x) for x in never) + ".")
+    if len(parts) == 1:
+        parts.append("Your profile is still light — tell me what you care about and I'll remember.")
+    return {"answer": " ".join(parts), "citations": []}
+
+
+async def gmail_recent_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    from briefly_api.services.gmail_read import list_recent_emails
+
+    emails = await list_recent_emails(db, user.id, limit=5)
+    if not emails:
+        return {
+            "answer": "I couldn't read your inbox. Connect Gmail in Briefly settings first.",
+            "citations": [],
+        }
+    lines = ["Here are your latest emails:"]
+    cites: list[dict] = []
+    for i, em in enumerate(emails, start=1):
+        subj = em.get("subject") or "(no subject)"
+        sender = em.get("from") or "unknown sender"
+        lines.append(f"{i}. From {sender}: {subj}")
+        cites.append(
+            {
+                "ref": f"G{i}",
+                "title": subj,
+                "source_name": "Gmail",
+                "snippet": (em.get("snippet") or "")[:200],
+                "kind": "gmail",
+            }
+        )
+    return {"answer": " ".join(lines), "citations": cites}
+
+
+async def gmail_search_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    from briefly_api.services.gmail_read import extract_gmail_search_query, search_emails
+
+    query = extract_gmail_search_query(transcript, args)
+    if not query:
+        return {"answer": "What should I search your email for?", "citations": [], "expects_reply": True}
+    emails = await search_emails(db, user.id, query, limit=5)
+    if not emails:
+        return {
+            "answer": f"No emails matched “{query}”. Connect Gmail in settings if you haven't yet.",
+            "citations": [],
+        }
+    lines = [f"I found {len(emails)} email{'s' if len(emails) != 1 else ''} about {query}:"]
+    cites: list[dict] = []
+    for i, em in enumerate(emails, start=1):
+        subj = em.get("subject") or "(no subject)"
+        sender = em.get("from") or "unknown sender"
+        lines.append(f"{i}. From {sender}: {subj}")
+        cites.append(
+            {
+                "ref": f"G{i}",
+                "title": subj,
+                "source_name": "Gmail",
+                "snippet": (em.get("snippet") or "")[:200],
+                "kind": "gmail",
+            }
+        )
+    return {"answer": " ".join(lines), "citations": cites}
+
+
+async def compose_report_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    from briefly_api.services.orb_reports import compose_report, extract_report_goal
+
+    goal = extract_report_goal(transcript, args)
+    if not goal:
+        return {"answer": "What topic should I write the report on?", "citations": [], "expects_reply": True}
+    out = await compose_report(db, user, goal, thread_id=thread_id)
+    body = str(out.get("report_body") or "")
+    topic = str(out.get("report_topic") or goal)
+    if body:
+        from briefly_api.services.orb_report_cache import store_report
+
+        store_report(user.id, topic, body)
+    return {
+        "answer": out.get("answer", ""),
+        "citations": out.get("citations") or [],
+        "thread_id": out.get("thread_id"),
+        "display": out.get("display"),
+        "expects_reply": True,
+        "report_topic": out.get("report_topic"),
+        "report_body": out.get("report_body"),
+    }
+
+
 async def web_search_handler(
     db: AsyncSession,
     user: User,
@@ -221,9 +430,6 @@ async def web_search_handler(
                 "kind": "web_search",
             }
         )
-    return {"answer": " ".join(lines), "citations": cites}
-
-
     return {"answer": " ".join(lines), "citations": cites}
 
 
@@ -366,10 +572,18 @@ async def draft_email_handler(
     """Draft a grounded email. Creates a reviewable draft only — never sends.
     Sending stays behind the explicit review-card confirmation."""
     from briefly_api.services.email_drafts import compose_email_draft
+    from briefly_api.services.orb_report_cache import get_report
 
     instruction = ((args or {}).get("instruction") or transcript or "").strip()
     if not instruction:
         return {"answer": "What should the email say, and who's it for?", "citations": []}
+
+    cached = get_report(user.id)
+    if cached and re.search(r"\b(report|write-up|summary)\b", instruction, re.IGNORECASE):
+        instruction = (
+            f"Email the following report about {cached.get('topic', 'the topic')} to the recipient. "
+            f"Report body:\n{cached.get('body', '')}"
+        )
 
     draft = await compose_email_draft(db, user, instruction, content_id=content_id)
 
@@ -644,6 +858,76 @@ async def confirm_send_handler(
 
 DATA_TOOLS: list[OrbTool] = [
     OrbTool(
+        name="current_datetime",
+        description="Today's day of week, calendar date, and current local time for the user.",
+        handler=current_datetime_handler,
+        fast_patterns=(
+            re.compile(r"\b(what('s| is)?\s+)?(the\s+)?(day|date|time)\b", re.IGNORECASE),
+            re.compile(r"\bwhat day is (it|today)\b", re.IGNORECASE),
+            re.compile(r"\bwhat('s| is)?\s+today('s)?\s+date\b", re.IGNORECASE),
+            re.compile(r"\bwhat time is it\b", re.IGNORECASE),
+        ),
+    ),
+    OrbTool(
+        name="weather",
+        description="Current weather and forecast for a city — use for weather, temperature, rain, or forecast questions.",
+        handler=weather_handler,
+        fast_patterns=(
+            re.compile(r"\bweather\b", re.IGNORECASE),
+            re.compile(r"\b(temperature|forecast|rain|sunny|cloudy|humidity)\b", re.IGNORECASE),
+            re.compile(r"\bhow(?:'s| is)\s+the\s+weather\b", re.IGNORECASE),
+        ),
+        args_schema={"location": "city or place name"},
+    ),
+    OrbTool(
+        name="user_preferences",
+        description="Summarize the user's declared interests, role, topic clusters, and content preferences from their Briefly profile.",
+        handler=user_preferences_handler,
+        fast_patterns=(
+            re.compile(r"\b(my\s+)?(interests|preferences|topics)\b", re.IGNORECASE),
+            re.compile(r"\bwhat do (you|i) know about me\b", re.IGNORECASE),
+            re.compile(r"\bwhat am i (into|interested in)\b", re.IGNORECASE),
+        ),
+    ),
+    OrbTool(
+        name="gmail_recent",
+        description="Read the user's recent Gmail inbox messages (subjects and senders). Requires Gmail connected.",
+        handler=gmail_recent_handler,
+        fast_patterns=(
+            re.compile(r"\b(recent|latest|new)\s+(emails?|mail|messages?)\b", re.IGNORECASE),
+            re.compile(r"\b(check|read|show)\s+(my\s+)?(inbox|gmail|email)\b", re.IGNORECASE),
+            re.compile(r"\bany new emails?\b", re.IGNORECASE),
+        ),
+    ),
+    OrbTool(
+        name="gmail_search",
+        description="Search the user's Gmail for messages matching a topic, sender, or keyword.",
+        handler=gmail_search_handler,
+        fast_patterns=(
+            re.compile(r"\b(search|find)\s+(my\s+)?(email|emails|gmail|inbox)\b", re.IGNORECASE),
+            re.compile(r"\bemails?\s+(about|from|regarding)\b", re.IGNORECASE),
+        ),
+        args_schema={"query": "search terms"},
+    ),
+    OrbTool(
+        name="compose_report",
+        description=(
+            "Research a topic using the user's sources and the web, then write a detailed spoken report. "
+            "Use for 'write a report on X', 'research X and summarize'."
+        ),
+        handler=compose_report_handler,
+        side_effect="write",
+        fast_patterns=(
+            re.compile(
+                r"\b(write|compose|create|draft|prepare)\s+(?:a\s+)?(?:detailed\s+)?(?:report|summary|write-up)\b",
+                re.IGNORECASE,
+            ),
+            re.compile(r"\breport\s+(?:on|about)\b", re.IGNORECASE),
+            re.compile(r"\bresearch\b.{0,40}\b(and|then)\b.{0,20}\b(report|summarize|write)\b", re.IGNORECASE),
+        ),
+        args_schema={"topic": "report subject"},
+    ),
+    OrbTool(
         name="today_brief",
         description="Fetch today's briefing items and summarize key headlines.",
         handler=today_brief_handler,
@@ -694,7 +978,8 @@ DATA_TOOLS: list[OrbTool] = [
         side_effect="write",
         fast_patterns=(
             re.compile(r"\b(draft|write|compose)\b.{0,30}\b(e-?mail|note|message|reply)\b", re.IGNORECASE),
-            re.compile(r"\be-?mail\s+(to|him|her|them|my|the|a)\b", re.IGNORECASE),
+            re.compile(r"\be-?mail\s+(to|him|her|them|my|the|a|this)\b", re.IGNORECASE),
+            re.compile(r"\bemail\s+(this|the)\s+report\b", re.IGNORECASE),
         ),
         args_schema={"instruction": "what the email should say and to whom"},
     ),

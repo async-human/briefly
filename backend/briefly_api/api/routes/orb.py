@@ -24,6 +24,7 @@ from briefly_api.api.schemas import (
     OrbProactiveVoiceOut,
     OrbSessionIn,
     OrbSessionOut,
+    OrbWelcomeOut,
     OrbSpeakIn,
     OrbTurnJsonIn,
     OrbTurnOut,
@@ -75,6 +76,18 @@ async def orb_create_session(
         surface=body.surface or "desktop",
     )
     return OrbSessionOut(session_id=state.session_id, thread_id=state.thread_id)
+
+
+@router.get("/orb/welcome", response_model=OrbWelcomeOut)
+async def orb_welcome(
+    user: User = Depends(get_capture_user),
+    db: AsyncSession = Depends(get_db),
+) -> OrbWelcomeOut:
+    """Personalized spoken greeting when the voice orb session starts."""
+    from briefly_api.services.orb_welcome import build_orb_welcome
+
+    payload = await build_orb_welcome(db, user.id)
+    return OrbWelcomeOut(**payload)
 
 
 @router.post("/orb/turn", response_model=OrbTurnOut)

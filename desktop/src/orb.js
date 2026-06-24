@@ -172,7 +172,8 @@ const state = {
   liveListenMode: null,
   auxPcmCtx: null,
   auxPcmNode: null,
-  agentSpokenText: "",
+  welcomedThisLaunch: false,
+  userDisplayName: "",
   wakeListenActive: false,
   bargeListenActive: false,
 };
@@ -349,7 +350,40 @@ function onAccountLinkedSuccess() {
   updateLinkStatus();
   void primeWakeListening();
   void startWakeWord();
-  void initLiveSession();
+  void initLiveSession().then(() => maybeWelcomeAndListen());
+}
+
+async function fetchOrbWelcome() {
+  if (!store.token || !state.linkVerified) return null;
+  try {
+    await ensureOrbSession();
+    return await apiGet("/api/v1/orb/welcome");
+  } catch (_) {
+    return null;
+  }
+}
+
+async function maybeWelcomeAndListen() {
+  if (state.welcomedThisLaunch || state.conversationMuted) return;
+  if (!isAccountLinked() || !state.linkVerified) return;
+  if (state.mode !== "idle") return;
+  const welcome = await fetchOrbWelcome();
+  if (!welcome?.speak || !welcome.script) return;
+  state.welcomedThisLaunch = true;
+  state.conversationActive = true;
+  if (welcome.user_name) state.userDisplayName = welcome.user_name;
+  void primeAudioPlayback();
+  void showWindow();
+  setStatusForMode("speaking", "Briefly");
+  flashCaption(truncateStatus(welcome.script, 80), 5000);
+  try {
+    await playTts(welcome.script);
+  } catch (_) {
+    flashCaption(welcome.script, 5000);
+  }
+  if (welcome.open_listen && !state.conversationMuted) {
+    await continueConversationAfterSpeak();
+  }
 }
 
 async function ensureLiveSession() {
@@ -2251,8 +2285,11 @@ async function initLiveSession() {
 
   state.liveClient.onSessionReady = (frame) => {
     state.serverStreamingStt = !!frame.streaming_stt;
-    if (state.mode === "idle" && store.wakeEnabled && !store.wakeMuted) {
+    if (state.mode === "idle" && store.wakeEnabled && !store.wakeMuted && !state.conversationActive) {
       void startWakeListenStream();
+    }
+    if (state.linkVerified && !state.welcomedThisLaunch) {
+      void maybeWelcomeAndListen();
     }
   };
 
@@ -2594,6 +2631,7 @@ function init() {
         openSettings(true);
       } else {
         void startWakeWord();
+        void initLiveSession().then(() => maybeWelcomeAndListen());
       }
     });
   } else {
