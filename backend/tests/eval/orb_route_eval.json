@@ -18,5 +18,6 @@
   {"transcript": "what's in my saved queue", "expect_tool": "saved_queue"},
   {"transcript": "research quantum computing and tell me later", "expect_tool": "start_research"},
   {"transcript": "what do you know about me", "expect_tool": "user_preferences"},
-  {"transcript": "summarize the latest on EU AI regulation from my library", "expect_kind": "ask_briefly"}
+  {"transcript": "summarize the latest on EU AI regulation from my library", "expect_kind": "ask_briefly"},
+  {"transcript": "what are the most interesting articles we have about AI", "expect_kind": "ask_briefly", "expect_reason": "corpus_library"}
 ]

@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import re
 
-from briefly_api.services.orb_router import RouteDecision, regex_matches, route_transcript
+from briefly_api.services.corpus_queries import is_corpus_library_query, is_saved_queue_only_query
 from briefly_api.services.orb_session import OrbSessionState
 from briefly_api.services.orb_tools import DATA_TOOLS, OrbTool
 
@@ -92,6 +92,10 @@ async def classify_orb_intent(
     text = (transcript or "").strip()
     if not text:
         return RouteDecision(kind="ask_briefly", reason="empty")
+
+    # Library / article questions always go to RAG over the full corpus.
+    if is_corpus_library_query(text):
+        return RouteDecision(kind="ask_briefly", confidence=1.0, reason="corpus_library")
 
     matched = regex_matches(text)
     active_thread = thread_message_count > 0 or (

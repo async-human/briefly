@@ -954,7 +954,17 @@ DATA_TOOLS: list[OrbTool] = [
         description="Fetch saved/unread queue items the user has not read.",
         handler=saved_queue_handler,
         fast_patterns=(
-            re.compile(r"(?:saved|unread|reading\s+list|backlog|queue)", re.IGNORECASE),
+            re.compile(
+                r"\b(?:saved|unread)\s+(?:queue|list|backlog)\b",
+                re.IGNORECASE,
+            ),
+            re.compile(r"\breading\s+list\b", re.IGNORECASE),
+            re.compile(r"\bread(?:ing)?\s+(?:list|queue|backlog)\b", re.IGNORECASE),
+            re.compile(
+                r"\bwhat(?:'s| is)?\s+(?:in\s+)?(?:my\s+)?(?:saved|unread)\s+(?:queue|list|backlog)\b",
+                re.IGNORECASE,
+            ),
+            re.compile(r"\b(?:haven'?t|have not)\s+read\b", re.IGNORECASE),
         ),
     ),
     OrbTool(

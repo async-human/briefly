@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from briefly_api.config import get_settings
-from briefly_api.services.orb_tools import DATA_TOOLS, OrbTool
+from briefly_api.services.corpus_queries import is_corpus_library_query
 
 log = logging.getLogger(__name__)
 
@@ -72,6 +72,9 @@ async def route_transcript(
     text = (transcript or "").strip()
     if not text:
         return RouteDecision(kind="ask_briefly", reason="empty")
+
+    if is_corpus_library_query(text):
+        return RouteDecision(kind="ask_briefly", confidence=1.0, reason="corpus_library")
 
     matched = regex_matches(text)
 

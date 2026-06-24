@@ -36,7 +36,11 @@ from briefly_api.db.models import (
 )
 from briefly_api.embeddings.adapter import get_embedding_adapter
 from briefly_api.llm.adapter import Message, get_llm_adapter
-from briefly_api.services.browser_capture import list_recent_captures
+from briefly_api.services.corpus_queries import (
+    extract_topic_terms,
+    is_corpus_library_query,
+    is_saved_queue_only_query,
+)
 from briefly_api.services.profile_utils import cluster_label, iter_topic_clusters
 from briefly_api.services.url_scraper import UrlFetchError, scrape_url
 
@@ -63,7 +67,9 @@ _TODAY_BRIEF_QUERY = re.compile(
 _MAX_HISTORY = 8
 _MAX_RETRIEVAL_POOL = 250
 _MAX_CHUNKS = 8
+_MAX_CORPUS_CHUNKS = 12
 _MIN_SIMILARITY = 0.32
+_MIN_CORPUS_SIMILARITY = 0.24
 _SAVED_UNREAD_LIMIT = 12
 _ARTICLE_CHUNK_CHARS = 750
 _ARTICLE_CHUNK_OVERLAP = 120
@@ -214,7 +220,7 @@ def is_saved_unread_query(message: str) -> bool:
     text = message.strip()
     if _TODAY_BRIEF_QUERY.search(text):
         return False
-    return bool(_SAVED_UNREAD_QUERY.search(text))
+    return is_saved_queue_only_query(text)
 
 
 def is_today_brief_query(message: str) -> bool:
@@ -689,8 +695,9 @@ async def _semantic_retrieve(
     exclude_ids: set[str],
     never_show: list[str],
     limit: int,
+    min_similarity: float = _MIN_SIMILARITY,
 ) -> list[ContextChunk]:
-    max_distance = 1.0 - _MIN_SIMILARITY
+    max_distance = 1.0 - min_similarity
     distance_expr = ContentEmbedding.embedding.cosine_distance(query_embedding)
 
     stmt = (
@@ -743,6 +750,153 @@ async def _semantic_retrieve(
             )
         )
     return chunks
+
+
+async def _raw_to_context_chunk(
+    db: AsyncSession,
+    user_id: str,
+    raw: RawContent,
+    *,
+    never_show: list[str],
+) -> ContextChunk | None:
+    title = raw.title or "Untitled"
+    snippet = (raw.summary or raw.clean_text or "")[:900]
+    blob = f"{title} {snippet}"
+    if _never_show_block(blob, never_show):
+        return None
+    meta = raw.meta or {}
+    kind = "brain_dump" if meta.get("brain_dump") else "article"
+    source_name = None
+    if raw.source_id:
+        src = await db.get(Source, raw.source_id)
+        source_name = src.name if src else None
+    enrich = await db.execute(
+        select(ContentEnrichmentCache).where(
+            ContentEnrichmentCache.user_id == user_id,
+            ContentEnrichmentCache.content_id == raw.id,
+        )
+    )
+    enrichment = enrich.scalar_one_or_none()
+    if enrichment and enrichment.why_relevant:
+        snippet += f"\n\nWhy relevant: {enrichment.why_relevant}"
+    return ContextChunk(
+        ref="",
+        content_id=raw.id,
+        title=title,
+        url=raw.url,
+        source_name=source_name,
+        snippet=snippet,
+        kind=kind,
+    )
+
+
+async def _retrieve_library_by_keywords(
+    db: AsyncSession,
+    user_id: str,
+    terms: list[str],
+    *,
+    never_show: list[str],
+    limit: int,
+    exclude_ids: set[str] | None = None,
+) -> list[ContextChunk]:
+    """Title/summary keyword fallback when embeddings miss relevant articles."""
+    if not terms:
+        return []
+    exclude = exclude_ids or set()
+    stmt = (
+        select(RawContent)
+        .where(RawContent.user_id == user_id)
+        .order_by(RawContent.ingested_at.desc())
+        .limit(max(limit * 8, 40))
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    scored: list[tuple[int, RawContent]] = []
+    for raw in rows:
+        if raw.id in exclude:
+            continue
+        hay = f"{raw.title or ''} {raw.summary or ''} {raw.clean_text or ''}".lower()
+        hits = sum(1 for t in terms if t in hay)
+        if hits:
+            scored.append((hits, raw))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    chunks: list[ContextChunk] = []
+    for _, raw in scored[:limit]:
+        chunk = await _raw_to_context_chunk(db, user_id, raw, never_show=never_show)
+        if chunk:
+            chunks.append(chunk)
+    return chunks
+
+
+async def _retrieve_recent_library(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    never_show: list[str],
+    limit: int,
+    exclude_ids: set[str] | None = None,
+) -> list[ContextChunk]:
+    """Recent saved content when semantic/keyword retrieval returns nothing."""
+    exclude = exclude_ids or set()
+    stmt = (
+        select(RawContent)
+        .where(RawContent.user_id == user_id)
+        .order_by(RawContent.ingested_at.desc())
+        .limit(max(limit * 3, 24))
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    chunks: list[ContextChunk] = []
+    for raw in rows:
+        if raw.id in exclude or len(chunks) >= limit:
+            continue
+        chunk = await _raw_to_context_chunk(db, user_id, raw, never_show=never_show)
+        if chunk:
+            chunks.append(chunk)
+    return chunks
+
+
+async def _retrieve_corpus_library(
+    db: AsyncSession,
+    user_id: str,
+    message: str,
+    query_embedding: list[float],
+    *,
+    never_show: list[str],
+    limit: int = _MAX_CORPUS_CHUNKS,
+) -> list[ContextChunk]:
+    """Wide retrieval for questions about the user's overall article library."""
+    semantic = await _semantic_retrieve(
+        db,
+        user_id,
+        query_embedding,
+        exclude_ids=set(),
+        never_show=never_show,
+        limit=limit,
+        min_similarity=_MIN_CORPUS_SIMILARITY,
+    )
+    if len(semantic) >= max(4, limit // 2):
+        return semantic
+
+    terms = extract_topic_terms(message)
+    keyword = await _retrieve_library_by_keywords(
+        db,
+        user_id,
+        terms,
+        never_show=never_show,
+        limit=limit,
+        exclude_ids={c.content_id for c in semantic},
+    )
+    merged = semantic + keyword
+    if merged:
+        return merged[:limit]
+
+    recent = await _retrieve_recent_library(
+        db,
+        user_id,
+        never_show=never_show,
+        limit=limit,
+        exclude_ids={c.content_id for c in merged},
+    )
+    return recent[:limit]
 
 
 def _assign_refs(chunks: list[ContextChunk], start_index: int = 1) -> list[ContextChunk]:
@@ -813,7 +967,9 @@ You answer using ONLY the sources in the context pack, labeled [S1], [S2], etc.
 - Never mention that you are an AI or language model.
 - Never tell the user to check external apps (Reader, email, etc.) — Briefly IS their reading system.
 - When the pack is a SAVED/UNREAD INDEX, list each item by title with a short note on why it's unread. If the index is empty, say their saved queue is clear.
-- When the pack is a TODAY BRIEF INDEX, summarize today's briefing items first. If empty, clearly say today's briefing is not ready yet."""
+- When the pack is a TODAY BRIEF INDEX, summarize today's briefing items first. If empty, clearly say today's briefing is not ready yet.
+- When the pack is a LIBRARY INDEX, the user is asking about their saved articles/content overall. Summarize the most relevant items from the pack (2–5 for voice) with title and one concrete detail each. If the pack lists recent library items but none match the topic, say what you found and note the closest matches.
+- If the pack says there are no matching sources, tell the user honestly and suggest they save or ingest content on that topic."""
 
 
 def _is_referential_followup(message: str) -> bool:
@@ -852,8 +1008,15 @@ def _resolve_thread_anchor(
     if not cid and not tid and history and _is_referential_followup(message):
         cid = _infer_content_id_from_messages(history)
 
-    # Keep multi-turn threads on the last cited article when scope was never stored.
-    if not cid and not tid and history and len(history) >= 2:
+    # Keep multi-turn threads on the last cited article when scope was never stored,
+    # unless the user is asking across their whole library (not one article).
+    if (
+        not cid
+        and not tid
+        and history
+        and len(history) >= 2
+        and not is_corpus_library_query(message)
+    ):
         cid = _infer_content_id_from_messages(history)
 
     return cid, tid
@@ -915,6 +1078,7 @@ async def _prepare_ask(
 
     today_brief_mode = is_today_brief_query(message) and not content_id and not digest_item_id
     saved_unread_mode = is_saved_unread_query(message) and not content_id and not digest_item_id
+    corpus_library_mode = is_corpus_library_query(message) and not content_id and not digest_item_id
 
     if today_brief_mode:
         today_chunks = await _retrieve_today_brief(db, user.id, never_show=never_show)
@@ -935,6 +1099,27 @@ async def _prepare_ask(
             context_pack = (
                 "SAVED/UNREAD INDEX: No saved-but-unread items in Briefly right now "
                 "(no starred briefing items awaiting open, no queued browser saves)."
+            )
+    elif corpus_library_mode:
+        embedder = get_embedding_adapter()
+        query_embedding = await embedder.embed(message)
+        library_chunks = await _retrieve_corpus_library(
+            db,
+            user.id,
+            message,
+            query_embedding,
+            never_show=never_show,
+        )
+        all_chunks = _assign_refs(library_chunks, start_index=1)
+        if all_chunks:
+            context_pack = (
+                "LIBRARY INDEX (saved articles & content in the user's Briefly library):\n"
+                + _format_context_pack(all_chunks)
+            )
+        else:
+            context_pack = (
+                "LIBRARY INDEX: The user has no saved articles or content in Briefly yet. "
+                "Tell them honestly and suggest saving articles or connecting sources."
             )
     else:
         embedder = get_embedding_adapter()
@@ -1105,13 +1290,19 @@ async def ask_briefly(
 
     system = _ASK_SYSTEM
     max_tokens = 1200
+    corpus_mode = is_corpus_library_query(message)
     if voice:
         system = (
             f"{_ASK_SYSTEM}\n\n"
             "VOICE MODE: Reply in 2–5 short spoken sentences unless the user explicitly "
             "asked for detail. No markdown, headings, or bullet lists — natural speech only."
         )
-        max_tokens = 480
+        if corpus_mode:
+            system += (
+                "\n\nVOICE LIBRARY MODE: When listing articles from the library, name 2–4 "
+                "specific titles with one brief detail each, grounded in the source pack."
+            )
+        max_tokens = 520 if corpus_mode else 480
 
     llm = get_llm_adapter()
     response = await llm.complete(
@@ -1165,19 +1356,25 @@ async def iter_ask_briefly_events(
     system = _ASK_SYSTEM
     max_tokens = 1200
     history = list(snapshot.prior_messages)
+    corpus_mode = is_corpus_library_query(message)
     if voice:
         system = (
             f"{_ASK_SYSTEM}\n\n"
             "VOICE MODE: Reply in 2–5 short spoken sentences unless the user explicitly "
             "asked for detail. No markdown, headings, or bullet lists — natural speech only."
         )
+        if corpus_mode:
+            system += (
+                "\n\nVOICE LIBRARY MODE: When listing articles from the library, name 2–4 "
+                "specific titles with one brief detail each, grounded in the source pack."
+            )
         if history:
             system += (
                 "\n\nVOICE FOLLOW-UP: The user is continuing a spoken conversation in this "
                 "thread. Treat their new question as referring to your immediately prior answer "
                 "and the same topic unless they clearly change subject."
             )
-        max_tokens = 480
+        max_tokens = 520 if corpus_mode else 480
 
     yield {"type": "thread_id", "thread_id": snapshot.thread_id}
 
