@@ -83,31 +83,34 @@ const VAD = {
 };
 
 /** Pause before reopening the mic after the agent speaks (avoids echo). */
-const LISTEN_REOPEN_DELAY_MS = 150;
+const LISTEN_REOPEN_DELAY_MS = 80;
 
-/** Barge-in — STT-confirmed primary; RMS backup if live STT unavailable. */
+/** Barge-in — STT final utterance or tap; RMS backup only while speaking. */
 const BARGE_IN = {
-  GRACE_AFTER_SPEAK_MS: 350,
-  COOLDOWN_MS: 800,
+  GRACE_AFTER_SPEAK_MS: 500,
+  COOLDOWN_MS: 1000,
   RMS_POLL_MS: 80,
-  RMS_CALIBRATE_MS: 400,
-  RMS_NOISE_MULT: 3.8,
-  RMS_MIN_ABS: 0.028,
-  RMS_SUSTAIN_MS: 380,
+  RMS_CALIBRATE_MS: 550,
+  RMS_NOISE_MULT: 4.5,
+  RMS_MIN_ABS: 0.034,
+  RMS_SUSTAIN_MS: 420,
   RMS_DECAY_MS: 45,
 };
 
 /** If speech was heard but VAD never endpointed, force-send after this silence. */
 const LISTEN_STUCK_SILENCE_MS = 3200;
 
-/** Abort a stuck turn (listen → thinking with no response). */
-const TURN_TIMEOUT_MS = 90000;
+/** HTTP turn timeout (LLM + TTS can be slow). */
+const TURN_TIMEOUT_MS = 120000;
 
-/** WS: max wait after speech ends before turn_start. */
-const WS_TURN_START_TIMEOUT_MS = 45000;
+/** WS: wait for turn_start after user stops speaking. */
+const WS_TURN_START_TIMEOUT_MS = 75000;
+
+/** WS: agent stuck in thinking with no speech. */
+const THINKING_STALL_MS = 90000;
 
 /** Stop auto-reopening mic after this many consecutive turn failures. */
-const MAX_TURN_FAILURE_RETRIES = 1;
+const MAX_TURN_FAILURE_RETRIES = 2;
 
 const state = {
   mode: "idle", // idle | listening | thinking | speaking
@@ -152,6 +155,8 @@ const state = {
   conversationMuted: false,
   lastAssistantAnswer: "",
   turnFailureCount: 0,
+  thinkingWatchdog: null,
+  pendingUserTranscript: "",
   playbackCtx: null,
   playbackUnlocked: false,
   conversationGeneration: 0,
@@ -279,7 +284,7 @@ function stopWakeListenStream() {
 }
 
 async function startSemanticBargeIn() {
-  if (state.mode !== "speaking" && state.mode !== "thinking") return;
+  if (state.mode !== "speaking") return;
   if (!state.liveClient?.ready) {
     startBargeInMonitor();
     return;
@@ -287,7 +292,7 @@ async function startSemanticBargeIn() {
   try {
     await ensureMic();
     const ok = await state.liveClient.prepareBargeIn();
-    if (state.mode !== "speaking" && state.mode !== "thinking") return;
+    if (state.mode !== "speaking") return;
     if (ok) {
       startAuxPcmStream("barge_in");
       return;
@@ -863,10 +868,15 @@ function setMode(mode) {
   } else {
     stopWakeListenStream();
     setStatusForMode(mode);
-    if (mode === "speaking" || mode === "thinking") {
+    if (mode === "speaking") {
+      clearThinkingWatchdog();
       state.speakingStartedAt = Date.now();
-      state.bargeInCooldownUntil = 0;
+      state.bargeInCooldownUntil = Date.now() + BARGE_IN.GRACE_AFTER_SPEAK_MS;
       void ensureMic().then(() => startSemanticBargeIn()).catch(() => {});
+    } else if (mode === "thinking") {
+      stopBargeInMonitor();
+      stopSemanticBargeIn();
+      armThinkingWatchdog();
     } else {
       stopBargeInMonitor();
       stopSemanticBargeIn();
@@ -903,48 +913,43 @@ function updateWakeStatus() {
   }
 }
 
-function clearWsTurnWatchdog() {
-  if (state.wsTurnWatchdog) {
-    clearTimeout(state.wsTurnWatchdog);
-    state.wsTurnWatchdog = null;
+function clearThinkingWatchdog() {
+  if (state.thinkingWatchdog) {
+    clearTimeout(state.thinkingWatchdog);
+    state.thinkingWatchdog = null;
   }
 }
 
-function armWsTurnWatchdog() {
-  clearWsTurnWatchdog();
-  state.wsTurnWatchdog = setTimeout(() => {
-    state.wsTurnWatchdog = null;
-    if (state.wsTurnActive) return;
-    if (!state.sendingUtterance && state.mode !== "thinking") return;
-    state.sendingUtterance = false;
-    state.wsTurnActive = false;
-    if (state.liveClient) state.liveClient.interrupt();
+function armThinkingWatchdog() {
+  clearThinkingWatchdog();
+  state.thinkingWatchdog = setTimeout(() => {
+    state.thinkingWatchdog = null;
+    if (state.mode !== "thinking") return;
+    resetWsTurnState();
     setMode("idle");
-    flashCaption("Didn't get a response — tap and try again.", 2800);
-  }, WS_TURN_START_TIMEOUT_MS);
+    flashCaption("That took too long — tap to try again.", 3200);
+  }, THINKING_STALL_MS);
 }
 
-function abortHttpTurn(reason) {
-  state.turnAbortReason = reason;
-  if (state.turnTimeoutHandle) {
-    clearTimeout(state.turnTimeoutHandle);
-    state.turnTimeoutHandle = null;
-  }
-  if (state.turnAbort) {
-    state.turnAbort.abort();
-    state.turnAbort = null;
-  }
-}
-
-function hardStopSpeech() {
-  state.conversationGeneration += 1;
-  state.activeTurnEpoch += 1;
-  state.sendingUtterance = false;
-  state.wsTurnActive = false;
-  state.agentSpokenText = "";
+/** Clear WS turn flags without killing playback (used on stale events). */
+function resetWsTurnState() {
   clearWsTurnWatchdog();
+  clearThinkingWatchdog();
+  state.wsTurnActive = false;
+  state.sendingUtterance = false;
+  if (state.wsTurnSpeaker) {
+    state.wsTurnSpeaker.abort();
+    state.wsTurnSpeaker = null;
+  }
+  if (state.speakAbort) {
+    try { state.speakAbort.abort(); } catch (_) {}
+    state.speakAbort = null;
+  }
+  state.ttsAudio = null;
+}
+
+function hardStopPlayback() {
   if (typeof stopAllPlayback === "function") stopAllPlayback();
-  abortHttpTurn("user");
   if (state.speakAbort) {
     try { state.speakAbort.abort(); } catch (_) {}
     state.speakAbort = null;
@@ -964,10 +969,59 @@ function hardStopSpeech() {
   }
   stopBargeInMonitor();
   stopSemanticBargeIn();
-  if (state.liveClient?.ready) {
+}
+
+function cancelActiveTurn(options = {}) {
+  const { notifyServer = true } = options;
+  state.conversationGeneration += 1;
+  state.activeTurnEpoch += 1;
+  state.sendingUtterance = false;
+  state.wsTurnActive = false;
+  state.agentSpokenText = "";
+  clearWsTurnWatchdog();
+  clearThinkingWatchdog();
+  abortHttpTurn("user");
+  hardStopPlayback();
+  if (notifyServer && state.liveClient?.ready) {
     const client = state.liveClient;
     setTimeout(() => { client.interrupt(); }, 0);
   }
+}
+
+function clearWsTurnWatchdog() {
+  if (state.wsTurnWatchdog) {
+    clearTimeout(state.wsTurnWatchdog);
+    state.wsTurnWatchdog = null;
+  }
+}
+
+function armWsTurnWatchdog() {
+  clearWsTurnWatchdog();
+  state.wsTurnWatchdog = setTimeout(() => {
+    state.wsTurnWatchdog = null;
+    if (state.wsTurnActive) return;
+    if (!state.sendingUtterance && state.mode !== "thinking") return;
+    resetWsTurnState();
+    if (state.liveClient) state.liveClient.interrupt();
+    setMode("idle");
+    flashCaption("Didn't get a response — tap and try again.", 2800);
+  }, WS_TURN_START_TIMEOUT_MS);
+}
+
+function abortHttpTurn(reason) {
+  state.turnAbortReason = reason;
+  if (state.turnTimeoutHandle) {
+    clearTimeout(state.turnTimeoutHandle);
+    state.turnTimeoutHandle = null;
+  }
+  if (state.turnAbort) {
+    state.turnAbort.abort();
+    state.turnAbort = null;
+  }
+}
+
+function hardStopSpeech() {
+  cancelActiveTurn();
 }
 
 function stopSpeaking() {
@@ -987,7 +1041,7 @@ function stopBargeInMonitor() {
 function startBargeInMonitor() {
   stopBargeInMonitor();
   if (!state.micStream || state.conversationMuted) return;
-  if (state.mode !== "speaking" && state.mode !== "thinking") return;
+  if (state.mode !== "speaking") return;
 
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx) return;
@@ -1007,7 +1061,7 @@ function startBargeInMonitor() {
   state.bargeInCalibratingUntil = Date.now() + BARGE_IN.RMS_CALIBRATE_MS;
 
   state.bargeInTimer = setInterval(() => {
-    if (state.mode !== "speaking" && state.mode !== "thinking") {
+    if (state.mode !== "speaking") {
       stopBargeInMonitor();
       return;
     }
@@ -1412,9 +1466,11 @@ async function stopListeningAndSend() {
   if (state.useServerEndpointing && state.liveClient?.ready) {
     state.sendingUtterance = true;
     state.liveClient.sendEndUtterance();
-    setStatusForMode("listening", "Processing…");
+    setMode("thinking");
+    setStatusForMode("thinking", "Thinking…");
     stopListeningOnly();
     armWsTurnWatchdog();
+    armThinkingWatchdog();
     return;
   }
 
@@ -2210,17 +2266,16 @@ async function initLiveSession() {
     scheduleWakeListenRestart(600);
   };
 
-  state.liveClient.onBargeInPartial = (text, isFinal) => {
-    if (state.mode !== "speaking" && state.mode !== "thinking") return;
+  state.liveClient.onBargeInPartial = (text) => {
+    if (state.mode !== "speaking") return;
     if (Date.now() - state.speakingStartedAt < BARGE_IN.GRACE_AFTER_SPEAK_MS) return;
-    if (Date.now() < state.bargeInCooldownUntil) return;
-    if (!looksLikeUserBargeIn(text, isFinal)) return;
-    state.bargeInCooldownUntil = Date.now() + BARGE_IN.COOLDOWN_MS;
-    interruptAndListen();
+    if (!text) return;
+    setStatusForMode("speaking", truncateStatus(text, 48));
   };
 
   state.liveClient.onBargeInDetected = (text) => {
-    if (state.mode !== "speaking" && state.mode !== "thinking") return;
+    if (state.mode !== "speaking") return;
+    if (Date.now() - state.speakingStartedAt < BARGE_IN.GRACE_AFTER_SPEAK_MS) return;
     if (Date.now() < state.bargeInCooldownUntil) return;
     if (!looksLikeUserBargeIn(text, true)) return;
     state.bargeInCooldownUntil = Date.now() + BARGE_IN.COOLDOWN_MS;
@@ -2240,16 +2295,6 @@ async function initLiveSession() {
       setStatusForMode("listening", truncateStatus(text, 48));
       return;
     }
-    if (state.mode === "speaking" || state.mode === "thinking") {
-      if (looksLikeUserBargeIn(text, isFinal)) {
-        if (Date.now() >= state.bargeInCooldownUntil
-            && Date.now() - state.speakingStartedAt >= BARGE_IN.GRACE_AFTER_SPEAK_MS) {
-          state.bargeInCooldownUntil = Date.now() + BARGE_IN.COOLDOWN_MS;
-          interruptAndListen();
-        }
-      }
-      return;
-    }
     if (isFinal && state.mode === "thinking") {
       const cmd = matchVoiceCommand(text);
       if (cmd) {
@@ -2267,10 +2312,13 @@ async function initLiveSession() {
     }
   };
 
-  state.liveClient.onSpeechFinal = () => {
-    if (state.mode !== "listening" || state.wsTurnActive) return;
+  state.liveClient.onSpeechFinal = (text) => {
+    if (state.mode !== "listening" && state.mode !== "thinking") return;
+    if (state.wsTurnActive) return;
+    state.pendingUserTranscript = String(text || "").trim();
     state.sendingUtterance = true;
-    setStatusForMode("listening", "Processing…");
+    setMode("thinking");
+    setStatusForMode("thinking", "Thinking…");
     stopListeningOnly();
     armWsTurnWatchdog();
   };
@@ -2284,7 +2332,6 @@ async function initLiveSession() {
     state.wsTurnActive = true;
     state.sendingUtterance = false;
     state.agentSpokenText = "";
-    state.speakingStartedAt = Date.now();
     stopListeningOnly();
     if (typeof stopAllPlayback === "function") stopAllPlayback();
     if (state.wsTurnSpeaker) {
@@ -2320,19 +2367,17 @@ async function initLiveSession() {
   state.liveClient.onTurnComplete = async (turn) => {
     clearWsTurnWatchdog();
     const turnEpoch = state.currentTurnEpoch;
-    if (turnEpoch !== state.activeTurnEpoch) return;
+    if (turnEpoch !== state.activeTurnEpoch) {
+      resetWsTurnState();
+      return;
+    }
 
     applyTurnMeta(turn);
     const transcript = (turn?.transcript || "").trim();
     const voiceCmd = matchVoiceCommand(transcript);
     if (voiceCmd) {
-      state.wsTurnActive = false;
-      state.sendingUtterance = false;
-      if (state.wsTurnSpeaker) {
-        state.wsTurnSpeaker.abort();
-        state.wsTurnSpeaker = null;
-      }
-      state.speakAbort = null;
+      resetWsTurnState();
+      clearThinkingWatchdog();
       await applyVoiceCommand(voiceCmd);
       return;
     }
@@ -2341,36 +2386,52 @@ async function initLiveSession() {
         turnEpoch !== state.activeTurnEpoch ||
         turnEpoch !== state.currentTurnEpoch
       ) {
-        if (state.wsTurnSpeaker) {
-          state.wsTurnSpeaker.abort();
-          state.wsTurnSpeaker = null;
+        resetWsTurnState();
+        return;
+      }
+      const answer = (turn?.answer ? String(turn.answer) : "").trim();
+      if (!answer) {
+        resetWsTurnState();
+        clearThinkingWatchdog();
+        setMode("idle");
+        flashCaption("Didn't get a response — tap to try again.", 2800);
+        if (state.conversationActive && !state.conversationMuted) {
+          await continueConversationAfterSpeak(turn);
         }
         return;
       }
       if (
         turnEpoch === state.currentTurnEpoch &&
         state.wsTurnSpeaker &&
-        !state.conversationMuted &&
-        turn?.answer
+        !state.conversationMuted
       ) {
         await state.wsTurnSpeaker.finish(turn);
-      } else if (turnEpoch === state.currentTurnEpoch && turn?.answer && !state.conversationMuted) {
-        await playTts(turn.answer);
+      } else if (turnEpoch === state.currentTurnEpoch && !state.conversationMuted) {
+        await playTts(answer);
       } else if (turnEpoch === state.currentTurnEpoch) {
         setMode("idle");
       }
     } catch (_) {
-      if (turnEpoch !== state.activeTurnEpoch) return;
-      if (turnEpoch === state.currentTurnEpoch && turn?.answer && !state.conversationMuted) {
-        await playTts(turn.answer);
+      if (turnEpoch !== state.activeTurnEpoch) {
+        resetWsTurnState();
+        return;
+      }
+      const answer = (turn?.answer ? String(turn.answer) : "").trim();
+      if (turnEpoch === state.currentTurnEpoch && answer && !state.conversationMuted) {
+        await playTts(answer);
       }
     }
-    if (turnEpoch !== state.currentTurnEpoch) return;
+    if (turnEpoch !== state.currentTurnEpoch || turnEpoch !== state.activeTurnEpoch) {
+      resetWsTurnState();
+      return;
+    }
     state.wsTurnSpeaker = null;
     state.speakAbort = null;
     state.ttsAudio = null;
     state.wsTurnActive = false;
     state.sendingUtterance = false;
+    state.pendingUserTranscript = "";
+    clearThinkingWatchdog();
     state.turnFailureCount = 0;
     if (state.conversationMuted) return;
     state.conversationActive = true;
@@ -2383,20 +2444,22 @@ async function initLiveSession() {
 
   state.liveClient.onError = (message) => {
     clearWsTurnWatchdog();
+    clearThinkingWatchdog();
+    const pending = state.pendingUserTranscript;
+    const wasTurn = state.wsTurnActive || state.sendingUtterance;
     state.sendingUtterance = false;
     const msg = String(message || "");
     if (msg.toLowerCase().includes("unauthorized")) {
       try { localStorage.setItem("briefly.orbLiveSession", "0"); } catch (_) {}
     }
-    if (state.wsTurnActive || state.sendingUtterance) {
-      state.wsTurnActive = false;
-      state.sendingUtterance = false;
-      if (state.wsTurnSpeaker) {
-        state.wsTurnSpeaker.abort();
-        state.wsTurnSpeaker = null;
-      }
-      state.speakAbort = null;
+    if (wasTurn) {
+      resetWsTurnState();
       setMode("idle");
+      if (pending && pending.length >= 2 && isAccountLinked()) {
+        flashCaption("Retrying…", 1200);
+        void executeTurn(async (signal) => apiTurnText(pending, signal));
+        return;
+      }
       flashCaption(msg || "Something went wrong — tap to try again.", 2600);
     }
   };
