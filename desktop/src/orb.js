@@ -144,6 +144,7 @@ const state = {
   bargeInCtx: null,
   bargeInSpeechMs: 0,
   bargeInCooldownUntil: 0,
+  interruptInFlight: false,
 };
 
 function isAccountLinked() {
@@ -729,20 +730,40 @@ function updateWakeStatus() {
   }
 }
 
-function stopSpeaking() {
+function hardStopSpeech() {
+  state.conversationGeneration += 1;
+  state.activeTurnEpoch += 1;
+  state.sendingUtterance = false;
+  state.wsTurnActive = false;
+  if (state.turnAbort) {
+    state.turnAbort.abort();
+    state.turnAbort = null;
+  }
   if (state.speakAbort) {
     state.speakAbort.abort();
     state.speakAbort = null;
+  }
+  if (state.wsTurnSpeaker) {
+    state.wsTurnSpeaker.abort();
+    state.wsTurnSpeaker = null;
   }
   if (typeof stopAllPlayback === "function") stopAllPlayback();
   if (state.ttsAudio) {
     try {
       state.ttsAudio.pause();
       state.ttsAudio.currentTime = 0;
+      state.ttsAudio.src = "";
+      state.ttsAudio.load();
     } catch (_) {}
     state.ttsAudio = null;
   }
-  if (state.mode === "speaking") setMode("idle");
+  if (state.liveClient) state.liveClient.interrupt();
+  stopBargeInMonitor();
+}
+
+function stopSpeaking() {
+  hardStopSpeech();
+  if (state.mode === "speaking" || state.mode === "thinking") setMode("idle");
 }
 
 function stopBargeInMonitor() {
@@ -780,47 +801,35 @@ function startBargeInMonitor() {
     }
     if (Date.now() < state.bargeInCooldownUntil) return;
     const rms = measureMicRms(analyser);
-    if (rms >= 0.022) {
-      state.bargeInSpeechMs += 100;
-      if (state.bargeInSpeechMs >= 240) {
+    if (rms >= 0.018) {
+      state.bargeInSpeechMs += 50;
+      if (state.bargeInSpeechMs >= 100) {
         state.bargeInSpeechMs = 0;
-        state.bargeInCooldownUntil = Date.now() + 1200;
-        void interruptAndListen();
+        state.bargeInCooldownUntil = Date.now() + 800;
+        interruptAndListen();
       }
     } else {
-      state.bargeInSpeechMs = Math.max(0, state.bargeInSpeechMs - 60);
+      state.bargeInSpeechMs = Math.max(0, state.bargeInSpeechMs - 30);
     }
-  }, 100);
+  }, 50);
 }
 
 function interruptAndListen() {
+  if (state.interruptInFlight || state.mode === "listening") return;
+  state.interruptInFlight = true;
   state.conversationActive = true;
-  flashCaption("Listening…", 900);
-  void startListening();
+  hardStopSpeech();
+  setMode("listening");
+  setStatusForMode("listening", "Listening…");
+  void startListening({ afterInterrupt: true }).finally(() => {
+    state.interruptInFlight = false;
+  });
 }
 
 function stopCurrentTurn(options = {}) {
   const { reopenMic = false } = options;
-  state.conversationGeneration += 1;
-  state.activeTurnEpoch += 1;
-  state.sendingUtterance = false;
-  state.wsTurnActive = false;
-  if (state.turnAbort) {
-    state.turnAbort.abort();
-    state.turnAbort = null;
-  }
-  if (state.speakAbort) {
-    state.speakAbort.abort();
-    state.speakAbort = null;
-  }
-  if (state.liveClient) state.liveClient.interrupt();
-  if (state.wsTurnSpeaker) {
-    state.wsTurnSpeaker.abort();
-    state.wsTurnSpeaker = null;
-  }
+  hardStopSpeech();
   stopListening();
-  stopSpeaking();
-  stopBargeInMonitor();
   setCaption("");
   updateWakeStatus();
   if (reopenMic) void startListening();
@@ -1100,37 +1109,53 @@ function chooseMimeType() {
   return "";
 }
 
-async function startListening() {
+async function startListening(options = {}) {
+  const afterInterrupt = !!options.afterInterrupt;
+  if (state.mode === "listening" && !afterInterrupt) return;
+
+  if (!afterInterrupt) {
+    hardStopSpeech();
+    stopListening();
+  }
+
   if (!isAccountLinked()) {
     if (store.token) {
       const ok = await refreshLinkState();
       if (!ok) {
+        setMode("idle");
         flashCaption("Session expired — click Connect in settings.", 3200);
         openSettings(true);
         return;
       }
     } else {
+      setMode("idle");
       flashCaption("Connect your Briefly account first (gear icon).", 2800);
       openSettings(true);
       return;
     }
   }
-  if (state.mode === "listening") return;
-  stopCurrentTurn();
-  void primeAudioPlayback();
-  await ensureLiveSession();
-  if (state.liveClient?.ready) {
-    await state.liveClient.prepareListen();
-  }
-  await showWindow();
+
   setMode("listening");
+  setStatusForMode("listening", "Listening…");
   state.audioChunks = [];
   state.listeningStartedAt = Date.now();
+  void primeAudioPlayback();
+  void showWindow();
 
   try {
-    const stream = await ensureMic();
+    const [, stream] = await Promise.all([ensureLiveSession(), ensureMic()]);
+    if (state.mode !== "listening") return;
+
+    // Open the mic immediately — don't wait for STT session prep.
+    startVadMonitor(stream);
+
+    if (state.liveClient?.ready) {
+      await state.liveClient.prepareListen();
+    }
+    if (state.mode !== "listening") return;
+
     state.liveSttActive = shouldUseLiveStt();
-    if (!state.liveSttActive) {
+    if (!state.liveSttActive && !state.mediaRecorder) {
       const opts = {};
       const mimeType = chooseMimeType();
       if (mimeType) opts.mimeType = mimeType;
@@ -1140,6 +1165,8 @@ async function startListening() {
       };
       recorder.start(250);
       state.mediaRecorder = recorder;
+    } else if (state.liveSttActive && state.mediaRecorder) {
+      stopListeningOnly();
     }
     startVadMonitor(stream);
   } catch (_) {
@@ -1980,7 +2007,7 @@ async function initLiveSession() {
   };
 
   state.liveClient.onTurnDelta = (content) => {
-    if (state.wsTurnSpeaker && content) {
+    if (state.wsTurnSpeaker && content && state.currentTurnEpoch === state.activeTurnEpoch) {
       state.wsTurnSpeaker.pushDelta(content);
     }
   };

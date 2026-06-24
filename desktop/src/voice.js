@@ -2,12 +2,24 @@
 
 /** All in-flight TTS `<audio>` elements — stop together on interrupt. */
 const activePlaybackAudios = new Set();
+/** Resolve handlers for in-progress playBlobAudio waits — unblocks drain loops on interrupt. */
+const activePlaybackCancels = new Set();
+let playbackEpoch = 0;
 
 function stopAllPlayback() {
+  playbackEpoch += 1;
+  for (const cancel of activePlaybackCancels) {
+    try {
+      cancel();
+    } catch (_) {}
+  }
+  activePlaybackCancels.clear();
   for (const audio of activePlaybackAudios) {
     try {
       audio.pause();
       audio.currentTime = 0;
+      audio.src = "";
+      audio.load();
     } catch (_) {}
   }
   activePlaybackAudios.clear();
@@ -35,16 +47,19 @@ async function playBlobAudio(blob, opts = {}) {
   if (!blob || blob.size < 64) {
     throw new Error("Empty audio");
   }
+  if (signal?.aborted) return;
+
+  const epoch = playbackEpoch;
   const url = URL.createObjectURL(blob);
   let started = false;
+  let settled = false;
+
   try {
     await new Promise((resolve, reject) => {
-      const audio = new Audio(url);
-      audio.preload = "auto";
-      activePlaybackAudios.add(audio);
-      if (onAudio) onAudio(audio);
-
       const finish = (err) => {
+        if (settled) return;
+        settled = true;
+        activePlaybackCancels.delete(cancelPlayback);
         activePlaybackAudios.delete(audio);
         if (onAudio) onAudio(null);
         URL.revokeObjectURL(url);
@@ -52,31 +67,45 @@ async function playBlobAudio(blob, opts = {}) {
         else resolve();
       };
 
+      const cancelPlayback = () => {
+        try {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.src = "";
+          audio.load();
+        } catch (_) {}
+        finish();
+      };
+
+      const audio = new Audio(url);
+      audio.preload = "auto";
+      activePlaybackAudios.add(audio);
+      activePlaybackCancels.add(cancelPlayback);
+      if (onAudio) onAudio(audio);
+
       if (signal) {
         if (signal.aborted) {
-          finish();
+          cancelPlayback();
           return;
         }
-        signal.addEventListener(
-          "abort",
-          () => {
-            try {
-              audio.pause();
-              audio.currentTime = 0;
-            } catch (_) {}
-            finish();
-          },
-          { once: true },
-        );
+        signal.addEventListener("abort", cancelPlayback, { once: true });
       }
 
       audio.onended = () => finish();
       audio.onerror = () => finish(new Error("Audio playback error"));
 
       const tryPlay = () => {
+        if (settled || epoch !== playbackEpoch || signal?.aborted) {
+          cancelPlayback();
+          return;
+        }
         audio
           .play()
           .then(() => {
+            if (settled || epoch !== playbackEpoch || signal?.aborted) {
+              cancelPlayback();
+              return;
+            }
             if (!started) {
               started = true;
               if (onStart) onStart();
@@ -89,10 +118,13 @@ async function playBlobAudio(blob, opts = {}) {
       else audio.oncanplaythrough = tryPlay;
     });
   } catch (err) {
-    URL.revokeObjectURL(url);
+    if (!settled) URL.revokeObjectURL(url);
+    if (signal?.aborted || epoch !== playbackEpoch) return;
     throw err;
   }
-  if (!started) throw new Error("Audio did not start");
+  if (!started && !signal?.aborted && epoch === playbackEpoch) {
+    throw new Error("Audio did not start");
+  }
 }
 
 /**
@@ -272,15 +304,19 @@ async function streamOrbTurnAndSpeak({
   };
 
   const synthSentence = async (sentence) => {
+    if (signal?.aborted) return null;
     if (prefetch.has(sentence)) {
       const blob = await prefetch.get(sentence);
       prefetch.delete(sentence);
+      if (signal?.aborted) return null;
       if (blob && blob.size >= 64) return blob;
     }
     let blob = await synth(sentence, signal).catch(() => null);
+    if (signal?.aborted) return null;
     if ((!blob || blob.size < 64) && speakFn && speakFn !== synth) {
       blob = await speakFn(sentence, signal).catch(() => null);
     }
+    if (signal?.aborted) return null;
     return blob && blob.size >= 64 ? blob : null;
   };
 
@@ -323,13 +359,24 @@ async function streamOrbTurnAndSpeak({
       const sentence = sentenceQueue.shift();
       if (sentenceQueue.length > 0) schedulePrefetch(sentenceQueue[0]);
       const blob = await synthSentence(sentence);
-      if (blob) await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+      if (signal?.aborted) break;
+      if (blob) {
+        try {
+          await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+        } catch (_) {
+          if (signal?.aborted) break;
+        }
+      }
     }
     const tail = fullText.slice(spokenUpTo).trim();
     if (tail.length >= 4 && !signal?.aborted) {
       spokenUpTo = fullText.length;
       const blob = await synthSentence(tail);
-      if (blob) await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+      if (!signal?.aborted && blob) {
+        try {
+          await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+        } catch (_) {}
+      }
     }
   }
 
@@ -411,33 +458,36 @@ function createDeltaStreamingSpeaker({
   };
 
   const synthSentence = async (sentence) => {
+    if (aborted || signal?.aborted) return null;
     if (prefetch.has(sentence)) {
       const blob = await prefetch.get(sentence);
       prefetch.delete(sentence);
+      if (aborted || signal?.aborted) return null;
       if (blob && blob.size >= 64) return blob;
     }
     let blob = await synth(sentence, signal).catch(() => null);
+    if (aborted || signal?.aborted) return null;
     if ((!blob || blob.size < 64) && speakFn && speakFn !== synth) {
       blob = await speakFn(sentence, signal).catch(() => null);
     }
+    if (aborted || signal?.aborted) return null;
     return blob && blob.size >= 64 ? blob : null;
   };
 
   const schedulePrefetch = (sentence) => {
-    if (!prefetch.has(sentence)) {
-      prefetch.set(
-        sentence,
-        synth(sentence, signal)
-          .then((blob) => {
-            if (blob && blob.size >= 64) return blob;
-            if (speakFn && speakFn !== synth) {
-              return speakFn(sentence, signal).catch(() => null);
-            }
-            return null;
-          })
-          .catch(() => null),
-      );
-    }
+    if (aborted || signal?.aborted || prefetch.has(sentence)) return;
+    prefetch.set(
+      sentence,
+      synth(sentence, signal)
+        .then((blob) => {
+          if (blob && blob.size >= 64) return blob;
+          if (speakFn && speakFn !== synth) {
+            return speakFn(sentence, signal).catch(() => null);
+          }
+          return null;
+        })
+        .catch(() => null),
+    );
   };
 
   function enqueueNewSentences() {
@@ -462,13 +512,24 @@ function createDeltaStreamingSpeaker({
       const sentence = sentenceQueue.shift();
       if (sentenceQueue.length > 0) schedulePrefetch(sentenceQueue[0]);
       const blob = await synthSentence(sentence);
-      if (blob) await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+      if (aborted || signal?.aborted) break;
+      if (blob) {
+        try {
+          await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+        } catch (_) {
+          if (aborted || signal?.aborted) break;
+        }
+      }
     }
     const tail = fullText.slice(spokenUpTo).trim();
     if (tail.length >= 4 && !aborted && !signal?.aborted) {
       spokenUpTo = fullText.length;
       const blob = await synthSentence(tail);
-      if (blob) await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+      if (!aborted && !signal?.aborted && blob) {
+        try {
+          await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+        } catch (_) {}
+      }
     }
   }
 
@@ -504,6 +565,7 @@ function createDeltaStreamingSpeaker({
     abort() {
       aborted = true;
       finished = true;
+      sentenceQueue.length = 0;
       prefetch.clear();
       stopAllPlayback();
     },
