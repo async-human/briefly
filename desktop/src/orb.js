@@ -83,7 +83,19 @@ const VAD = {
 };
 
 /** Pause before reopening the mic after the agent speaks (avoids echo). */
-const LISTEN_REOPEN_DELAY_MS = 400;
+const LISTEN_REOPEN_DELAY_MS = 150;
+
+/** Barge-in while agent speaks — tap orb always works; voice barge uses strict VAD. */
+const BARGE_IN = {
+  POLL_MS: 80,
+  CALIBRATE_MS: 500,
+  GRACE_AFTER_SPEAK_MS: 2000,
+  NOISE_MULT: 4.2,
+  MIN_ABS_RMS: 0.032,
+  SUSTAIN_MS: 520,
+  DECAY_MS: 50,
+  COOLDOWN_MS: 1400,
+};
 
 /** If speech was heard but VAD never endpointed, force-send after this silence. */
 const LISTEN_STUCK_SILENCE_MS = 3200;
@@ -150,6 +162,9 @@ const state = {
   bargeInCtx: null,
   bargeInSpeechMs: 0,
   bargeInCooldownUntil: 0,
+  bargeInNoiseFloor: 0.008,
+  bargeInCalibratingUntil: 0,
+  speakingStartedAt: 0,
   interruptInFlight: false,
 };
 
@@ -703,7 +718,8 @@ function setMode(mode) {
     updateWakeStatus();
   } else {
     setStatusForMode(mode);
-    if (mode === "speaking" || mode === "thinking") {
+    if (mode === "speaking") {
+      state.speakingStartedAt = Date.now();
       void ensureMic().then(() => startBargeInMonitor()).catch(() => {});
     } else {
       stopBargeInMonitor();
@@ -818,7 +834,7 @@ function stopBargeInMonitor() {
 
 function startBargeInMonitor() {
   stopBargeInMonitor();
-  if (!state.micStream || state.conversationMuted) return;
+  if (!state.micStream || state.conversationMuted || state.mode !== "speaking") return;
 
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx) return;
@@ -830,29 +846,44 @@ function startBargeInMonitor() {
   const source = ctx.createMediaStreamSource(state.micStream);
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048;
-  analyser.smoothingTimeConstant = 0.55;
+  analyser.smoothingTimeConstant = 0.72;
   source.connect(analyser);
   state.bargeInAnalyser = analyser;
   state.bargeInSpeechMs = 0;
+  state.bargeInNoiseFloor = 0.008;
+  state.bargeInCalibratingUntil = Date.now() + BARGE_IN.CALIBRATE_MS;
 
   state.bargeInTimer = setInterval(() => {
-    if (state.mode !== "speaking" && state.mode !== "thinking") {
+    if (state.mode !== "speaking") {
       stopBargeInMonitor();
       return;
     }
-    if (Date.now() < state.bargeInCooldownUntil) return;
+    const now = Date.now();
+    if (now < state.bargeInCooldownUntil) return;
+    if (now - state.speakingStartedAt < BARGE_IN.GRACE_AFTER_SPEAK_MS) return;
+
     const rms = measureMicRms(analyser);
-    if (rms >= 0.018) {
-      state.bargeInSpeechMs += 50;
-      if (state.bargeInSpeechMs >= 100) {
+    if (now < state.bargeInCalibratingUntil) {
+      state.bargeInNoiseFloor = Math.max(state.bargeInNoiseFloor, Math.min(rms, 0.022));
+      return;
+    }
+
+    const threshold = Math.max(
+      BARGE_IN.MIN_ABS_RMS,
+      state.bargeInNoiseFloor * BARGE_IN.NOISE_MULT,
+    );
+
+    if (rms >= threshold) {
+      state.bargeInSpeechMs += BARGE_IN.POLL_MS;
+      if (state.bargeInSpeechMs >= BARGE_IN.SUSTAIN_MS) {
         state.bargeInSpeechMs = 0;
-        state.bargeInCooldownUntil = Date.now() + 800;
+        state.bargeInCooldownUntil = now + BARGE_IN.COOLDOWN_MS;
         interruptAndListen();
       }
     } else {
-      state.bargeInSpeechMs = Math.max(0, state.bargeInSpeechMs - 30);
+      state.bargeInSpeechMs = Math.max(0, state.bargeInSpeechMs - BARGE_IN.DECAY_MS);
     }
-  }, 50);
+  }, BARGE_IN.POLL_MS);
 }
 
 function interruptAndListen() {
@@ -982,7 +1013,7 @@ function startVadMonitor(stream) {
 
   if (shouldStreamPcmToServer() && typeof float32To16kPcm === "function") {
     const inputRate = ctx.sampleRate || 48000;
-    const pcmNode = ctx.createScriptProcessor(4096, 1, 1);
+    const pcmNode = ctx.createScriptProcessor(2048, 1, 1);
     pcmNode.onaudioprocess = (ev) => {
       if (state.mode !== "listening" || !state.liveClient?.ready) return;
       const input = ev.inputBuffer.getChannelData(0);
@@ -2026,13 +2057,10 @@ async function initLiveSession() {
         void applyVoiceCommand(cmd);
         return;
       }
-      if (text && text.trim().length >= 4) {
-        interruptAndListen();
-        return;
-      }
     }
     if (
-      (state.mode === "idle" || state.mode === "speaking" || state.mode === "thinking") &&
+      state.mode !== "speaking" &&
+      (state.mode === "idle" || state.mode === "thinking") &&
       store.wakeEnabled &&
       !store.wakeMuted &&
       transcriptMatchesWakePhrase(text)

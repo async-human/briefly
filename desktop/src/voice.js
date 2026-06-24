@@ -237,14 +237,32 @@ async function playSentencePipeline({
   if (!spoke) throw new Error("No audio played");
 }
 
-/** Pull the next complete sentence from incremental LLM text. */
-function pullNextSentence(fullText, spokenUpTo) {
+/** Pull the next speakable chunk from incremental LLM text. */
+function pullNextSentence(fullText, spokenUpTo, opts = {}) {
   const rest = fullText.slice(spokenUpTo);
   if (!rest.trim()) return null;
+
   const match = rest.match(/^[\s\S]*?[.!?]+["')\]]*\s+/);
-  if (match && match[0].trim().length >= 6) {
+  if (match && match[0].trim().length >= 4) {
     return { sentence: match[0].trim(), nextUpTo: spokenUpTo + match[0].length };
   }
+
+  // First spoken chunk: don't wait for a full sentence — cuts time-to-first-audio.
+  if (opts.earlyFirst && spokenUpTo === 0) {
+    const clause = rest.match(/^[\s\S]{14,}?[,;:]\s+/);
+    if (clause && clause[0].trim().length >= 14) {
+      return { sentence: clause[0].trim(), nextUpTo: spokenUpTo + clause[0].length };
+    }
+    const trimmed = rest.trim();
+    if (trimmed.length >= 36) {
+      const space = trimmed.lastIndexOf(" ", 42);
+      if (space >= 18) {
+        const chunk = trimmed.slice(0, space).trim();
+        return { sentence: chunk, nextUpTo: spokenUpTo + rest.indexOf(chunk) + chunk.length };
+      }
+    }
+  }
+
   return null;
 }
 
@@ -339,13 +357,13 @@ async function streamOrbTurnAndSpeak({
 
   function enqueueNewSentences() {
     while (true) {
-      const pulled = pullNextSentence(fullText, spokenUpTo);
+      const pulled = pullNextSentence(fullText, spokenUpTo, { earlyFirst: spokenUpTo === 0 });
       if (!pulled) break;
       sentenceQueue.push(pulled.sentence);
       spokenUpTo = pulled.nextUpTo;
     }
-    if (sentenceQueue.length > 0) {
-      schedulePrefetch(sentenceQueue[sentenceQueue.length - 1]);
+    for (let i = 0; i < Math.min(2, sentenceQueue.length); i += 1) {
+      schedulePrefetch(sentenceQueue[i]);
     }
   }
 
@@ -353,11 +371,13 @@ async function streamOrbTurnAndSpeak({
     while (!streamDone || sentenceQueue.length > 0) {
       if (signal?.aborted) break;
       if (sentenceQueue.length === 0) {
-        await new Promise((r) => setTimeout(r, 35));
+        await new Promise((r) => setTimeout(r, 20));
         continue;
       }
       const sentence = sentenceQueue.shift();
-      if (sentenceQueue.length > 0) schedulePrefetch(sentenceQueue[0]);
+      for (let i = 0; i < Math.min(2, sentenceQueue.length); i += 1) {
+        schedulePrefetch(sentenceQueue[i]);
+      }
       const blob = await synthSentence(sentence);
       if (signal?.aborted) break;
       if (blob) {
@@ -492,13 +512,13 @@ function createDeltaStreamingSpeaker({
 
   function enqueueNewSentences() {
     while (true) {
-      const pulled = pullNextSentence(fullText, spokenUpTo);
+      const pulled = pullNextSentence(fullText, spokenUpTo, { earlyFirst: spokenUpTo === 0 });
       if (!pulled) break;
       sentenceQueue.push(pulled.sentence);
       spokenUpTo = pulled.nextUpTo;
     }
-    if (sentenceQueue.length > 0) {
-      schedulePrefetch(sentenceQueue[sentenceQueue.length - 1]);
+    for (let i = 0; i < Math.min(2, sentenceQueue.length); i += 1) {
+      schedulePrefetch(sentenceQueue[i]);
     }
   }
 
@@ -506,11 +526,13 @@ function createDeltaStreamingSpeaker({
     while (!finished || sentenceQueue.length > 0) {
       if (aborted || signal?.aborted) break;
       if (sentenceQueue.length === 0) {
-        await new Promise((r) => setTimeout(r, 30));
+        await new Promise((r) => setTimeout(r, 20));
         continue;
       }
       const sentence = sentenceQueue.shift();
-      if (sentenceQueue.length > 0) schedulePrefetch(sentenceQueue[0]);
+      for (let i = 0; i < Math.min(2, sentenceQueue.length); i += 1) {
+        schedulePrefetch(sentenceQueue[i]);
+      }
       const blob = await synthSentence(sentence);
       if (aborted || signal?.aborted) break;
       if (blob) {
