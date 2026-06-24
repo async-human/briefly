@@ -9,16 +9,37 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from briefly_api.config import get_settings
 
 log = logging.getLogger(__name__)
 
 DEEPGRAM_WS = "wss://api.deepgram.com/v1/listen"
+
+
+def _keywords_from_prompt(context_prompt: str | None) -> list[str]:
+    """Extract vocabulary hints for Deepgram keyword boosting."""
+    if not context_prompt:
+        return []
+    terms: list[str] = []
+    for chunk in re.split(r"[,.\n;]", context_prompt):
+        token = chunk.strip()
+        if not token or len(token) < 2:
+            continue
+        if token.lower().startswith(("expected vocabulary", "conversation context", "transcribe")):
+            continue
+        if len(token) > 48:
+            token = token[:48]
+        if token not in terms:
+            terms.append(token)
+        if len(terms) >= 12:
+            break
+    return terms
 
 
 @dataclass
@@ -45,19 +66,21 @@ class DeepgramStreamSession:
             raise RuntimeError("DEEPGRAM_API_KEY is required for streaming STT")
         import websockets
 
-        params = {
-            "model": self._settings.stt_model or "nova-2",
-            "language": self._language,
-            "encoding": "linear16",
-            "sample_rate": "16000",
-            "channels": "1",
-            "punctuate": "true",
-            "interim_results": "true",
-            "endpointing": str(max(300, self._settings.deepgram_endpointing_ms)),
-            "utterance_end_ms": str(max(1600, self._settings.deepgram_utterance_end_ms)),
-            "vad_events": "true",
-            "smart_format": "true",
-        }
+        params: list[tuple[str, str]] = [
+            ("model", self._settings.stt_model or "nova-2"),
+            ("language", self._language),
+            ("encoding", "linear16"),
+            ("sample_rate", "16000"),
+            ("channels", "1"),
+            ("punctuate", "true"),
+            ("interim_results", "true"),
+            ("endpointing", str(max(300, self._settings.deepgram_endpointing_ms))),
+            ("utterance_end_ms", str(max(1600, self._settings.deepgram_utterance_end_ms))),
+            ("vad_events", "true"),
+            ("smart_format", "true"),
+        ]
+        for term in _keywords_from_prompt(self._context_prompt):
+            params.append(("keywords", f"{quote(term, safe='')}:1.5"))
         url = f"{DEEPGRAM_WS}?{urlencode(params)}"
         self._ws = await websockets.connect(
             url,
@@ -105,6 +128,14 @@ class DeepgramStreamSession:
     async def send_audio(self, chunk: bytes) -> None:
         if self._ws is not None and chunk:
             await self._ws.send(chunk)
+
+    async def finalize(self) -> None:
+        """Signal end of user utterance so Deepgram emits UtteranceEnd."""
+        if self._ws is not None:
+            try:
+                await self._ws.send(json.dumps({"type": "CloseStream"}))
+            except Exception:
+                pass
 
     async def close(self) -> None:
         if self._reader_task is not None:

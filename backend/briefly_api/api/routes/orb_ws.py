@@ -1,8 +1,8 @@
 """
 briefly_api/api/routes/orb_ws.py
 
-WebSocket duplex session for the voice orb — streaming audio in, partial
-transcripts, turn results, and streaming TTS out.
+WebSocket duplex session for the voice orb — streaming PCM in, partial
+transcripts, streaming LLM deltas, client-side TTS playback.
 """
 from __future__ import annotations
 
@@ -18,10 +18,9 @@ from briefly_api.config import get_settings
 from briefly_api.db.engine import SessionLocal
 from briefly_api.db.models import User
 from briefly_api.services import orb as orb_service
-from briefly_api.services.orb_session import OrbSessionState, resolve_session, update_session_after_turn
-from briefly_api.stt.profile_context import transcription_prompt_for_user
+from briefly_api.services.orb_session import OrbSessionState, resolve_session
+from briefly_api.stt.profile_context import transcription_prompt_for_orb_turn
 from briefly_api.stt.streaming import DeepgramStreamSession, StreamTranscriptEvent, open_streaming_stt
-from briefly_api.tts.adapter import get_tts_adapter
 
 log = logging.getLogger(__name__)
 
@@ -40,47 +39,144 @@ async def _send(ws: WebSocket, payload: dict[str, Any]) -> None:
     await ws.send_text(json.dumps(payload))
 
 
-async def _stream_tts(ws: WebSocket, text: str, *, cancel: asyncio.Event) -> None:
-    tts = get_tts_adapter()
-    if not tts.enabled or cancel.is_set():
-        return
-    try:
-        async for chunk in tts.synthesize_stream(text):
-            if cancel.is_set():
-                break
-            if chunk:
-                await ws.send_bytes(chunk)
-    except Exception:
-        log.debug("ws tts stream failed", exc_info=True)
+class SttRuntime:
+    """Manage Deepgram live STT lifecycle — restart after each utterance/turn."""
+
+    def __init__(self) -> None:
+        self.session: DeepgramStreamSession | None = None
+        self.task: asyncio.Task | None = None
+        self._lock = asyncio.Lock()
+
+    @property
+    def active(self) -> bool:
+        return self.session is not None and self.task is not None and not self.task.done()
+
+    async def stop(self) -> None:
+        task = self.task
+        self.task = None
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        session = self.session
+        self.session = None
+        if session is not None:
+            await session.close()
+
+    async def start(
+        self,
+        ws: WebSocket,
+        user: User,
+        session: OrbSessionState,
+        cancel_holder: list[asyncio.Event],
+    ) -> bool:
+        settings = get_settings()
+        if not settings.orb_streaming_stt_enabled:
+            return False
+        async with self._lock:
+            await self.stop()
+            try:
+                async with SessionLocal() as db:
+                    prompt = await transcription_prompt_for_orb_turn(
+                        db,
+                        user.id,
+                        session=session,
+                        thread_id=session.thread_id,
+                    )
+                stt = await open_streaming_stt(context_prompt=prompt)
+                self.session = stt
+                self.task = asyncio.create_task(
+                    _stt_listener(ws, stt, user, session, cancel_holder, self)
+                )
+                return True
+            except Exception as exc:
+                log.debug("streaming stt unavailable: %s", exc)
+                return False
+
+    async def restart(
+        self,
+        ws: WebSocket,
+        user: User,
+        session: OrbSessionState,
+        cancel_holder: list[asyncio.Event],
+    ) -> bool:
+        ok = await self.start(ws, user, session, cancel_holder)
+        await _send(ws, {"type": "stt_ready", "streaming_stt": ok})
+        return ok
 
 
-async def _run_turn(
+async def _run_turn_stream(
     ws: WebSocket,
     user: User,
     session: OrbSessionState,
     transcript: str,
-    tts_cancel: asyncio.Event,
+    cancel: asyncio.Event,
+    *,
+    stt_runtime: SttRuntime | None = None,
+    cancel_holder: list[asyncio.Event] | None = None,
 ) -> None:
-    async with SessionLocal() as db:
-        result = await orb_service.run_orb_turn(
-            db,
+    """Stream LLM answer deltas; client synthesizes speech locally."""
+    expects_reply = True
+    try:
+        await _send(ws, {"type": "turn_start", "transcript": transcript})
+        async with SessionLocal() as db:
+            async for event in orb_service.iter_orb_text_turn_events(
+                db,
+                user,
+                transcript,
+                thread_id=session.thread_id,
+                session=session,
+                surface=session.surface,
+            ):
+                if cancel.is_set():
+                    return
+                et = event.get("type")
+                if et == "meta":
+                    if event.get("thread_id"):
+                        session.thread_id = event["thread_id"]
+                    await _send(ws, {"type": "turn_meta", **event})
+                elif et == "delta":
+                    await _send(ws, {"type": "turn_delta", "content": event.get("content") or ""})
+                elif et == "complete":
+                    expects_reply = bool(event.get("expects_reply", True))
+                    await _send(ws, {"type": "turn_complete", **event})
+        if not cancel.is_set():
+            await _send(ws, {"type": "turn_end", "expects_reply": expects_reply})
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        log.exception("ws turn stream failed session=%s", session.session_id)
+        await _send(ws, {"type": "error", "message": "Turn failed — please try again."})
+    finally:
+        if stt_runtime is not None and cancel_holder is not None:
+            await stt_runtime.restart(ws, user, session, cancel_holder)
+
+
+def _schedule_turn(
+    ws: WebSocket,
+    user: User,
+    session: OrbSessionState,
+    transcript: str,
+    cancel_holder: list[asyncio.Event],
+    stt_runtime: SttRuntime,
+) -> None:
+    _cancel_turn(session.session_id)
+    cancel = asyncio.Event()
+    cancel_holder[:] = [cancel]
+    task = asyncio.create_task(
+        _run_turn_stream(
+            ws,
             user,
-            text=transcript,
-            thread_id=session.thread_id,
-            session_id=session.session_id,
-            surface=session.surface,
+            session,
+            transcript,
+            cancel,
+            stt_runtime=stt_runtime,
+            cancel_holder=cancel_holder,
         )
-    await update_session_after_turn(
-        session,
-        thread_id=result.get("thread_id"),
-        transcript=transcript,
     )
-    await _send(ws, {"type": "turn_start"})
-    await _send(ws, {"type": "turn_result", **result})
-    answer = str(result.get("answer") or "")
-    if answer:
-        await _stream_tts(ws, answer, cancel=tts_cancel)
-    await _send(ws, {"type": "turn_end", "expects_reply": bool(result.get("expects_reply"))})
+    _ACTIVE_TURNS[session.session_id] = task
 
 
 async def _stt_listener(
@@ -88,11 +184,21 @@ async def _stt_listener(
     stt_session: DeepgramStreamSession,
     user: User,
     session: OrbSessionState,
-    tts_cancel_holder: list[asyncio.Event],
+    cancel_holder: list[asyncio.Event],
+    stt_runtime: SttRuntime,
 ) -> None:
     finals: list[str] = []
-    async for ev in stt_session.events():
-        await _handle_stt_event(ws, ev, finals, user, session, tts_cancel_holder)
+    try:
+        async for ev in stt_session.events():
+            await _handle_stt_event(
+                ws, ev, finals, user, session, cancel_holder, stt_runtime
+            )
+    except asyncio.CancelledError:
+        raise
+    finally:
+        if stt_runtime.session is stt_session:
+            stt_runtime.session = None
+            stt_runtime.task = None
 
 
 async def _handle_stt_event(
@@ -101,7 +207,8 @@ async def _handle_stt_event(
     finals: list[str],
     user: User,
     session: OrbSessionState,
-    tts_cancel_holder: list[asyncio.Event],
+    cancel_holder: list[asyncio.Event],
+    stt_runtime: SttRuntime,
 ) -> None:
     if ev.text:
         await _send(
@@ -115,22 +222,17 @@ async def _handle_stt_event(
         if ev.is_final:
             finals.append(ev.text)
 
-    # Only end the user's turn on Deepgram UtteranceEnd — not on speech_final
-    # between phrases (that caused premature "thinking" mid-sentence).
     if not ev.utterance_end:
         return
 
     transcript = " ".join(finals).strip()
     finals.clear()
-    if len(transcript) < 4:
+    if len(transcript) < 3:
+        await stt_runtime.restart(ws, user, session, cancel_holder)
         return
 
     await _send(ws, {"type": "speech_final", "text": transcript})
-    _cancel_turn(session.session_id)
-    tts_cancel = asyncio.Event()
-    tts_cancel_holder[:] = [tts_cancel]
-    task = asyncio.create_task(_run_turn(ws, user, session, transcript, tts_cancel))
-    _ACTIVE_TURNS[session.session_id] = task
+    _schedule_turn(ws, user, session, transcript, cancel_holder, stt_runtime)
 
 
 @router.websocket("/orb/session/live")
@@ -143,9 +245,8 @@ async def orb_session_live(ws: WebSocket) -> None:
     await ws.accept()
     user: User | None = None
     session: OrbSessionState | None = None
-    stt_session: DeepgramStreamSession | None = None
-    stt_task: asyncio.Task | None = None
-    tts_cancel_holder: list[asyncio.Event] = [asyncio.Event()]
+    stt_runtime = SttRuntime()
+    cancel_holder: list[asyncio.Event] = [asyncio.Event()]
 
     try:
         while True:
@@ -171,52 +272,55 @@ async def orb_session_live(ws: WebSocket) -> None:
                         thread_id=frame.get("thread_id"),
                         surface=str(frame.get("surface") or "desktop"),
                     )
-                    if settings.orb_streaming_stt_enabled:
-                        async with SessionLocal() as db:
-                            prompt = await transcription_prompt_for_user(db, user.id)
-                        try:
-                            stt_session = await open_streaming_stt(context_prompt=prompt)
-                            stt_task = asyncio.create_task(
-                                _stt_listener(ws, stt_session, user, session, tts_cancel_holder)
-                            )
-                        except Exception as exc:
-                            log.debug("streaming stt unavailable: %s", exc)
+                    streaming = False
+                    if settings.orb_streaming_stt_enabled and user and session:
+                        streaming = await stt_runtime.start(ws, user, session, cancel_holder)
                     await _send(
                         ws,
                         {
                             "type": "session_ready",
                             "session_id": session.session_id,
                             "thread_id": session.thread_id,
-                            "streaming_stt": stt_session is not None,
+                            "streaming_stt": streaming,
                         },
                     )
                     continue
 
+                if ftype == "ping":
+                    await _send(ws, {"type": "pong"})
+                    continue
+
+                if ftype == "prepare_listen" and user and session:
+                    await stt_runtime.restart(ws, user, session, cancel_holder)
+                    continue
+
                 if ftype == "interrupt" and session:
-                    tts_cancel_holder[0].set()
+                    cancel_holder[0].set()
                     _cancel_turn(session.session_id)
                     await _send(ws, {"type": "interrupted"})
                     continue
 
-                if ftype == "text_turn" and user and session:
-                    _cancel_turn(session.session_id)
-                    tts_cancel = asyncio.Event()
-                    tts_cancel_holder[:] = [tts_cancel]
-                    task = asyncio.create_task(
-                        _run_turn(ws, user, session, str(frame.get("text") or ""), tts_cancel)
-                    )
-                    _ACTIVE_TURNS[session.session_id] = task
+                if ftype == "end_utterance" and stt_runtime.session is not None:
+                    await stt_runtime.session.finalize()
                     continue
 
-            if msg.get("bytes") and stt_session is not None:
-                await stt_session.send_audio(msg["bytes"])
+                if ftype == "text_turn" and user and session:
+                    _schedule_turn(
+                        ws,
+                        user,
+                        session,
+                        str(frame.get("text") or ""),
+                        cancel_holder,
+                        stt_runtime,
+                    )
+                    continue
+
+            if msg.get("bytes") and stt_runtime.session is not None:
+                await stt_runtime.session.send_audio(msg["bytes"])
 
     except WebSocketDisconnect:
         pass
     finally:
         if session:
             _cancel_turn(session.session_id)
-        if stt_task is not None:
-            stt_task.cancel()
-        if stt_session is not None:
-            await stt_session.close()
+        await stt_runtime.stop()

@@ -363,3 +363,128 @@ async function streamOrbTurnAndSpeak({
   if (!spoke) throw new Error("Audio playback failed");
   return completeTurn;
 }
+
+/**
+ * Speak LLM deltas as they arrive (WebSocket or local push).
+ * Returns a controller with pushDelta / finish / abort.
+ */
+function createDeltaStreamingSpeaker({
+  speakFn,
+  speakStreamFn,
+  signal,
+  onAudio,
+  onSpeakingStart,
+}) {
+  const synth = speakStreamFn || speakFn;
+  let fullText = "";
+  let spokenUpTo = 0;
+  let spoke = false;
+  let finished = false;
+  let aborted = false;
+  const sentenceQueue = [];
+  const prefetch = new Map();
+
+  const markStart = () => {
+    if (!spoke) {
+      spoke = true;
+      if (onSpeakingStart) onSpeakingStart();
+    }
+  };
+
+  const synthSentence = async (sentence) => {
+    if (prefetch.has(sentence)) {
+      const blob = await prefetch.get(sentence);
+      prefetch.delete(sentence);
+      if (blob && blob.size >= 64) return blob;
+    }
+    let blob = await synth(sentence, signal).catch(() => null);
+    if ((!blob || blob.size < 64) && speakFn && speakFn !== synth) {
+      blob = await speakFn(sentence, signal).catch(() => null);
+    }
+    return blob && blob.size >= 64 ? blob : null;
+  };
+
+  const schedulePrefetch = (sentence) => {
+    if (!prefetch.has(sentence)) {
+      prefetch.set(
+        sentence,
+        synth(sentence, signal)
+          .then((blob) => {
+            if (blob && blob.size >= 64) return blob;
+            if (speakFn && speakFn !== synth) {
+              return speakFn(sentence, signal).catch(() => null);
+            }
+            return null;
+          })
+          .catch(() => null),
+      );
+    }
+  };
+
+  function enqueueNewSentences() {
+    while (true) {
+      const pulled = pullNextSentence(fullText, spokenUpTo);
+      if (!pulled) break;
+      sentenceQueue.push(pulled.sentence);
+      spokenUpTo = pulled.nextUpTo;
+    }
+    if (sentenceQueue.length > 0) {
+      schedulePrefetch(sentenceQueue[sentenceQueue.length - 1]);
+    }
+  }
+
+  async function drainQueue() {
+    while (!finished || sentenceQueue.length > 0) {
+      if (aborted || signal?.aborted) break;
+      if (sentenceQueue.length === 0) {
+        await new Promise((r) => setTimeout(r, 30));
+        continue;
+      }
+      const sentence = sentenceQueue.shift();
+      if (sentenceQueue.length > 0) schedulePrefetch(sentenceQueue[0]);
+      const blob = await synthSentence(sentence);
+      if (blob) await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+    }
+    const tail = fullText.slice(spokenUpTo).trim();
+    if (tail.length >= 4 && !aborted && !signal?.aborted) {
+      spokenUpTo = fullText.length;
+      const blob = await synthSentence(tail);
+      if (blob) await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+    }
+  }
+
+  const drainPromise = drainQueue();
+
+  return {
+    pushDelta(text) {
+      if (aborted || finished) return;
+      fullText += text || "";
+      enqueueNewSentences();
+    },
+    async finish(completeTurn) {
+      if (completeTurn?.answer && fullText.length < String(completeTurn.answer).length) {
+        fullText = String(completeTurn.answer);
+      }
+      enqueueNewSentences();
+      finished = true;
+      await drainPromise;
+      if (!spoke && completeTurn?.answer) {
+        await playAnswerTts({
+          text: completeTurn.answer,
+          speakFn,
+          speakStreamFn,
+          signal,
+          prefetch: 3,
+          onAudio,
+          onSpeakingStart: markStart,
+        });
+      }
+      if (!spoke) throw new Error("Audio playback failed");
+      return completeTurn;
+    },
+    abort() {
+      aborted = true;
+      finished = true;
+    },
+  };
+}

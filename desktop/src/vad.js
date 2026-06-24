@@ -152,3 +152,20 @@ function float32ToInt16PCM(float32Array) {
   }
   return out.buffer;
 }
+
+/** Downsample mic audio to 16 kHz linear16 for Deepgram live STT. */
+function float32To16kPcm(float32Array, inputSampleRate) {
+  const targetRate = 16000;
+  if (!inputSampleRate || inputSampleRate <= targetRate) {
+    return float32ToInt16PCM(float32Array);
+  }
+  const ratio = inputSampleRate / targetRate;
+  const outLen = Math.max(1, Math.floor(float32Array.length / ratio));
+  const out = new Int16Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    const srcIdx = Math.min(float32Array.length - 1, Math.floor(i * ratio));
+    const s = Math.max(-1, Math.min(1, float32Array[srcIdx]));
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return out.buffer;
+}

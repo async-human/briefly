@@ -123,6 +123,8 @@ const state = {
   useServerEndpointing: false,
   serverStreamingStt: false,
   wsTurnActive: false,
+  wsTurnSpeaker: null,
+  liveSttActive: false,
   wakePrimed: false,
   wakeErrorShownAt: 0,
   linkVerified: false,
@@ -173,6 +175,12 @@ function onAccountLinkedSuccess() {
   void primeWakeListening();
   void startWakeWord();
   void initLiveSession();
+}
+
+async function ensureLiveSession() {
+  if (!state.liveClient || !state.liveClient.ready) {
+    await initLiveSession();
+  }
 }
 
 function pollForBrowserConnect() {
@@ -785,10 +793,16 @@ function stopVadMonitor() {
   state.vadAnalyser = null;
 }
 
+function shouldUseLiveStt() {
+  return !!(state.serverStreamingStt && state.liveClient?.ready && state.liveClient.streamingStt);
+}
+
 function shouldStreamPcmToServer() {
-  // Client VAD + HTTP upload is the reliable turn path. Streaming PCM in parallel
-  // can duplicate turns when both client and Deepgram utterance-end fire.
-  return false;
+  return shouldUseLiveStt() && state.mode === "listening" && !state.wsTurnActive;
+}
+
+function shouldUseServerEndpointing() {
+  return shouldUseLiveStt();
 }
 
 function stopListeningOnly() {
@@ -818,14 +832,15 @@ function startVadMonitor(stream) {
 
   state.vadAudioCtx = ctx;
   state.vadAnalyser = analyser;
-  state.useServerEndpointing = false;
+  state.useServerEndpointing = shouldUseServerEndpointing();
 
-  if (shouldStreamPcmToServer() && typeof float32ToInt16PCM === "function") {
+  if (shouldStreamPcmToServer() && typeof float32To16kPcm === "function") {
+    const inputRate = ctx.sampleRate || 48000;
     const pcmNode = ctx.createScriptProcessor(4096, 1, 1);
     pcmNode.onaudioprocess = (ev) => {
       if (state.mode !== "listening" || !state.liveClient?.ready) return;
       const input = ev.inputBuffer.getChannelData(0);
-      state.liveClient.sendAudio(float32ToInt16PCM(input));
+      state.liveClient.sendAudio(float32To16kPcm(input, inputRate));
     };
     source.connect(pcmNode);
     pcmNode.connect(ctx.destination);
@@ -861,6 +876,11 @@ function startVadMonitor(stream) {
       bumpEnergy();
     }
 
+    if (state.useServerEndpointing) {
+      if (result === "cancel") void cancelListening();
+      return;
+    }
+
     if (
       state.endpointer.speechDetected &&
       state.endpointer.lastSpeechAt > 0 &&
@@ -891,6 +911,10 @@ function stopCurrentTurn() {
     state.speakAbort = null;
   }
   if (state.liveClient) state.liveClient.interrupt();
+  if (state.wsTurnSpeaker) {
+    state.wsTurnSpeaker.abort();
+    state.wsTurnSpeaker = null;
+  }
   stopListening();
   stopSpeaking();
   setCaption("");
@@ -1018,6 +1042,10 @@ async function startListening() {
   if (state.mode === "listening") return;
   stopCurrentTurn();
   void primeAudioPlayback();
+  await ensureLiveSession();
+  if (state.liveClient?.ready) {
+    await state.liveClient.prepareListen();
+  }
   await showWindow();
   setMode("listening");
   state.audioChunks = [];
@@ -1025,15 +1053,18 @@ async function startListening() {
 
   try {
     const stream = await ensureMic();
-    const opts = {};
-    const mimeType = chooseMimeType();
-    if (mimeType) opts.mimeType = mimeType;
-    const recorder = new MediaRecorder(stream, opts);
-    recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) state.audioChunks.push(e.data);
-    };
-    recorder.start(250);
-    state.mediaRecorder = recorder;
+    state.liveSttActive = shouldUseLiveStt();
+    if (!state.liveSttActive) {
+      const opts = {};
+      const mimeType = chooseMimeType();
+      if (mimeType) opts.mimeType = mimeType;
+      const recorder = new MediaRecorder(stream, opts);
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) state.audioChunks.push(e.data);
+      };
+      recorder.start(250);
+      state.mediaRecorder = recorder;
+    }
     startVadMonitor(stream);
   } catch (_) {
     setMode("idle");
@@ -1043,6 +1074,23 @@ async function startListening() {
 
 async function stopListeningAndSend() {
   if (state.mode !== "listening" || state.sendingUtterance || state.wsTurnActive) return;
+
+  if (state.useServerEndpointing && state.liveClient?.ready) {
+    state.sendingUtterance = true;
+    state.liveClient.sendEndUtterance();
+    setStatusForMode("listening", "Processing…");
+    stopListeningOnly();
+    setTimeout(() => {
+      if (state.sendingUtterance && !state.wsTurnActive) {
+        state.sendingUtterance = false;
+        if (state.mode === "idle") return;
+        setMode("idle");
+        flashCaption("Didn't catch that — try again.", 2000);
+      }
+    }, 28000);
+    return;
+  }
+
   if (state.endpointer && !state.endpointer.speechDetected) {
     void cancelListening();
     return;
@@ -1776,11 +1824,25 @@ async function initLiveSession() {
     setSessionId: (id) => { store.sessionId = id; },
     setThreadId: (id) => { store.threadId = id; },
   });
+
   state.liveClient.onSessionReady = (frame) => {
     state.serverStreamingStt = !!frame.streaming_stt;
   };
+
+  state.liveClient.onSttReady = (frame) => {
+    state.serverStreamingStt = !!frame.streaming_stt;
+  };
+
+  state.liveClient.onDisconnected = () => {
+    state.serverStreamingStt = false;
+    if (state.mode === "listening" && state.liveSttActive) {
+      flashCaption("Reconnecting live session…", 1600);
+    }
+  };
+
   state.liveClient.onPartialTranscript = (text, isFinal) => {
     if (state.mode === "listening") {
+      if (text) state.vadHasSpeech = true;
       setStatusForMode("listening", truncateStatus(text, 48));
       return;
     }
@@ -1800,44 +1862,102 @@ async function initLiveSession() {
       onWakePhraseHeard();
     }
   };
+
+  state.liveClient.onSpeechFinal = () => {
+    if (state.mode !== "listening" || state.wsTurnActive) return;
+    state.sendingUtterance = true;
+    setStatusForMode("listening", "Processing…");
+    stopListeningOnly();
+  };
+
   state.liveClient.onTurnStart = () => {
     state.wsTurnActive = true;
+    state.sendingUtterance = false;
     stopListeningOnly();
     setMode("thinking");
+
+    const speakAbort = new AbortController();
+    state.speakAbort = speakAbort;
+    state.wsTurnSpeaker = createDeltaStreamingSpeaker({
+      speakFn: apiSpeakToBlob,
+      speakStreamFn: apiSpeakStreamToBlob,
+      signal: speakAbort.signal,
+      onAudio: (audio) => { state.ttsAudio = audio; },
+      onSpeakingStart: () => setMode("speaking"),
+    });
   };
-  state.liveClient.onTurnResult = async (turn) => {
+
+  state.liveClient.onTurnMeta = (meta) => {
+    applyTurnMeta(meta);
+  };
+
+  state.liveClient.onTurnDelta = (content) => {
+    if (state.wsTurnSpeaker && content) {
+      state.wsTurnSpeaker.pushDelta(content);
+    }
+  };
+
+  state.liveClient.onTurnComplete = async (turn) => {
     applyTurnMeta(turn);
     const transcript = (turn?.transcript || "").trim();
     const voiceCmd = matchVoiceCommand(transcript);
     if (voiceCmd) {
       state.wsTurnActive = false;
       state.sendingUtterance = false;
+      if (state.wsTurnSpeaker) {
+        state.wsTurnSpeaker.abort();
+        state.wsTurnSpeaker = null;
+      }
+      state.speakAbort = null;
       await applyVoiceCommand(voiceCmd);
       return;
     }
-    const answer = (turn && turn.answer ? String(turn.answer) : "").trim();
-    if (answer && !state.conversationMuted) await playTts(answer);
-    else setMode("idle");
+    try {
+      if (state.wsTurnSpeaker && !state.conversationMuted && turn?.answer) {
+        await state.wsTurnSpeaker.finish(turn);
+      } else if (turn?.answer && !state.conversationMuted) {
+        await playTts(turn.answer);
+      } else {
+        setMode("idle");
+      }
+    } catch (_) {
+      if (turn?.answer && !state.conversationMuted) {
+        await playTts(turn.answer);
+      }
+    }
+    state.wsTurnSpeaker = null;
+    state.speakAbort = null;
+    state.ttsAudio = null;
     state.wsTurnActive = false;
     state.sendingUtterance = false;
+    state.turnFailureCount = 0;
     if (state.conversationMuted) return;
     state.conversationActive = true;
     await continueConversationAfterSpeak(turn);
   };
+
   state.liveClient.onTurnEnd = () => {
-    /* turn lifecycle finished on server; mic reopens after TTS in onTurnResult */
+    /* lifecycle completed in onTurnComplete */
   };
-  state.liveClient.onSpeechFinal = () => {
-    if (!shouldStreamPcmToServer()) return;
-    if (state.mode !== "listening" || state.wsTurnActive) return;
-    setStatusForMode("listening", "Processing…");
-    stopListeningOnly();
-  };
+
   state.liveClient.onError = (message) => {
-    if (String(message || "").toLowerCase().includes("unauthorized")) {
+    const msg = String(message || "");
+    if (msg.toLowerCase().includes("unauthorized")) {
       try { localStorage.setItem("briefly.orbLiveSession", "0"); } catch (_) {}
     }
+    if (state.wsTurnActive || state.sendingUtterance) {
+      state.wsTurnActive = false;
+      state.sendingUtterance = false;
+      if (state.wsTurnSpeaker) {
+        state.wsTurnSpeaker.abort();
+        state.wsTurnSpeaker = null;
+      }
+      state.speakAbort = null;
+      setMode("idle");
+      flashCaption(msg || "Something went wrong — tap to try again.", 2600);
+    }
   };
+
   const connected = await state.liveClient.connect();
   if (!connected) {
     state.serverStreamingStt = false;

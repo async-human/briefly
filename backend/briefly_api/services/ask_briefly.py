@@ -1069,7 +1069,7 @@ async def ask_briefly(
     }
 
 
-async def stream_ask_briefly(
+async def iter_ask_briefly_events(
     db: AsyncSession,
     user: User,
     message: str,
@@ -1078,7 +1078,8 @@ async def stream_ask_briefly(
     content_id: str | None = None,
     digest_item_id: str | None = None,
     voice: bool = False,
-) -> AsyncIterator[str]:
+) -> AsyncIterator[dict]:
+    """Yield structured events for streaming ask turns (SSE + WebSocket)."""
     prepared = await _prepare_ask(
         db,
         user,
@@ -1098,7 +1099,7 @@ async def stream_ask_briefly(
         )
         max_tokens = 480
 
-    yield _sse_event({"type": "thread_id", "thread_id": prepared.thread.id})
+    yield {"type": "thread_id", "thread_id": prepared.thread.id}
 
     llm = get_llm_adapter()
     parts: list[str] = []
@@ -1111,12 +1112,12 @@ async def stream_ask_briefly(
         agent="ask_briefly",
     ):
         parts.append(delta)
-        yield _sse_event({"type": "delta", "content": delta})
+        yield {"type": "delta", "content": delta}
 
     answer = "".join(parts).strip()
     citations = _extract_citations(answer, prepared.all_chunks)
     created_at = await _persist_ask_response(db, prepared, answer, citations)
-    yield _sse_event({
+    yield {
         "type": "done",
         "answer": answer,
         "citations": citations,
@@ -1124,7 +1125,29 @@ async def stream_ask_briefly(
         "content_id": prepared.thread.content_id,
         "digest_item_id": prepared.thread.digest_item_id,
         "anchor_title": prepared.focus_title,
-    })
+    }
+
+
+async def stream_ask_briefly(
+    db: AsyncSession,
+    user: User,
+    message: str,
+    *,
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    digest_item_id: str | None = None,
+    voice: bool = False,
+) -> AsyncIterator[str]:
+    async for event in iter_ask_briefly_events(
+        db,
+        user,
+        message,
+        thread_id=thread_id,
+        content_id=content_id,
+        digest_item_id=digest_item_id,
+        voice=voice,
+    ):
+        yield _sse_event(event)
 
 
 async def list_threads(db: AsyncSession, user_id: str, *, limit: int = 30) -> list[dict]:

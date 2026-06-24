@@ -234,10 +234,10 @@ class Settings(BaseSettings):
     orb_session_ttl_seconds: int = 86400
     orb_semantic_route_threshold: float = 0.72
     orb_semantic_route_medium_threshold: float = 0.58
-    orb_streaming_stt_enabled: bool = False
+    orb_streaming_stt_enabled: bool = True
     orb_ws_enabled: bool = True
-    deepgram_endpointing_ms: int = 400
-    deepgram_utterance_end_ms: int = 1800
+    deepgram_endpointing_ms: int = 350
+    deepgram_utterance_end_ms: int = 1400
     orb_plugin_modules: str = ""
 
     # ── Continuous enrichment worker ──────────────────────────────────────────
