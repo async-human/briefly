@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
 import logging
 
 import httpx
@@ -135,6 +136,55 @@ async def orb_turn_json(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return OrbTurnOut(**result)
+
+
+@router.post("/orb/turn/stream")
+async def orb_turn_stream(
+    body: OrbTurnJsonIn,
+    user: User = Depends(get_capture_user),
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    """SSE voice turn — streams LLM tokens; client starts TTS on first sentence."""
+    audio_bytes: bytes | None = None
+    if body.audio_base64:
+        try:
+            audio_bytes = base64.b64decode(body.audio_base64, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid audio_base64") from exc
+
+    async def event_generator():
+        try:
+            async for chunk in orb_service.stream_orb_turn(
+                db,
+                user,
+                audio_bytes=audio_bytes,
+                filename=body.filename or "turn.webm",
+                content_type=body.content_type or "audio/webm",
+                text=body.text,
+                thread_id=body.thread_id,
+                session_id=body.session_id,
+                surface=body.surface or "desktop",
+                content_id=body.content_id,
+            ):
+                yield chunk
+        except ValueError as exc:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"
+        except Exception:
+            log.exception("orb turn stream failed for user %s", getattr(user, "id", "?"))
+            yield (
+                "data: "
+                + json.dumps(
+                    {"type": "error", "message": "Turn failed — please try again."},
+                    ensure_ascii=False,
+                )
+                + "\n\n"
+            )
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/orb/wake-check", response_model=OrbWakeCheckOut)

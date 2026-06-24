@@ -26,6 +26,7 @@ import logging
 import re
 import time
 import uuid
+from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 
 import httpx
@@ -38,7 +39,7 @@ from briefly_api.agent import AgentRuntime, ToolContext, ToolRegistry, from_orb_
 from briefly_api.config import get_settings
 from briefly_api.db.models import FollowUpThread, User
 from briefly_api.llm.adapter import Message, get_llm_adapter
-from briefly_api.services.ask_briefly import ask_briefly
+from briefly_api.services.ask_briefly import ask_briefly, stream_ask_briefly
 from briefly_api.services.orb_router import route_transcript
 from briefly_api.services.orb_session import (
     OrbSessionState,
@@ -631,3 +632,176 @@ async def run_orb_turn(
             transcript=transcript,
         )
     return payload
+
+
+def _orb_sse_event(payload: dict) -> str:
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+async def stream_orb_turn(
+    db: AsyncSession,
+    user: User,
+    *,
+    audio_bytes: bytes | None = None,
+    filename: str = "speech.webm",
+    content_type: str = "audio/webm",
+    text: str | None = None,
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    session_id: str | None = None,
+    surface: str = "desktop",
+) -> AsyncIterator[str]:
+    """
+    SSE stream for a voice turn. Yields meta + LLM deltas for ask_briefly routes,
+    or a single complete event for tool routes (client plays TTS after).
+    """
+    timings: dict[str, int] = {}
+    started = time.monotonic()
+    session: OrbSessionState | None = None
+    if db is not None and getattr(user, "id", None):
+        session = await resolve_session(
+            user.id,
+            session_id=session_id,
+            thread_id=thread_id,
+            surface=surface,
+        )
+        if session.thread_id and not thread_id:
+            thread_id = session.thread_id
+
+    transcript = (text or "").strip()
+
+    if audio_bytes:
+        if len(audio_bytes) < 400:
+            raise ValueError("Recording too short — try again.")
+        stt_started = time.monotonic()
+        stt = get_stt_adapter()
+        context_prompt = None
+        if db is not None and getattr(user, "id", None):
+            from briefly_api.stt.profile_context import transcription_prompt_for_orb_turn
+
+            context_prompt = await transcription_prompt_for_orb_turn(
+                db,
+                user.id,
+                session=session,
+                thread_id=thread_id or (session.thread_id if session else None),
+            )
+        try:
+            transcript = (
+                await stt.transcribe(
+                    audio_bytes,
+                    filename=filename,
+                    content_type=content_type,
+                    context_prompt=context_prompt,
+                )
+            ).strip()
+        except httpx.HTTPStatusError as exc:
+            log.warning(
+                "orb stream STT failed user=%s status=%s",
+                getattr(user, "id", None),
+                exc.response.status_code,
+            )
+            raise ValueError("Couldn't process that audio — please try again.") from exc
+        timings["stt_ms"] = int((time.monotonic() - stt_started) * 1000)
+
+    if not transcript:
+        raise ValueError("No speech detected — try again.")
+
+    resolved_thread = thread_id or (session.thread_id if session else None)
+    yield _orb_sse_event({
+        "type": "meta",
+        "transcript": transcript,
+        "session_id": session.session_id if session else None,
+        "thread_id": resolved_thread,
+        "timings": timings,
+    })
+
+    if session:
+        await update_session_after_turn(session, transcript=transcript)
+
+    route_started = time.monotonic()
+    if db is not None and getattr(user, "id", None):
+        thread_msg_count = await _thread_message_count(db, user.id, resolved_thread)
+        decision = await route_transcript(transcript, thread_message_count=thread_msg_count)
+        timings["route_ms"] = int((time.monotonic() - route_started) * 1000)
+
+        stream_ask = decision.kind == "ask_briefly" or (
+            decision.kind == "direct"
+            and len(decision.tools) == 1
+            and decision.tools[0].name == "ask_briefly"
+        )
+
+        if not stream_ask:
+            result = await run_orb_turn(
+                db,
+                user,
+                text=transcript,
+                thread_id=resolved_thread,
+                content_id=content_id,
+                session_id=session.session_id if session else session_id,
+                surface=surface,
+            )
+            timings["total_ms"] = int((time.monotonic() - started) * 1000)
+            result["timings"] = {**result.get("timings", {}), **timings}
+            yield _orb_sse_event({"type": "complete", **result})
+            return
+
+    if db is None or not getattr(user, "id", None):
+        raise ValueError("Voice turn unavailable.")
+
+    stream_thread_id = resolved_thread
+    answer_parts: list[str] = []
+    citations: list = []
+    async for chunk in stream_ask_briefly(
+        db,
+        user,
+        transcript,
+        thread_id=stream_thread_id,
+        content_id=content_id,
+        voice=True,
+    ):
+        if not chunk.startswith("data: "):
+            continue
+        try:
+            payload = json.loads(chunk[6:].strip())
+        except json.JSONDecodeError:
+            continue
+        event_type = payload.get("type")
+        if event_type == "thread_id" and payload.get("thread_id"):
+            stream_thread_id = payload["thread_id"]
+            yield _orb_sse_event({
+                "type": "meta",
+                "transcript": transcript,
+                "session_id": session.session_id if session else None,
+                "thread_id": stream_thread_id,
+                "timings": timings,
+            })
+        elif event_type == "delta":
+            delta = str(payload.get("content") or "")
+            if delta:
+                answer_parts.append(delta)
+                yield _orb_sse_event({"type": "delta", "content": delta})
+        elif event_type == "done":
+            citations = payload.get("citations") or []
+            if payload.get("answer"):
+                answer_parts = [str(payload["answer"])]
+
+    answer = "".join(answer_parts).strip()
+    timings["total_ms"] = int((time.monotonic() - started) * 1000)
+    complete = {
+        "type": "complete",
+        "transcript": transcript,
+        "thread_id": stream_thread_id,
+        "session_id": session.session_id if session else None,
+        "answer": answer,
+        "citations": citations,
+        "tool_trace": [{"tool": "ask_briefly"}],
+        "expects_reply": bool(answer.endswith("?")),
+        "timings": timings,
+    }
+    if session:
+        await update_session_after_turn(
+            session,
+            thread_id=stream_thread_id,
+            transcript=transcript,
+        )
+    yield _orb_sse_event(complete)

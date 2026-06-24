@@ -459,6 +459,14 @@ async function apiTurn(audioBlob, signal) {
   const mime = audioBlob.type || "audio/webm";
   const filename = mime.includes("mp4") ? "turn.m4a" : "turn.webm";
 
+  const streamPayload = {
+    audio_base64: await blobToBase64(audioBlob),
+    content_type: mime,
+    filename,
+  };
+  const streamed = await runOrbTurnWithStream(streamPayload, signal);
+  if (streamed) return streamed;
+
   // Web/mobile: multipart upload avoids base64 inflation (~33% smaller, faster).
   if (!TAURI && typeof FormData !== "undefined") {
     const form = new FormData();
@@ -493,6 +501,8 @@ async function apiTurn(audioBlob, signal) {
 
 async function apiTurnText(text, signal) {
   await ensureOrbSession();
+  const streamed = await runOrbTurnWithStream({ text }, signal);
+  if (streamed) return streamed;
   const res = await apiFetch(store.apiBase + "/api/v1/orb/turn/json", {
     method: "POST",
     headers: {
@@ -503,6 +513,100 @@ async function apiTurnText(text, signal) {
     signal,
   });
   return await parseApiJson(res, "Turn failed");
+}
+
+async function requestOrbTurnStream(body, signal) {
+  return apiFetch(store.apiBase + "/api/v1/orb/turn/stream", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + store.token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(turnJsonBody(body)),
+    signal,
+  });
+}
+
+/**
+ * Stream LLM response and speak each sentence as it completes (low-latency path).
+ * Falls back to batch turn + playTts on 404 or stream errors.
+ */
+async function runOrbTurnWithStream(payload, signal) {
+  if (state.conversationMuted) return null;
+
+  const fetchAbort = new AbortController();
+  const onParentAbort = () => fetchAbort.abort();
+  if (signal) signal.addEventListener("abort", onParentAbort, { once: true });
+
+  let res;
+  try {
+    res = await requestOrbTurnStream(payload, fetchAbort.signal);
+  } catch (_) {
+    if (signal) signal.removeEventListener("abort", onParentAbort);
+    return null;
+  }
+  if (signal) signal.removeEventListener("abort", onParentAbort);
+
+  if (res.status === 404 || res.status === 405) return null;
+
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const errBody = await res.json();
+      detail = errBody?.detail ? String(errBody.detail) : "";
+    } catch (_) {}
+    throw new Error(detail || `Turn stream failed: HTTP ${res.status}`);
+  }
+
+  const speakAbort = new AbortController();
+  state.speakAbort = speakAbort;
+  const linked = () => {
+    if (signal?.aborted) speakAbort.abort();
+  };
+  signal?.addEventListener("abort", linked, { once: true });
+
+  setMode("thinking");
+  setStatusForMode("thinking", "Thinking…");
+
+  let voiceCmd = null;
+  try {
+    const turn = await streamOrbTurnAndSpeak({
+      response: res,
+      speakFn: apiSpeakToBlob,
+      speakStreamFn: apiSpeakStreamToBlob,
+      signal: speakAbort.signal,
+      onAudio: (audio) => {
+        state.ttsAudio = audio;
+      },
+      onSpeakingStart: () => setMode("speaking"),
+      onMeta: (meta) => {
+        applyTurnMeta(meta);
+        const cmd = matchVoiceCommand(meta.transcript || "");
+        if (cmd) {
+          voiceCmd = cmd;
+          speakAbort.abort();
+          fetchAbort.abort();
+        }
+      },
+    });
+
+    signal?.removeEventListener("abort", linked);
+    state.speakAbort = null;
+    state.ttsAudio = null;
+
+    if (!speakAbort.signal.aborted) setMode("idle");
+    turn._ttsPlayed = true;
+    return turn;
+  } catch (err) {
+    signal?.removeEventListener("abort", linked);
+    state.speakAbort = null;
+    state.ttsAudio = null;
+    if (voiceCmd) {
+      await applyVoiceCommand(voiceCmd);
+      return { _ttsPlayed: true };
+    }
+    throw err;
+  }
 }
 
 async function apiSpeakToBlob(text, signal) {
@@ -1089,6 +1193,14 @@ async function executeTurn(turnFactory) {
       await applyVoiceCommand(voiceCmd);
       return;
     }
+    if (turn?._ttsPlayed) {
+      if (state.conversationMuted) {
+        setMode("idle");
+        return;
+      }
+      await continueConversationAfterSpeak(turn);
+      return;
+    }
     const answer = (turn && turn.answer ? String(turn.answer) : "").trim();
     if (!answer) throw new Error("No answer");
     const trace = Array.isArray(turn?.tool_trace) ? turn.tool_trace : [];
@@ -1101,7 +1213,9 @@ async function executeTurn(turnFactory) {
       flashCaption("Muted — say \"unmute\" or tap to talk.", 2800);
       return;
     }
-    await playTts(answer);
+    if (!turn._ttsPlayed) {
+      await playTts(answer);
+    }
     if (turnAbort.signal.aborted) return;
     await continueConversationAfterSpeak(turn);
   } catch (err) {

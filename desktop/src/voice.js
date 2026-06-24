@@ -185,3 +185,181 @@ async function playSentencePipeline({
 
   if (!spoke) throw new Error("No audio played");
 }
+
+/** Pull the next complete sentence from incremental LLM text. */
+function pullNextSentence(fullText, spokenUpTo) {
+  const rest = fullText.slice(spokenUpTo);
+  if (!rest.trim()) return null;
+  const match = rest.match(/^[\s\S]*?[.!?]+["')\]]*\s+/);
+  if (match && match[0].trim().length >= 6) {
+    return { sentence: match[0].trim(), nextUpTo: spokenUpTo + match[0].length };
+  }
+  return null;
+}
+
+async function consumeSseResponse(response, onEvent, signal) {
+  if (!response.body) throw new Error("No stream body");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    if (signal?.aborted) break;
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      for (const line of block.split("\n")) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          onEvent(JSON.parse(line.slice(6)));
+        } catch (_) {}
+      }
+    }
+  }
+}
+
+/**
+ * Stream an orb turn (SSE) and start TTS as soon as the first sentence is ready.
+ */
+async function streamOrbTurnAndSpeak({
+  response,
+  speakFn,
+  speakStreamFn,
+  signal,
+  onAudio,
+  onSpeakingStart,
+  onMeta,
+}) {
+  const synth = speakStreamFn || speakFn;
+  if (!synth) throw new Error("No TTS function");
+
+  let fullText = "";
+  let spokenUpTo = 0;
+  let spoke = false;
+  let completeTurn = null;
+  let streamError = null;
+  const sentenceQueue = [];
+  let streamDone = false;
+  const prefetch = new Map();
+
+  const markStart = () => {
+    if (!spoke) {
+      spoke = true;
+      if (onSpeakingStart) onSpeakingStart();
+    }
+  };
+
+  const synthSentence = async (sentence) => {
+    if (prefetch.has(sentence)) {
+      const blob = await prefetch.get(sentence);
+      prefetch.delete(sentence);
+      if (blob && blob.size >= 64) return blob;
+    }
+    let blob = await synth(sentence, signal).catch(() => null);
+    if ((!blob || blob.size < 64) && speakFn && speakFn !== synth) {
+      blob = await speakFn(sentence, signal).catch(() => null);
+    }
+    return blob && blob.size >= 64 ? blob : null;
+  };
+
+  const schedulePrefetch = (sentence) => {
+    if (!prefetch.has(sentence)) {
+      prefetch.set(
+        sentence,
+        synth(sentence, signal)
+          .then((blob) => {
+            if (blob && blob.size >= 64) return blob;
+            if (speakFn && speakFn !== synth) {
+              return speakFn(sentence, signal).catch(() => null);
+            }
+            return null;
+          })
+          .catch(() => null),
+      );
+    }
+  };
+
+  function enqueueNewSentences() {
+    while (true) {
+      const pulled = pullNextSentence(fullText, spokenUpTo);
+      if (!pulled) break;
+      sentenceQueue.push(pulled.sentence);
+      spokenUpTo = pulled.nextUpTo;
+    }
+    if (sentenceQueue.length > 0) {
+      schedulePrefetch(sentenceQueue[sentenceQueue.length - 1]);
+    }
+  }
+
+  async function drainQueue() {
+    while (!streamDone || sentenceQueue.length > 0) {
+      if (signal?.aborted) break;
+      if (sentenceQueue.length === 0) {
+        await new Promise((r) => setTimeout(r, 35));
+        continue;
+      }
+      const sentence = sentenceQueue.shift();
+      if (sentenceQueue.length > 0) schedulePrefetch(sentenceQueue[0]);
+      const blob = await synthSentence(sentence);
+      if (blob) await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+    }
+    const tail = fullText.slice(spokenUpTo).trim();
+    if (tail.length >= 4 && !signal?.aborted) {
+      spokenUpTo = fullText.length;
+      const blob = await synthSentence(tail);
+      if (blob) await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+    }
+  }
+
+  const drainPromise = drainQueue();
+
+  await consumeSseResponse(
+    response,
+    (ev) => {
+      if (ev.type === "error") {
+        streamError = new Error(ev.message || "Stream error");
+        streamDone = true;
+        return;
+      }
+      if (ev.type === "meta") {
+        if (onMeta) onMeta(ev);
+      } else if (ev.type === "delta") {
+        fullText += ev.content || "";
+        enqueueNewSentences();
+      } else if (ev.type === "complete") {
+        completeTurn = ev;
+        if (ev.answer && !fullText) fullText = String(ev.answer);
+        else if (ev.answer && fullText.length < String(ev.answer).length) {
+          fullText = String(ev.answer);
+        }
+        enqueueNewSentences();
+        streamDone = true;
+      }
+    },
+    signal,
+  );
+
+  streamDone = true;
+  await drainPromise;
+
+  if (streamError) throw streamError;
+  if (!completeTurn) throw new Error("Incomplete stream");
+
+  if (!spoke && completeTurn.answer) {
+    await playAnswerTts({
+      text: completeTurn.answer,
+      speakFn,
+      speakStreamFn,
+      signal,
+      prefetch: 3,
+      onAudio,
+      onSpeakingStart: markStart,
+    });
+  }
+
+  if (!spoke) throw new Error("Audio playback failed");
+  return completeTurn;
+}

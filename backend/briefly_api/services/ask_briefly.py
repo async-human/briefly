@@ -1077,6 +1077,7 @@ async def stream_ask_briefly(
     thread_id: str | None = None,
     content_id: str | None = None,
     digest_item_id: str | None = None,
+    voice: bool = False,
 ) -> AsyncIterator[str]:
     prepared = await _prepare_ask(
         db,
@@ -1087,15 +1088,25 @@ async def stream_ask_briefly(
         digest_item_id=digest_item_id,
     )
 
+    system = _ASK_SYSTEM
+    max_tokens = 1200
+    if voice:
+        system = (
+            f"{_ASK_SYSTEM}\n\n"
+            "VOICE MODE: Reply in 2–5 short spoken sentences unless the user explicitly "
+            "asked for detail. No markdown, headings, or bullet lists — natural speech only."
+        )
+        max_tokens = 480
+
     yield _sse_event({"type": "thread_id", "thread_id": prepared.thread.id})
 
     llm = get_llm_adapter()
     parts: list[str] = []
     async for delta in llm.stream_complete(
         prepared.llm_messages,
-        system=_ASK_SYSTEM,
+        system=system,
         temperature=0.35,
-        max_tokens=1200,
+        max_tokens=max_tokens,
         user_id=user.id,
         agent="ask_briefly",
     ):
@@ -1107,6 +1118,7 @@ async def stream_ask_briefly(
     created_at = await _persist_ask_response(db, prepared, answer, citations)
     yield _sse_event({
         "type": "done",
+        "answer": answer,
         "citations": citations,
         "created_at": created_at,
         "content_id": prepared.thread.content_id,
