@@ -1,5 +1,18 @@
 "use strict";
 
+/** All in-flight TTS `<audio>` elements — stop together on interrupt. */
+const activePlaybackAudios = new Set();
+
+function stopAllPlayback() {
+  for (const audio of activePlaybackAudios) {
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+    } catch (_) {}
+  }
+  activePlaybackAudios.clear();
+}
+
 /** Split spoken answer into sentence-sized TTS chunks (mirrors mobile orb). */
 function splitSentences(text) {
   const raw = text.match(/[^.!?]+[.!?]+["')\]]*\s*|[^.!?]+$/g) || [text];
@@ -28,9 +41,11 @@ async function playBlobAudio(blob, opts = {}) {
     await new Promise((resolve, reject) => {
       const audio = new Audio(url);
       audio.preload = "auto";
+      activePlaybackAudios.add(audio);
       if (onAudio) onAudio(audio);
 
       const finish = (err) => {
+        activePlaybackAudios.delete(audio);
         if (onAudio) onAudio(null);
         URL.revokeObjectURL(url);
         if (err) reject(err);
@@ -38,6 +53,10 @@ async function playBlobAudio(blob, opts = {}) {
       };
 
       if (signal) {
+        if (signal.aborted) {
+          finish();
+          return;
+        }
         signal.addEventListener(
           "abort",
           () => {
@@ -485,6 +504,8 @@ function createDeltaStreamingSpeaker({
     abort() {
       aborted = true;
       finished = true;
+      prefetch.clear();
+      stopAllPlayback();
     },
   };
 }

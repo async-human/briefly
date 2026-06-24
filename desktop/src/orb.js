@@ -82,8 +82,8 @@ const VAD = {
   SPEECH_START_FRAMES: 2,
 };
 
-/** Pause before reopening the mic after the agent speaks (avoids echo + gives you time to start). */
-const LISTEN_REOPEN_DELAY_MS = 700;
+/** Pause before reopening the mic after the agent speaks (avoids echo). */
+const LISTEN_REOPEN_DELAY_MS = 400;
 
 /** If speech was heard but VAD never endpointed, force-send after this silence. */
 const LISTEN_STUCK_SILENCE_MS = 3200;
@@ -136,6 +136,14 @@ const state = {
   turnFailureCount: 0,
   playbackCtx: null,
   playbackUnlocked: false,
+  conversationGeneration: 0,
+  activeTurnEpoch: 0,
+  currentTurnEpoch: 0,
+  bargeInTimer: null,
+  bargeInAnalyser: null,
+  bargeInCtx: null,
+  bargeInSpeechMs: 0,
+  bargeInCooldownUntil: 0,
 };
 
 function isAccountLinked() {
@@ -680,9 +688,15 @@ function setMode(mode) {
     mode === "speaking" ? 0.68 :
     0.08;
   if (mode === "idle") {
+    stopBargeInMonitor();
     updateWakeStatus();
   } else {
     setStatusForMode(mode);
+    if (mode === "speaking" || mode === "thinking") {
+      void ensureMic().then(() => startBargeInMonitor()).catch(() => {});
+    } else {
+      stopBargeInMonitor();
+    }
   }
 }
 
@@ -720,6 +734,7 @@ function stopSpeaking() {
     state.speakAbort.abort();
     state.speakAbort = null;
   }
+  if (typeof stopAllPlayback === "function") stopAllPlayback();
   if (state.ttsAudio) {
     try {
       state.ttsAudio.pause();
@@ -727,7 +742,88 @@ function stopSpeaking() {
     } catch (_) {}
     state.ttsAudio = null;
   }
-  setMode("idle");
+  if (state.mode === "speaking") setMode("idle");
+}
+
+function stopBargeInMonitor() {
+  if (state.bargeInTimer) {
+    clearInterval(state.bargeInTimer);
+    state.bargeInTimer = null;
+  }
+  state.bargeInAnalyser = null;
+  state.bargeInSpeechMs = 0;
+}
+
+function startBargeInMonitor() {
+  stopBargeInMonitor();
+  if (!state.micStream || state.conversationMuted) return;
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+
+  if (!state.bargeInCtx) state.bargeInCtx = new AudioCtx();
+  const ctx = state.bargeInCtx;
+  if (ctx.state === "suspended") void ctx.resume();
+
+  const source = ctx.createMediaStreamSource(state.micStream);
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.55;
+  source.connect(analyser);
+  state.bargeInAnalyser = analyser;
+  state.bargeInSpeechMs = 0;
+
+  state.bargeInTimer = setInterval(() => {
+    if (state.mode !== "speaking" && state.mode !== "thinking") {
+      stopBargeInMonitor();
+      return;
+    }
+    if (Date.now() < state.bargeInCooldownUntil) return;
+    const rms = measureMicRms(analyser);
+    if (rms >= 0.022) {
+      state.bargeInSpeechMs += 100;
+      if (state.bargeInSpeechMs >= 240) {
+        state.bargeInSpeechMs = 0;
+        state.bargeInCooldownUntil = Date.now() + 1200;
+        void interruptAndListen();
+      }
+    } else {
+      state.bargeInSpeechMs = Math.max(0, state.bargeInSpeechMs - 60);
+    }
+  }, 100);
+}
+
+function interruptAndListen() {
+  state.conversationActive = true;
+  flashCaption("Listening…", 900);
+  void startListening();
+}
+
+function stopCurrentTurn(options = {}) {
+  const { reopenMic = false } = options;
+  state.conversationGeneration += 1;
+  state.activeTurnEpoch += 1;
+  state.sendingUtterance = false;
+  state.wsTurnActive = false;
+  if (state.turnAbort) {
+    state.turnAbort.abort();
+    state.turnAbort = null;
+  }
+  if (state.speakAbort) {
+    state.speakAbort.abort();
+    state.speakAbort = null;
+  }
+  if (state.liveClient) state.liveClient.interrupt();
+  if (state.wsTurnSpeaker) {
+    state.wsTurnSpeaker.abort();
+    state.wsTurnSpeaker = null;
+  }
+  stopListening();
+  stopSpeaking();
+  stopBargeInMonitor();
+  setCaption("");
+  updateWakeStatus();
+  if (reopenMic) void startListening();
 }
 
 function stopListening() {
@@ -899,26 +995,6 @@ function startVadMonitor(stream) {
       void cancelListening();
     }
   }, VAD.POLL_MS);
-}
-
-function stopCurrentTurn() {
-  if (state.turnAbort) {
-    state.turnAbort.abort();
-    state.turnAbort = null;
-  }
-  if (state.speakAbort) {
-    state.speakAbort.abort();
-    state.speakAbort = null;
-  }
-  if (state.liveClient) state.liveClient.interrupt();
-  if (state.wsTurnSpeaker) {
-    state.wsTurnSpeaker.abort();
-    state.wsTurnSpeaker = null;
-  }
-  stopListening();
-  stopSpeaking();
-  setCaption("");
-  updateWakeStatus();
 }
 
 async function ensureMic() {
@@ -1137,8 +1213,10 @@ function sleep(ms) {
 async function continueConversationAfterSpeak(turn) {
   if (state.conversationMuted) return;
   if (!state.conversationActive) state.conversationActive = true;
+  const generation = state.conversationGeneration;
   if (LISTEN_REOPEN_DELAY_MS > 0) {
     await sleep(LISTEN_REOPEN_DELAY_MS);
+    if (generation !== state.conversationGeneration) return;
     if (state.mode !== "idle" || state.conversationMuted) return;
   }
   flashCaption("Listening…", 900);
@@ -1390,8 +1468,7 @@ function startProactiveLoop() {
 
 function toggleTalk() {
   if (state.mode === "speaking" || state.mode === "thinking") {
-    stopCurrentTurn();
-    flashCaption("Interrupted", 900);
+    interruptAndListen();
     return;
   }
   if (state.mode === "listening") {
@@ -1472,10 +1549,7 @@ function stopWakeWord() {
 function onWakePhraseHeard() {
   if (state.mode === "listening") return;
   if (state.mode === "speaking" || state.mode === "thinking") {
-    stopCurrentTurn();
-    flashCaption("Interrupted — listening.", 1200);
-    state.conversationActive = true;
-    void startListening();
+    interruptAndListen();
     return;
   }
   if (state.mode !== "idle") return;
@@ -1852,6 +1926,10 @@ async function initLiveSession() {
         void applyVoiceCommand(cmd);
         return;
       }
+      if (text && text.trim().length >= 4) {
+        interruptAndListen();
+        return;
+      }
     }
     if (
       (state.mode === "idle" || state.mode === "speaking" || state.mode === "thinking") &&
@@ -1871,9 +1949,17 @@ async function initLiveSession() {
   };
 
   state.liveClient.onTurnStart = () => {
+    state.activeTurnEpoch += 1;
+    state.currentTurnEpoch = state.activeTurnEpoch;
+    const turnEpoch = state.currentTurnEpoch;
     state.wsTurnActive = true;
     state.sendingUtterance = false;
     stopListeningOnly();
+    if (typeof stopAllPlayback === "function") stopAllPlayback();
+    if (state.wsTurnSpeaker) {
+      state.wsTurnSpeaker.abort();
+      state.wsTurnSpeaker = null;
+    }
     setMode("thinking");
 
     const speakAbort = new AbortController();
@@ -1883,7 +1969,9 @@ async function initLiveSession() {
       speakStreamFn: apiSpeakStreamToBlob,
       signal: speakAbort.signal,
       onAudio: (audio) => { state.ttsAudio = audio; },
-      onSpeakingStart: () => setMode("speaking"),
+      onSpeakingStart: () => {
+        if (turnEpoch === state.currentTurnEpoch) setMode("speaking");
+      },
     });
   };
 
@@ -1898,6 +1986,9 @@ async function initLiveSession() {
   };
 
   state.liveClient.onTurnComplete = async (turn) => {
+    const turnEpoch = state.currentTurnEpoch;
+    if (turnEpoch !== state.activeTurnEpoch) return;
+
     applyTurnMeta(turn);
     const transcript = (turn?.transcript || "").trim();
     const voiceCmd = matchVoiceCommand(transcript);
@@ -1913,18 +2004,24 @@ async function initLiveSession() {
       return;
     }
     try {
-      if (state.wsTurnSpeaker && !state.conversationMuted && turn?.answer) {
+      if (
+        turnEpoch === state.currentTurnEpoch &&
+        state.wsTurnSpeaker &&
+        !state.conversationMuted &&
+        turn?.answer
+      ) {
         await state.wsTurnSpeaker.finish(turn);
-      } else if (turn?.answer && !state.conversationMuted) {
+      } else if (turnEpoch === state.currentTurnEpoch && turn?.answer && !state.conversationMuted) {
         await playTts(turn.answer);
-      } else {
+      } else if (turnEpoch === state.currentTurnEpoch) {
         setMode("idle");
       }
     } catch (_) {
-      if (turn?.answer && !state.conversationMuted) {
+      if (turnEpoch === state.currentTurnEpoch && turn?.answer && !state.conversationMuted) {
         await playTts(turn.answer);
       }
     }
+    if (turnEpoch !== state.currentTurnEpoch) return;
     state.wsTurnSpeaker = null;
     state.speakAbort = null;
     state.ttsAudio = null;

@@ -65,6 +65,8 @@ async def route_transcript(
     transcript: str,
     *,
     thread_message_count: int = 0,
+    session_thread_id: str | None = None,
+    session_has_prior_turn: bool = False,
 ) -> RouteDecision:
     """Decide how to handle a spoken/typed orb turn."""
     text = (transcript or "").strip()
@@ -73,9 +75,13 @@ async def route_transcript(
 
     matched = regex_matches(text)
 
+    active_thread = thread_message_count > 0 or (
+        bool(session_thread_id) and session_has_prior_turn
+    )
+
     # Active voice thread — route follow-ups through ask_briefly unless an explicit
     # command regex matches (e.g. "read my brief", "what's on my calendar").
-    if thread_message_count > 0:
+    if active_thread:
         if len(matched) == 1:
             return RouteDecision(
                 kind="direct",

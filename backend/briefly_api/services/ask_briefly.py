@@ -1091,12 +1091,19 @@ async def iter_ask_briefly_events(
 
     system = _ASK_SYSTEM
     max_tokens = 1200
+    history = list(prepared.thread.messages or [])
     if voice:
         system = (
             f"{_ASK_SYSTEM}\n\n"
             "VOICE MODE: Reply in 2–5 short spoken sentences unless the user explicitly "
             "asked for detail. No markdown, headings, or bullet lists — natural speech only."
         )
+        if history:
+            system += (
+                "\n\nVOICE FOLLOW-UP: The user is continuing a spoken conversation in this "
+                "thread. Treat their new question as referring to your immediately prior answer "
+                "and the same topic unless they clearly change subject."
+            )
         max_tokens = 480
 
     yield {"type": "thread_id", "thread_id": prepared.thread.id}

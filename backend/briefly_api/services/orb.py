@@ -543,7 +543,12 @@ async def run_orb_turn(
     if db is not None and getattr(user, "id", None):
         resolved_thread = thread_id or (session.thread_id if session else None)
         thread_msg_count = await _thread_message_count(db, user.id, resolved_thread)
-        decision = await route_transcript(transcript, thread_message_count=thread_msg_count)
+        decision = await route_transcript(
+            transcript,
+            thread_message_count=thread_msg_count,
+            session_thread_id=session.thread_id if session else None,
+            session_has_prior_turn=bool(session and session.last_transcript),
+        )
         timings["route_ms"] = int((time.monotonic() - route_started) * 1000)
 
         if decision.kind == "direct" and len(decision.tools) == 1:
@@ -670,7 +675,12 @@ async def iter_orb_text_turn_events(
     route_started = time.monotonic()
     if db is not None and getattr(user, "id", None):
         thread_msg_count = await _thread_message_count(db, user.id, resolved_thread)
-        decision = await route_transcript(transcript, thread_message_count=thread_msg_count)
+        decision = await route_transcript(
+            transcript,
+            thread_message_count=thread_msg_count,
+            session_thread_id=session.thread_id if session else None,
+            session_has_prior_turn=bool(session and session.last_transcript),
+        )
         timings["route_ms"] = int((time.monotonic() - route_started) * 1000)
 
         stream_ask = decision.kind == "ask_briefly" or (
@@ -711,6 +721,9 @@ async def iter_orb_text_turn_events(
         event_type = event.get("type")
         if event_type == "thread_id" and event.get("thread_id"):
             stream_thread_id = event["thread_id"]
+            if session:
+                session.thread_id = stream_thread_id
+                await update_session_after_turn(session, thread_id=stream_thread_id)
             yield {
                 "type": "meta",
                 "transcript": transcript,
