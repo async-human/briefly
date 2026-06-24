@@ -720,7 +720,7 @@ function setMode(mode) {
     setStatusForMode(mode);
     if (mode === "speaking") {
       state.speakingStartedAt = Date.now();
-      void ensureMic().then(() => startBargeInMonitor()).catch(() => {});
+      // Voice barge-in disabled — tap/hotkey only (background noise was false-triggering).
     } else {
       stopBargeInMonitor();
     }
@@ -1677,13 +1677,15 @@ function stopWakeWord() {
   state.wakeBackend = "none";
 }
 
-function onWakePhraseHeard() {
+function onWakePhraseHeard(transcript) {
   if (state.mode === "listening") return;
+  const matched = transcriptMatchesWakePhrase(transcript);
   if (state.mode === "speaking" || state.mode === "thinking") {
-    interruptAndListen();
+    if (matched) interruptAndListen();
     return;
   }
   if (state.mode !== "idle") return;
+  if (!matched && transcript) return;
   state.conversationActive = true;
   flashCaption("Wake word heard.", 900);
   void startListening();
@@ -1752,8 +1754,8 @@ async function startMicWakeWord() {
     verifyLinked: async () => refreshLinkState(),
     isIdle: () => {
       if (!store.wakeEnabled || store.wakeMuted) return false;
-      if (state.mode === "listening") return false;
-      return state.mode === "idle" || state.mode === "speaking" || state.mode === "thinking";
+      if (state.mode !== "idle") return false;
+      return true;
     },
     measureRms: measureMicRms,
     chooseMimeType,
@@ -1792,7 +1794,7 @@ function startWebWakeWord() {
       transcript += event.results[i][0]?.transcript || "";
     }
     if (!transcriptMatchesWakePhrase(transcript)) return;
-    onWakePhraseHeard();
+    onWakePhraseHeard(transcript);
   };
   rec.onerror = () => {
     state.wakeRestartTimer = setTimeout(() => startWakeWord(), 1500);
@@ -1824,7 +1826,7 @@ async function startWakeWord() {
         state.wakeBackend = "native";
         if (TAURI?.event) {
           state.wakeEventUnlisten = await TAURI.event.listen("wake-detected", () => {
-            onWakePhraseHeard();
+            onWakePhraseHeard("hey briefly");
           });
         }
         updateWakeStatus();
@@ -2065,7 +2067,7 @@ async function initLiveSession() {
       !store.wakeMuted &&
       transcriptMatchesWakePhrase(text)
     ) {
-      onWakePhraseHeard();
+      onWakePhraseHeard(text);
     }
   };
 

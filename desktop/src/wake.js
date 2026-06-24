@@ -217,32 +217,18 @@ class MicWakeMonitor {
       if (result?.wake || transcriptMatchesWakePhrase(result?.transcript)) {
         this.cooldownUntil = Date.now() + this.cooldownMs;
         this.onWake(result?.transcript || "");
-        return;
-      }
-      // Verified account: STT may miss "hey briefly" — still open the mic.
-      if (this.isLinked?.()) {
-        this.cooldownUntil = Date.now() + this.cooldownMs;
-        this.onWake("");
       }
     } catch (err) {
       const msg = String(err?.message || err || "");
       const authFailed = msg.includes("401");
       if (authFailed && this.verifyLinked) {
-        const ok = await this.verifyLinked();
-        if (ok) {
-          this.cooldownUntil = Date.now() + this.cooldownMs;
-          this.onWake("");
-          return;
-        }
+        await this.verifyLinked();
       }
       if (authFailed) {
         if (this.onError) this.onError("check", err);
         return;
       }
       if (this.onError) this.onError("check", err);
-      // Server/STT unavailable — still open the mic so voice isn't blocked.
-      this.cooldownUntil = Date.now() + this.cooldownMs;
-      this.onWake("");
     } finally {
       this.busy = false;
     }
