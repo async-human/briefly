@@ -259,16 +259,12 @@ function pullNextSentence(fullText, spokenUpTo, opts = {}) {
     return { sentence: match[0].trim(), nextUpTo: spokenUpTo + match[0].length };
   }
 
-  // First spoken chunk: don't wait for a full sentence — cuts time-to-first-audio.
+    // First spoken chunk: wait for a natural sentence boundary when possible.
   if (opts.earlyFirst && spokenUpTo === 0) {
-    const clause = rest.match(/^[\s\S]{14,}?[,;:]\s+/);
-    if (clause && clause[0].trim().length >= 14) {
-      return { sentence: clause[0].trim(), nextUpTo: spokenUpTo + clause[0].length };
-    }
     const trimmed = rest.trim();
-    if (trimmed.length >= 36) {
-      const space = trimmed.lastIndexOf(" ", 42);
-      if (space >= 18) {
+    if (trimmed.length >= 52) {
+      const space = trimmed.lastIndexOf(" ", 48);
+      if (space >= 24) {
         const chunk = trimmed.slice(0, space).trim();
         return { sentence: chunk, nextUpTo: spokenUpTo + rest.indexOf(chunk) + chunk.length };
       }

@@ -236,8 +236,8 @@ class Settings(BaseSettings):
     orb_semantic_route_medium_threshold: float = 0.58
     orb_streaming_stt_enabled: bool = True
     orb_ws_enabled: bool = True
-    deepgram_endpointing_ms: int = 280
-    deepgram_utterance_end_ms: int = 1050
+    deepgram_endpointing_ms: int = 550
+    deepgram_utterance_end_ms: int = 2200
     orb_plugin_modules: str = ""
     orb_voice_max_steps: int = 3
     orb_tts_single_request_max_chars: int = 900

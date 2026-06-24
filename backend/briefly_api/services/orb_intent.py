@@ -102,21 +102,6 @@ async def classify_orb_intent(
                 confidence=1.0,
                 reason="regex_multi_in_thread",
             )
-        # Semantic tool match allowed in active threads (was ask_briefly-only).
-        decision = await route_transcript(
-            text,
-            thread_message_count=0,
-            session_thread_id=None,
-            session_has_prior_turn=False,
-        )
-        if decision.kind in {"direct", "agent"} and decision.tools:
-            decision = RouteDecision(
-                kind=decision.kind,
-                tools=decision.tools,
-                confidence=decision.confidence,
-                reason=f"semantic_in_thread:{decision.reason}",
-            )
-            return decision
         return RouteDecision(kind="ask_briefly", confidence=1.0, reason="active_thread_rag")
 
     return await route_transcript(

@@ -136,7 +136,11 @@ class SttRuntime:
                     session=session,
                     thread_id=session.thread_id,
                 )
-            stt = await open_streaming_stt(context_prompt=prompt)
+            stt = await open_streaming_stt(
+                context_prompt=prompt,
+                endpointing_ms=settings.deepgram_endpointing_ms,
+                utterance_end_ms=settings.deepgram_utterance_end_ms,
+            )
 
         self.session = stt
         self.mode = mode
@@ -351,11 +355,12 @@ async def _handle_stt_event(
     transcript = " ".join(finals).strip()
     finals.clear()
     if len(transcript) < 3:
-        await stt_runtime.restart(ws, user_id, session, cancel_holder, mode="conversation")
         return
 
+    # Segment final — client merges continuations and submits via text_turn when the
+    # user has finished speaking (avoids cutting off mid-thought on brief pauses).
     await _send(ws, {"type": "speech_final", "text": transcript})
-    await _schedule_turn(ws, user_id, session, transcript, cancel_holder, stt_runtime)
+    return
 
 
 @router.websocket("/orb/session/live")

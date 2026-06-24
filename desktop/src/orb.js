@@ -70,35 +70,41 @@ const PROACTIVE_POLL_MS = 90000;
 // Voice activity detection — client-side endpointing (always on; server STT is optional).
 const VAD = {
   POLL_MS: 48,
-  BASE_SILENCE_MS: 1600,
-  MAX_ADAPTIVE_SILENCE_MS: 1000,
+  BASE_SILENCE_MS: 2200,
+  MAX_ADAPTIVE_SILENCE_MS: 1400,
   MIN_SPEECH_MS: 320,
-  HANGOVER_MS: 500,
+  HANGOVER_MS: 700,
   CALIBRATE_MS: 600,
   MIN_LISTEN_MS: 700,
   MAX_LISTEN_MS: 60000,
   MAX_LISTEN_NO_SPEECH_MS: 15000,
-  MAX_POST_SPEECH_SILENCE_MS: 3200,
+  MAX_POST_SPEECH_SILENCE_MS: 4500,
   SPEECH_START_FRAMES: 2,
 };
+
+/** After a speech segment, wait this long for the user to continue before sending. */
+const UTTERANCE_CONFIRM_MS = 2800;
+
+/** Immediate submit when the user explicitly stops listening (tap / PTT release). */
+const UTTERANCE_MANUAL_CONFIRM_MS = 450;
 
 /** Pause before reopening the mic after the agent speaks (avoids echo). */
 const LISTEN_REOPEN_DELAY_MS = 80;
 
 /** Barge-in — STT final utterance or tap; RMS backup only while speaking. */
 const BARGE_IN = {
-  GRACE_AFTER_SPEAK_MS: 500,
-  COOLDOWN_MS: 1000,
+  GRACE_AFTER_SPEAK_MS: 1400,
+  COOLDOWN_MS: 1200,
   RMS_POLL_MS: 80,
-  RMS_CALIBRATE_MS: 550,
-  RMS_NOISE_MULT: 4.5,
-  RMS_MIN_ABS: 0.034,
-  RMS_SUSTAIN_MS: 420,
-  RMS_DECAY_MS: 45,
+  RMS_CALIBRATE_MS: 650,
+  RMS_NOISE_MULT: 5.2,
+  RMS_MIN_ABS: 0.042,
+  RMS_SUSTAIN_MS: 820,
+  RMS_DECAY_MS: 50,
 };
 
 /** If speech was heard but VAD never endpointed, force-send after this silence. */
-const LISTEN_STUCK_SILENCE_MS = 3200;
+const LISTEN_STUCK_SILENCE_MS = 4500;
 
 /** HTTP turn timeout (LLM + TTS can be slow). */
 const TURN_TIMEOUT_MS = 120000;
@@ -157,6 +163,7 @@ const state = {
   turnFailureCount: 0,
   thinkingWatchdog: null,
   pendingUserTranscript: "",
+  utteranceSubmitTimer: null,
   playbackCtx: null,
   playbackUnlocked: false,
   conversationGeneration: 0,
@@ -211,9 +218,8 @@ function looksLikeUserBargeIn(text, isFinal) {
     "stop", "wait", "hold", "no", "mute", "pause", "hey", "briefly", "shh", "quiet",
   ]);
   if (words.length === 1 && oneWordBarge.has(words[0])) return true;
-  if (words.length >= 2) return true;
-  if (isFinal && norm.length >= 4) return true;
-  if (!isFinal && norm.length >= 6) return true;
+  if (words.length >= 2 && isFinal) return true;
+  if (isFinal && norm.length >= 7) return true;
   return false;
 }
 
@@ -993,6 +999,8 @@ function hardStopPlayback() {
 
 function cancelActiveTurn(options = {}) {
   const { notifyServer = true } = options;
+  clearUtteranceSubmitTimer();
+  state.pendingUserTranscript = "";
   state.conversationGeneration += 1;
   state.activeTurnEpoch += 1;
   state.sendingUtterance = false;
@@ -1279,6 +1287,7 @@ function startVadMonitor(stream) {
 
     if (state.endpointer.speechActive) {
       bumpEnergy();
+      clearUtteranceSubmitTimer();
     }
 
     if (state.useServerEndpointing) {
@@ -1442,6 +1451,8 @@ async function startListening(options = {}) {
 
   setMode("listening");
   setStatusForMode("listening", "Listening…");
+  clearUtteranceSubmitTimer();
+  state.pendingUserTranscript = "";
   state.audioChunks = [];
   state.listeningStartedAt = Date.now();
   void primeAudioPlayback();
@@ -1480,17 +1491,68 @@ async function startListening(options = {}) {
   }
 }
 
+function clearUtteranceSubmitTimer() {
+  if (state.utteranceSubmitTimer) {
+    clearTimeout(state.utteranceSubmitTimer);
+    state.utteranceSubmitTimer = null;
+  }
+}
+
+function appendSpeechSegment(text) {
+  const seg = String(text || "").trim();
+  if (!seg) return;
+  const prev = state.pendingUserTranscript.trim();
+  if (prev && prev.endsWith(seg)) return;
+  if (prev && seg.startsWith(prev)) {
+    state.pendingUserTranscript = seg;
+  } else {
+    state.pendingUserTranscript = prev ? `${prev} ${seg}` : seg;
+  }
+  setStatusForMode("listening", truncateStatus(state.pendingUserTranscript, 56));
+}
+
+function scheduleUtteranceSubmit(delayMs = UTTERANCE_CONFIRM_MS) {
+  clearUtteranceSubmitTimer();
+  state.utteranceSubmitTimer = setTimeout(() => {
+    state.utteranceSubmitTimer = null;
+    void confirmAndSubmitUtterance();
+  }, delayMs);
+}
+
+async function confirmAndSubmitUtterance() {
+  if (state.mode !== "listening" || state.wsTurnActive || state.sendingUtterance) return;
+  const text = state.pendingUserTranscript.trim();
+  if (!text || text.length < 3) {
+    void cancelListening();
+    return;
+  }
+  clearUtteranceSubmitTimer();
+  state.sendingUtterance = true;
+  state.pendingUserTranscript = "";
+  stopListeningOnly();
+  setMode("thinking");
+  setStatusForMode("thinking", truncateStatus(text, 52));
+  if (state.liveClient?.ready) {
+    state.liveClient.sendTextTurn(text);
+    armWsTurnWatchdog();
+    armThinkingWatchdog();
+    return;
+  }
+  state.sendingUtterance = false;
+  setMode("idle");
+  flashCaption("Live session unavailable — tap to retry.", 2400);
+}
+
 async function stopListeningAndSend() {
   if (state.mode !== "listening" || state.sendingUtterance || state.wsTurnActive) return;
 
   if (state.useServerEndpointing && state.liveClient?.ready) {
-    state.sendingUtterance = true;
     state.liveClient.sendEndUtterance();
-    setMode("thinking");
-    setStatusForMode("thinking", "Thinking…");
-    stopListeningOnly();
-    armWsTurnWatchdog();
-    armThinkingWatchdog();
+    if (state.pendingUserTranscript.trim()) {
+      scheduleUtteranceSubmit(UTTERANCE_MANUAL_CONFIRM_MS);
+    } else {
+      scheduleUtteranceSubmit(UTTERANCE_CONFIRM_MS);
+    }
     return;
   }
 
@@ -1542,6 +1604,8 @@ async function stopListeningAndSend() {
 
 async function cancelListening() {
   if (state.mode !== "listening") return;
+  clearUtteranceSubmitTimer();
+  state.pendingUserTranscript = "";
   stopListening();
   setMode("idle");
   flashCaption("Cancelled.", 900);
@@ -1742,8 +1806,7 @@ async function executeTurn(turnFactory) {
 async function playTts(text) {
   const speakAbort = new AbortController();
   state.speakAbort = speakAbort;
-  setMode("thinking");
-  setStatusForMode("thinking", "Preparing voice…");
+  setStatusForMode(state.mode === "speaking" ? "speaking" : "thinking", "Preparing voice…");
   let spoke = false;
   try {
     await playAnswerTts({
@@ -2331,8 +2394,14 @@ async function initLiveSession() {
 
   state.liveClient.onPartialTranscript = (text, isFinal) => {
     if (state.mode === "listening") {
-      if (text) state.vadHasSpeech = true;
-      setStatusForMode("listening", truncateStatus(text, 48));
+      if (text) {
+        state.vadHasSpeech = true;
+        clearUtteranceSubmitTimer();
+      }
+      const shown = state.pendingUserTranscript.trim()
+        ? `${state.pendingUserTranscript} ${text || ""}`.trim()
+        : (text || "");
+      setStatusForMode("listening", truncateStatus(shown, 56));
       return;
     }
     if (isFinal && state.mode === "thinking") {
@@ -2353,18 +2422,15 @@ async function initLiveSession() {
   };
 
   state.liveClient.onSpeechFinal = (text) => {
-    if (state.mode !== "listening" && state.mode !== "thinking") return;
-    if (state.wsTurnActive) return;
-    state.pendingUserTranscript = String(text || "").trim();
-    state.sendingUtterance = true;
-    setMode("thinking");
-    setStatusForMode("thinking", "Thinking…");
-    stopListeningOnly();
-    armWsTurnWatchdog();
+    if (state.mode !== "listening") return;
+    if (state.wsTurnActive || state.sendingUtterance) return;
+    appendSpeechSegment(text);
+    scheduleUtteranceSubmit();
   };
 
   state.liveClient.onTurnStart = () => {
     clearWsTurnWatchdog();
+    clearUtteranceSubmitTimer();
     abortHttpTurn("user");
     state.activeTurnEpoch += 1;
     state.currentTurnEpoch = state.activeTurnEpoch;
@@ -2372,13 +2438,17 @@ async function initLiveSession() {
     state.wsTurnActive = true;
     state.sendingUtterance = false;
     state.agentSpokenText = "";
+    state.pendingUserTranscript = "";
     stopListeningOnly();
-    if (typeof stopAllPlayback === "function") stopAllPlayback();
-    if (state.wsTurnSpeaker) {
-      state.wsTurnSpeaker.abort();
-      state.wsTurnSpeaker = null;
+    if (state.mode === "speaking" || state.wsTurnSpeaker) {
+      if (typeof stopAllPlayback === "function") stopAllPlayback();
+      if (state.wsTurnSpeaker) {
+        state.wsTurnSpeaker.abort();
+        state.wsTurnSpeaker = null;
+      }
     }
     setMode("thinking");
+    setStatusForMode("thinking", "Working on it…");
 
     const speakAbort = new AbortController();
     state.speakAbort = speakAbort;
