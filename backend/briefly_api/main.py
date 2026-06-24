@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from briefly_api.api.router import api_router
 from briefly_api.config import get_settings
-from briefly_api.db.engine import init_db
+from briefly_api.db.engine import init_db, close_db
 from briefly_api.ingestion.smtp_server import start_smtp_server
 from briefly_api.services.embedding_guard import validate_embedding_configuration
 
@@ -111,6 +111,19 @@ async def lifespan(_app: FastAPI):
     if smtp_controller:
         smtp_controller.stop()
         logger.info("SMTP ingestion server stopped")
+
+    try:
+        from briefly_api.api.routes.orb_ws import shutdown_active_orb_turns
+
+        await shutdown_active_orb_turns()
+    except Exception:
+        logger.warning("Orb turn shutdown failed — non-fatal", exc_info=True)
+
+    try:
+        await close_db()
+        logger.info("Database pool closed")
+    except Exception:
+        logger.warning("Database pool close failed — non-fatal", exc_info=True)
 
 
 def create_app() -> FastAPI:

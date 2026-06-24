@@ -210,6 +210,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+async def close_db() -> None:
+    """Return all pooled connections — call during app shutdown."""
+    await engine.dispose()
+
+
 def get_session_factory():
     """Return the async session factory (used by the pipeline orchestrator)."""
     return SessionLocal

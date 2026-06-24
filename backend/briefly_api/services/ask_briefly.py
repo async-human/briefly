@@ -6,6 +6,7 @@ persists to FollowUpThread.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -19,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from briefly_api.db.engine import SessionLocal
 from briefly_api.db.models import (
     BehavioralSignal,
     ContentEmbedding,
@@ -109,6 +111,45 @@ class AskPrepared:
     user_id: str
     focused: bool = False
     focus_title: str | None = None
+
+
+@dataclass
+class _AskPersistSnapshot:
+    """Plain data for persisting after the LLM stream — no ORM session required."""
+
+    thread_id: str
+    user_id: str
+    message: str
+    content_id: str | None
+    digest_item_id: str | None
+    prior_messages: list
+    thread_content_id: str | None
+    thread_digest_item_id: str | None
+
+
+def _ask_persist_snapshot(prepared: AskPrepared) -> _AskPersistSnapshot:
+    return _AskPersistSnapshot(
+        thread_id=prepared.thread.id,
+        user_id=prepared.user_id,
+        message=prepared.message,
+        content_id=prepared.content_id,
+        digest_item_id=prepared.digest_item_id,
+        prior_messages=list(prepared.thread.messages or []),
+        thread_content_id=prepared.thread.content_id,
+        thread_digest_item_id=prepared.thread.digest_item_id,
+    )
+
+
+async def _load_user_for_ask(db: AsyncSession, user_id: str) -> User:
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.profile))
+        .where(User.id == user_id, User.is_active.is_(True))
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise ValueError("User not found.")
+    return user
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -969,9 +1010,33 @@ async def _persist_ask_response(
     answer: str,
     citations: list[dict],
 ) -> str:
+    return await _persist_ask_snapshot(
+        db,
+        _ask_persist_snapshot(prepared),
+        answer,
+        citations,
+    )
+
+
+async def _persist_ask_snapshot(
+    db: AsyncSession,
+    snapshot: _AskPersistSnapshot,
+    answer: str,
+    citations: list[dict],
+) -> str:
     now = datetime.now(timezone.utc).isoformat()
-    prepared.thread.messages = list(prepared.thread.messages or []) + [
-        {"role": "user", "content": prepared.message, "timestamp": now},
+    result = await db.execute(
+        select(FollowUpThread).where(
+            FollowUpThread.id == snapshot.thread_id,
+            FollowUpThread.user_id == snapshot.user_id,
+        )
+    )
+    thread = result.scalar_one_or_none()
+    if not thread:
+        raise ValueError("Thread not found.")
+
+    thread.messages = list(snapshot.prior_messages) + [
+        {"role": "user", "content": snapshot.message, "timestamp": now},
         {
             "role": "assistant",
             "content": answer,
@@ -980,22 +1045,25 @@ async def _persist_ask_response(
         },
     ]
 
-    if not prepared.thread.content_id and prepared.content_id:
-        prepared.thread.content_id = prepared.content_id
+    if not thread.content_id and snapshot.content_id:
+        thread.content_id = snapshot.content_id
     elif (
-        not prepared.thread.content_id
-        and not prepared.thread.digest_item_id
+        not thread.content_id
+        and not thread.digest_item_id
         and citations
     ):
         primary = citations[0].get("content_id")
         if primary and not str(primary).startswith("digest-item"):
-            prepared.thread.content_id = str(primary)
+            thread.content_id = str(primary)
 
-    if prepared.digest_item_id:
+    if snapshot.digest_item_id:
         item_result = await db.execute(
             select(DigestItem)
             .join(Digest, DigestItem.digest_id == Digest.id)
-            .where(DigestItem.id == prepared.digest_item_id, Digest.user_id == prepared.user_id)
+            .where(
+                DigestItem.id == snapshot.digest_item_id,
+                Digest.user_id == snapshot.user_id,
+            )
         )
         item = item_result.scalar_one_or_none()
         if item:
@@ -1003,7 +1071,7 @@ async def _persist_ask_response(
             item.follow_up_depth = (item.follow_up_depth or 0) + 1
             db.add(
                 BehavioralSignal(
-                    user_id=prepared.user_id,
+                    user_id=snapshot.user_id,
                     signal_type=SignalType.followed_up,
                     digest_id=item.digest_id,
                     digest_item_id=item.id,
@@ -1012,7 +1080,7 @@ async def _persist_ask_response(
             )
 
     await db.commit()
-    await db.refresh(prepared.thread)
+    await db.refresh(thread)
     return now
 
 
@@ -1070,7 +1138,7 @@ async def ask_briefly(
 
 
 async def iter_ask_briefly_events(
-    db: AsyncSession,
+    db: AsyncSession | None,
     user: User,
     message: str,
     *,
@@ -1080,18 +1148,23 @@ async def iter_ask_briefly_events(
     voice: bool = False,
 ) -> AsyncIterator[dict]:
     """Yield structured events for streaming ask turns (SSE + WebSocket)."""
-    prepared = await _prepare_ask(
-        db,
-        user,
-        message,
-        thread_id=thread_id,
-        content_id=content_id,
-        digest_item_id=digest_item_id,
-    )
+    user_id = str(user.id)
+    async with SessionLocal() as prep_db:
+        prep_user = await _load_user_for_ask(prep_db, user_id)
+        prepared = await _prepare_ask(
+            prep_db,
+            prep_user,
+            message,
+            thread_id=thread_id,
+            content_id=content_id,
+            digest_item_id=digest_item_id,
+        )
+        await prep_db.commit()
+    snapshot = _ask_persist_snapshot(prepared)
 
     system = _ASK_SYSTEM
     max_tokens = 1200
-    history = list(prepared.thread.messages or [])
+    history = list(snapshot.prior_messages)
     if voice:
         system = (
             f"{_ASK_SYSTEM}\n\n"
@@ -1106,31 +1179,35 @@ async def iter_ask_briefly_events(
             )
         max_tokens = 480
 
-    yield {"type": "thread_id", "thread_id": prepared.thread.id}
+    yield {"type": "thread_id", "thread_id": snapshot.thread_id}
 
     llm = get_llm_adapter()
     parts: list[str] = []
-    async for delta in llm.stream_complete(
-        prepared.llm_messages,
-        system=system,
-        temperature=0.35,
-        max_tokens=max_tokens,
-        user_id=user.id,
-        agent="ask_briefly",
-    ):
-        parts.append(delta)
-        yield {"type": "delta", "content": delta}
+    try:
+        async for delta in llm.stream_complete(
+            prepared.llm_messages,
+            system=system,
+            temperature=0.35,
+            max_tokens=max_tokens,
+            user_id=user_id,
+            agent="ask_briefly",
+        ):
+            parts.append(delta)
+            yield {"type": "delta", "content": delta}
+    except asyncio.CancelledError:
+        raise
 
     answer = "".join(parts).strip()
     citations = _extract_citations(answer, prepared.all_chunks)
-    created_at = await _persist_ask_response(db, prepared, answer, citations)
+    async with SessionLocal() as persist_db:
+        created_at = await _persist_ask_snapshot(persist_db, snapshot, answer, citations)
     yield {
         "type": "done",
         "answer": answer,
         "citations": citations,
         "created_at": created_at,
-        "content_id": prepared.thread.content_id,
-        "digest_item_id": prepared.thread.digest_item_id,
+        "content_id": snapshot.thread_content_id or snapshot.content_id,
+        "digest_item_id": snapshot.thread_digest_item_id or snapshot.digest_item_id,
         "anchor_title": prepared.focus_title,
     }
 

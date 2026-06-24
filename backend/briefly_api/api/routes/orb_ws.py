@@ -9,16 +9,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from contextlib import aclosing
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 from briefly_api.auth.deps import resolve_capture_user_from_token
 from briefly_api.config import get_settings
 from briefly_api.db.engine import SessionLocal
-from briefly_api.db.models import User
 from briefly_api.services import orb as orb_service
 from briefly_api.services.orb_session import OrbSessionState, resolve_session
 from briefly_api.stt.profile_context import transcription_prompt_for_orb_turn
@@ -29,6 +27,13 @@ log = logging.getLogger(__name__)
 router = APIRouter(tags=["orb"])
 
 _ACTIVE_TURNS: dict[str, asyncio.Task] = {}
+
+
+async def shutdown_active_orb_turns() -> None:
+    """Cancel in-flight WS turns during app shutdown."""
+    session_ids = list(_ACTIVE_TURNS.keys())
+    for session_id in session_ids:
+        await _await_turn_cancel(session_id)
 
 
 async def _await_turn_cancel(session_id: str) -> None:
@@ -47,15 +52,6 @@ async def _await_turn_cancel(session_id: str) -> None:
 
 async def _send(ws: WebSocket, payload: dict[str, Any]) -> None:
     await ws.send_text(json.dumps(payload))
-
-
-async def _load_user(db, user_id: str) -> User | None:
-    result = await db.execute(
-        select(User)
-        .options(selectinload(User.profile))
-        .where(User.id == user_id, User.is_active.is_(True))
-    )
-    return result.scalar_one_or_none()
 
 
 class SttRuntime:
@@ -137,21 +133,19 @@ async def _run_turn_stream(
     expects_reply = True
     try:
         await _send(ws, {"type": "turn_start", "transcript": transcript})
-        async with SessionLocal() as db:
-            user = await _load_user(db, user_id)
-            if user is None:
-                await _send(ws, {"type": "error", "message": "User not found"})
-                return
-            async for event in orb_service.iter_orb_text_turn_events(
-                db,
-                user,
-                transcript,
-                thread_id=session.thread_id,
-                session=session,
-                surface=session.surface,
-            ):
+        events = orb_service.iter_orb_text_turn_events(
+            None,
+            None,
+            transcript,
+            user_id=user_id,
+            thread_id=session.thread_id,
+            session=session,
+            surface=session.surface,
+        )
+        async with aclosing(events) as stream:
+            async for event in stream:
                 if cancel.is_set():
-                    return
+                    break
                 et = event.get("type")
                 if et == "meta":
                     if event.get("thread_id"):

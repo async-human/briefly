@@ -653,10 +653,11 @@ def _orb_sse_event(payload: dict) -> str:
 
 
 async def iter_orb_text_turn_events(
-    db: AsyncSession,
-    user: User,
+    db: AsyncSession | None,
+    user: User | None,
     transcript: str,
     *,
+    user_id: str | None = None,
     thread_id: str | None = None,
     content_id: str | None = None,
     session: OrbSessionState | None = None,
@@ -666,9 +667,12 @@ async def iter_orb_text_turn_events(
     started: float | None = None,
 ) -> AsyncIterator[dict]:
     """Stream structured turn events after transcript is known (HTTP SSE + WS)."""
+    from briefly_api.services.ask_briefly import _load_user_for_ask
+
     timings = timings if timings is not None else {}
     started = started if started is not None else time.monotonic()
     resolved_thread = thread_id or (session.thread_id if session else None)
+    uid = user_id or (str(user.id) if user and getattr(user, "id", None) else None)
 
     yield {
         "type": "meta",
@@ -682,46 +686,81 @@ async def iter_orb_text_turn_events(
         await update_session_after_turn(session, transcript=transcript)
 
     route_started = time.monotonic()
-    if db is not None and getattr(user, "id", None):
-        thread_msg_count = await _thread_message_count(db, user.id, resolved_thread)
-        decision = await route_transcript(
-            transcript,
-            thread_message_count=thread_msg_count,
-            session_thread_id=session.thread_id if session else None,
-            session_has_prior_turn=bool(session and session.last_transcript),
-        )
-        timings["route_ms"] = int((time.monotonic() - route_started) * 1000)
-
-        stream_ask = decision.kind == "ask_briefly" or (
-            decision.kind == "direct"
-            and len(decision.tools) == 1
-            and decision.tools[0].name == "ask_briefly"
-        )
-
-        if not stream_ask:
-            result = await run_orb_turn(
-                db,
-                user,
-                text=transcript,
-                thread_id=resolved_thread,
-                content_id=content_id,
-                session_id=session.session_id if session else session_id,
-                surface=surface,
+    stream_ask = False
+    if uid:
+        if db is not None and user is not None:
+            thread_msg_count = await _thread_message_count(db, uid, resolved_thread)
+            decision = await route_transcript(
+                transcript,
+                thread_message_count=thread_msg_count,
+                session_thread_id=session.thread_id if session else None,
+                session_has_prior_turn=bool(session and session.last_transcript),
             )
-            timings["total_ms"] = int((time.monotonic() - started) * 1000)
-            result["timings"] = {**result.get("timings", {}), **timings}
-            yield {"type": "complete", **result}
-            return
+            timings["route_ms"] = int((time.monotonic() - route_started) * 1000)
+            stream_ask = decision.kind == "ask_briefly" or (
+                decision.kind == "direct"
+                and len(decision.tools) == 1
+                and decision.tools[0].name == "ask_briefly"
+            )
+            if not stream_ask:
+                result = await run_orb_turn(
+                    db,
+                    user,
+                    text=transcript,
+                    thread_id=resolved_thread,
+                    content_id=content_id,
+                    session_id=session.session_id if session else session_id,
+                    surface=surface,
+                )
+                timings["total_ms"] = int((time.monotonic() - started) * 1000)
+                result["timings"] = {**result.get("timings", {}), **timings}
+                yield {"type": "complete", **result}
+                return
+        else:
+            async with SessionLocal() as route_db:
+                route_user = await _load_user_for_ask(route_db, uid)
+                thread_msg_count = await _thread_message_count(route_db, uid, resolved_thread)
+                decision = await route_transcript(
+                    transcript,
+                    thread_message_count=thread_msg_count,
+                    session_thread_id=session.thread_id if session else None,
+                    session_has_prior_turn=bool(session and session.last_transcript),
+                )
+                timings["route_ms"] = int((time.monotonic() - route_started) * 1000)
+                stream_ask = decision.kind == "ask_briefly" or (
+                    decision.kind == "direct"
+                    and len(decision.tools) == 1
+                    and decision.tools[0].name == "ask_briefly"
+                )
+                if not stream_ask:
+                    result = await run_orb_turn(
+                        route_db,
+                        route_user,
+                        text=transcript,
+                        thread_id=resolved_thread,
+                        content_id=content_id,
+                        session_id=session.session_id if session else session_id,
+                        surface=surface,
+                    )
+                    timings["total_ms"] = int((time.monotonic() - started) * 1000)
+                    result["timings"] = {**result.get("timings", {}), **timings}
+                    yield {"type": "complete", **result}
+                    return
 
-    if db is None or not getattr(user, "id", None):
+    if not uid or not stream_ask:
         raise ValueError("Voice turn unavailable.")
+
+    ask_user = user
+    if ask_user is None:
+        async with SessionLocal() as ask_db:
+            ask_user = await _load_user_for_ask(ask_db, uid)
 
     stream_thread_id = resolved_thread
     answer_parts: list[str] = []
     citations: list = []
     async for event in iter_ask_briefly_events(
-        db,
-        user,
+        None,
+        ask_user,
         transcript,
         thread_id=stream_thread_id,
         content_id=content_id,
