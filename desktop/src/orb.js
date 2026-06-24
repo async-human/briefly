@@ -89,7 +89,10 @@ const LISTEN_REOPEN_DELAY_MS = 400;
 const LISTEN_STUCK_SILENCE_MS = 3200;
 
 /** Abort a stuck turn (listen → thinking with no response). */
-const TURN_TIMEOUT_MS = 75000;
+const TURN_TIMEOUT_MS = 90000;
+
+/** WS: max wait after speech ends before turn_start. */
+const WS_TURN_START_TIMEOUT_MS = 45000;
 
 /** Stop auto-reopening mic after this many consecutive turn failures. */
 const MAX_TURN_FAILURE_RETRIES = 1;
@@ -101,6 +104,9 @@ const state = {
   micStream: null,
   listeningStartedAt: 0,
   turnAbort: null,
+  turnAbortReason: null,
+  turnTimeoutHandle: null,
+  wsTurnWatchdog: null,
   speakAbort: null,
   ttsAudio: null,
   wakeRecognizer: null,
@@ -473,6 +479,7 @@ async function ensureOrbSession() {
 
 async function apiTurn(audioBlob, signal) {
   await ensureOrbSession();
+  if (signal?.aborted) return null;
   const mime = audioBlob.type || "audio/webm";
   const filename = mime.includes("mp4") ? "turn.m4a" : "turn.webm";
 
@@ -483,6 +490,7 @@ async function apiTurn(audioBlob, signal) {
   };
   const streamed = await runOrbTurnWithStream(streamPayload, signal);
   if (streamed) return streamed;
+  if (signal?.aborted) return null;
 
   // Web/mobile: multipart upload avoids base64 inflation (~33% smaller, faster).
   if (!TAURI && typeof FormData !== "undefined") {
@@ -560,6 +568,7 @@ async function runOrbTurnWithStream(payload, signal) {
     res = await requestOrbTurnStream(payload, fetchAbort.signal);
   } catch (_) {
     if (signal) signal.removeEventListener("abort", onParentAbort);
+    if (signal?.aborted) return null;
     return null;
   }
   if (signal) signal.removeEventListener("abort", onParentAbort);
@@ -618,6 +627,7 @@ async function runOrbTurnWithStream(payload, signal) {
     signal?.removeEventListener("abort", linked);
     state.speakAbort = null;
     state.ttsAudio = null;
+    if (signal?.aborted) return null;
     if (voiceCmd) {
       await applyVoiceCommand(voiceCmd);
       return { _ttsPlayed: true };
@@ -730,15 +740,46 @@ function updateWakeStatus() {
   }
 }
 
+function clearWsTurnWatchdog() {
+  if (state.wsTurnWatchdog) {
+    clearTimeout(state.wsTurnWatchdog);
+    state.wsTurnWatchdog = null;
+  }
+}
+
+function armWsTurnWatchdog() {
+  clearWsTurnWatchdog();
+  state.wsTurnWatchdog = setTimeout(() => {
+    state.wsTurnWatchdog = null;
+    if (state.wsTurnActive) return;
+    if (!state.sendingUtterance && state.mode !== "thinking") return;
+    state.sendingUtterance = false;
+    state.wsTurnActive = false;
+    if (state.liveClient) state.liveClient.interrupt();
+    setMode("idle");
+    flashCaption("Didn't get a response — tap and try again.", 2800);
+  }, WS_TURN_START_TIMEOUT_MS);
+}
+
+function abortHttpTurn(reason) {
+  state.turnAbortReason = reason;
+  if (state.turnTimeoutHandle) {
+    clearTimeout(state.turnTimeoutHandle);
+    state.turnTimeoutHandle = null;
+  }
+  if (state.turnAbort) {
+    state.turnAbort.abort();
+    state.turnAbort = null;
+  }
+}
+
 function hardStopSpeech() {
   state.conversationGeneration += 1;
   state.activeTurnEpoch += 1;
   state.sendingUtterance = false;
   state.wsTurnActive = false;
-  if (state.turnAbort) {
-    state.turnAbort.abort();
-    state.turnAbort = null;
-  }
+  clearWsTurnWatchdog();
+  abortHttpTurn("user");
   if (state.speakAbort) {
     state.speakAbort.abort();
     state.speakAbort = null;
@@ -1111,9 +1152,12 @@ function chooseMimeType() {
 
 async function startListening(options = {}) {
   const afterInterrupt = !!options.afterInterrupt;
+  const soft = !!options.soft;
   if (state.mode === "listening" && !afterInterrupt) return;
 
-  if (!afterInterrupt) {
+  if (soft) {
+    stopListening();
+  } else if (!afterInterrupt) {
     hardStopSpeech();
     stopListening();
   }
@@ -1183,17 +1227,7 @@ async function stopListeningAndSend() {
     state.liveClient.sendEndUtterance();
     setStatusForMode("listening", "Processing…");
     stopListeningOnly();
-    setTimeout(() => {
-      if (state.sendingUtterance && !state.wsTurnActive) {
-        state.sendingUtterance = false;
-        if (state.mode === "idle") return;
-        setMode("idle");
-        flashCaption("Didn't catch that — try again.", 2000);
-        if (state.conversationActive && !state.conversationMuted) {
-          void continueConversationAfterSpeak();
-        }
-      }
-    }, 28000);
+    armWsTurnWatchdog();
     return;
   }
 
@@ -1264,7 +1298,7 @@ async function continueConversationAfterSpeak(turn) {
     if (state.mode !== "idle" || state.conversationMuted) return;
   }
   flashCaption("Listening…", 900);
-  await startListening();
+  await startListening({ soft: true });
 }
 
 function normalizeCommandText(text) {
@@ -1348,13 +1382,28 @@ async function applyVoiceCommand(cmd) {
 
 async function executeTurn(turnFactory) {
   setMode("thinking");
+  state.turnAbortReason = null;
   const turnAbort = new AbortController();
   state.turnAbort = turnAbort;
-  const timeout = setTimeout(() => turnAbort.abort(), TURN_TIMEOUT_MS);
+  state.turnTimeoutHandle = setTimeout(() => {
+    state.turnAbortReason = "timeout";
+    turnAbort.abort();
+  }, TURN_TIMEOUT_MS);
   try {
     const turn = await turnFactory(turnAbort.signal);
-    clearTimeout(timeout);
+    if (state.turnTimeoutHandle) {
+      clearTimeout(state.turnTimeoutHandle);
+      state.turnTimeoutHandle = null;
+    }
     state.turnAbort = null;
+    state.turnAbortReason = null;
+    if (!turn) {
+      if (turnAbort.signal.aborted) {
+        setMode("idle");
+        return;
+      }
+      throw new Error("No response from server");
+    }
     state.turnFailureCount = 0;
     applyTurnMeta(turn);
     const transcript = (turn?.transcript || "").trim();
@@ -1389,11 +1438,18 @@ async function executeTurn(turnFactory) {
     if (turnAbort.signal.aborted) return;
     await continueConversationAfterSpeak(turn);
   } catch (err) {
-    clearTimeout(timeout);
+    if (state.turnTimeoutHandle) {
+      clearTimeout(state.turnTimeoutHandle);
+      state.turnTimeoutHandle = null;
+    }
+    const reason = state.turnAbortReason;
     state.turnAbort = null;
+    state.turnAbortReason = null;
     if (turnAbort.signal.aborted) {
       setMode("idle");
-      flashCaption("That took too long — try again.", 2800);
+      if (reason === "timeout") {
+        flashCaption("That took too long — try again.", 2800);
+      }
       return;
     }
     state.turnFailureCount += 1;
@@ -1990,9 +2046,12 @@ async function initLiveSession() {
     state.sendingUtterance = true;
     setStatusForMode("listening", "Processing…");
     stopListeningOnly();
+    armWsTurnWatchdog();
   };
 
   state.liveClient.onTurnStart = () => {
+    clearWsTurnWatchdog();
+    abortHttpTurn("user");
     state.activeTurnEpoch += 1;
     state.currentTurnEpoch = state.activeTurnEpoch;
     const turnEpoch = state.currentTurnEpoch;
@@ -2030,6 +2089,7 @@ async function initLiveSession() {
   };
 
   state.liveClient.onTurnComplete = async (turn) => {
+    clearWsTurnWatchdog();
     const turnEpoch = state.currentTurnEpoch;
     if (turnEpoch !== state.activeTurnEpoch) return;
 
@@ -2082,6 +2142,8 @@ async function initLiveSession() {
   };
 
   state.liveClient.onError = (message) => {
+    clearWsTurnWatchdog();
+    state.sendingUtterance = false;
     const msg = String(message || "");
     if (msg.toLowerCase().includes("unauthorized")) {
       try { localStorage.setItem("briefly.orbLiveSession", "0"); } catch (_) {}
