@@ -20,6 +20,7 @@ class OrbSessionClient {
     this.onTurnStart = null;
     this.onTurnMeta = null;
     this.onTurnDelta = null;
+    this.onTurnStatus = null;
     this.onAgentStep = null;
     this.onTurnComplete = null;
     this.onTurnEnd = null;
@@ -243,6 +244,10 @@ class OrbSessionClient {
     }
     if (type === "turn_delta") {
       if (this.onTurnDelta) this.onTurnDelta(frame.content || "");
+      return;
+    }
+    if (type === "turn_status") {
+      if (this.onTurnStatus) this.onTurnStatus(frame.message || "");
       return;
     }
     if (type === "turn_complete") {

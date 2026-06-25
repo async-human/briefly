@@ -1,5 +1,7 @@
 "use strict";
 
+/** Max wait for audio element to start playback — avoids stuck "Speaking" UI. */
+const PLAYBACK_LOAD_MS = 12000;
 /** All in-flight TTS `<audio>` elements — stop together on interrupt. */
 const activePlaybackAudios = new Set();
 /** Resolve handlers for in-progress playBlobAudio waits — unblocks drain loops on interrupt. */
@@ -85,11 +87,15 @@ async function playBlobAudio(blob, opts = {}) {
 
   try {
     await new Promise((resolve, reject) => {
+      let loadTimer = null;
+      let audio = null;
+
       const finish = (err) => {
         if (settled) return;
         settled = true;
+        if (loadTimer) clearTimeout(loadTimer);
         activePlaybackCancels.delete(cancelPlayback);
-        activePlaybackAudios.delete(audio);
+        if (audio) activePlaybackAudios.delete(audio);
         if (onAudio) onAudio(null);
         URL.revokeObjectURL(url);
         if (err) reject(err);
@@ -98,15 +104,17 @@ async function playBlobAudio(blob, opts = {}) {
 
       const cancelPlayback = () => {
         try {
-          audio.pause();
-          audio.currentTime = 0;
-          audio.src = "";
-          audio.load();
+          if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.src = "";
+            audio.load();
+          }
         } catch (_) {}
         finish();
       };
 
-      const audio = new Audio(url);
+      audio = new Audio(url);
       audio.preload = "auto";
       activePlaybackAudios.add(audio);
       activePlaybackCancels.add(cancelPlayback);
@@ -137,11 +145,16 @@ async function playBlobAudio(blob, opts = {}) {
             }
             if (!started) {
               started = true;
+              if (loadTimer) clearTimeout(loadTimer);
               if (onStart) onStart();
             }
           })
           .catch((err) => finish(err));
       };
+
+      loadTimer = setTimeout(() => {
+        if (!started && !settled) finish(new Error("Audio load timeout"));
+      }, PLAYBACK_LOAD_MS);
 
       if (audio.readyState >= 2) tryPlay();
       else audio.oncanplaythrough = tryPlay;
@@ -388,13 +401,18 @@ async function streamOrbTurnAndSpeak({
     }
     const tail = fullText.slice(spokenUpTo).trim();
     if (tail.length >= 4 && !signal?.aborted) {
-      spokenUpTo = fullText.length;
-      const blob = await synthSentence(tail);
-      if (!signal?.aborted && blob) {
-        try {
-          await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
-        } catch (_) {}
+      for (const sentence of splitSentences(tail)) {
+        const blob = await synthSentence(sentence);
+        if (signal?.aborted) break;
+        if (blob) {
+          try {
+            await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+          } catch (_) {
+            if (signal?.aborted) break;
+          }
+        }
       }
+      spokenUpTo = fullText.length;
     }
   }
 
@@ -536,17 +554,21 @@ function createDeltaStreamingSpeaker({
     }
     const tail = fullText.slice(spokenUpTo).trim();
     if (tail.length >= 4 && !aborted && !signal?.aborted) {
-      spokenUpTo = fullText.length;
-      const blob = await synthSentence(tail);
-      if (!aborted && !signal?.aborted && blob) {
-        playing = true;
-        try {
-          await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
-        } catch (_) {
-        } finally {
-          markIdle();
+      for (const sentence of splitSentences(tail)) {
+        const blob = await synthSentence(sentence);
+        if (aborted || signal?.aborted) break;
+        if (blob) {
+          playing = true;
+          try {
+            await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
+          } catch (_) {
+            if (aborted || signal?.aborted) break;
+          } finally {
+            markIdle();
+          }
         }
       }
+      spokenUpTo = fullText.length;
     }
   }
 
@@ -559,15 +581,36 @@ function createDeltaStreamingSpeaker({
       enqueueNewSentences();
     },
     async finish(completeTurn) {
-      if (completeTurn?.answer && fullText.length < String(completeTurn.answer).length) {
-        fullText = String(completeTurn.answer);
+      const answerText = String(completeTurn?.answer || "").trim();
+      if (answerText && !fullText.includes(answerText.slice(0, Math.min(40, answerText.length)))) {
+        fullText = `${fullText.trim()} ${answerText}`.trim();
+      } else if (answerText && fullText.length < answerText.length) {
+        fullText = answerText;
       }
       enqueueNewSentences();
       finished = true;
       await drainPromise;
-      if (!spoke && completeTurn?.answer && !aborted && !signal?.aborted) {
+
+      const spokenBody = fullText.slice(0, spokenUpTo);
+      const answerMarker = answerText.slice(0, Math.min(32, answerText.length));
+      const answerSpoken =
+        !answerText ||
+        (answerMarker.length >= 8 && spokenBody.includes(answerMarker));
+
+      if (answerText && !answerSpoken && !aborted && !signal?.aborted) {
         await playAnswerTts({
-          text: completeTurn.answer,
+          text: answerText,
+          speakFn,
+          signal,
+          prefetch: 3,
+          onAudio,
+          onSpeakingStart: markStart,
+        });
+      }
+
+      if (!spoke && answerText && !aborted && !signal?.aborted) {
+        await playAnswerTts({
+          text: answerText,
           speakFn,
           signal,
           prefetch: 3,

@@ -223,6 +223,8 @@ async def _run_turn_stream(
                     await _send(ws, {"type": "agent_step", **event})
                 elif et == "delta":
                     await _send(ws, {"type": "turn_delta", "content": event.get("content") or ""})
+                elif et == "status":
+                    await _send(ws, {"type": "turn_status", "message": event.get("message") or ""})
                 elif et == "complete":
                     expects_reply = bool(event.get("expects_reply", True))
                     await _send(ws, {"type": "turn_complete", **event})

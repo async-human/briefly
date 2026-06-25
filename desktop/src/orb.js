@@ -2520,7 +2520,16 @@ async function initLiveSession() {
     applyTurnMeta(meta);
     showToolStatus(meta);
     state.agentTurnActive = meta?.route_kind === "agent";
+    if (meta?.route_reason === "research_report" && state.mode === "thinking") {
+      setStatusForMode("thinking", "Researching and writing your report…");
+    }
     if (state.mode === "thinking") armThinkingWatchdog();
+  };
+
+  state.liveClient.onTurnStatus = (message) => {
+    if (state.currentTurnEpoch !== state.activeTurnEpoch) return;
+    if (!message || state.mode === "speaking") return;
+    setStatusForMode("thinking", truncateStatus(message, 56));
   };
 
   state.liveClient.onAgentStep = (step) => {
@@ -2633,6 +2642,7 @@ async function initLiveSession() {
           await state.wsTurnSpeaker.finish(turn);
         } catch (_) {
           if (turnEpoch === state.currentTurnEpoch && answer) {
+            setMode("thinking");
             await playTts(answer);
           }
         }

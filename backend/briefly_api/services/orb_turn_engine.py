@@ -6,6 +6,7 @@ uses one consistent pipeline on the client.
 """
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 import time
@@ -43,6 +44,12 @@ from briefly_api.services.orb_tools import OrbTool
 log = logging.getLogger(__name__)
 
 ASK_TOOL_NAME = "ask_briefly"
+
+_COMPOSE_REPORT_PROGRESS: tuple[str, ...] = (
+    "I'm searching the web and your saved articles — this usually takes about half a minute.",
+    "Still pulling sources together for your report…",
+    "Almost done — finishing up your report now.",
+)
 
 
 def _tool_trace(outputs: list[dict]) -> list[dict]:
@@ -606,16 +613,49 @@ async def iter_orb_turn_events(
                 yield {"type": "delta", "content": chunk}
 
     exec_started = time.monotonic()
-    payload = await execute_routed_turn(
-        db,
-        user,
-        effective_transcript,
-        decision=decision,
-        thread_id=resolved_thread,
-        content_id=content_id,
-        surface=surface,
-        session=session,
+    is_compose_report = (
+        decision.kind == "direct"
+        and len(decision.tools) == 1
+        and decision.tools[0].name == "compose_report"
     )
+    if is_compose_report:
+        task = asyncio.create_task(
+            execute_routed_turn(
+                db,
+                user,
+                effective_transcript,
+                decision=decision,
+                thread_id=resolved_thread,
+                content_id=content_id,
+                surface=surface,
+                session=session,
+            )
+        )
+        tick_idx = 0
+        while not task.done():
+            try:
+                await asyncio.wait_for(asyncio.shield(task), timeout=10.0)
+                break
+            except asyncio.TimeoutError:
+                msg = _COMPOSE_REPORT_PROGRESS[
+                    min(tick_idx, len(_COMPOSE_REPORT_PROGRESS) - 1)
+                ]
+                tick_idx += 1
+                yield {"type": "status", "message": msg}
+                for chunk in chunk_for_streaming(msg):
+                    yield {"type": "delta", "content": chunk}
+        payload = await task
+    else:
+        payload = await execute_routed_turn(
+            db,
+            user,
+            effective_transcript,
+            decision=decision,
+            thread_id=resolved_thread,
+            content_id=content_id,
+            surface=surface,
+            session=session,
+        )
     timings["agent_ms"] = int((time.monotonic() - exec_started) * 1000)
     timings["total_ms"] = int((time.monotonic() - started) * 1000)
     payload["timings"] = timings
