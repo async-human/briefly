@@ -259,15 +259,22 @@ function pullNextSentence(fullText, spokenUpTo, opts = {}) {
     return { sentence: match[0].trim(), nextUpTo: spokenUpTo + match[0].length };
   }
 
-    // First spoken chunk: wait for a natural sentence boundary when possible.
+  const trimmed = rest.trim();
+  // Closed phrase at end of buffered text (e.g. "Got it." ack before more deltas arrive).
+  if (/[.!?]["')\]]*$/.test(trimmed) && trimmed.length >= 4) {
+    return { sentence: trimmed, nextUpTo: spokenUpTo + rest.length };
+  }
+
   if (opts.earlyFirst && spokenUpTo === 0) {
-    const trimmed = rest.trim();
-    if (trimmed.length >= 52) {
-      const space = trimmed.lastIndexOf(" ", 48);
-      if (space >= 24) {
+    if (trimmed.length >= 28) {
+      const space = trimmed.lastIndexOf(" ", 42);
+      if (space >= 16) {
         const chunk = trimmed.slice(0, space).trim();
         return { sentence: chunk, nextUpTo: spokenUpTo + rest.indexOf(chunk) + chunk.length };
       }
+    }
+    if (trimmed.length >= 10) {
+      return { sentence: trimmed, nextUpTo: spokenUpTo + rest.length };
     }
   }
 
@@ -448,6 +455,7 @@ function createDeltaStreamingSpeaker({
   speakFn,
   signal,
   onAudio,
+    onPlaybackIdle,
   onSpeakingStart,
 }) {
   let fullText = "";
@@ -455,6 +463,7 @@ function createDeltaStreamingSpeaker({
   let spoke = false;
   let finished = false;
   let aborted = false;
+  let playing = false;
   const sentenceQueue = [];
   const prefetch = new Map();
 
@@ -463,6 +472,11 @@ function createDeltaStreamingSpeaker({
       spoke = true;
       if (onSpeakingStart) onSpeakingStart();
     }
+  };
+
+  const markIdle = () => {
+    playing = false;
+    if (!finished && !aborted && onPlaybackIdle) onPlaybackIdle();
   };
 
   const synthSentence = async (sentence) => {
@@ -499,6 +513,7 @@ function createDeltaStreamingSpeaker({
     while (!finished || sentenceQueue.length > 0) {
       if (aborted || signal?.aborted) break;
       if (sentenceQueue.length === 0) {
+        if (finished) break;
         await new Promise((r) => setTimeout(r, 20));
         continue;
       }
@@ -509,10 +524,13 @@ function createDeltaStreamingSpeaker({
       const blob = await synthSentence(sentence);
       if (aborted || signal?.aborted) break;
       if (blob) {
+        playing = true;
         try {
           await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
         } catch (_) {
           if (aborted || signal?.aborted) break;
+        } finally {
+          markIdle();
         }
       }
     }
@@ -521,9 +539,13 @@ function createDeltaStreamingSpeaker({
       spokenUpTo = fullText.length;
       const blob = await synthSentence(tail);
       if (!aborted && !signal?.aborted && blob) {
+        playing = true;
         try {
           await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
-        } catch (_) {}
+        } catch (_) {
+        } finally {
+          markIdle();
+        }
       }
     }
   }

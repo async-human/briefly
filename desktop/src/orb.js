@@ -121,6 +121,7 @@ const WS_TURN_START_TIMEOUT_MS = 75000;
 
 /** WS: agent stuck in thinking with no speech. */
 const THINKING_STALL_MS = 90000;
+const AGENT_THINKING_STALL_MS = 180000;
 
 /** Stop auto-reopening mic after this many consecutive turn failures. */
 const MAX_TURN_FAILURE_RETRIES = 2;
@@ -157,6 +158,7 @@ const state = {
   useServerEndpointing: false,
   serverStreamingStt: false,
   wsTurnActive: false,
+  agentTurnActive: false,
   wsTurnSpeaker: null,
   liveSttActive: false,
   wakePrimed: false,
@@ -955,15 +957,16 @@ function clearThinkingWatchdog() {
   }
 }
 
-function armThinkingWatchdog() {
+function armThinkingWatchdog(extraMs = 0) {
   clearThinkingWatchdog();
+  const budget = (state.agentTurnActive ? AGENT_THINKING_STALL_MS : THINKING_STALL_MS) + extraMs;
   state.thinkingWatchdog = setTimeout(() => {
     state.thinkingWatchdog = null;
     if (state.mode !== "thinking") return;
     resetWsTurnState();
     setMode("idle");
     flashCaption("That took too long — tap to try again.", 3200);
-  }, THINKING_STALL_MS);
+  }, budget);
 }
 
 /** Clear WS turn flags without killing playback (used on stale events). */
@@ -971,6 +974,7 @@ function resetWsTurnState() {
   clearWsTurnWatchdog();
   clearThinkingWatchdog();
   state.wsTurnActive = false;
+  state.agentTurnActive = false;
   state.sendingUtterance = false;
   if (state.wsTurnSpeaker) {
     state.wsTurnSpeaker.abort();
@@ -1594,7 +1598,6 @@ async function confirmAndSubmitUtterance() {
   if (state.liveClient?.ready) {
     state.liveClient.sendTextTurn(text);
     armWsTurnWatchdog();
-    armThinkingWatchdog();
     return;
   }
   state.sendingUtterance = false;
@@ -2487,6 +2490,20 @@ async function initLiveSession() {
     scheduleUtteranceSubmit();
   };
 
+  state.liveClient.onTurnMeta = (meta) => {
+    applyTurnMeta(meta);
+    showToolStatus(meta);
+    state.agentTurnActive = meta?.route_kind === "agent";
+    if (state.mode === "thinking") armThinkingWatchdog();
+  };
+
+  state.liveClient.onAgentStep = (step) => {
+    if (state.currentTurnEpoch !== state.activeTurnEpoch) return;
+    const label = step?.label || (step?.tool ? String(step.tool).replace(/_/g, " ") : "");
+    if (!label) return;
+    setStatusForMode(state.mode === "speaking" ? "speaking" : "thinking", truncateStatus(label, 48));
+  };
+
   state.liveClient.onTurnStart = () => {
     clearWsTurnWatchdog();
     clearUtteranceSubmitTimer();
@@ -2495,6 +2512,7 @@ async function initLiveSession() {
     state.currentTurnEpoch = state.activeTurnEpoch;
     const turnEpoch = state.currentTurnEpoch;
     state.wsTurnActive = true;
+    state.agentTurnActive = false;
     state.sendingUtterance = false;
     state.agentSpokenText = "";
     state.pendingUserTranscript = "";
@@ -2518,20 +2536,18 @@ async function initLiveSession() {
       onSpeakingStart: () => {
         if (turnEpoch === state.currentTurnEpoch) setMode("speaking");
       },
+      onPlaybackIdle: () => {
+        if (
+          turnEpoch !== state.currentTurnEpoch ||
+          !state.wsTurnActive ||
+          state.conversationMuted
+        ) {
+          return;
+        }
+        setMode("thinking");
+        armThinkingWatchdog();
+      },
     });
-  };
-
-  state.liveClient.onTurnMeta = (meta) => {
-    applyTurnMeta(meta);
-    showToolStatus(meta);
-  };
-
-  state.liveClient.onAgentStep = (step) => {
-    if (state.currentTurnEpoch !== state.activeTurnEpoch) return;
-    const label = step?.label || (step?.tool ? String(step.tool).replace(/_/g, " ") : "");
-    if (!label) return;
-    const mode = state.mode === "speaking" ? "speaking" : "thinking";
-    setStatusForMode(mode, truncateStatus(label, 48));
   };
 
   state.liveClient.onTurnDelta = (content) => {
@@ -2583,7 +2599,13 @@ async function initLiveSession() {
         state.wsTurnSpeaker &&
         !state.conversationMuted
       ) {
-        await state.wsTurnSpeaker.finish(turn);
+        try {
+          await state.wsTurnSpeaker.finish(turn);
+        } catch (_) {
+          if (turnEpoch === state.currentTurnEpoch && answer) {
+            await playTts(answer);
+          }
+        }
       } else if (turnEpoch === state.currentTurnEpoch && !state.conversationMuted) {
         await playTts(answer);
       } else if (turnEpoch === state.currentTurnEpoch) {
@@ -2607,6 +2629,7 @@ async function initLiveSession() {
     state.speakAbort = null;
     state.ttsAudio = null;
     state.wsTurnActive = false;
+    state.agentTurnActive = false;
     state.sendingUtterance = false;
     state.pendingUserTranscript = "";
     clearThinkingWatchdog();

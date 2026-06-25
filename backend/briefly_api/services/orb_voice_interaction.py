@@ -204,4 +204,4 @@ def spoken_step_bridge(tool_name: str | None, *, first: bool = False) -> str | N
     label = step_label(tool_name)
     if label == "Thinking":
         return None
-    return f"{label}…"
+    return f"{label}."

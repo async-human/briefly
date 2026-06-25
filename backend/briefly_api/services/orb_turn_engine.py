@@ -108,18 +108,16 @@ async def _iter_voice_agent_turn(
     )
     started = time.monotonic()
     result = None
-    first_tool_step = True
     try:
         async for event in runtime.iter_run(ctx):
             if event.get("type") == "agent_step":
                 tool = event.get("tool")
                 phase = event.get("phase") or "done"
-                if phase == "start" and first_tool_step:
+                if phase == "start":
                     bridge = spoken_step_bridge(tool, first=True)
                     if bridge:
                         for chunk in chunk_for_streaming(bridge):
                             yield {"type": "delta", "content": chunk}
-                    first_tool_step = False
                 yield {
                     "type": "agent_step",
                     "n": event.get("n"),
