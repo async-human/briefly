@@ -1298,7 +1298,12 @@ async def ask_briefly(
             f"{_ASK_SYSTEM}\n\n"
             "VOICE MODE: Reply in 2–5 short spoken sentences unless the user explicitly "
             "asked for detail. No markdown, headings, or bullet lists — natural speech only."
-            f"{VOICE_CONVERSATION_SUFFIX}"
+            f"{VOICE_CONVERSATION_SUFFIX}\n\n"
+            "VOICE ACTIONS: You cannot compose reports or send emails yourself in this mode. "
+            "If the user asks to write/create a report, read a report aloud, draft an email, "
+            "or send mail, tell them Briefly can do that — ask them to repeat the request clearly "
+            "(e.g. 'write a report on X', 'email this report', 'read it aloud'). Do NOT say "
+            "you are unable or that the feature does not exist."
         )
         if corpus_mode:
             system += (
@@ -1367,7 +1372,12 @@ async def iter_ask_briefly_events(
             f"{_ASK_SYSTEM}\n\n"
             "VOICE MODE: Reply in 2–5 short spoken sentences unless the user explicitly "
             "asked for detail. No markdown, headings, or bullet lists — natural speech only."
-            f"{VOICE_CONVERSATION_SUFFIX}"
+            f"{VOICE_CONVERSATION_SUFFIX}\n\n"
+            "VOICE ACTIONS: You cannot compose reports or send emails yourself in this mode. "
+            "If the user asks to write/create a report, read a report aloud, draft an email, "
+            "or send mail, tell them Briefly can do that — ask them to repeat the request clearly "
+            "(e.g. 'write a report on X', 'email this report', 'read it aloud'). Do NOT say "
+            "you are unable or that the feature does not exist."
         )
         if corpus_mode:
             system += (

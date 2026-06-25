@@ -111,8 +111,26 @@ _NARRATE_REPORT_RE = re.compile(
 )
 _EMAIL_REPORT_RE = re.compile(
     r"\b(?:email|send|mail)\s+(?:me\s+)?(?:this|the|my)\s+report\b"
-    r"|\b(?:email|send|mail)\s+(?:the\s+)?report\b",
+    r"|\b(?:email|send|mail)\s+(?:the\s+)?report\b"
+    r"|\b(?:email|send|mail)\s+(?:it|this)\b",
     re.IGNORECASE,
+)
+_DRAFT_EMAIL_RE = re.compile(
+    r"\b(draft|write|compose|send|email|mail)\s+(?:an?\s+)?(?:e-?mail|message|note)\b"
+    r"|\be-?mail\s+(?:to|him|her|them|my|a|this|the)\b"
+    r"|\bsend\s+(?:an?\s+)?(?:e-?mail|message|it)\b",
+    re.IGNORECASE,
+)
+_ACTION_TOOL_NAMES = frozenset(
+    {
+        "compose_report",
+        "narrate_report",
+        "draft_email",
+        "revise_email",
+        "send_email",
+        "confirm_send",
+        "save_email_to_gmail",
+    }
 )
 
 
@@ -124,27 +142,98 @@ def _wants_narrate_report(text: str, session: OrbSessionState | None = None) -> 
     if session and session.last_tool in ("compose_report", "narrate_report"):
         if re.search(
             r"^\s*(?:yes|yeah|sure|please|ok|okay)?\s*,?\s*"
-            r"(?:read\s+(?:it|the\s+report|it\s+aloud)|narrate\s+it|go\s+ahead)\s*[.?!]?\s*$",
+            r"(?:read\s+(?:it|the\s+report|it\s+aloud|the\s+full\s+report)|narrate\s+it|go\s+ahead)\s*[.?!]?\s*$",
             text,
             re.IGNORECASE,
         ):
             return True
+        if re.search(r"\b(read|narrate)\b.{0,20}\b(?:full\s+)?report\b", text, re.IGNORECASE):
+            return True
+        if re.search(r"\bfull\s+report\b.{0,12}\baloud\b", text, re.IGNORECASE):
+            return True
     return False
+
+
+def _wants_draft_email(text: str, session: OrbSessionState | None = None) -> bool:
+    if (
+        (_RESEARCH_REPORT_RE.search(text) or _EXPLICIT_REPORT_RE.search(text))
+        and _REPORT_EMAIL_RE.search(text)
+        and _has_email_recipient(text)
+    ):
+        return False
+    if _DRAFT_EMAIL_RE.search(text) or _EMAIL_REPORT_RE.search(text):
+        return True
+    if session and session.last_tool in ("compose_report", "narrate_report"):
+        if re.search(r"\b(email|send|mail|draft)\b", text, re.IGNORECASE):
+            return True
+    if session and session.last_tool in ("draft_email", "revise_email"):
+        if re.search(r"\b(send|confirm|email|mail|save)\b", text, re.IGNORECASE):
+            return True
+    if session and session.route_reason in ("research_report", "email_report"):
+        if re.search(r"\b(email|send|mail|draft)\b", text, re.IGNORECASE):
+            return True
+    return False
+
+
+def _has_email_recipient(text: str) -> bool:
+    return bool(
+        re.search(r"\bto\s+[\w.+-]+@[\w.-]+\.\w+\b", text, re.IGNORECASE)
+        or re.search(r"\bto\s+[A-Za-z][\w.\- ]{1,40}\b", text, re.IGNORECASE)
+    )
 
 
 def _routes_to_compose_report(text: str) -> bool:
     """Single-shot report goals — compose_report already runs web + corpus research."""
-    if _REPORT_EMAIL_RE.search(text):
+    has_report_intent = (
+        bool(_RESEARCH_REPORT_RE.search(text))
+        or bool(_EXPLICIT_REPORT_RE.search(text))
+        or (
+            re.search(r"\breport\b", text, re.IGNORECASE)
+            and re.search(r"\bresearch\b", text, re.IGNORECASE)
+        )
+    )
+    if not has_report_intent:
         return False
-    if _RESEARCH_REPORT_RE.search(text):
-        return True
-    if _EXPLICIT_REPORT_RE.search(text):
-        return True
-    if re.search(r"\breport\b", text, re.IGNORECASE) and re.search(
-        r"\bresearch\b", text, re.IGNORECASE
-    ):
-        return True
-    return False
+    # Same utterance with a named recipient needs agent/email tools, not compose alone.
+    if _REPORT_EMAIL_RE.search(text) and _has_email_recipient(text):
+        return False
+    return True
+
+
+def _pick_direct_tool(
+    matched: list[OrbTool],
+    text: str,
+    session: OrbSessionState | None,
+) -> OrbTool | None:
+    """Prefer action tools over ask_briefly when utterance matches report/email work."""
+    if _wants_narrate_report(text, session):
+        tool = _BY_NAME.get("narrate_report")
+        if tool is not None:
+            return tool
+    if _routes_to_compose_report(text):
+        tool = _BY_NAME.get("compose_report")
+        if tool is not None:
+            return tool
+    if _wants_draft_email(text, session):
+        tool = _BY_NAME.get("draft_email")
+        if tool is not None:
+            return tool
+    if len(matched) == 1:
+        return matched[0]
+    names = {t.name for t in matched}
+    if names & _ACTION_TOOL_NAMES:
+        for name in (
+            "confirm_send",
+            "send_email",
+            "draft_email",
+            "narrate_report",
+            "compose_report",
+            "revise_email",
+            "save_email_to_gmail",
+        ):
+            if name in names:
+                return _BY_NAME.get(name)
+    return None
 
 
 async def classify_orb_intent(
@@ -165,38 +254,20 @@ async def classify_orb_intent(
         return RouteDecision(kind="ask_briefly", confidence=1.0, reason="corpus_library")
 
     matched = regex_matches(text)
-    if _wants_narrate_report(text, session):
-        narrate_tool = _BY_NAME.get("narrate_report")
-        if narrate_tool is not None:
-            log.debug("orb intent → narrate_report")
-            return RouteDecision(
-                kind="direct",
-                tools=(narrate_tool,),
-                confidence=1.0,
-                reason="narrate_report",
-            )
-
-    if _EMAIL_REPORT_RE.search(text):
-        email_tool = _BY_NAME.get("draft_email")
-        if email_tool is not None:
-            log.debug("orb intent → draft_email (report)")
-            return RouteDecision(
-                kind="direct",
-                tools=(email_tool,),
-                confidence=1.0,
-                reason="email_report",
-            )
-
-    if _routes_to_compose_report(text):
-        report_tool = _BY_NAME.get("compose_report")
-        if report_tool is not None:
-            log.debug("orb intent research/report → compose_report (single shot)")
-            return RouteDecision(
-                kind="direct",
-                tools=(report_tool,),
-                confidence=1.0,
-                reason="research_report",
-            )
+    picked = _pick_direct_tool(matched, text, session)
+    if picked is not None:
+        reason = picked.name
+        if picked.name == "compose_report":
+            reason = "research_report"
+        elif picked.name == "draft_email" and _EMAIL_REPORT_RE.search(text):
+            reason = "email_report"
+        log.debug("orb intent → %s (picked)", picked.name)
+        return RouteDecision(
+            kind="direct",
+            tools=(picked,),
+            confidence=1.0,
+            reason=reason,
+        )
 
     if wants_web_search(text):
         web_tool = _BY_NAME.get("web_search")
@@ -213,6 +284,17 @@ async def classify_orb_intent(
         return RouteDecision(kind="clarify", confidence=1.0, reason="incomplete_utterance")
 
     goal_decision = classify_goal_routing(text, session, matched_tool_count=len(matched))
+    if goal_decision is not None and goal_decision.reason == "compound_goal":
+        if _routes_to_compose_report(text):
+            report_tool = _BY_NAME.get("compose_report")
+            if report_tool is not None:
+                log.debug("orb intent compound report → compose_report first")
+                return RouteDecision(
+                    kind="direct",
+                    tools=(report_tool,),
+                    confidence=0.98,
+                    reason="research_report",
+                )
     if goal_decision is not None:
         if goal_decision.reason == "compound_goal" and session:
             start_goal(session, text)
@@ -241,6 +323,14 @@ async def classify_orb_intent(
         ):
             if is_goal_followup(text) or session.route_kind in ("agent", "clarify"):
                 return RouteDecision(kind="agent", confidence=0.95, reason="goal_continue")
+        picked = _pick_direct_tool(matched, text, session)
+        if picked is not None:
+            return RouteDecision(
+                kind="direct",
+                tools=(picked,),
+                confidence=0.98,
+                reason=picked.name,
+            )
         if len(matched) == 1:
             return RouteDecision(
                 kind="direct",
