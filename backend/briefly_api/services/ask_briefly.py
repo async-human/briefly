@@ -80,11 +80,23 @@ _MIN_PASSAGE_SIMILARITY = 0.22
 _MAX_ANCHOR_SNIPPET_CHARS = 8000
 _REFERENTIAL_FOLLOWUP = re.compile(
     r"(?:"
-    r"\b(?:this|the|that|same)\s+(?:article|story|piece|post|read|item|source)\b|"
-    r"\b(?:it|this)\s+(?:says|said|mentions|mentioned|discusses|discussed|covers|covered)\b|"
+    r"\b(?:this|the|that|same)\s+(?:article|story|piece|post|read|item|source|topic|subject)\b|"
+    r"\b(?:it|this|that)\s+(?:says|said|mentions|mentioned|discusses|discussed|covers|covered)\b|"
     r"\babout\s+(?:it|this|that)\b|"
-    r"\b(?:go|dive)\s+(?:deeper|in\s+depth)\b"
+    r"\b(?:go|dive)\s+(?:deeper|in\s+depth)\b|"
+    r"\b(?:more details|more detail|more info|more information|tell me more|go on|go deeper|"
+    r"keep going|say more|elaborate|expand on|explain more|provide more|anything else|"
+    r"what else|continue|more on that)\b"
     r")",
+    re.IGNORECASE,
+)
+_VAGUE_CONTINUATION_RE = re.compile(
+    r"\b(?:"
+    r"more details|more detail|more info|more information|tell me more|go on|go deeper|"
+    r"keep going|say more|elaborate|expand on|explain more|provide more|anything else|"
+    r"what else|continue|more on that|can you provide|could you provide|give me more|"
+    r"dive deeper|in more depth|be more specific"
+    r")\b",
     re.IGNORECASE,
 )
 _THIN_BODY_CHARS = 600
@@ -976,6 +988,38 @@ def _is_referential_followup(message: str) -> bool:
     return bool(_REFERENTIAL_FOLLOWUP.search(message))
 
 
+def is_vague_continuation(message: str) -> bool:
+    """Short follow-ups that refer to the prior turn without naming the topic."""
+    text = (message or "").strip()
+    if not text or len(text.split()) > 14:
+        return False
+    if is_corpus_library_query(text) or is_today_brief_query(text) or is_saved_unread_query(text):
+        return False
+    return bool(_VAGUE_CONTINUATION_RE.search(text))
+
+
+def _prior_user_question(history: list[dict]) -> str:
+    for msg in reversed(history):
+        if msg.get("role") != "user":
+            continue
+        content = str(msg.get("content") or "").strip()
+        if content and len(content.split()) >= 3:
+            return content
+    return ""
+
+
+def _resolve_retrieval_query(message: str, thread: FollowUpThread | None) -> str:
+    """Expand elliptical follow-ups so RAG search stays on the active topic."""
+    text = (message or "").strip()
+    if not is_vague_continuation(text):
+        return text
+    history = list(thread.messages or []) if thread else []
+    prior = _prior_user_question(history)
+    if prior:
+        return f"{prior} {text}".strip()
+    return text
+
+
 def _infer_content_id_from_messages(messages: list[dict]) -> str | None:
     for msg in reversed(messages):
         if msg.get("role") != "assistant":
@@ -1068,6 +1112,9 @@ async def _prepare_ask(
         message=message,
     )
 
+    retrieval_query = _resolve_retrieval_query(message, thread)
+    continuation = is_vague_continuation(message) and bool(thread and thread.messages)
+
     if digest_item_id and not thread.digest_item_id:
         thread.digest_item_id = digest_item_id
     if content_id and not thread.content_id:
@@ -1102,7 +1149,7 @@ async def _prepare_ask(
             )
     elif corpus_library_mode:
         embedder = get_embedding_adapter()
-        query_embedding = await embedder.embed(message)
+        query_embedding = await embedder.embed(retrieval_query)
         library_chunks = await _retrieve_corpus_library(
             db,
             user.id,
@@ -1123,14 +1170,14 @@ async def _prepare_ask(
             )
     else:
         embedder = get_embedding_adapter()
-        query_embedding = await embedder.embed(message)
+        query_embedding = await embedder.embed(retrieval_query)
 
         anchor_chunks = await _load_anchor_chunks(
             db,
             user.id,
             content_id=content_id,
             digest_item_id=digest_item_id,
-            query=message,
+            query=retrieval_query,
             query_embedding=query_embedding,
             embedder=embedder,
         )
@@ -1172,8 +1219,14 @@ async def _prepare_ask(
     user_prompt = (
         f"USER PROFILE:\n{profile_text}\n\n"
         f"SOURCE PACK:\n{context_pack}\n\n"
-        f"USER QUESTION:\n{message.strip()}"
     )
+    if continuation:
+        user_prompt += (
+            "CONTINUATION: The user is asking for more detail on the same topic as the "
+            "conversation above. Expand on your previous answer — do NOT explain what "
+            "'more details' means or ask them to clarify the phrase.\n\n"
+        )
+    user_prompt += f"USER QUESTION:\n{message.strip()}"
     llm_messages.append(Message(role="user", content=user_prompt))
 
     return AskPrepared(
@@ -1310,7 +1363,30 @@ async def ask_briefly(
                 "\n\nVOICE LIBRARY MODE: When listing articles from the library, name 2–4 "
                 "specific titles with one brief detail each, grounded in the source pack."
             )
-        max_tokens = 520 if corpus_mode else 480
+        history = [
+            m for m in prepared.llm_messages
+            if m.role in ("user", "assistant")
+        ]
+        if len(history) > 1:
+            system += (
+                "\n\nVOICE FOLLOW-UP: The user is continuing a spoken conversation in this "
+                "thread. Treat their new question as referring to your immediately prior answer "
+                "and the same topic unless they clearly change subject. If they ask for 'more "
+                "details', 'tell me more', or similar, give deeper information on that same "
+                "topic — never define their request or explain what the phrase means."
+            )
+        if is_vague_continuation(message) and len(history) > 1:
+            system += (
+                "\n\nVOICE CONTINUATION: Answer as a direct extension of your last response. "
+                "Use the source pack and your prior answer together. Give a fuller answer "
+                "(several sentences) since they explicitly asked for more detail."
+            )
+        if corpus_mode:
+            max_tokens = 520
+        elif is_vague_continuation(message) and len(history) > 1:
+            max_tokens = 900
+        else:
+            max_tokens = 480
 
     llm = get_llm_adapter()
     response = await llm.complete(
@@ -1388,9 +1464,22 @@ async def iter_ask_briefly_events(
             system += (
                 "\n\nVOICE FOLLOW-UP: The user is continuing a spoken conversation in this "
                 "thread. Treat their new question as referring to your immediately prior answer "
-                "and the same topic unless they clearly change subject."
+                "and the same topic unless they clearly change subject. If they ask for 'more "
+                "details', 'tell me more', or similar, give deeper information on that same "
+                "topic — never define their request or explain what the phrase means."
             )
-        max_tokens = 520 if corpus_mode else 480
+        if is_vague_continuation(message) and history:
+            system += (
+                "\n\nVOICE CONTINUATION: Answer as a direct extension of your last response. "
+                "Use the source pack and your prior answer together. Give a fuller answer "
+                "(several sentences) since they explicitly asked for more detail."
+            )
+        if corpus_mode:
+            max_tokens = 520
+        elif is_vague_continuation(message) and history:
+            max_tokens = 900
+        else:
+            max_tokens = 480
 
     yield {"type": "thread_id", "thread_id": snapshot.thread_id}
 

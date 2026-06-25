@@ -19,6 +19,7 @@ from briefly_api.services.orb_goal import (
 from briefly_api.services.orb_router import RouteDecision, regex_matches, route_transcript
 from briefly_api.services.orb_session import OrbSessionState
 from briefly_api.services.orb_tools import DATA_TOOLS, OrbTool
+from briefly_api.services.ask_briefly import is_vague_continuation
 from briefly_api.services.orb_voice_interaction import is_incomplete_utterance
 
 log = logging.getLogger(__name__)
@@ -282,6 +283,25 @@ async def classify_orb_intent(
 
     if is_incomplete_utterance(text):
         return RouteDecision(kind="clarify", confidence=1.0, reason="incomplete_utterance")
+
+    if is_vague_continuation(text) and session and len(text.split()) <= 14:
+        if session.last_tool and session.last_tool != "ask_briefly":
+            reuse = _BY_NAME.get(session.last_tool)
+            if reuse is not None:
+                log.debug("orb intent continuation → reuse %s", reuse.name)
+                return RouteDecision(
+                    kind="direct",
+                    tools=(reuse,),
+                    confidence=0.95,
+                    reason="continuation_tool",
+                )
+        if session.last_transcript or session.last_answer or session.route_kind == "ask_briefly":
+            log.debug("orb intent continuation → ask_briefly")
+            return RouteDecision(
+                kind="ask_briefly",
+                confidence=0.98,
+                reason="continuation_followup",
+            )
 
     goal_decision = classify_goal_routing(text, session, matched_tool_count=len(matched))
     if goal_decision is not None and goal_decision.reason == "compound_goal":
