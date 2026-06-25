@@ -219,6 +219,8 @@ async def _run_turn_stream(
                     if event.get("thread_id"):
                         session.thread_id = event["thread_id"]
                     await _send(ws, {"type": "turn_meta", **event})
+                elif et == "agent_step":
+                    await _send(ws, {"type": "agent_step", **event})
                 elif et == "delta":
                     await _send(ws, {"type": "turn_delta", "content": event.get("content") or ""})
                 elif et == "complete":

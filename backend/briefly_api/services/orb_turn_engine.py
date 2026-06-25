@@ -19,6 +19,15 @@ from briefly_api.db.models import User
 from briefly_api.services.ask_briefly import ask_briefly, iter_ask_briefly_events
 from briefly_api.services.orb_intent import classify_orb_intent
 from briefly_api.services.orb_context import load_orb_tool_context, update_tool_slots_from_turn
+from briefly_api.services.orb_goal import (
+    agent_goal_text,
+    agent_history_from_goal,
+    is_compound_goal,
+    should_resume_goal,
+    start_goal,
+    step_label,
+    sync_goal_from_result,
+)
 from briefly_api.services.orb_persona import chunk_for_streaming, polish_spoken_answer
 from briefly_api.services.orb_router import RouteDecision
 from briefly_api.services.orb_session import OrbSessionState, update_session_after_turn
@@ -57,6 +66,98 @@ def _agent_registry() -> ToolRegistry:
     return registry
 
 
+async def _iter_voice_agent_turn(
+    db: AsyncSession,
+    user: User,
+    transcript: str,
+    *,
+    thread_id: str | None,
+    content_id: str | None,
+    surface: str,
+    session: OrbSessionState | None = None,
+    route_reason: str = "",
+) -> AsyncIterator[dict]:
+    """Stream agent steps, answer deltas, and a final complete payload."""
+    settings = get_settings()
+    steps_cap = _voice_agent_steps(surface)
+    if session:
+        goal = session.active_goal
+        if is_compound_goal(transcript) and (not goal or goal.get("status") != "awaiting_confirm"):
+            start_goal(session, transcript)
+        elif should_resume_goal(session, transcript) and goal:
+            goal["status"] = "active"
+
+    goal_text = agent_goal_text(session, transcript)
+    history = agent_history_from_goal(session)
+    runtime = AgentRuntime(_agent_registry(), max_steps=steps_cap, allow_writes=True)
+    ctx = ToolContext(
+        db=db,
+        user=user,
+        settings=settings,
+        goal=goal_text,
+        thread_id=thread_id,
+        content_id=content_id,
+        extra={"agent_history": history},
+    )
+    started = time.monotonic()
+    result = None
+    try:
+        async for event in runtime.iter_run(ctx):
+            if event.get("type") == "agent_step":
+                tool = event.get("tool")
+                yield {
+                    "type": "agent_step",
+                    "n": event.get("n"),
+                    "tool": tool,
+                    "label": step_label(tool),
+                    "phase": event.get("phase") or "done",
+                    "ok": event.get("ok"),
+                }
+            elif event.get("type") == "agent_result":
+                result = event.get("result")
+    except Exception:
+        log.exception("orb voice agent failed")
+        return
+
+    if result is None:
+        return
+
+    duration_ms = int((time.monotonic() - started) * 1000)
+    from briefly_api.services.orb import _persist_agent_run
+
+    await _persist_agent_run(user.id, transcript, result, duration_ms)
+
+    if session:
+        sync_goal_from_result(
+            session,
+            session.active_goal.get("objective") if session.active_goal else transcript,
+            steps=result.steps,
+            stopped_reason=result.stopped_reason,
+        )
+
+    answer = polish_spoken_answer(result.answer or "")
+    if not answer:
+        return
+
+    expects_reply = answer.endswith("?") or result.stopped_reason == "needs_confirmation"
+    payload = {
+        "transcript": transcript,
+        "thread_id": result.thread_id or thread_id,
+        "answer": answer,
+        "citations": result.citations,
+        "tool_trace": [{"tool": s.tool, "ok": s.ok} for s in result.steps if s.tool],
+        "expects_reply": expects_reply,
+        "route_kind": "agent",
+        "route_reason": route_reason or result.stopped_reason,
+        "agent_steps": len(result.steps),
+        "agent_stopped": result.stopped_reason,
+    }
+
+    for chunk in chunk_for_streaming(answer):
+        yield {"type": "delta", "content": chunk}
+    yield {"type": "complete", **payload}
+
+
 async def _run_voice_agent(
     db: AsyncSession,
     user: User,
@@ -65,41 +166,25 @@ async def _run_voice_agent(
     thread_id: str | None,
     content_id: str | None,
     surface: str,
+    session: OrbSessionState | None = None,
+    route_reason: str = "",
 ) -> dict | None:
-    settings = get_settings()
-    steps = _voice_agent_steps(surface)
-    runtime = AgentRuntime(_agent_registry(), max_steps=steps, allow_writes=True)
-    ctx = ToolContext(
-        db=db,
-        user=user,
-        settings=settings,
-        goal=transcript,
+    payload = None
+    async for event in _iter_voice_agent_turn(
+        db,
+        user,
+        transcript,
         thread_id=thread_id,
         content_id=content_id,
-    )
-    started = time.monotonic()
-    try:
-        result = await runtime.run(ctx)
-    except Exception:
-        log.exception("orb voice agent failed")
+        surface=surface,
+        session=session,
+        route_reason=route_reason,
+    ):
+        if event.get("type") == "complete":
+            payload = event
+    if not payload:
         return None
-    duration_ms = int((time.monotonic() - started) * 1000)
-    from briefly_api.services.orb import _persist_agent_run
-
-    await _persist_agent_run(user.id, transcript, result, duration_ms)
-    answer = polish_spoken_answer(result.answer or "")
-    if not answer:
-        return None
-    expects_reply = answer.endswith("?") or result.stopped_reason == "needs_confirmation"
-    return {
-        "thread_id": result.thread_id or thread_id,
-        "answer": answer,
-        "citations": result.citations,
-        "tool_trace": [{"tool": s.tool, "ok": s.ok} for s in result.steps if s.tool],
-        "expects_reply": expects_reply,
-        "route_kind": "agent",
-        "route_reason": result.stopped_reason,
-    }
+    return {k: v for k, v in payload.items() if k != "type"}
 
 
 async def _exec_tool(
@@ -194,7 +279,14 @@ async def execute_routed_turn(
 
     if decision.kind == "agent":
         planned = await _run_voice_agent(
-            db, user, transcript, thread_id=thread_id, content_id=content_id, surface=surface
+            db,
+            user,
+            transcript,
+            thread_id=thread_id,
+            content_id=content_id,
+            surface=surface,
+            session=session,
+            route_reason=decision.reason,
         )
         if planned:
             planned["transcript"] = transcript
@@ -379,6 +471,67 @@ async def iter_orb_turn_events(
         yield complete
         return
 
+    if decision.kind == "agent" and db is not None and user is not None and uid:
+        exec_started = time.monotonic()
+        complete = None
+        async for event in _iter_voice_agent_turn(
+            db,
+            user,
+            transcript,
+            thread_id=resolved_thread,
+            content_id=content_id,
+            surface=surface,
+            session=session,
+            route_reason=decision.reason,
+        ):
+            et = event.get("type")
+            if et == "agent_step":
+                yield event
+            elif et == "delta":
+                yield event
+            elif et == "complete":
+                complete = event
+
+        timings["agent_ms"] = int((time.monotonic() - exec_started) * 1000)
+        timings["total_ms"] = int((time.monotonic() - started) * 1000)
+        if complete is None:
+            log.warning("orb agent produced no answer; falling back to ask_briefly")
+            decision = RouteDecision(kind="ask_briefly", reason="agent_empty_fallback")
+        else:
+            complete["timings"] = timings
+            complete["session_id"] = session.session_id if session else session_id
+            answer = complete.get("answer") or ""
+            tool_name = None
+            trace = complete.get("tool_trace") or []
+            if trace:
+                tool_name = trace[0].get("tool")
+
+            if session:
+                await update_session_after_turn(
+                    session,
+                    thread_id=complete.get("thread_id"),
+                    transcript=transcript,
+                    last_tool=tool_name,
+                    route_kind="agent",
+                    last_answer=str(answer)[:4000],
+                    tool_slots=dict(session.tool_slots or {}),
+                    active_goal=session.active_goal,
+                )
+            persisted = await _persist_orb_exchange(
+                db,
+                uid,
+                complete.get("thread_id") or resolved_thread,
+                transcript,
+                answer,
+                citations=complete.get("citations") or [],
+            )
+            if persisted:
+                complete["thread_id"] = persisted
+
+            _log_turn(uid, transcript, decision, complete, timings)
+            yield complete
+            return
+
     if db is None or user is None or not uid:
         raise ValueError("Voice turn unavailable.")
 
@@ -418,6 +571,7 @@ async def iter_orb_turn_events(
             route_kind=str(payload.get("route_kind") or decision.kind),
             last_answer=str(payload.get("answer") or "")[:4000],
             tool_slots=dict(session.tool_slots or {}),
+            active_goal=session.active_goal,
         )
     persisted = await _persist_orb_exchange(
         db,

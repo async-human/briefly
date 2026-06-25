@@ -2526,6 +2526,14 @@ async function initLiveSession() {
     showToolStatus(meta);
   };
 
+  state.liveClient.onAgentStep = (step) => {
+    if (state.currentTurnEpoch !== state.activeTurnEpoch) return;
+    const label = step?.label || (step?.tool ? String(step.tool).replace(/_/g, " ") : "");
+    if (!label) return;
+    const mode = state.mode === "speaking" ? "speaking" : "thinking";
+    setStatusForMode(mode, truncateStatus(label, 48));
+  };
+
   state.liveClient.onTurnDelta = (content) => {
     if (content) state.agentSpokenText += content;
     if (state.wsTurnSpeaker && content && state.currentTurnEpoch === state.activeTurnEpoch) {

@@ -10,6 +10,7 @@ import logging
 import re
 
 from briefly_api.services.corpus_queries import is_corpus_library_query
+from briefly_api.services.orb_goal import classify_goal_routing, start_goal
 from briefly_api.services.orb_router import RouteDecision, regex_matches, route_transcript
 from briefly_api.services.orb_session import OrbSessionState
 from briefly_api.services.orb_tools import DATA_TOOLS, OrbTool
@@ -99,6 +100,13 @@ async def classify_orb_intent(
         return RouteDecision(kind="ask_briefly", confidence=1.0, reason="corpus_library")
 
     matched = regex_matches(text)
+    goal_decision = classify_goal_routing(text, session, matched_tool_count=len(matched))
+    if goal_decision is not None:
+        if goal_decision.reason == "compound_goal" and session:
+            start_goal(session, text)
+        log.debug("orb intent goal → %s", goal_decision.reason)
+        return goal_decision
+
     active_thread = thread_message_count > 0 or (
         bool(session_thread_id) and session_has_prior_turn
     )

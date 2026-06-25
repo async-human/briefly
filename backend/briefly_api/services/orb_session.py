@@ -32,6 +32,7 @@ class OrbSessionState:
     route_kind: str | None = None
     tool_slots: dict[str, Any] = field(default_factory=dict)
     last_answer: str | None = None
+    active_goal: dict[str, Any] | None = None
     updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -50,6 +51,7 @@ class OrbSessionState:
             route_kind=data.get("route_kind"),
             tool_slots=dict(data.get("tool_slots") or {}),
             last_answer=data.get("last_answer"),
+            active_goal=data.get("active_goal") if isinstance(data.get("active_goal"), dict) else None,
             updated_at=str(data.get("updated_at") or datetime.now(timezone.utc).isoformat()),
         )
 
@@ -150,6 +152,7 @@ async def update_session_after_turn(
     route_kind: str | None = None,
     last_answer: str | None = None,
     tool_slots: dict[str, Any] | None = None,
+    active_goal: dict[str, Any] | None = None,
 ) -> OrbSessionState:
     if thread_id:
         state.thread_id = thread_id
@@ -165,5 +168,7 @@ async def update_session_after_turn(
         state.route_kind = route_kind
     if tool_slots is not None:
         state.tool_slots = tool_slots
+    if active_goal is not None:
+        state.active_goal = active_goal
     await save_session(state)
     return state

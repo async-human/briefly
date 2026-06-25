@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -138,11 +139,12 @@ class AgentRuntime:
             return {"thought": "", "tool": "", "args": {}, "final": ""}
         return data if isinstance(data, dict) else {}
 
-    async def run(self, ctx: ToolContext) -> AgentResult:
+    async def iter_run(self, ctx: ToolContext) -> AsyncIterator[dict[str, Any]]:
+        """Stream planner steps; final event is ``agent_result`` with ``AgentResult``."""
         steps: list[AgentStep] = []
         citations: list[dict] = []
         tools_used: list[str] = []
-        history: list[str] = []
+        history: list[str] = list((ctx.extra or {}).get("agent_history") or [])
         resolved_thread_id = ctx.thread_id
 
         for n in range(1, self.max_steps + 1):
@@ -152,28 +154,62 @@ class AgentRuntime:
             tool_name = str(plan.get("tool") or "").strip()
             args = plan.get("args") if isinstance(plan.get("args"), dict) else {}
 
-            # Planner chose to finish.
             if not tool_name:
                 answer = final or self._fallback_answer(history)
-                return AgentResult(answer, steps, citations, tools_used, "final", thread_id=resolved_thread_id)
+                result = AgentResult(
+                    answer, steps, citations, tools_used, "final", thread_id=resolved_thread_id
+                )
+                yield {"type": "agent_result", "result": result}
+                return
+
+            yield {
+                "type": "agent_step",
+                "n": n,
+                "tool": tool_name,
+                "phase": "start",
+                "thought": thought[:240],
+            }
 
             tool = self.registry.get(tool_name)
             if tool is None:
-                obs = f"No such tool '{tool_name}'. Available: {', '.join(t.name for t in self.registry.all())}."
+                obs = (
+                    f"No such tool '{tool_name}'. Available: "
+                    f"{', '.join(t.name for t in self.registry.all())}."
+                )
                 steps.append(AgentStep(n, thought, tool_name, args, obs, ok=False))
                 history.append(f"step{n}: tried {tool_name} -> {obs}")
+                yield {
+                    "type": "agent_step",
+                    "n": n,
+                    "tool": tool_name,
+                    "phase": "done",
+                    "ok": False,
+                    "observation": obs[:180],
+                }
                 continue
 
-            # Write-gating: irreversible/world-changing tools need explicit approval.
             if tool.side_effect == "write" and not self.allow_writes:
                 msg = (
                     f"The step '{tool_name}' makes a change and needs your confirmation. "
                     "Approve it and I'll proceed."
                 )
-                steps.append(AgentStep(n, thought, tool_name, args, "blocked: needs confirmation", ok=False))
-                return AgentResult(msg, steps, citations, tools_used, "needs_confirmation", thread_id=resolved_thread_id)
+                steps.append(
+                    AgentStep(n, thought, tool_name, args, "blocked: needs confirmation", ok=False)
+                )
+                result = AgentResult(
+                    msg, steps, citations, tools_used, "needs_confirmation", thread_id=resolved_thread_id
+                )
+                yield {
+                    "type": "agent_step",
+                    "n": n,
+                    "tool": tool_name,
+                    "phase": "done",
+                    "ok": False,
+                    "observation": "blocked: needs confirmation",
+                }
+                yield {"type": "agent_result", "result": result}
+                return
 
-            # Execute — a crash becomes an observation so the agent can recover.
             try:
                 result = await tool.handler(ctx, args)
             except Exception as exc:
@@ -189,15 +225,39 @@ class AgentRuntime:
             obs = (result.summary or "")[:_MAX_OBS_CHARS]
             steps.append(AgentStep(n, thought, tool_name, args, obs, ok=result.ok))
             history.append(f"step{n}: {tool_name}({json.dumps(args, default=str)}) -> {obs}")
+            yield {
+                "type": "agent_step",
+                "n": n,
+                "tool": tool_name,
+                "phase": "done",
+                "ok": result.ok,
+                "observation": obs[:180],
+            }
 
-        # Budget exhausted — synthesize a final answer from what we gathered.
-        return AgentResult(
+        result = AgentResult(
             self._fallback_answer(history),
             steps,
             citations,
             tools_used,
             "max_steps",
             thread_id=resolved_thread_id,
+        )
+        yield {"type": "agent_result", "result": result}
+
+    async def run(self, ctx: ToolContext) -> AgentResult:
+        result: AgentResult | None = None
+        async for event in self.iter_run(ctx):
+            if event.get("type") == "agent_result":
+                result = event["result"]
+        if result is not None:
+            return result
+        return AgentResult(
+            self._fallback_answer([]),
+            [],
+            [],
+            [],
+            "error",
+            thread_id=ctx.thread_id,
         )
 
     @staticmethod

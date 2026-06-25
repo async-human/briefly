@@ -239,7 +239,7 @@ class Settings(BaseSettings):
     deepgram_endpointing_ms: int = 900
     deepgram_utterance_end_ms: int = 3600
     orb_plugin_modules: str = ""
-    orb_voice_max_steps: int = 3
+    orb_voice_max_steps: int = 8
     orb_tts_single_request_max_chars: int = 900
 
     # ── Continuous enrichment worker ──────────────────────────────────────────
