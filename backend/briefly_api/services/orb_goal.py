@@ -64,6 +64,7 @@ STEP_LABELS: dict[str, str] = {
     "ask_briefly": "Searching your library",
     "web_search": "Searching the web",
     "compose_report": "Writing your report",
+    "narrate_report": "Reading your report",
     "draft_email": "Drafting your email",
     "send_email": "Sending your email",
     "confirm_send": "Confirming send",

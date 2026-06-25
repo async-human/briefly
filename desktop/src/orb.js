@@ -161,6 +161,7 @@ const state = {
   serverStreamingStt: false,
   wsTurnActive: false,
   agentTurnActive: false,
+  longFormNarration: false,
   wsTurnSpeaker: null,
   liveSttActive: false,
   wakePrimed: false,
@@ -290,12 +291,14 @@ function startAuxPcmStream(mode) {
 async function startWakeListenStream() {
   if (!store.wakeEnabled || store.wakeMuted || !isAccountLinked()) return;
   if (state.mode !== "idle" || state.conversationActive) return;
-  if (!state.liveClient?.ready || !state.serverStreamingStt) return;
+  if (!state.liveClient?.ready) return;
   try {
     await ensureMic();
     const ok = await state.liveClient.prepareWakeListen();
-    if (!ok || state.mode !== "idle") return;
-    startAuxPcmStream("wake");
+    if (state.mode !== "idle") return;
+    if (ok && state.serverStreamingStt) {
+      startAuxPcmStream("wake");
+    }
   } catch (_) {}
 }
 
@@ -304,6 +307,7 @@ function stopWakeListenStream() {
 }
 
 async function startSemanticBargeIn() {
+  if (state.longFormNarration) return;
   if (state.mode !== "speaking") return;
   if (!state.liveClient?.ready) {
     startBargeInMonitor();
@@ -911,7 +915,9 @@ function setMode(mode) {
       clearThinkingWatchdog();
       state.speakingStartedAt = Date.now();
       state.bargeInCooldownUntil = Date.now() + BARGE_IN.GRACE_AFTER_SPEAK_MS;
-      void ensureMic().then(() => startSemanticBargeIn()).catch(() => {});
+      if (!state.longFormNarration) {
+        void ensureMic().then(() => startSemanticBargeIn()).catch(() => {});
+      }
     } else if (mode === "thinking") {
       stopBargeInMonitor();
       stopSemanticBargeIn();
@@ -1082,6 +1088,7 @@ function stopBargeInMonitor() {
 }
 
 function startBargeInMonitor() {
+  if (state.longFormNarration) return;
   stopBargeInMonitor();
   if (!state.micStream || state.conversationMuted) return;
   if (state.mode !== "speaking") return;
@@ -2073,7 +2080,7 @@ function onWakePhraseHeard(transcript) {
   if (!matched && transcript) return;
   stopWakeListenStream();
   state.conversationActive = true;
-  flashCaption("Wake word heard.", 900);
+  flashCaption("Hey — I'm listening.", 900);
   void startListening();
 }
 
@@ -2141,7 +2148,7 @@ async function startMicWakeWord() {
     isIdle: () => {
       if (!store.wakeEnabled || store.wakeMuted) return false;
       if (state.mode !== "idle") return false;
-      if (state.wakeListenActive) return false;
+      if (state.conversationActive) return false;
       return true;
     },
     measureRms: measureMicRms,
@@ -2465,6 +2472,7 @@ async function initLiveSession() {
   };
 
   state.liveClient.onBargeInDetected = (text) => {
+    if (state.longFormNarration) return;
     if (state.mode !== "speaking") return;
     if (Date.now() - state.speakingStartedAt < BARGE_IN.GRACE_AFTER_SPEAK_MS) return;
     if (Date.now() < state.bargeInCooldownUntil) return;
@@ -2520,6 +2528,9 @@ async function initLiveSession() {
     applyTurnMeta(meta);
     showToolStatus(meta);
     state.agentTurnActive = meta?.route_kind === "agent";
+    state.longFormNarration =
+      meta?.route_reason === "narrate_report" ||
+      (Array.isArray(meta?.route_tools) && meta.route_tools.includes("narrate_report"));
     if (meta?.route_reason === "research_report" && state.mode === "thinking") {
       setStatusForMode("thinking", "Researching and writing your report…");
     }
@@ -2576,6 +2587,7 @@ async function initLiveSession() {
         if (turnEpoch === state.currentTurnEpoch) setMode("speaking");
       },
       onPlaybackIdle: () => {
+        if (state.longFormNarration) return;
         if (
           turnEpoch !== state.currentTurnEpoch ||
           !state.wsTurnActive ||
@@ -2606,6 +2618,7 @@ async function initLiveSession() {
 
     applyTurnMeta(turn);
     showToolStatus(turn);
+    state.longFormNarration = !!turn?.narrate_mode;
     const transcript = (turn?.transcript || "").trim();
     const voiceCmd = matchVoiceCommand(transcript);
     if (voiceCmd) {
@@ -2668,6 +2681,7 @@ async function initLiveSession() {
     state.wsTurnSpeaker = null;
     state.speakAbort = null;
     state.ttsAudio = null;
+    state.longFormNarration = false;
     state.wsTurnActive = false;
     state.agentTurnActive = false;
     state.sendingUtterance = false;

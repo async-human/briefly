@@ -253,7 +253,10 @@ async function playSentencePipeline({
     ensure(i);
     for (let j = 1; j <= prefetch; j += 1) ensure(i + j);
 
-    const blob = await jobs[i];
+    let blob = await jobs[i];
+    if ((!blob || blob.size < 64) && !signal?.aborted) {
+      blob = await fetchSentence(sentences[i]);
+    }
     if (!blob || blob.size < 64 || signal?.aborted) continue;
 
     await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
@@ -547,6 +550,14 @@ function createDeltaStreamingSpeaker({
           await playBlobAudio(blob, { signal, onAudio, onStart: markStart });
         } catch (_) {
           if (aborted || signal?.aborted) break;
+          const retry = await speakFn(sentence, signal).catch(() => null);
+          if (retry && retry.size >= 64 && !aborted && !signal?.aborted) {
+            try {
+              await playBlobAudio(retry, { signal, onAudio, onStart: markStart });
+            } catch (_) {
+              if (aborted || signal?.aborted) break;
+            }
+          }
         } finally {
           markIdle();
         }

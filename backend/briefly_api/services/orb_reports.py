@@ -48,6 +48,63 @@ def _spoken_excerpt(body: str, *, max_chars: int = 1200) -> str:
     return cut + "…"
 
 
+def _report_headline(body: str, *, max_chars: int = 320) -> str:
+    """Short spoken teaser — not the full report."""
+    text = (body or "").strip()
+    if not text:
+        return ""
+    parts = re.split(r"(?<=[.!?])\s+", text)
+    headline = parts[0].strip() if parts else text
+    if len(parts) >= 2 and len(headline) < 80:
+        headline = f"{headline} {parts[1].strip()}".strip()
+    if len(headline) <= max_chars:
+        return headline
+    return _spoken_excerpt(headline, max_chars=max_chars)
+
+
+def build_report_ready_answer(goal: str, body: str) -> str:
+    """Offer delivery choice instead of reading the entire report unprompted."""
+    headline = _report_headline(body)
+    lead = f"I've finished your report on {goal}."
+    if headline:
+        lead += f" In short: {headline}"
+    return (
+        f"{lead} "
+        "Would you like me to read the full report aloud, draft an email with it, "
+        "or are you good for now?"
+    )
+
+
+def build_narrated_report_answer(topic: str, body: str) -> str:
+    topic = (topic or "your topic").strip()
+    body = (body or "").strip()
+    if not body:
+        return "I couldn't find the report text — want me to write it again?"
+    return f"Alright — here's your full report on {topic}. {body}"
+
+
+def narrate_cached_report(user_id: str) -> dict:
+    from briefly_api.services.orb_report_cache import get_report
+
+    cached = get_report(user_id)
+    if not cached or not (cached.get("body") or "").strip():
+        return {
+            "answer": "I don't have a report ready yet. What topic should I research?",
+            "citations": [],
+            "expects_reply": True,
+        }
+    topic = str(cached.get("topic") or "your topic")
+    body = str(cached.get("body") or "")
+    return {
+        "answer": build_narrated_report_answer(topic, body),
+        "report_topic": topic,
+        "report_body": body,
+        "narrate_mode": True,
+        "expects_reply": True,
+        "display": f"Reading report — {topic[:60]}",
+    }
+
+
 async def compose_report(
     db: AsyncSession,
     user: User,
@@ -104,12 +161,14 @@ async def compose_report(
     if not body:
         body = "I couldn't assemble a report from your sources right now."
 
-    spoken = _spoken_excerpt(body)
     return {
-        "answer": f"I've finished your report on {goal}. {spoken}",
+        "answer": build_report_ready_answer(goal, body),
         "report_body": body,
         "report_topic": goal,
         "citations": citations,
         "thread_id": thread_id,
-        "display": f"Report ready — {goal[:60]}\nSay “email this report” or “tell me more”.",
+        "display": (
+            f"Report ready — {goal[:60]}\n"
+            "Say “read it aloud”, “email this report”, or “I'm good”."
+        ),
     }

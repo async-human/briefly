@@ -407,6 +407,20 @@ async def compose_report_handler(
     }
 
 
+async def narrate_report_handler(
+    db: AsyncSession,
+    user: User,
+    *,
+    transcript: str = "",
+    thread_id: str | None = None,
+    content_id: str | None = None,
+    args: dict | None = None,
+) -> dict:
+    from briefly_api.services.orb_reports import narrate_cached_report
+
+    return narrate_cached_report(str(user.id))
+
+
 async def web_search_handler(
     db: AsyncSession,
     user: User,
@@ -947,6 +961,22 @@ DATA_TOOLS: list[OrbTool] = [
             re.compile(r"\bresearch\b.{0,40}\b(and|then)\b.{0,20}\b(report|summarize|write)\b", re.IGNORECASE),
         ),
         args_schema={"topic": "report subject"},
+    ),
+    OrbTool(
+        name="narrate_report",
+        description=(
+            "Read aloud the user's most recently composed report in full. Use when they "
+            "ask to read, narrate, or hear the report — not when composing a new one."
+        ),
+        handler=narrate_report_handler,
+        fast_patterns=(
+            re.compile(
+                r"\b(read|narrate|speak)\s+(?:it|the\s+report|the\s+full\s+report|(?:it\s+)?(?:out\s+)?aloud)\b",
+                re.IGNORECASE,
+            ),
+            re.compile(r"\bread\s+(?:the\s+)?(?:full\s+)?report\b", re.IGNORECASE),
+            re.compile(r"\btell\s+me\s+(?:the\s+)?(?:full\s+)?report\b", re.IGNORECASE),
+        ),
     ),
     OrbTool(
         name="today_brief",

@@ -300,6 +300,7 @@ async def execute_routed_turn(
             "route_kind": decision.kind,
             "route_reason": decision.reason,
             "draft_id": out.get("draft_id"),
+            "narrate_mode": bool(out.get("narrate_mode")),
         }
 
     if decision.kind == "agent":
@@ -663,10 +664,12 @@ async def iter_orb_turn_events(
     payload["transcript"] = user_transcript
 
     answer = payload.get("answer") or ""
+    spoken_max = 8000 if payload.get("narrate_mode") else 2400
+    answer = polish_spoken_answer(answer, max_chars=spoken_max)
     for chunk in chunk_for_streaming(answer):
         yield {"type": "delta", "content": chunk}
 
-    complete = {"type": "complete", **payload}
+    complete = {"type": "complete", **payload, "answer": answer}
     tool_name = None
     trace = payload.get("tool_trace") or []
     if trace:

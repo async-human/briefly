@@ -101,6 +101,37 @@ _RESEARCH_REPORT_RE = re.compile(
 )
 
 
+_NARRATE_REPORT_RE = re.compile(
+    r"\b(read|narrate|speak)\s+(?:it|the\s+report|the\s+full\s+report|(?:it\s+)?(?:out\s+)?aloud)\b"
+    r"|\bread\s+(?:the\s+)?(?:full\s+)?report\b"
+    r"|\btell\s+me\s+(?:the\s+)?(?:full\s+)?report\b"
+    r"|\bgo\s+ahead\s+(?:and\s+)?read\b"
+    r"|\b(read|narrate)\s+(?:the\s+)?report\s+(?:to\s+me|please)\b",
+    re.IGNORECASE,
+)
+_EMAIL_REPORT_RE = re.compile(
+    r"\b(?:email|send|mail)\s+(?:me\s+)?(?:this|the|my)\s+report\b"
+    r"|\b(?:email|send|mail)\s+(?:the\s+)?report\b",
+    re.IGNORECASE,
+)
+
+
+def _wants_narrate_report(text: str, session: OrbSessionState | None = None) -> bool:
+    if re.search(r"\b(?:email|inbox|gmail)\b", text, re.IGNORECASE):
+        return False
+    if _NARRATE_REPORT_RE.search(text):
+        return True
+    if session and session.last_tool in ("compose_report", "narrate_report"):
+        if re.search(
+            r"^\s*(?:yes|yeah|sure|please|ok|okay)?\s*,?\s*"
+            r"(?:read\s+(?:it|the\s+report|it\s+aloud)|narrate\s+it|go\s+ahead)\s*[.?!]?\s*$",
+            text,
+            re.IGNORECASE,
+        ):
+            return True
+    return False
+
+
 def _routes_to_compose_report(text: str) -> bool:
     """Single-shot report goals — compose_report already runs web + corpus research."""
     if _REPORT_EMAIL_RE.search(text):
@@ -134,6 +165,28 @@ async def classify_orb_intent(
         return RouteDecision(kind="ask_briefly", confidence=1.0, reason="corpus_library")
 
     matched = regex_matches(text)
+    if _wants_narrate_report(text, session):
+        narrate_tool = _BY_NAME.get("narrate_report")
+        if narrate_tool is not None:
+            log.debug("orb intent → narrate_report")
+            return RouteDecision(
+                kind="direct",
+                tools=(narrate_tool,),
+                confidence=1.0,
+                reason="narrate_report",
+            )
+
+    if _EMAIL_REPORT_RE.search(text):
+        email_tool = _BY_NAME.get("draft_email")
+        if email_tool is not None:
+            log.debug("orb intent → draft_email (report)")
+            return RouteDecision(
+                kind="direct",
+                tools=(email_tool,),
+                confidence=1.0,
+                reason="email_report",
+            )
+
     if _routes_to_compose_report(text):
         report_tool = _BY_NAME.get("compose_report")
         if report_tool is not None:

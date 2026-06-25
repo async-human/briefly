@@ -71,6 +71,7 @@ _ACK_BY_TOOL: dict[str, str] = {
     "current_datetime": "Sure.",
     "draft_email": "Okay — I'll draft that email.",
     "compose_report": "Got it — I'll work on that report.",
+    "narrate_report": "Sure — I'll read your report.",
     "web_search": "Alright — I'll search for that.",
     "user_preferences": "Let me check your profile.",
     "start_research": "Sure — I'll start researching that.",
@@ -88,6 +89,8 @@ _ACK_BY_REASON: dict[str, str] = {
     "explicit_web": "Alright — I'll search the web for that.",
     "explicit_report": "Got it — I'll research that and write your report.",
     "research_report": "Got it — I'll research that and write your report.",
+    "narrate_report": "Sure — I'll read your report aloud.",
+    "email_report": "Okay — I'll draft an email with your report.",
 }
 
 
