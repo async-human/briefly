@@ -10,7 +10,13 @@ import logging
 import re
 
 from briefly_api.services.corpus_queries import is_corpus_library_query
-from briefly_api.services.orb_goal import classify_goal_routing, is_goal_followup, start_goal, wants_web_search
+from briefly_api.services.orb_goal import (
+    classify_goal_routing,
+    is_compound_goal,
+    is_goal_followup,
+    start_goal,
+    wants_web_search,
+)
 from briefly_api.services.orb_router import RouteDecision, regex_matches, route_transcript
 from briefly_api.services.orb_session import OrbSessionState
 from briefly_api.services.orb_tools import DATA_TOOLS, OrbTool
@@ -83,6 +89,13 @@ def _affinity_tool(session: OrbSessionState | None, transcript: str) -> OrbTool 
     return None
 
 
+_EXPLICIT_REPORT_RE = re.compile(
+    r"\b(create|write|compose|draft|prepare|make|generate)\s+(?:a\s+|my\s+|the\s+)?"
+    r"(?:detailed\s+)?(?:report|summary|write-up)\b",
+    re.IGNORECASE,
+)
+
+
 async def classify_orb_intent(
     transcript: str,
     *,
@@ -101,6 +114,17 @@ async def classify_orb_intent(
         return RouteDecision(kind="ask_briefly", confidence=1.0, reason="corpus_library")
 
     matched = regex_matches(text)
+    if _EXPLICIT_REPORT_RE.search(text) and not is_compound_goal(text):
+        report_tool = _BY_NAME.get("compose_report")
+        if report_tool is not None:
+            log.debug("orb intent explicit report → compose_report")
+            return RouteDecision(
+                kind="direct",
+                tools=(report_tool,),
+                confidence=1.0,
+                reason="explicit_report",
+            )
+
     if wants_web_search(text):
         web_tool = _BY_NAME.get("web_search")
         if web_tool is not None:

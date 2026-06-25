@@ -22,19 +22,30 @@ def extract_report_goal(transcript: str, args: dict | None) -> str:
         return str(args["goal"]).strip()
     text = (transcript or "").strip()
     for pat in (
-        r"\b(?:write|compose|create|draft|prepare)\s+(?:a\s+)?(?:detailed\s+)?(?:report|summary|write-up)\s+(?:on|about)\s+(.+?)(?:\s+and\s+|\?|$)",
-        r"\breport\s+(?:on|about)\s+(.+?)(?:\?|$)",
+        r"\b(?:write|compose|create|draft|prepare|make|generate)\s+(?:a\s+|my\s+|the\s+)?"
+        r"(?:detailed\s+)?(?:report|summary|write-up)\s+(?:on|about|for)\s+(.+?)(?:\s+and\s+|\?|$)",
+        r"\breport\s+(?:on|about|for)\s+(.+?)(?:\?|$)",
+        r"\bresearch\s+(?:on|about|for)\s+(.+?)\s+and\s+(?:write|create|compose)\s+(?:a\s+)?report",
     ):
         m = re.search(pat, text, re.IGNORECASE)
         if m:
             return m.group(1).strip().rstrip(".")
     cleaned = re.sub(
-        r"^(please\s+)?(write|compose|create|draft)\s+(a\s+)?(detailed\s+)?(report|summary)\s+(on|about)\s+",
+        r"^(?:please\s+)?(?:write|compose|create|draft|make|generate)\s+(?:a\s+|my\s+|the\s+)?"
+        r"(?:detailed\s+)?(?:report|summary|write-up)\s+(?:on|about|for)\s+",
         "",
         text,
         flags=re.IGNORECASE,
     ).strip()
     return cleaned or text
+
+
+def _spoken_excerpt(body: str, *, max_chars: int = 1200) -> str:
+    text = (body or "").strip()
+    if len(text) <= max_chars:
+        return text
+    cut = text[: max_chars - 1].rsplit(" ", 1)[0]
+    return cut + "…"
 
 
 async def compose_report(
@@ -93,9 +104,9 @@ async def compose_report(
     if not body:
         body = "I couldn't assemble a report from your sources right now."
 
-    preview = body[:420].rsplit(" ", 1)[0] + "…" if len(body) > 420 else body
+    spoken = _spoken_excerpt(body)
     return {
-        "answer": f"Here's your report on {goal}. {preview}",
+        "answer": f"I've finished your report on {goal}. {spoken}",
         "report_body": body,
         "report_topic": goal,
         "citations": citations,

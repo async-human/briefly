@@ -416,9 +416,17 @@ async def web_search_handler(
     content_id: str | None = None,
     args: dict | None = None,
 ) -> dict:
-    from briefly_api.services.web_search import web_search
+    from briefly_api.services.web_search import synthesize_web_answer, web_search
 
     query = ((args or {}).get("query") or transcript or "").strip()
+    # Strip common command prefixes so the search query is the topic.
+    query = re.sub(
+        r"^(?:please\s+)?(?:(?:go to|search|look up on|research on)\s+(?:the\s+)?(?:web|internet)(?:\s+for)?|"
+        r"web search for|search the web for|find on the web)\s*",
+        "",
+        query,
+        flags=re.IGNORECASE,
+    ).strip() or query
     if not query:
         return {"answer": "What would you like me to look up on the web?", "citations": []}
 
@@ -429,10 +437,9 @@ async def web_search_handler(
             "citations": [],
         }
 
-    lines = ["Here's what I found on the web — note this is the open web, not your own sources:"]
+    answer = await synthesize_web_answer(query, results, user_id=str(user.id), voice=True)
     cites: list[dict] = []
     for i, r in enumerate(results, start=1):
-        lines.append(f"{i}. {r['title']}")
         cites.append(
             {
                 "ref": f"S{i}",
@@ -444,7 +451,7 @@ async def web_search_handler(
                 "kind": "web_search",
             }
         )
-    return {"answer": " ".join(lines), "citations": cites}
+    return {"answer": answer, "citations": cites}
 
 
 async def calendar_upcoming_handler(
@@ -926,11 +933,11 @@ DATA_TOOLS: list[OrbTool] = [
     OrbTool(
         name="compose_report",
         description=(
-            "Research a topic using the user's sources and the web, then write a detailed spoken report. "
-            "Use for 'write a report on X', 'research X and summarize'."
+            "Research a topic using the user's sources AND the web, then write a full spoken report. "
+            "Use whenever the user asks to create, write, or compose a report — this tool CAN "
+            "create reports. Pass topic in args.topic when possible."
         ),
         handler=compose_report_handler,
-        side_effect="write",
         fast_patterns=(
             re.compile(
                 r"\b(write|compose|create|draft|prepare)\s+(?:a\s+)?(?:detailed\s+)?(?:report|summary|write-up)\b",
@@ -978,9 +985,9 @@ DATA_TOOLS: list[OrbTool] = [
     OrbTool(
         name="web_search",
         description=(
-            "Search the public web for current facts or info NOT in the user's own "
-            "sources. Use ONLY for explicit web/internet requests, or when the user's "
-            "corpus clearly cannot answer — prefer the user's own sources otherwise."
+            "Search the public web and return a synthesized spoken summary of findings. "
+            "Use when the user asks for web/internet research. Do NOT list titles only — "
+            "this tool summarizes results into natural speech."
         ),
         handler=web_search_handler,
         fast_patterns=(

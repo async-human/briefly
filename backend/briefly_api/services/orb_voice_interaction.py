@@ -88,6 +88,7 @@ _ACK_BY_REASON: dict[str, str] = {
     "semantic_multi": "Got it — I'll work through that.",
     "agent": "Understood. Let me figure out the best way to help.",
     "explicit_web": "Alright — I'll search the web for that.",
+    "explicit_report": "Got it — I'll research that and write your report.",
 }
 
 

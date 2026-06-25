@@ -68,6 +68,70 @@ async def _tavily(query: str, s: Settings) -> list[dict]:
     return out
 
 
+async def synthesize_web_answer(
+    query: str,
+    results: list[dict],
+    *,
+    user_id: str | None = None,
+    voice: bool = True,
+) -> str:
+    """Turn raw web hits into a spoken summary — not a list of titles."""
+    q = (query or "").strip()
+    if not results:
+        return "I couldn't find useful web results for that."
+
+    blocks: list[str] = []
+    for i, r in enumerate(results[:5], start=1):
+        title = str(r.get("title") or "Result")
+        snippet = str(r.get("snippet") or "").strip()
+        if snippet:
+            blocks.append(f"[{i}] {title}: {snippet[:320]}")
+        else:
+            blocks.append(f"[{i}] {title}")
+
+    source_text = "\n".join(blocks)
+    from briefly_api.llm.adapter import Message, get_llm_adapter
+
+    system = (
+        "You summarize open-web research for a voice assistant. "
+        "Synthesize the key findings into clear spoken prose."
+    )
+    if voice:
+        system += (
+            " Use 4–6 short sentences. No markdown, headings, or bullet lists. "
+            "Do NOT just read source titles — explain what the research shows."
+        )
+    prompt = (
+        f"User query: {q}\n\nWeb results:\n{source_text}\n\n"
+        "Write the answer the assistant should speak aloud."
+    )
+    try:
+        resp = await get_llm_adapter().complete(
+            [Message(role="user", content=prompt)],
+            system=system,
+            max_tokens=480 if voice else 900,
+            temperature=0.35,
+            user_id=user_id,
+            agent="web_search_synth",
+        )
+        body = (resp.content or "").strip()
+        if body:
+            return body
+    except Exception:
+        log.debug("web_search synthesis failed", exc_info=True)
+
+    # Fallback: titles + snippets, not titles alone.
+    parts: list[str] = [f"Here's what I found on the web about {q}:"]
+    for r in results[:3]:
+        title = str(r.get("title") or "Result")
+        snippet = str(r.get("snippet") or "").strip()
+        if snippet:
+            parts.append(f"{title}: {snippet[:160]}")
+        else:
+            parts.append(title)
+    return " ".join(parts)
+
+
 async def _brave(query: str, s: Settings) -> list[dict]:
     async with httpx.AsyncClient(timeout=15.0) as client:
         resp = await client.get(
