@@ -70,23 +70,30 @@ const PROACTIVE_POLL_MS = 90000;
 // Voice activity detection — client-side endpointing (always on; server STT is optional).
 const VAD = {
   POLL_MS: 48,
-  BASE_SILENCE_MS: 2200,
-  MAX_ADAPTIVE_SILENCE_MS: 1400,
+  BASE_SILENCE_MS: 2800,
+  MAX_ADAPTIVE_SILENCE_MS: 2200,
   MIN_SPEECH_MS: 320,
-  HANGOVER_MS: 700,
+  HANGOVER_MS: 900,
   CALIBRATE_MS: 600,
   MIN_LISTEN_MS: 700,
   MAX_LISTEN_MS: 60000,
   MAX_LISTEN_NO_SPEECH_MS: 15000,
-  MAX_POST_SPEECH_SILENCE_MS: 4500,
+  MAX_POST_SPEECH_SILENCE_MS: 6500,
   SPEECH_START_FRAMES: 2,
 };
 
-/** After a speech segment, wait this long for the user to continue before sending. */
-const UTTERANCE_CONFIRM_MS = 2800;
+/** Base wait after last STT segment before submitting — extended for pauses / fillers. */
+const UTTERANCE_CONFIRM_BASE_MS = 4200;
+/** Extra wait when the transcript looks cut off mid-thought. */
+const UTTERANCE_INCOMPLETE_MIN_MS = 6200;
+const UTTERANCE_CONFIRM_MAX_MS = 9500;
+/** Per-word extension for longer spoken queries. */
+const UTTERANCE_CONFIRM_PER_WORD_MS = 160;
+/** Defer submit if partials or mic speech arrived within this window. */
+const UTTERANCE_STT_GRACE_MS = 1400;
 
 /** Immediate submit when the user explicitly stops listening (tap / PTT release). */
-const UTTERANCE_MANUAL_CONFIRM_MS = 450;
+const UTTERANCE_MANUAL_CONFIRM_MS = 650;
 
 /** Pause before reopening the mic after the agent speaks (avoids echo). */
 const LISTEN_REOPEN_DELAY_MS = 80;
@@ -104,7 +111,7 @@ const BARGE_IN = {
 };
 
 /** If speech was heard but VAD never endpointed, force-send after this silence. */
-const LISTEN_STUCK_SILENCE_MS = 4500;
+const LISTEN_STUCK_SILENCE_MS = 6500;
 
 /** HTTP turn timeout (LLM + TTS can be slow). */
 const TURN_TIMEOUT_MS = 120000;
@@ -164,6 +171,8 @@ const state = {
   thinkingWatchdog: null,
   pendingUserTranscript: "",
   utteranceSubmitTimer: null,
+  lastSttActivityAt: 0,
+  lastSpeechFinalAt: 0,
   playbackCtx: null,
   playbackUnlocked: false,
   conversationGeneration: 0,
@@ -1287,7 +1296,7 @@ function startVadMonitor(stream) {
 
     if (state.endpointer.speechActive) {
       bumpEnergy();
-      clearUtteranceSubmitTimer();
+      markSttActivity();
     }
 
     if (state.useServerEndpointing) {
@@ -1453,6 +1462,8 @@ async function startListening(options = {}) {
   setStatusForMode("listening", "Listening…");
   clearUtteranceSubmitTimer();
   state.pendingUserTranscript = "";
+  state.lastSttActivityAt = 0;
+  state.lastSpeechFinalAt = 0;
   state.audioChunks = [];
   state.listeningStartedAt = Date.now();
   void primeAudioPlayback();
@@ -1498,6 +1509,30 @@ function clearUtteranceSubmitTimer() {
   }
 }
 
+/** True when the transcript likely ends mid-phrase (fillers, conjunctions, etc.). */
+function looksIncompleteUtterance(text) {
+  const t = String(text || "").trim();
+  if (!t) return true;
+  if (/[,:;\-–—]\s*$/.test(t)) return true;
+  if (/\b(um+|uh+|er+|ah+|hmm+|like|so|well|okay|ok)\s*$/i.test(t)) return true;
+  return /\b(and|or|but|because|if|when|where|what|which|how|who|that|this|the|a|an|in|on|at|for|about|with|from|to|of|any|some|my|your|our|we|i|you|have|has|is|are|do|does|can|could|would|should|tell|give|show|find|get|know|want|need|please)\s*$/i.test(t);
+}
+
+function markSttActivity() {
+  state.lastSttActivityAt = Date.now();
+  clearUtteranceSubmitTimer();
+}
+
+function computeUtteranceConfirmDelay() {
+  const pending = state.pendingUserTranscript.trim();
+  const words = pending ? pending.split(/\s+/).filter(Boolean).length : 0;
+  let delay = UTTERANCE_CONFIRM_BASE_MS + Math.min(words * UTTERANCE_CONFIRM_PER_WORD_MS, 3600);
+  if (looksIncompleteUtterance(pending)) {
+    delay = Math.max(delay, UTTERANCE_INCOMPLETE_MIN_MS);
+  }
+  return Math.min(UTTERANCE_CONFIRM_MAX_MS, delay);
+}
+
 function appendSpeechSegment(text) {
   const seg = String(text || "").trim();
   if (!seg) return;
@@ -1508,15 +1543,39 @@ function appendSpeechSegment(text) {
   } else {
     state.pendingUserTranscript = prev ? `${prev} ${seg}` : seg;
   }
+  state.lastSpeechFinalAt = Date.now();
+  state.lastSttActivityAt = Date.now();
   setStatusForMode("listening", truncateStatus(state.pendingUserTranscript, 56));
 }
 
-function scheduleUtteranceSubmit(delayMs = UTTERANCE_CONFIRM_MS) {
+function scheduleUtteranceSubmit(delayMs) {
   clearUtteranceSubmitTimer();
+  const delay = typeof delayMs === "number" ? delayMs : computeUtteranceConfirmDelay();
   state.utteranceSubmitTimer = setTimeout(() => {
     state.utteranceSubmitTimer = null;
+    if (state.mode !== "listening" || state.wsTurnActive || state.sendingUtterance) return;
+
+    const sinceStt = Date.now() - (state.lastSttActivityAt || 0);
+    if (sinceStt < UTTERANCE_STT_GRACE_MS) {
+      scheduleUtteranceSubmit(UTTERANCE_STT_GRACE_MS - sinceStt + 200);
+      return;
+    }
+    if (state.endpointer?.speechActive) {
+      scheduleUtteranceSubmit(900);
+      return;
+    }
+
+    const pending = state.pendingUserTranscript.trim();
+    if (looksIncompleteUtterance(pending)) {
+      const sinceFinal = Date.now() - (state.lastSpeechFinalAt || 0);
+      if (sinceFinal < UTTERANCE_INCOMPLETE_MIN_MS) {
+        scheduleUtteranceSubmit(UTTERANCE_INCOMPLETE_MIN_MS - sinceFinal + 250);
+        return;
+      }
+    }
+
     void confirmAndSubmitUtterance();
-  }, delayMs);
+  }, delay);
 }
 
 async function confirmAndSubmitUtterance() {
@@ -1551,7 +1610,7 @@ async function stopListeningAndSend() {
     if (state.pendingUserTranscript.trim()) {
       scheduleUtteranceSubmit(UTTERANCE_MANUAL_CONFIRM_MS);
     } else {
-      scheduleUtteranceSubmit(UTTERANCE_CONFIRM_MS);
+      scheduleUtteranceSubmit(computeUtteranceConfirmDelay());
     }
     return;
   }
@@ -2396,7 +2455,7 @@ async function initLiveSession() {
     if (state.mode === "listening") {
       if (text) {
         state.vadHasSpeech = true;
-        clearUtteranceSubmitTimer();
+        markSttActivity();
       }
       const shown = state.pendingUserTranscript.trim()
         ? `${state.pendingUserTranscript} ${text || ""}`.trim()
