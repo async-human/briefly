@@ -378,6 +378,7 @@ async def run_orb_turn(
                 draft_id=payload.get("draft_id"),
                 last_tool=tool_name,
                 route_kind=str(payload.get("route_kind") or decision.kind),
+                route_reason=str(payload.get("route_reason") or decision.reason or ""),
                 last_answer=str(payload.get("answer") or "")[:4000],
                 tool_slots=dict(session.tool_slots or {}),
             )
@@ -426,6 +427,9 @@ async def run_orb_turn(
             session,
             thread_id=payload.get("thread_id"),
             transcript=transcript,
+            route_kind="ask_briefly",
+            route_reason="fallback_ask_briefly",
+            last_answer=str(answer)[:4000],
         )
     return payload
 

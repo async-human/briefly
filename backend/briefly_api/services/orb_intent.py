@@ -170,7 +170,7 @@ def _wants_draft_email(text: str, session: OrbSessionState | None = None) -> boo
     if session and session.last_tool in ("draft_email", "revise_email"):
         if re.search(r"\b(send|confirm|email|mail|save)\b", text, re.IGNORECASE):
             return True
-    if session and session.route_reason in ("research_report", "email_report"):
+    if session and getattr(session, "route_reason", None) in ("research_report", "email_report"):
         if re.search(r"\b(email|send|mail|draft)\b", text, re.IGNORECASE):
             return True
     return False

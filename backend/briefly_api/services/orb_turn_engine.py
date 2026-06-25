@@ -450,6 +450,7 @@ async def iter_orb_turn_events(
                 session,
                 transcript=user_transcript,
                 route_kind="clarify",
+                route_reason="needs_clarification",
                 last_answer=answer[:4000],
                 pending_user_goal=effective_transcript,
             )
@@ -524,6 +525,7 @@ async def iter_orb_turn_events(
                 transcript=user_transcript,
                 last_tool=tool_name,
                 route_kind="ask_briefly",
+                route_reason=decision.reason,
                 last_answer=answer[:4000],
                 pending_user_goal=None,
             )
@@ -580,6 +582,7 @@ async def iter_orb_turn_events(
                     transcript=user_transcript,
                     last_tool=tool_name,
                     route_kind="agent",
+                    route_reason=str(complete.get("route_reason") or decision.reason or ""),
                     last_answer=str(answer)[:4000],
                     tool_slots=dict(session.tool_slots or {}),
                     active_goal=session.active_goal,
@@ -683,6 +686,7 @@ async def iter_orb_turn_events(
             draft_id=payload.get("draft_id"),
             last_tool=tool_name,
             route_kind=str(payload.get("route_kind") or decision.kind),
+            route_reason=str(payload.get("route_reason") or decision.reason or ""),
             last_answer=str(payload.get("answer") or "")[:4000],
             tool_slots=dict(session.tool_slots or {}),
             active_goal=session.active_goal,

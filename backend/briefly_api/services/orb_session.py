@@ -30,6 +30,7 @@ class OrbSessionState:
     last_transcript: str | None = None
     last_tool: str | None = None
     route_kind: str | None = None
+    route_reason: str | None = None
     tool_slots: dict[str, Any] = field(default_factory=dict)
     last_answer: str | None = None
     active_goal: dict[str, Any] | None = None
@@ -50,6 +51,7 @@ class OrbSessionState:
             last_transcript=data.get("last_transcript"),
             last_tool=data.get("last_tool"),
             route_kind=data.get("route_kind"),
+            route_reason=data.get("route_reason"),
             tool_slots=dict(data.get("tool_slots") or {}),
             last_answer=data.get("last_answer"),
             active_goal=data.get("active_goal") if isinstance(data.get("active_goal"), dict) else None,
@@ -152,6 +154,7 @@ async def update_session_after_turn(
     draft_id: str | None = None,
     last_tool: str | None = None,
     route_kind: str | None = None,
+    route_reason: str | None = None,
     last_answer: str | None = None,
     tool_slots: dict[str, Any] | None = None,
     active_goal: dict[str, Any] | None = None,
@@ -169,6 +172,8 @@ async def update_session_after_turn(
         state.last_tool = last_tool
     if route_kind:
         state.route_kind = route_kind
+    if route_reason is not None:
+        state.route_reason = route_reason[:120] if route_reason else None
     if tool_slots is not None:
         state.tool_slots = tool_slots
     if active_goal is not None:
