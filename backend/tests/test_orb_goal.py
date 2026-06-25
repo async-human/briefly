@@ -33,7 +33,8 @@ def test_goal_resume_after_confirmation():
     assert decision.reason == "goal_resume_confirm"
 
 
-def test_compound_routes_to_agent():
+def test_compound_routes_to_agent(mock_intent):
+    mock_intent(kind="agent", tools=["compose_report"], reason="compound_goal")
     session = OrbSessionState(session_id="s1", user_id="u1")
     decision = asyncio.run(
         classify_orb_intent(

@@ -1,8 +1,9 @@
-"""Eval: orb intent routing matches expected tools for common spoken phrases."""
+"""Eval: orb intent routing — live LLM (requires API key)."""
 from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,11 @@ import pytest
 from briefly_api.services.orb_intent import classify_orb_intent
 
 EVAL_PATH = Path(__file__).parent / "eval" / "orb_route_eval.json"
+
+pytestmark = pytest.mark.skipif(
+    not os.getenv("OPENAI_API_KEY") and not os.getenv("ANTHROPIC_API_KEY"),
+    reason="Live LLM eval requires OPENAI_API_KEY or ANTHROPIC_API_KEY",
+)
 
 
 def _cases():

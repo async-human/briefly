@@ -38,7 +38,8 @@ def test_prior_user_question_skips_empty():
     assert _prior_user_question(history) == ""
 
 
-def test_continuation_routes_to_ask_briefly_with_session():
+def test_continuation_routes_to_ask_briefly_with_session(mock_intent):
+    mock_intent(kind="ask_briefly", reason="continuation_followup")
     session = OrbSessionState(
         session_id="s1",
         user_id="u1",

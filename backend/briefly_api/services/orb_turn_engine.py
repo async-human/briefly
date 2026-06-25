@@ -411,6 +411,7 @@ async def iter_orb_turn_events(
             session=session,
             session_thread_id=session.thread_id if session else None,
             session_has_prior_turn=bool(session and session.last_transcript),
+            user_id=uid,
         )
     timings["route_ms"] = int((time.monotonic() - route_started) * 1000)
 
@@ -426,7 +427,11 @@ async def iter_orb_turn_events(
         "timings": timings,
     }
 
-    clarify = detect_clarification(effective_transcript, decision, session=session)
+    clarify = None
+    if decision.kind == "clarify" and decision.clarifying_question:
+        clarify = decision.clarifying_question
+    else:
+        clarify = detect_clarification(effective_transcript, decision, session=session)
     if clarify:
         timings["total_ms"] = int((time.monotonic() - started) * 1000)
         answer = polish_spoken_answer(clarify)

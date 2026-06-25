@@ -51,7 +51,8 @@ def test_update_tool_slots_after_weather_turn():
     assert state.tool_slots["weather"]["location"] == "Pune"
 
 
-def test_weather_rain_follow_up_routes_with_affinity():
+def test_weather_rain_follow_up_routes_with_affinity(mock_intent):
+    mock_intent(kind="direct", tools=["weather"], reason="thread_affinity")
     session = OrbSessionState(
         session_id="s1",
         user_id="u1",

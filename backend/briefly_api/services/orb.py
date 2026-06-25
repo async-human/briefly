@@ -347,6 +347,7 @@ async def run_orb_turn(
             session=session,
             session_thread_id=session.thread_id if session else None,
             session_has_prior_turn=bool(session and session.last_transcript),
+            user_id=str(user.id),
         )
         timings["route_ms"] = int((time.monotonic() - route_started) * 1000)
 

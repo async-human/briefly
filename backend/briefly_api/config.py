@@ -232,6 +232,8 @@ class Settings(BaseSettings):
 
     # ── Voice orb session / routing / streaming ───────────────────────────────
     orb_session_ttl_seconds: int = 86400
+    orb_intent_model: str = ""  # empty = use llm_model (gpt-4o-mini)
+    orb_intent_max_tokens: int = 280
     orb_semantic_route_threshold: float = 0.72
     orb_semantic_route_medium_threshold: float = 0.58
     orb_streaming_stt_enabled: bool = True

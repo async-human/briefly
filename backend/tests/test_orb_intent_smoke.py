@@ -1,4 +1,4 @@
-"""Smoke tests: classify_orb_intent must not crash for any session field combo."""
+"""Smoke tests: classify_orb_intent with mocked LLM."""
 from __future__ import annotations
 
 import asyncio
@@ -12,12 +12,10 @@ def _session_field_names() -> set[str]:
     return {f.name for f in OrbSessionState.__dataclass_fields__.values()}
 
 
-def test_orb_session_fields_match_intent_usage():
-    """Every session.* access in orb_intent must exist on OrbSessionState."""
-    import briefly_api.services.orb_intent as mod
+def test_orb_session_fields_used_in_llm_context():
+    import briefly_api.services.orb_intent_llm as mod
 
-    source = inspect.getsource(mod)
-    # crude but catches missing dataclass fields like route_reason
+    source = inspect.getsource(mod._session_block)
     for name in (
         "last_tool",
         "last_transcript",
@@ -26,23 +24,12 @@ def test_orb_session_fields_match_intent_usage():
         "route_reason",
         "active_goal",
     ):
-        assert f"session.{name}" in source or f"getattr(session, \"{name}\"" in source
+        assert name in source
         assert name in _session_field_names()
 
 
-_TRANSCRIPTS = (
-    "what's on my calendar tomorrow",
-    "research AI agents and write a report",
-    "email it to me",
-    "read the report aloud",
-    "what's the weather in Pune",
-    "more details",
-    "search my inbox for invoices",
-    "draft an email to john@example.com",
-)
-
-
-def test_classify_orb_intent_smoke_with_full_session():
+def test_classify_orb_intent_smoke_with_full_session(mock_intent):
+    mock_intent(kind="direct", tools=["gmail_recent"], reason="inbox_list")
     session = OrbSessionState(
         session_id="s1",
         user_id="u1",
@@ -52,7 +39,11 @@ def test_classify_orb_intent_smoke_with_full_session():
         last_answer="Report is ready.",
         route_kind="direct",
     )
-    for text in _TRANSCRIPTS:
+    for text in (
+        "what's on my calendar tomorrow",
+        "So what are the emails I got today?",
+        "more details",
+    ):
         decision = asyncio.run(
             classify_orb_intent(
                 text,

@@ -38,7 +38,8 @@ def test_narrate_cached_report():
     assert "Full report body here." in out.get("answer", "")
 
 
-def test_read_it_after_report_routes_to_narrate():
+def test_read_it_after_report_routes_to_narrate(mock_intent):
+    mock_intent(kind="direct", tools=["narrate_report"], reason="narrate_report")
     session = OrbSessionState(
         session_id="s1",
         user_id="u1",

@@ -5,6 +5,7 @@
   {"transcript": "read my briefing", "expect_tool": "today_brief"},
   {"transcript": "what's on my calendar", "expect_tool": "calendar_upcoming"},
   {"transcript": "check my inbox", "expect_tool": "gmail_recent"},
+  {"transcript": "So what are the emails I got today?", "expect_tool": "gmail_recent"},
   {"transcript": "search my email for invoices", "expect_tool": "gmail_search"},
   {"transcript": "search the web for OpenAI news", "expect_tool": "web_search"},
   {"transcript": "write a report on climate tech", "expect_tool": "compose_report"},

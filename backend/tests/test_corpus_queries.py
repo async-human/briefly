@@ -23,7 +23,8 @@ def test_saved_queue_only_not_corpus():
     assert not is_corpus_library_query(q)
 
 
-def test_corpus_routes_to_ask_briefly():
+def test_corpus_routes_to_ask_briefly(mock_intent):
+    mock_intent(kind="ask_briefly", reason="corpus_library")
     decision = asyncio.run(
         classify_orb_intent(
             "what articles do I have about startups?",

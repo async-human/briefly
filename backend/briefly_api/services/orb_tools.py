@@ -3,13 +3,8 @@ briefly_api/services/orb_tools.py
 
 Declarative tool registry for the voice orb.
 
-Each tool is one `OrbTool`: the planner prompt, the fast-path router, and the
-executor are all generated from this list — so adding a capability means
-appending one entry here instead of editing four separate call sites.
-
-Conventions:
-  - `fast_patterns`  → regexes that confidently route to this tool WITHOUT an
-                       LLM planner round-trip (the latency win).
+Each tool is one `OrbTool`: name, description, and handler. The LLM intent router
+reads names + descriptions from this list; `fast_patterns` are legacy only.
   - `side_effect`    → "read" (safe) or "write". WRITE tools must be gated
                        behind explicit user confirmation in the client before
                        they're allowed to execute. Every tool today is read-only.
@@ -930,8 +925,16 @@ DATA_TOOLS: list[OrbTool] = [
         handler=gmail_recent_handler,
         fast_patterns=(
             re.compile(r"\b(recent|latest|new)\s+(emails?|mail|messages?)\b", re.IGNORECASE),
-            re.compile(r"\b(check|read|show)\s+(my\s+)?(inbox|gmail|email)\b", re.IGNORECASE),
+            re.compile(r"\b(check|read|show)\s+(my\s+)?(inbox|gmail|emails?|mail|messages?)\b", re.IGNORECASE),
             re.compile(r"\bany new emails?\b", re.IGNORECASE),
+            re.compile(r"\b(emails?|messages?)\s+(I\s+)?(got|received)\b", re.IGNORECASE),
+            re.compile(r"\bwhat\s+(are|were)\s+(the\s+)?(emails?|messages?)\b", re.IGNORECASE),
+            re.compile(r"\b(show|tell|list)\s+me\s+(my\s+)?(emails?|inbox|mail|messages?)\b", re.IGNORECASE),
+            re.compile(r"\b(emails?|mail|messages?)\s+(today|this morning|tonight|yesterday)\b", re.IGNORECASE),
+            re.compile(
+                r"\bwhat\s+(emails?|mail|messages?)\s+(did\s+I|have\s+I)\s+(get|receive)\b",
+                re.IGNORECASE,
+            ),
         ),
     ),
     OrbTool(

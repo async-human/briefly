@@ -25,8 +25,9 @@ def test_session_route_reason_roundtrip():
     assert restored.route_kind == "direct"
 
 
-def test_session_from_dict_without_route_reason():
+def test_session_from_dict_without_route_reason(mock_intent):
     """Older Redis payloads omit route_reason — must not crash on load."""
+    mock_intent(kind="direct", tools=["draft_email"], reason="email_report")
     data = {
         "session_id": "s1",
         "user_id": "u1",
