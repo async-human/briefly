@@ -25,7 +25,7 @@ def extract_report_goal(transcript: str, args: dict | None) -> str:
         r"\b(?:write|compose|create|draft|prepare|make|generate)\s+(?:a\s+|my\s+|the\s+)?"
         r"(?:detailed\s+)?(?:report|summary|write-up)\s+(?:on|about|for)\s+(.+?)(?:\s+and\s+|\?|$)",
         r"\breport\s+(?:on|about|for)\s+(.+?)(?:\?|$)",
-        r"\bresearch\s+(?:on|about|for)\s+(.+?)\s+and\s+(?:write|create|compose)\s+(?:a\s+)?report",
+        r"\bresearch\s+(?:on|about|for)\s+(.+?)\s+and\s+(?:write|create|compose|draft)(?:\s+me)?\s+(?:a\s+)?(?:report|summary)",
     ):
         m = re.search(pat, text, re.IGNORECASE)
         if m:

@@ -6,6 +6,7 @@ from briefly_api.services.orb_voice_interaction import (
     detect_clarification,
     merge_clarification_follow_up,
     spoken_acknowledgment,
+    spoken_agent_narration,
 )
 
 
@@ -69,6 +70,26 @@ def test_wheres_my_report_goal_followup():
     assert decision is not None
     assert decision.kind == "agent"
     assert decision.reason == "goal_continue"
+
+
+def test_spoken_agent_narration_prefers_thought_and_dedupes_tools():
+    seen: set[str] = set()
+    first = spoken_agent_narration(
+        "web_search",
+        "I'll start by checking what's new online about quantum computing.",
+        seen_tools=seen,
+    )
+    assert first is not None
+    assert "quantum" in first.lower()
+    repeat = spoken_agent_narration(
+        "web_search",
+        "",
+        seen_tools=seen,
+    )
+    assert repeat is None
+    report = spoken_agent_narration("compose_report", "", seen_tools=seen)
+    assert report is not None
+    assert "report" in report.lower()
 
 
 def test_merge_clarification_follow_up():

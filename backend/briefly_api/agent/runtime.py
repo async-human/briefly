@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
@@ -33,8 +34,10 @@ _PLANNER_SYSTEM = (
     "Before running a tool, check whether critical details are missing (recipient, topic, date, "
     "scope, location). If anything essential is unclear, do NOT guess — ask ONE short clarifying "
     "question instead (tool=\"\", final=your question). "
-    "When the user asks to create or write a report, use compose_report — do not say you "
-    "cannot create reports. "
+    "When the user asks to create or write a report, use compose_report — it already "
+    "searches the web and the user's library. Do NOT call web_search before compose_report "
+    "for report requests, and do NOT call compose_report more than once. "
+    "When compose_report succeeds, stop and give the user the spoken report summary. "
     "When the user explicitly asked for web/internet search, use web_search first — "
     "do not ask whether to use internal sources versus the web. "
     "When you have enough context, proceed step by step. Prefer the user's own sources "
@@ -49,10 +52,14 @@ _PLANNER_INSTRUCTIONS = (
     'If the request is ambiguous or required information is missing, set "tool" to "" and put '
     'ONE short clarifying question in "final" — do not invent missing details. '
     "If a tool's observation is a clarifying question or shows missing information, STOP and "
-    'return that question as "final" (do not guess).'
+    'return that question as "final" (do not guess). '
+    'If an observation starts with "REPORT_COMPLETE" or says the report is finished, set '
+    '"tool" to "" and summarize for the user in "final".'
 )
 
 _MAX_OBS_CHARS = 600
+_REPORT_OBS_CHARS = 1200
+_REPORT_DONE_RE = re.compile(r"\b(?:finished your report|report is ready|REPORT_COMPLETE)\b", re.I)
 
 
 @dataclass
@@ -218,10 +225,23 @@ class AgentRuntime:
                 yield {"type": "agent_result", "result": result}
                 return
 
+            if tool_name == "compose_report" and "compose_report" in tools_used:
+                prior = next(
+                    (s for s in reversed(steps) if s.tool == "compose_report" and s.ok),
+                    None,
+                )
+                if prior:
+                    answer = prior.observation or self._fallback_answer(history)
+                    result = AgentResult(
+                        answer, steps, citations, tools_used, "final", thread_id=resolved_thread_id
+                    )
+                    yield {"type": "agent_result", "result": result}
+                    return
+
             try:
                 result = await tool.handler(ctx, args)
             except Exception as exc:
-                log.exception("agent tool '%s' failed", tool_name)
+                log.warning("agent tool '%s' failed", tool_name)
                 result = ToolResult(summary=f"Tool error: {exc!r}", ok=False, error=repr(exc))
 
             tools_used.append(tool_name)
@@ -230,7 +250,11 @@ class AgentRuntime:
                 resolved_thread_id = tid
             if result.citations:
                 citations.extend(result.citations)
-            obs = (result.summary or "")[:_MAX_OBS_CHARS]
+            obs_limit = _REPORT_OBS_CHARS if tool_name == "compose_report" else _MAX_OBS_CHARS
+            raw_summary = str(result.summary or "")
+            obs = raw_summary[:obs_limit]
+            if tool_name == "compose_report" and result.ok:
+                obs = f"REPORT_COMPLETE: {obs}"
             steps.append(AgentStep(n, thought, tool_name, args, obs, ok=result.ok))
             history.append(f"step{n}: {tool_name}({json.dumps(args, default=str)}) -> {obs}")
             yield {
@@ -241,6 +265,14 @@ class AgentRuntime:
                 "ok": result.ok,
                 "observation": obs[:180],
             }
+
+            if tool_name == "compose_report" and result.ok and _REPORT_DONE_RE.search(raw_summary):
+                answer = raw_summary or self._fallback_answer(history)
+                result = AgentResult(
+                    answer, steps, citations, tools_used, "final", thread_id=resolved_thread_id
+                )
+                yield {"type": "agent_result", "result": result}
+                return
 
         result = AgentResult(
             self._fallback_answer(history),

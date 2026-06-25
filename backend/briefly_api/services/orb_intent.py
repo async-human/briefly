@@ -12,7 +12,6 @@ import re
 from briefly_api.services.corpus_queries import is_corpus_library_query
 from briefly_api.services.orb_goal import (
     classify_goal_routing,
-    is_compound_goal,
     is_goal_followup,
     start_goal,
     wants_web_search,
@@ -94,6 +93,27 @@ _EXPLICIT_REPORT_RE = re.compile(
     r"(?:detailed\s+)?(?:report|summary|write-up)\b",
     re.IGNORECASE,
 )
+_REPORT_EMAIL_RE = re.compile(r"\b(?:send|email|mail)\b", re.IGNORECASE)
+_RESEARCH_REPORT_RE = re.compile(
+    r"\bresearch\b.{0,120}\b(?:write|create|compose|draft|prepare|make)\b.{0,40}\b(?:report|summary)\b"
+    r"|\b(?:write|create|compose|draft|prepare|make)\b.{0,40}\b(?:report|summary)\b.{0,80}\bresearch\b",
+    re.IGNORECASE,
+)
+
+
+def _routes_to_compose_report(text: str) -> bool:
+    """Single-shot report goals — compose_report already runs web + corpus research."""
+    if _REPORT_EMAIL_RE.search(text):
+        return False
+    if _RESEARCH_REPORT_RE.search(text):
+        return True
+    if _EXPLICIT_REPORT_RE.search(text):
+        return True
+    if re.search(r"\breport\b", text, re.IGNORECASE) and re.search(
+        r"\bresearch\b", text, re.IGNORECASE
+    ):
+        return True
+    return False
 
 
 async def classify_orb_intent(
@@ -114,15 +134,15 @@ async def classify_orb_intent(
         return RouteDecision(kind="ask_briefly", confidence=1.0, reason="corpus_library")
 
     matched = regex_matches(text)
-    if _EXPLICIT_REPORT_RE.search(text) and not is_compound_goal(text):
+    if _routes_to_compose_report(text):
         report_tool = _BY_NAME.get("compose_report")
         if report_tool is not None:
-            log.debug("orb intent explicit report → compose_report")
+            log.debug("orb intent research/report → compose_report (single shot)")
             return RouteDecision(
                 kind="direct",
                 tools=(report_tool,),
                 confidence=1.0,
-                reason="explicit_report",
+                reason="research_report",
             )
 
     if wants_web_search(text):

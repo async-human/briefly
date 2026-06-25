@@ -4,8 +4,6 @@ Human-like voice interaction — acknowledgments, clarifying questions, and step
 Keeps the orb from silently diving into tools. It speaks first, asks when something
 is missing, and narrates the first step before long work begins.
 """
-from __future__ import annotations
-
 import re
 
 from briefly_api.services.corpus_queries import extract_topic_terms, is_corpus_library_query
@@ -89,6 +87,7 @@ _ACK_BY_REASON: dict[str, str] = {
     "agent": "Understood. Let me figure out the best way to help.",
     "explicit_web": "Alright — I'll search the web for that.",
     "explicit_report": "Got it — I'll research that and write your report.",
+    "research_report": "Got it — I'll research that and write your report.",
 }
 
 
@@ -226,3 +225,51 @@ def spoken_step_bridge(tool_name: str | None, *, first: bool = False) -> str | N
     if label == "Thinking":
         return None
     return f"{label}."
+
+
+def _clean_planner_thought(thought: str) -> str:
+    text = (thought or "").strip()
+    if not text:
+        return ""
+    text = re.sub(r"\s+", " ", text)
+    if text.lower().startswith("i will"):
+        text = text[0].upper() + text[1:]
+    if text and text[-1] not in ".!?":
+        text += "."
+    return text
+
+
+def spoken_agent_narration(
+    tool_name: str | None,
+    thought: str,
+    *,
+    seen_tools: set[str],
+) -> str | None:
+    """Human-like step narration — prefer planner reasoning, never repeat the same tool."""
+    cleaned = _clean_planner_thought(thought)
+    if cleaned and len(cleaned.split()) >= 4:
+        return cleaned
+    tool = (tool_name or "").strip()
+    if not tool or tool in seen_tools:
+        return None
+    seen_tools.add(tool)
+    variants: dict[str, tuple[str, ...]] = {
+        "web_search": (
+            "Let me search the web for the latest on this.",
+            "I'll check what's out there online first.",
+        ),
+        "compose_report": (
+            "Now I'll pull your sources together and write the report.",
+            "Give me a moment — I'm putting your report together.",
+        ),
+        "ask_briefly": (
+            "Let me look through your saved articles on this.",
+            "I'll check your library for relevant material.",
+        ),
+    }
+    options = variants.get(tool)
+    if options:
+        idx = len(seen_tools) % len(options)
+        return options[idx]
+    label = step_label(tool)
+    return f"{label}." if label != "Thinking" else None

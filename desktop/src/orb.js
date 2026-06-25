@@ -2525,9 +2525,13 @@ async function initLiveSession() {
 
   state.liveClient.onAgentStep = (step) => {
     if (state.currentTurnEpoch !== state.activeTurnEpoch) return;
-    const label = step?.label || (step?.tool ? String(step.tool).replace(/_/g, " ") : "");
-    if (!label) return;
-    setStatusForMode(state.mode === "speaking" ? "speaking" : "thinking", truncateStatus(label, 48));
+    const caption =
+      step?.narration ||
+      step?.thought ||
+      step?.label ||
+      (step?.tool ? String(step.tool).replace(/_/g, " ") : "");
+    if (!caption) return;
+    setStatusForMode(state.mode === "speaking" ? "speaking" : "thinking", truncateStatus(caption, 56));
   };
 
   state.liveClient.onTurnStart = () => {

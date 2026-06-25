@@ -34,7 +34,7 @@ from briefly_api.services.orb_voice_interaction import (
     detect_clarification,
     merge_clarification_follow_up,
     spoken_acknowledgment,
-    spoken_step_bridge,
+    spoken_agent_narration,
 )
 from briefly_api.services.orb_router import RouteDecision
 from briefly_api.services.orb_session import OrbSessionState, update_session_after_turn
@@ -108,22 +108,27 @@ async def _iter_voice_agent_turn(
     )
     started = time.monotonic()
     result = None
+    seen_tools: set[str] = set()
     try:
         async for event in runtime.iter_run(ctx):
             if event.get("type") == "agent_step":
                 tool = event.get("tool")
                 phase = event.get("phase") or "done"
+                thought = str(event.get("thought") or "")
+                narration = None
                 if phase == "start":
-                    bridge = spoken_step_bridge(tool, first=True)
-                    if bridge:
-                        for chunk in chunk_for_streaming(bridge):
+                    narration = spoken_agent_narration(tool, thought, seen_tools=seen_tools)
+                    if narration:
+                        for chunk in chunk_for_streaming(narration):
                             yield {"type": "delta", "content": chunk}
                 yield {
                     "type": "agent_step",
                     "n": event.get("n"),
                     "tool": tool,
                     "label": step_label(tool),
-                    "phase": event.get("phase") or "done",
+                    "thought": thought[:240] if thought else None,
+                    "narration": narration,
+                    "phase": phase,
                     "ok": event.get("ok"),
                 }
             elif event.get("type") == "agent_result":
@@ -589,6 +594,16 @@ async def iter_orb_turn_events(
 
     if db is None or user is None or not uid:
         raise ValueError("Voice turn unavailable.")
+
+    if (
+        decision.kind == "direct"
+        and len(decision.tools) == 1
+        and decision.tools[0].name == "compose_report"
+    ):
+        narr = spoken_agent_narration("compose_report", "", seen_tools=set())
+        if narr:
+            for chunk in chunk_for_streaming(narr):
+                yield {"type": "delta", "content": chunk}
 
     exec_started = time.monotonic()
     payload = await execute_routed_turn(
