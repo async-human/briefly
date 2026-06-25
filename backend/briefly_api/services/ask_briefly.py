@@ -1292,10 +1292,13 @@ async def ask_briefly(
     max_tokens = 1200
     corpus_mode = is_corpus_library_query(message)
     if voice:
+        from briefly_api.services.orb_persona import VOICE_CONVERSATION_SUFFIX
+
         system = (
             f"{_ASK_SYSTEM}\n\n"
             "VOICE MODE: Reply in 2–5 short spoken sentences unless the user explicitly "
             "asked for detail. No markdown, headings, or bullet lists — natural speech only."
+            f"{VOICE_CONVERSATION_SUFFIX}"
         )
         if corpus_mode:
             system += (
@@ -1358,10 +1361,13 @@ async def iter_ask_briefly_events(
     history = list(snapshot.prior_messages)
     corpus_mode = is_corpus_library_query(message)
     if voice:
+        from briefly_api.services.orb_persona import VOICE_CONVERSATION_SUFFIX
+
         system = (
             f"{_ASK_SYSTEM}\n\n"
             "VOICE MODE: Reply in 2–5 short spoken sentences unless the user explicitly "
             "asked for detail. No markdown, headings, or bullet lists — natural speech only."
+            f"{VOICE_CONVERSATION_SUFFIX}"
         )
         if corpus_mode:
             system += (

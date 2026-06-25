@@ -12,7 +12,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 from briefly_api.config import get_settings
-from briefly_api.services.corpus_queries import is_corpus_library_query
+from briefly_api.services.corpus_queries import is_corpus_library_query, extract_topic_terms
+from briefly_api.services.orb_tools import DATA_TOOLS, OrbTool
 
 log = logging.getLogger(__name__)
 

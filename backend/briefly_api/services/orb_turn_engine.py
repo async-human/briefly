@@ -29,6 +29,11 @@ from briefly_api.services.orb_goal import (
     sync_goal_from_result,
 )
 from briefly_api.services.orb_persona import chunk_for_streaming, polish_spoken_answer
+from briefly_api.services.orb_voice_interaction import (
+    detect_clarification,
+    spoken_acknowledgment,
+    spoken_step_bridge,
+)
 from briefly_api.services.orb_router import RouteDecision
 from briefly_api.services.orb_session import OrbSessionState, update_session_after_turn
 from briefly_api.services.orb_tools import OrbTool
@@ -101,10 +106,18 @@ async def _iter_voice_agent_turn(
     )
     started = time.monotonic()
     result = None
+    first_tool_step = True
     try:
         async for event in runtime.iter_run(ctx):
             if event.get("type") == "agent_step":
                 tool = event.get("tool")
+                phase = event.get("phase") or "done"
+                if phase == "start" and first_tool_step:
+                    bridge = spoken_step_bridge(tool, first=True)
+                    if bridge:
+                        for chunk in chunk_for_streaming(bridge):
+                            yield {"type": "delta", "content": chunk}
+                    first_tool_step = False
                 yield {
                     "type": "agent_step",
                     "n": event.get("n"),
@@ -396,6 +409,41 @@ async def iter_orb_turn_events(
         "route_tools": [t.name for t in decision.tools],
         "timings": timings,
     }
+
+    clarify = detect_clarification(transcript, decision, session=session)
+    if clarify:
+        timings["total_ms"] = int((time.monotonic() - started) * 1000)
+        answer = polish_spoken_answer(clarify)
+        for chunk in chunk_for_streaming(answer):
+            yield {"type": "delta", "content": chunk}
+        complete = {
+            "type": "complete",
+            "transcript": transcript,
+            "thread_id": resolved_thread,
+            "session_id": session.session_id if session else session_id,
+            "answer": answer,
+            "citations": [],
+            "tool_trace": [],
+            "expects_reply": True,
+            "route_kind": "clarify",
+            "route_reason": "needs_clarification",
+            "timings": timings,
+        }
+        if session:
+            await update_session_after_turn(
+                session,
+                transcript=transcript,
+                route_kind="clarify",
+                last_answer=answer[:4000],
+            )
+        _log_turn(uid, transcript, decision, complete, timings)
+        yield complete
+        return
+
+    ack = spoken_acknowledgment(transcript, decision)
+    if ack:
+        for chunk in chunk_for_streaming(ack):
+            yield {"type": "delta", "content": chunk}
 
     stream_rag = decision.kind == "ask_briefly" or (
         decision.kind == "direct"

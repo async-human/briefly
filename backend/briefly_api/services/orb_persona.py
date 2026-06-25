@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import re
 
-VOICE_PERSONA_SUFFIX = (
-    " Speak naturally in 2–5 short sentences unless the user asked for detail. "
-    "No markdown, bullet lists, or headings."
+VOICE_CONVERSATION_SUFFIX = (
+    " Sound like a thoughtful colleague in a live conversation — warm, natural, not robotic. "
+    "If the user's request is ambiguous or missing a key detail, ask ONE short clarifying "
+    "question instead of guessing. The user already heard a brief acknowledgment — do not "
+    "repeat 'sure' or 'got it'; go straight to the answer or your question."
 )
 
 
