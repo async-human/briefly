@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 
 from briefly_api.services.corpus_queries import extract_topic_terms, is_corpus_library_query
-from briefly_api.services.orb_goal import should_resume_goal, step_label
+from briefly_api.services.orb_goal import is_compound_goal, should_resume_goal, step_label
 from briefly_api.services.orb_router import RouteDecision
 from briefly_api.services.orb_session import OrbSessionState
 
@@ -24,22 +24,28 @@ _VAGUE_TASK_RE = re.compile(
     r"(?:do|run|execute|start|go)\s*(?:it|this|that|something)?\s*[.?!]?\s*$",
     re.IGNORECASE,
 )
-_EMAIL_NO_RECIPIENT_RE = re.compile(
-    r"\b(?:send|email|mail|draft)\b",
-    re.IGNORECASE,
-)
+_EMAIL_SEND_RE = re.compile(r"\b(?:send|email|mail)\b", re.IGNORECASE)
 _EMAIL_HAS_RECIPIENT_RE = re.compile(
     r"\b(?:to|for)\s+[A-Za-z@][\w@.\-+ ]{1,48}\b|\b[\w.+-]+@[\w.-]+\.\w+\b",
     re.IGNORECASE,
 )
-_REPORT_NO_TOPIC_RE = re.compile(
-    r"\b(?:write|draft|compose|prepare|create)\s+(?:a|an|my|the)?\s*"
-    r"(?:report|summary|email|brief)\s*[.?!]?\s*$",
+_BARE_REPORT_RE = re.compile(
+    r"^\s*(?:can you|could you|please|would you|help me|i want you to)?\s*"
+    r"(?:write|draft|compose|prepare|create)\s+(?:a|an|my|the)?\s*"
+    r"(?:report|summary|brief)\s*[.?!]?\s*$",
     re.IGNORECASE,
 )
-_RESEARCH_NO_TOPIC_RE = re.compile(
-    r"\b(?:research|look up|investigate|find out about)\s*[.?!]?\s*$",
+_BARE_RESEARCH_RE = re.compile(
+    r"^\s*(?:can you|could you|please|would you|help me|i want you to)?\s*"
+    r"(?:research|look up|investigate|find out about)\s*[.?!]?\s*$",
     re.IGNORECASE,
+)
+_TOPIC_IN_REQUEST_RE = re.compile(
+    r"\b(?:about|on|for|regarding|over)\s+[a-z0-9][\w\s\-]{2,}",
+    re.IGNORECASE,
+)
+_SHORT_COMPLETE_WORDS = frozenset(
+    {"ai", "ml", "ok", "pm", "am", "us", "uk", "eu", "it", "id", "go", "no", "yes"}
 )
 
 _ACK_BY_TOOL: dict[str, str] = {
@@ -71,6 +77,39 @@ _ACK_BY_REASON: dict[str, str] = {
 }
 
 
+def _looks_truncated(text: str) -> bool:
+    """Detect STT cut off mid-sentence (e.g. ending in 'curre' without punctuation)."""
+    t = (text or "").strip()
+    if not t or t.endswith((".", "!", "?")):
+        return False
+    words = t.split()
+    if not words or len(t) < 24:
+        return False
+    last = words[-1]
+    if not last.isalpha() or last.lower() in _SHORT_COMPLETE_WORDS:
+        return False
+    if len(last) <= 5:
+        return True
+    return False
+
+
+def merge_clarification_follow_up(
+    transcript: str,
+    session: OrbSessionState | None,
+) -> str:
+    """Merge a short answer after a clarify turn with the original user request."""
+    text = (transcript or "").strip()
+    if not session or not session.pending_user_goal:
+        return text
+    if session.route_kind != "clarify":
+        return text
+    if not text or len(text.split()) > 12:
+        return text
+    merged = f"{session.pending_user_goal} {text}".strip()
+    session.pending_user_goal = None
+    return merged
+
+
 def detect_clarification(
     transcript: str,
     decision: RouteDecision,
@@ -85,7 +124,15 @@ def detect_clarification(
     if session and should_resume_goal(session, text):
         return None
 
-    if _TRAILING_ELLIPSIS_RE.search(text) or _INCOMPLETE_TRAIL_RE.search(text):
+    # Compound / agent tasks already encode enough intent — don't second-guess routing.
+    if decision.kind == "agent" or is_compound_goal(text):
+        return None
+
+    if (
+        _TRAILING_ELLIPSIS_RE.search(text)
+        or _INCOMPLETE_TRAIL_RE.search(text)
+        or _looks_truncated(text)
+    ):
         return (
             "It sounds like you were still talking — could you finish that thought for me?"
         )
@@ -93,15 +140,17 @@ def detect_clarification(
     if _VAGUE_TASK_RE.match(text):
         return "Happy to help — what would you like me to do exactly?"
 
-    lower = text.lower()
-    if _EMAIL_NO_RECIPIENT_RE.search(text) and not _EMAIL_HAS_RECIPIENT_RE.search(text):
-        if any(w in lower for w in ("send", "email", "mail", "draft")):
-            return "Who should I send that to, and what's it about?"
+    if (
+        _EMAIL_SEND_RE.search(text)
+        and not _EMAIL_HAS_RECIPIENT_RE.search(text)
+        and not is_compound_goal(text)
+    ):
+        return "Who should I send that to, and what's it about?"
 
-    if _REPORT_NO_TOPIC_RE.search(text):
+    if _BARE_REPORT_RE.match(text):
         return "What topic should the report cover?"
 
-    if _RESEARCH_NO_TOPIC_RE.search(text):
+    if _BARE_RESEARCH_RE.match(text):
         return "What would you like me to research?"
 
     if is_corpus_library_query(text):
@@ -109,9 +158,8 @@ def detect_clarification(
         if not terms and re.search(r"\b(?:articles?|content|reads?|library)\s*$", text, re.I):
             return "Which topic or subject should I look for in your library?"
 
-    if decision.kind == "agent" and decision.reason == "compound_goal":
-        if not re.search(r"\b(?:about|on|for|regarding|to)\s+\w{2,}", text, re.I):
-            return "Can you tell me a bit more about what you'd like me to focus on?"
+    if _TOPIC_IN_REQUEST_RE.search(text):
+        return None
 
     return None
 

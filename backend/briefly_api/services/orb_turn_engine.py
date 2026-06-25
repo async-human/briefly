@@ -6,6 +6,7 @@ uses one consistent pipeline on the client.
 """
 from __future__ import annotations
 
+import inspect
 import logging
 import time
 from collections.abc import AsyncIterator
@@ -31,6 +32,7 @@ from briefly_api.services.orb_goal import (
 from briefly_api.services.orb_persona import chunk_for_streaming, polish_spoken_answer
 from briefly_api.services.orb_voice_interaction import (
     detect_clarification,
+    merge_clarification_follow_up,
     spoken_acknowledgment,
     spoken_step_bridge,
 )
@@ -211,15 +213,15 @@ async def _exec_tool(
     session: OrbSessionState | None = None,
 ) -> dict:
     ctx = await load_orb_tool_context(db, str(user.id), session, thread_id)
-    out = await tool.handler(
-        db,
-        user,
-        transcript=transcript,
-        thread_id=thread_id,
-        content_id=content_id,
-        args=args,
-        orb_context=ctx,
-    )
+    kwargs: dict = {
+        "transcript": transcript,
+        "thread_id": thread_id,
+        "content_id": content_id,
+        "args": args,
+    }
+    if "orb_context" in inspect.signature(tool.handler).parameters:
+        kwargs["orb_context"] = ctx
+    out = await tool.handler(db, user, **kwargs)
     answer = polish_spoken_answer(str(out.get("answer") or ""))
     return {"tool": tool.name, **out, "answer": answer, "ok": True}
 
@@ -384,6 +386,8 @@ async def iter_orb_turn_events(
         return
 
     resolved_thread = thread_id or (session.thread_id if session else None)
+    user_transcript = (transcript or "").strip()
+    effective_transcript = merge_clarification_follow_up(user_transcript, session)
 
     route_started = time.monotonic()
     decision = RouteDecision(kind="ask_briefly", reason="no_user")
@@ -391,7 +395,7 @@ async def iter_orb_turn_events(
         if thread_message_count == 0:
             thread_message_count = await _thread_message_count(db, uid, resolved_thread)
         decision = await classify_orb_intent(
-            transcript,
+            effective_transcript,
             thread_message_count=thread_message_count,
             session=session,
             session_thread_id=session.thread_id if session else None,
@@ -401,7 +405,8 @@ async def iter_orb_turn_events(
 
     yield {
         "type": "meta",
-        "transcript": transcript,
+        "transcript": user_transcript,
+        "effective_transcript": effective_transcript if effective_transcript != user_transcript else None,
         "session_id": session.session_id if session else session_id,
         "thread_id": resolved_thread,
         "route_kind": decision.kind,
@@ -410,7 +415,7 @@ async def iter_orb_turn_events(
         "timings": timings,
     }
 
-    clarify = detect_clarification(transcript, decision, session=session)
+    clarify = detect_clarification(effective_transcript, decision, session=session)
     if clarify:
         timings["total_ms"] = int((time.monotonic() - started) * 1000)
         answer = polish_spoken_answer(clarify)
@@ -418,7 +423,7 @@ async def iter_orb_turn_events(
             yield {"type": "delta", "content": chunk}
         complete = {
             "type": "complete",
-            "transcript": transcript,
+            "transcript": user_transcript,
             "thread_id": resolved_thread,
             "session_id": session.session_id if session else session_id,
             "answer": answer,
@@ -432,15 +437,16 @@ async def iter_orb_turn_events(
         if session:
             await update_session_after_turn(
                 session,
-                transcript=transcript,
+                transcript=user_transcript,
                 route_kind="clarify",
                 last_answer=answer[:4000],
+                pending_user_goal=effective_transcript,
             )
-        _log_turn(uid, transcript, decision, complete, timings)
+        _log_turn(uid, effective_transcript, decision, complete, timings)
         yield complete
         return
 
-    ack = spoken_acknowledgment(transcript, decision)
+    ack = spoken_acknowledgment(effective_transcript, decision)
     if ack:
         for chunk in chunk_for_streaming(ack):
             yield {"type": "delta", "content": chunk}
@@ -463,7 +469,7 @@ async def iter_orb_turn_events(
         async for event in iter_ask_briefly_events(
             db,
             ask_user,
-            transcript,
+            effective_transcript,
             thread_id=stream_thread_id,
             content_id=content_id,
             voice=True,
@@ -488,7 +494,7 @@ async def iter_orb_turn_events(
         timings["total_ms"] = int((time.monotonic() - started) * 1000)
         complete = {
             "type": "complete",
-            "transcript": transcript,
+            "transcript": user_transcript,
             "thread_id": stream_thread_id,
             "session_id": session.session_id if session else session_id,
             "answer": answer,
@@ -504,18 +510,19 @@ async def iter_orb_turn_events(
             await update_session_after_turn(
                 session,
                 thread_id=stream_thread_id,
-                transcript=transcript,
+                transcript=user_transcript,
                 last_tool=tool_name,
                 route_kind="ask_briefly",
                 last_answer=answer[:4000],
+                pending_user_goal=None,
             )
             if db is not None and user is not None:
                 persisted = await _persist_orb_exchange(
-                    db, uid, stream_thread_id, transcript, answer, citations=citations
+                    db, uid, stream_thread_id, effective_transcript, answer, citations=citations
                 )
                 if persisted:
                     complete["thread_id"] = persisted
-        _log_turn(uid, transcript, decision, complete, timings)
+        _log_turn(uid, effective_transcript, decision, complete, timings)
         yield complete
         return
 
@@ -525,7 +532,7 @@ async def iter_orb_turn_events(
         async for event in _iter_voice_agent_turn(
             db,
             user,
-            transcript,
+            effective_transcript,
             thread_id=resolved_thread,
             content_id=content_id,
             surface=surface,
@@ -548,6 +555,7 @@ async def iter_orb_turn_events(
         else:
             complete["timings"] = timings
             complete["session_id"] = session.session_id if session else session_id
+            complete["transcript"] = user_transcript
             answer = complete.get("answer") or ""
             tool_name = None
             trace = complete.get("tool_trace") or []
@@ -558,25 +566,26 @@ async def iter_orb_turn_events(
                 await update_session_after_turn(
                     session,
                     thread_id=complete.get("thread_id"),
-                    transcript=transcript,
+                    transcript=user_transcript,
                     last_tool=tool_name,
                     route_kind="agent",
                     last_answer=str(answer)[:4000],
                     tool_slots=dict(session.tool_slots or {}),
                     active_goal=session.active_goal,
+                    pending_user_goal=None,
                 )
             persisted = await _persist_orb_exchange(
                 db,
                 uid,
                 complete.get("thread_id") or resolved_thread,
-                transcript,
+                effective_transcript,
                 answer,
                 citations=complete.get("citations") or [],
             )
             if persisted:
                 complete["thread_id"] = persisted
 
-            _log_turn(uid, transcript, decision, complete, timings)
+            _log_turn(uid, effective_transcript, decision, complete, timings)
             yield complete
             return
 
@@ -587,7 +596,7 @@ async def iter_orb_turn_events(
     payload = await execute_routed_turn(
         db,
         user,
-        transcript,
+        effective_transcript,
         decision=decision,
         thread_id=resolved_thread,
         content_id=content_id,
@@ -598,6 +607,7 @@ async def iter_orb_turn_events(
     timings["total_ms"] = int((time.monotonic() - started) * 1000)
     payload["timings"] = timings
     payload["session_id"] = session.session_id if session else session_id
+    payload["transcript"] = user_transcript
 
     answer = payload.get("answer") or ""
     for chunk in chunk_for_streaming(answer):
@@ -613,24 +623,25 @@ async def iter_orb_turn_events(
         await update_session_after_turn(
             session,
             thread_id=payload.get("thread_id"),
-            transcript=transcript,
+            transcript=user_transcript,
             draft_id=payload.get("draft_id"),
             last_tool=tool_name,
             route_kind=str(payload.get("route_kind") or decision.kind),
             last_answer=str(payload.get("answer") or "")[:4000],
             tool_slots=dict(session.tool_slots or {}),
             active_goal=session.active_goal,
+            pending_user_goal=None,
         )
     persisted = await _persist_orb_exchange(
         db,
         uid,
         payload.get("thread_id") or resolved_thread,
-        transcript,
+        effective_transcript,
         answer,
         citations=payload.get("citations") or [],
     )
     if persisted:
         complete["thread_id"] = persisted
 
-    _log_turn(uid, transcript, decision, complete, timings)
+    _log_turn(uid, effective_transcript, decision, complete, timings)
     yield complete
