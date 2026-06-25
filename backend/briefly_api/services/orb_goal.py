@@ -46,6 +46,20 @@ _DENY_RE = re.compile(
     re.IGNORECASE,
 )
 
+_REPORT_FOLLOWUP_RE = re.compile(
+    r"\b(where('s| is)?|what about|how about|status of|did you finish|"
+    r"where did|show me|give me)\b.{0,24}\b(report|research|draft|summary)\b",
+    re.IGNORECASE,
+)
+_EXPLICIT_WEB_RE = re.compile(
+    r"\b("
+    r"go to (?:the )?web|use (?:the )?web|on the web|from the web|"
+    r"web search|search the web|internet search|look (?:it )?up online|"
+    r"explicitly told you to go to web|do (?:the )?research on the web"
+    r")\b",
+    re.IGNORECASE,
+)
+
 STEP_LABELS: dict[str, str] = {
     "ask_briefly": "Searching your library",
     "web_search": "Searching the web",
@@ -124,21 +138,33 @@ def agent_goal_text(session: OrbSessionState | None, transcript: str) -> str:
     """Build the goal string passed to the agent planner."""
     text = (transcript or "").strip()
     if not session or not session.active_goal:
+        if wants_web_search(text):
+            return (
+                f"{text}\nUSER REQUIRES WEB SEARCH — use web_search first. "
+                "Do not ask whether to use internal sources vs the web."
+            )
         return text
     goal = session.active_goal
     objective = str(goal.get("objective") or text)
+    web_note = ""
+    if wants_web_search(text) or wants_web_search(objective):
+        web_note = (
+            "\nUSER REQUIRES WEB SEARCH — use web_search first. "
+            "Do not ask whether to use internal sources vs the web."
+        )
     if goal.get("status") == "awaiting_confirm" and should_resume_goal(session, text):
         pending_tool = goal.get("pending_tool") or "the pending action"
         return (
             f"Original goal: {objective}\n"
             f"USER CONFIRMED the next step. Proceed with '{pending_tool}' and finish the goal."
+            f"{web_note}"
         )
     if goal.get("status") == "active" and goal.get("history"):
         return (
             f"Continuing goal: {objective}\n"
-            f"Latest user message: {text}"
+            f"Latest user message: {text}{web_note}"
         )
-    return objective or text
+    return (objective or text) + web_note
 
 
 def agent_history_from_goal(session: OrbSessionState | None) -> list[str]:
@@ -181,6 +207,21 @@ def sync_goal_from_result(
     session.active_goal = goal
 
 
+def wants_web_search(transcript: str) -> bool:
+    return bool(_EXPLICIT_WEB_RE.search((transcript or "").strip()))
+
+
+def is_goal_followup(transcript: str) -> bool:
+    text = (transcript or "").strip()
+    if not text:
+        return False
+    if _REPORT_FOLLOWUP_RE.search(text):
+        return True
+    if len(text.split()) <= 12 and re.search(r"\b(report|research|draft|summary|web)\b", text, re.I):
+        return True
+    return False
+
+
 def classify_goal_routing(
     transcript: str,
     session: OrbSessionState | None,
@@ -195,8 +236,12 @@ def classify_goal_routing(
         return None
     if should_resume_goal(session, text):
         return RouteDecision(kind="agent", confidence=1.0, reason="goal_resume_confirm")
-    if session and session.active_goal and session.active_goal.get("status") == "active":
-        if len(text.split()) <= 16 and session.active_goal.get("history"):
+    if session and session.active_goal and session.active_goal.get("status") in ("active", "awaiting_confirm"):
+        if is_goal_followup(text):
+            return RouteDecision(kind="agent", confidence=0.95, reason="goal_continue")
+        if len(text.split()) <= 16 and (
+            session.active_goal.get("history") or session.route_kind == "agent"
+        ):
             return RouteDecision(kind="agent", confidence=0.9, reason="goal_continue")
     if is_compound_goal(text):
         return RouteDecision(kind="agent", confidence=0.95, reason="compound_goal")

@@ -85,8 +85,10 @@ const VAD = {
 /** Base wait after last STT segment before submitting — extended for pauses / fillers. */
 const UTTERANCE_CONFIRM_BASE_MS = 4200;
 /** Extra wait when the transcript looks cut off mid-thought. */
-const UTTERANCE_INCOMPLETE_MIN_MS = 6200;
-const UTTERANCE_CONFIRM_MAX_MS = 9500;
+const UTTERANCE_INCOMPLETE_MIN_MS = 8200;
+const UTTERANCE_CONFIRM_MAX_MS = 12000;
+/** Never auto-submit while the last token looks cut off mid-word. */
+const UTTERANCE_TRUNCATED_WAIT_MS = 2400;
 /** Per-word extension for longer spoken queries. */
 const UTTERANCE_CONFIRM_PER_WORD_MS = 160;
 /** Defer submit if partials or mic speech arrived within this window. */
@@ -1514,9 +1516,25 @@ function clearUtteranceSubmitTimer() {
 }
 
 /** True when the transcript likely ends mid-phrase (fillers, conjunctions, etc.). */
+function looksTruncatedWord(text) {
+  const t = String(text || "").trim();
+  if (!t || /[.!?]$/.test(t)) return false;
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length < 4 || t.length < 24) return false;
+  const last = words[words.length - 1];
+  if (!/^[a-z]+$/i.test(last)) return false;
+  if (/^(ai|ml|ok|go|no|yes|web|it|to|do|the|and|or|but|so|hi|hey|my|me|we|you)$/i.test(last)) {
+    return false;
+  }
+  if (last.length >= 9) return false;
+  if (/(ing|tion|ment|ness|ally|able|ible|ists|ism|ers|ary)$/i.test(last)) return false;
+  return last.length >= 3 && last.length <= 8;
+}
+
 function looksIncompleteUtterance(text) {
   const t = String(text || "").trim();
   if (!t) return true;
+  if (looksTruncatedWord(t)) return true;
   if (/[,:;\-–—]\s*$/.test(t)) return true;
   if (/\b(um+|uh+|er+|ah+|hmm+|like|so|well|okay|ok)\s*$/i.test(t)) return true;
   return /\b(and|or|but|because|if|when|where|what|which|how|who|that|this|the|a|an|in|on|at|for|about|with|from|to|of|any|some|my|your|our|we|i|you|have|has|is|are|do|does|can|could|would|should|tell|give|show|find|get|know|want|need|please)\s*$/i.test(t);
@@ -1570,6 +1588,10 @@ function scheduleUtteranceSubmit(delayMs) {
     }
 
     const pending = state.pendingUserTranscript.trim();
+    if (looksTruncatedWord(pending)) {
+      scheduleUtteranceSubmit(UTTERANCE_TRUNCATED_WAIT_MS);
+      return;
+    }
     if (looksIncompleteUtterance(pending)) {
       const sinceFinal = Date.now() - (state.lastSpeechFinalAt || 0);
       if (sinceFinal < UTTERANCE_INCOMPLETE_MIN_MS) {
@@ -1587,6 +1609,10 @@ async function confirmAndSubmitUtterance() {
   const text = state.pendingUserTranscript.trim();
   if (!text || text.length < 3) {
     void cancelListening();
+    return;
+  }
+  if (looksTruncatedWord(text)) {
+    scheduleUtteranceSubmit(UTTERANCE_TRUNCATED_WAIT_MS);
     return;
   }
   clearUtteranceSubmitTimer();

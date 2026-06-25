@@ -33,8 +33,10 @@ _PLANNER_SYSTEM = (
     "Before running a tool, check whether critical details are missing (recipient, topic, date, "
     "scope, location). If anything essential is unclear, do NOT guess — ask ONE short clarifying "
     "question instead (tool=\"\", final=your question). "
-    "When you have enough context, proceed step by step. Prefer the user's own sources; use web "
-    "tools only when explicitly required. Spoken answers should sound warm and natural. "
+    "When the user explicitly asked for web/internet search, use web_search first — "
+    "do not ask whether to use internal sources versus the web. "
+    "When you have enough context, proceed step by step. Prefer the user's own sources "
+    "only when they did NOT ask for the web. Spoken answers should sound warm and natural. "
     "Respond in STRICT JSON only."
 )
 

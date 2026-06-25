@@ -986,6 +986,8 @@ DATA_TOOLS: list[OrbTool] = [
         fast_patterns=(
             re.compile(r"\b(search|look\s*up|find|pull|fetch)\b.{0,40}\b(web|internet|online|google)\b", re.IGNORECASE),
             re.compile(r"\b(on|from|across|over)\s+the\s+(web|internet)\b", re.IGNORECASE),
+            re.compile(r"\bgo\s+to\s+(?:the\s+)?web\b", re.IGNORECASE),
+            re.compile(r"\buse\s+(?:the\s+)?web\b", re.IGNORECASE),
             re.compile(r"\bweb\s*search\b", re.IGNORECASE),
             re.compile(r"\bgoogle\s+(it|this|that|for)\b", re.IGNORECASE),
         ),

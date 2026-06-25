@@ -48,6 +48,29 @@ def test_no_clarify_on_compound_research_report():
     assert msg is None
 
 
+def test_clarify_on_truncated_compound():
+    decision = RouteDecision(kind="agent", reason="compound_goal")
+    msg = detect_clarification(
+        "I want research on quantum computing. Go to web, do the researc",
+        decision,
+    )
+    assert msg is not None
+    assert "finish" in msg.lower()
+
+
+def test_wheres_my_report_goal_followup():
+    from briefly_api.services.orb_goal import classify_goal_routing, start_goal
+    from briefly_api.services.orb_session import OrbSessionState
+
+    session = OrbSessionState(session_id="s1", user_id="u1", route_kind="agent")
+    start_goal(session, "research quantum computing and write report")
+    session.active_goal["history"] = ["step1: web_search(...) -> ok"]
+    decision = classify_goal_routing("Where's my report?", session, matched_tool_count=0)
+    assert decision is not None
+    assert decision.kind == "agent"
+    assert decision.reason == "goal_continue"
+
+
 def test_merge_clarification_follow_up():
     from briefly_api.services.orb_session import OrbSessionState
 

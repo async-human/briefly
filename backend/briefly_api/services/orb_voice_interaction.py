@@ -45,8 +45,21 @@ _TOPIC_IN_REQUEST_RE = re.compile(
     re.IGNORECASE,
 )
 _SHORT_COMPLETE_WORDS = frozenset(
-    {"ai", "ml", "ok", "pm", "am", "us", "uk", "eu", "it", "id", "go", "no", "yes"}
+    {
+        "ai", "ml", "ok", "pm", "am", "us", "uk", "eu", "it", "id", "go", "no", "yes",
+        "web", "app", "api", "llm", "llms",
+    }
 )
+_COMPLETE_SUFFIXES = ("ing", "tion", "ment", "ness", "ally", "able", "ible", "ists", "ism", "ers", "ary")
+
+
+def _looks_like_complete_word(word: str) -> bool:
+    w = word.lower()
+    if w in _SHORT_COMPLETE_WORDS:
+        return True
+    if len(w) >= 9:
+        return True
+    return any(w.endswith(s) for s in _COMPLETE_SUFFIXES)
 
 _ACK_BY_TOOL: dict[str, str] = {
     "ask_briefly": "Good question — let me look through your library.",
@@ -74,23 +87,34 @@ _ACK_BY_REASON: dict[str, str] = {
     "multi_tool": "Alright — I'll handle that in a few steps.",
     "semantic_multi": "Got it — I'll work through that.",
     "agent": "Understood. Let me figure out the best way to help.",
+    "explicit_web": "Alright — I'll search the web for that.",
 }
 
 
+def is_incomplete_utterance(text: str) -> bool:
+    """True when STT likely cut the user off mid-thought."""
+    t = (text or "").strip()
+    if not t:
+        return True
+    if _TRAILING_ELLIPSIS_RE.search(t) or _INCOMPLETE_TRAIL_RE.search(t):
+        return True
+    return _looks_truncated(t)
+
+
 def _looks_truncated(text: str) -> bool:
-    """Detect STT cut off mid-sentence (e.g. ending in 'curre' without punctuation)."""
+    """Detect STT cut off mid-word (e.g. ending in 'researc' without punctuation)."""
     t = (text or "").strip()
     if not t or t.endswith((".", "!", "?")):
         return False
     words = t.split()
-    if not words or len(t) < 24:
+    if not words or len(t) < 20:
         return False
     last = words[-1]
     if not last.isalpha() or last.lower() in _SHORT_COMPLETE_WORDS:
         return False
-    if len(last) <= 5:
-        return True
-    return False
+    if _looks_like_complete_word(last):
+        return False
+    return len(last) <= 8
 
 
 def merge_clarification_follow_up(
@@ -124,18 +148,14 @@ def detect_clarification(
     if session and should_resume_goal(session, text):
         return None
 
-    # Compound / agent tasks already encode enough intent — don't second-guess routing.
-    if decision.kind == "agent" or is_compound_goal(text):
-        return None
-
-    if (
-        _TRAILING_ELLIPSIS_RE.search(text)
-        or _INCOMPLETE_TRAIL_RE.search(text)
-        or _looks_truncated(text)
-    ):
+    if is_incomplete_utterance(text):
         return (
             "It sounds like you were still talking — could you finish that thought for me?"
         )
+
+    # Compound / agent tasks already encode enough intent — don't second-guess routing.
+    if decision.kind == "agent" or is_compound_goal(text):
+        return None
 
     if _VAGUE_TASK_RE.match(text):
         return "Happy to help — what would you like me to do exactly?"
