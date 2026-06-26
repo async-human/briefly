@@ -151,6 +151,9 @@ def detect_clarification(
     if session and should_resume_goal(session, text):
         return None
 
+    if decision.kind in ("direct", "clarify"):
+        return None
+
     if is_incomplete_utterance(text):
         return (
             "It sounds like you were still talking — could you finish that thought for me?"

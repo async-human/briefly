@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from briefly_api.services.orb_tools import DATA_TOOLS, OrbTool
 
@@ -24,6 +24,7 @@ class RouteDecision:
     confidence: float = 0.0
     reason: str = ""
     clarifying_question: str | None = None
+    tool_args: dict[str, Any] | None = None
 
 
 def regex_matches(transcript: str) -> list[OrbTool]:

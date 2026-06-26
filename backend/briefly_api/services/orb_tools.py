@@ -341,18 +341,25 @@ async def gmail_search_handler(
     content_id: str | None = None,
     args: dict | None = None,
 ) -> dict:
-    from briefly_api.services.gmail_read import extract_gmail_search_query, search_emails
+    from briefly_api.services.gmail_read import resolve_gmail_search_query, search_emails
 
-    query = extract_gmail_search_query(transcript, args)
+    query = await resolve_gmail_search_query(
+        transcript, args, user_id=str(user.id) if user.id else None
+    )
     if not query:
         return {"answer": "What should I search your email for?", "citations": [], "expects_reply": True}
     emails = await search_emails(db, user.id, query, limit=5)
     if not emails:
         return {
-            "answer": f"No emails matched “{query}”. Connect Gmail in settings if you haven't yet.",
+            "answer": (
+                f"I searched your Gmail for {query} but didn't find any matches. "
+                "Want me to try a different spelling or a broader search?"
+            ),
             "citations": [],
+            "expects_reply": True,
         }
-    lines = [f"I found {len(emails)} email{'s' if len(emails) != 1 else ''} about {query}:"]
+    label = query.replace("from:", "from ").replace("subject:", "about ")
+    lines = [f"I found {len(emails)} email{'s' if len(emails) != 1 else ''} {label}:"]
     cites: list[dict] = []
     for i, em in enumerate(emails, start=1):
         subj = em.get("subject") or "(no subject)"
@@ -939,7 +946,11 @@ DATA_TOOLS: list[OrbTool] = [
     ),
     OrbTool(
         name="gmail_search",
-        description="Search the user's Gmail for messages matching a topic, sender, or keyword.",
+        description=(
+            "Search the user's Gmail by sender, company name, subject, or keyword. "
+            "Use for ANY request like 'emails from X', 'mail from Mitralabs', 'messages about invoices' — "
+            "even if X is 'Briefly' (the company, not the app library). Requires Gmail connected."
+        ),
         handler=gmail_search_handler,
         fast_patterns=(
             re.compile(r"\b(search|find)\s+(my\s+)?(email|emails|gmail|inbox)\b", re.IGNORECASE),

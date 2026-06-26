@@ -285,7 +285,16 @@ async def execute_routed_turn(
                 "route_kind": decision.kind,
                 "route_reason": decision.reason,
             }
-        out = await _exec_tool(tool, db, user, transcript, thread_id, content_id, session=session)
+        out = await _exec_tool(
+            tool,
+            db,
+            user,
+            transcript,
+            thread_id,
+            content_id,
+            args=decision.tool_args,
+            session=session,
+        )
         if out.get("thread_id"):
             resolved_thread = out["thread_id"]
         _merge_session_context(session, tool.name, transcript, out.get("answer", ""), out)
@@ -319,6 +328,30 @@ async def execute_routed_turn(
             planned.setdefault("route_kind", "agent")
             planned.setdefault("route_reason", decision.reason)
             return planned
+        if decision.tools:
+            tool = decision.tools[0]
+            log.warning("orb agent empty; falling back to direct %s", tool.name)
+            out = await _exec_tool(
+                tool,
+                db,
+                user,
+                transcript,
+                thread_id,
+                content_id,
+                args=decision.tool_args,
+                session=session,
+            )
+            _merge_session_context(session, tool.name, transcript, out.get("answer", ""), out)
+            return {
+                "transcript": transcript,
+                "thread_id": out.get("thread_id") or thread_id,
+                "answer": out.get("answer", ""),
+                "citations": out.get("citations", []),
+                "tool_trace": _tool_trace([out]),
+                "expects_reply": bool(out.get("expects_reply")),
+                "route_kind": "direct",
+                "route_reason": f"agent_fallback_{tool.name}",
+            }
 
     result_data = await ask_briefly(
         db, user, transcript, thread_id=thread_id, content_id=content_id, voice=True
@@ -568,9 +601,39 @@ async def iter_orb_turn_events(
         timings["agent_ms"] = int((time.monotonic() - exec_started) * 1000)
         timings["total_ms"] = int((time.monotonic() - started) * 1000)
         if complete is None:
-            log.warning("orb agent produced no answer; falling back to ask_briefly")
-            decision = RouteDecision(kind="ask_briefly", reason="agent_empty_fallback")
-        else:
+            if decision.tools:
+                tool = decision.tools[0]
+                log.warning("orb agent produced no answer; falling back to direct %s", tool.name)
+                out = await _exec_tool(
+                    tool,
+                    db,
+                    user,
+                    effective_transcript,
+                    resolved_thread,
+                    content_id,
+                    args=decision.tool_args,
+                    session=session,
+                )
+                answer = polish_spoken_answer(str(out.get("answer") or ""))
+                for chunk in chunk_for_streaming(answer):
+                    yield {"type": "delta", "content": chunk}
+                complete = {
+                    "type": "complete",
+                    "transcript": user_transcript,
+                    "thread_id": out.get("thread_id") or resolved_thread,
+                    "session_id": session.session_id if session else session_id,
+                    "answer": answer,
+                    "citations": out.get("citations") or [],
+                    "tool_trace": _tool_trace([out]),
+                    "expects_reply": bool(out.get("expects_reply")),
+                    "route_kind": "direct",
+                    "route_reason": f"agent_fallback_{tool.name}",
+                    "timings": timings,
+                }
+            else:
+                log.warning("orb agent produced no answer; falling back to ask_briefly")
+                decision = RouteDecision(kind="ask_briefly", reason="agent_empty_fallback")
+        if complete is not None:
             complete["timings"] = timings
             complete["session_id"] = session.session_id if session else session_id
             complete["transcript"] = user_transcript
@@ -586,7 +649,7 @@ async def iter_orb_turn_events(
                     thread_id=complete.get("thread_id"),
                     transcript=user_transcript,
                     last_tool=tool_name,
-                    route_kind="agent",
+                    route_kind=str(complete.get("route_kind") or "agent"),
                     route_reason=str(complete.get("route_reason") or decision.reason or ""),
                     last_answer=str(answer)[:4000],
                     tool_slots=dict(session.tool_slots or {}),

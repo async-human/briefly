@@ -33,7 +33,14 @@ _SYSTEM = (
     "follow-ups like 'tell me more' on a prior library answer)\n"
     "- clarify: utterance is incomplete or missing critical info — no tool yet\n\n"
     "ROUTING RULES:\n"
-    "- Gmail inbox / messages the user received → gmail_recent (NOT today_brief, NOT ask_briefly)\n"
+    "- Gmail inbox / today's messages (no specific sender) → gmail_recent\n"
+    "- Search email by SENDER, company, subject, or keyword → gmail_search (NOT ask_briefly, NOT clarify)\n"
+    "  Examples: 'emails from Mitralabs', 'any mail from Briefly', 'messages about invoices'\n"
+    "  Even if the sender name is 'Briefly', this is gmail_search — NOT the article library\n"
+    "- NEVER use clarify when the user already named who/what to search for in Gmail\n"
+    "- NEVER use agent for a single Gmail lookup — use direct gmail_search or gmail_recent\n"
+    "- Questions like 'do you have access to my Gmail?' → direct gmail_recent (prove access), NOT clarify\n"
+    "- goal_resume ONLY when active_goal_status is awaiting_confirm; otherwise ignore bare yes/confirm\n"
     "- Briefing / digest / headlines for today → today_brief\n"
     "- Calendar / schedule / meetings → calendar_upcoming\n"
     "- Weather / forecast → weather\n"
@@ -51,11 +58,13 @@ _SYSTEM = (
 
 _INSTRUCTIONS = (
     'Return JSON: {"kind":"direct|agent|ask_briefly|clarify","tools":["tool_name",...],'
-    '"reason":"short_snake_case","confidence":0.0-1.0,"clarifying_question":""}\n'
-    "- direct: exactly one tool name in tools\n"
+    '"tool_args":{},"reason":"short_snake_case","confidence":0.0-1.0,"clarifying_question":""}\n'
+    "- direct: exactly one tool name in tools; set tool_args when useful "
+    '(e.g. gmail_search → {"query":"from:mitralabs"} or {"query":"from:briefly"})\n'
     "- agent: one to three tool names in planned order\n"
-    "- ask_briefly / clarify: tools must be []\n"
-    "- clarifying_question: one short spoken question when kind=clarify, else empty string"
+    "- ask_briefly / clarify: tools must be [], tool_args must be {}\n"
+    "- clarifying_question: one short spoken question when kind=clarify, else empty string\n"
+    "- For gmail_search tool_args.query use Gmail search syntax: from:, subject:, newer_than:7d"
 )
 
 
@@ -125,6 +134,8 @@ def parse_route_response(data: dict[str, Any]) -> RouteDecision:
     confidence = max(0.0, min(1.0, confidence))
 
     clarifying_question = str(data.get("clarifying_question") or "").strip() or None
+    raw_args = data.get("tool_args")
+    tool_args = dict(raw_args) if isinstance(raw_args, dict) else None
 
     if kind == "direct":
         if not tools:
@@ -139,6 +150,7 @@ def parse_route_response(data: dict[str, Any]) -> RouteDecision:
             confidence=confidence,
             reason=reason,
             clarifying_question=clarifying_question,
+            tool_args=tool_args,
         )
 
     if kind == "agent":
@@ -154,6 +166,7 @@ def parse_route_response(data: dict[str, Any]) -> RouteDecision:
             confidence=confidence,
             reason=reason,
             clarifying_question=clarifying_question,
+            tool_args=tool_args,
         )
 
     if kind == "clarify":
@@ -162,6 +175,7 @@ def parse_route_response(data: dict[str, Any]) -> RouteDecision:
             confidence=confidence,
             reason=reason or "needs_clarification",
             clarifying_question=clarifying_question,
+            tool_args=tool_args,
         )
 
     return RouteDecision(
@@ -169,6 +183,7 @@ def parse_route_response(data: dict[str, Any]) -> RouteDecision:
         confidence=confidence,
         reason=reason,
         clarifying_question=clarifying_question,
+        tool_args=tool_args,
     )
 
 

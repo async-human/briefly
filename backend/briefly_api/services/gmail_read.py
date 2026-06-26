@@ -125,20 +125,84 @@ async def search_emails(
 
 def extract_gmail_search_query(transcript: str, args: dict | None) -> str:
     if args and args.get("query"):
-        return str(args["query"]).strip()
+        return _clean_gmail_query(str(args["query"]))
     text = (transcript or "").strip()
     for pat in (
         r"\b(?:search|find)\s+(?:my\s+)?(?:email|emails|mail|gmail)\s+(?:for|about)\s+(.+?)(?:\?|$)",
         r"\bemails?\s+about\s+(.+?)(?:\?|$)",
-        r"\b(?:any|show)\s+emails?\s+(?:from|about)\s+(.+?)(?:\?|$)",
+        r"\b(?:any|show|got)?\s*emails?\s+(?:from|by)\s+(.+?)(?:\?|$)",
+        r"\b(?:mail|messages?)\s+from\s+(.+?)(?:\?|$)",
     ):
         m = re.search(pat, text, re.IGNORECASE)
         if m:
-            return m.group(1).strip().rstrip(".")
+            return _clean_gmail_query(m.group(1))
     cleaned = re.sub(
         r"^(please\s+)?(search|find|check)\s+(my\s+)?(gmail|email|emails|inbox)\s*",
         "",
         text,
         flags=re.IGNORECASE,
     ).strip()
-    return cleaned or text
+    return _clean_gmail_query(cleaned or text)
+
+
+def _clean_gmail_query(query: str) -> str:
+    q = (query or "").strip().strip(".,!?")
+    q = q.lstrip(",").strip()
+    q = re.sub(r"\b(maybe|perhaps|please|got it|any|some)\b", "", q, flags=re.IGNORECASE)
+    q = re.sub(r"\s+", " ", q).strip()
+    if not q:
+        return ""
+    if ":" in q:
+        return q
+    if q.lower().startswith("from "):
+        sender = q[5:].strip()
+        return f"from:{sender}" if sender else q
+    return q
+
+
+async def resolve_gmail_search_query(
+    transcript: str,
+    args: dict | None = None,
+    *,
+    user_id: str | None = None,
+) -> str:
+    """Build a Gmail API q= string from the user utterance via LLM."""
+    if args and args.get("query"):
+        cleaned = _clean_gmail_query(str(args["query"]))
+        if cleaned:
+            return cleaned
+
+    text = (transcript or "").strip()
+    if not text:
+        return ""
+
+    heuristic = extract_gmail_search_query(text, args)
+    if heuristic and heuristic.startswith("from:"):
+        return heuristic
+
+    from briefly_api.llm.adapter import Message, get_llm_adapter
+
+    llm = get_llm_adapter()
+    prompt = (
+        f"User request (voice): {text}\n\n"
+        "Return JSON: {\"query\": \"<gmail search string>\"}\n"
+        "Use Gmail search operators: from:, subject:, newer_than:7d, is:unread.\n"
+        "For 'emails from Acme Corp' use from:acme or from:\"Acme Corp\".\n"
+        "Strip filler words (maybe, got it, please). No explanation."
+    )
+    try:
+        data = await llm.complete_json(
+            [Message(role="user", content=prompt)],
+            system="You convert spoken email search requests into Gmail search query strings.",
+            max_tokens=80,
+            user_id=user_id,
+            agent="gmail_query",
+        )
+        if isinstance(data, dict) and data.get("query"):
+            cleaned = _clean_gmail_query(str(data["query"]))
+            if cleaned:
+                return cleaned
+    except Exception:
+        log.debug("LLM gmail query build failed", exc_info=True)
+
+    return heuristic
