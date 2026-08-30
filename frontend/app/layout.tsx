@@ -24,9 +24,9 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Briefly — Your personal AI briefing agent",
+  title: "Briefly — AI market intelligence for founders",
   description:
-    "Briefly reads everything you follow and sends one sharp, cited, personalised briefing every morning",
+    "Briefly turns the sources that move your market into one cited, decision-ready intelligence brief for AI founders and solo builders.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

@@ -90,9 +90,9 @@ export function LandingThemeProvider({ children }: { children: React.ReactNode }
     setThemeState(resolved);
     themeRef.current = resolved;
     document.body.dataset.landingTheme = resolved;
-    document.body.classList.add("study-linear-body");
+    document.body.classList.add("market-landing-body");
     return () => {
-      document.body.classList.remove("study-linear-body");
+      document.body.classList.remove("market-landing-body");
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -121,7 +121,7 @@ export function LandingThemeProvider({ children }: { children: React.ReactNode }
   return (
     <LandingThemeContext.Provider value={value}>
       {/* suppressHydrationWarning: data-theme is intentionally set after mount */}
-      <div className="landing-page study-linear" data-theme={theme} suppressHydrationWarning>
+      <div className="landing-page market-landing" data-theme={theme} suppressHydrationWarning>
         {children}
       </div>
     </LandingThemeContext.Provider>

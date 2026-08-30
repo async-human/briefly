@@ -1,36 +1,10 @@
+import { FounderIntelligenceLanding } from "@/components/landing/FounderIntelligenceLanding";
 import { LandingPageShell } from "@/components/landing/LandingPageShell";
-import { ScrollProgress } from "@/components/landing/ScrollProgress";
-import { CardSpotlight } from "@/components/landing/CardSpotlight";
-import { Nav } from "@/components/landing/Nav";
-import { Hero } from "@/components/landing/Hero";
-import { WhyBriefly } from "@/components/landing/WhyBriefly";
-import { LiveDemo } from "@/components/landing/LiveDemo";
-import { MemoryDemo } from "@/components/landing/MemoryDemo";
-import { TrustSourcesSection } from "@/components/landing/TrustSourcesSection";
-import { Features } from "@/components/landing/Features";
-import { Personas } from "@/components/landing/Personas";
-import { CompareSection } from "@/components/landing/CompareSection";
-import { Pricing } from "@/components/landing/Pricing";
-import { CTA } from "@/components/landing/CTA";
-import { Footer } from "@/components/landing/Footer";
 
 export default function Home() {
   return (
     <LandingPageShell>
-      <ScrollProgress />
-      <CardSpotlight />
-      <Nav />
-      <Hero />
-      <WhyBriefly />
-      <LiveDemo />
-      <MemoryDemo />
-      <TrustSourcesSection />
-      <Features />
-      <Personas />
-      <CompareSection />
-      <Pricing />
-      <CTA />
-      <Footer />
+      <FounderIntelligenceLanding />
     </LandingPageShell>
   );
 }

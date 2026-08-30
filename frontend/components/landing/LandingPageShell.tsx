@@ -1,7 +1,6 @@
 "use client";
 
-import "@/styles/study-linear.css";
-import "@/styles/study-liner.css";
+import "@/styles/market-intelligence-landing.css";
 
 import { LandingThemeProvider } from "./LandingThemeContext";
 

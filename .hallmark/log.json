@@ -1,5 +1,15 @@
 [
   {
+    "date": "2026-08-31",
+    "scope": "single-page",
+    "target": "frontend landing (app/page.tsx)",
+    "verb": "redesign",
+    "macrostructure": "Narrative Workflow",
+    "theme": "Briefly editorial-minimal (design.md)",
+    "enrichment": "Tier-A intelligence dossier",
+    "brief": "Repositioned Briefly as gated AI market intelligence for AI founders: six-point brief, compound market memory, grounded actions, and earned ambient/team layers."
+  },
+  {
     "date": "2026-06-17",
     "scope": "single-page",
     "target": "frontend landing (app/page.tsx)",
