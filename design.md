@@ -10,6 +10,7 @@ editorial-minimal — warm paper, serif display, restrained indigo accent. A mor
 
 - **v1** — Workbench tokens, OKLCH palette, stacked-page loaders
 - **v2** — Airier rhythm, border-only surfaces, sidebar accent rail, redundant chrome removed
+- **v3** — Marketing redesign: Feature Stack loop, scroll-synced stage meters, N10 nav morph, all section eyebrows removed
 
 ## App macrostructure
 
@@ -17,12 +18,24 @@ editorial-minimal — warm paper, serif display, restrained indigo accent. A mor
 
 ## Marketing macrostructure
 
-**Narrative Workflow** — an asymmetric split hero followed by the product loop in sequence: decide → remember → act. Product direction is presented as gated layers, never as a list of unshipped claims.
+**Feature Stack** — an asymmetric split hero, then the product loop as three scroll-synced stages: decide → remember → act. Each stage pins a one-word verb on the left while its panels scroll past on the right. Product direction is presented as gated layers, never as a list of unshipped claims.
 
-- Hero: split diptych with a Tier-A intelligence dossier; no fake browser chrome
-- Navigation: N9 edge-aligned minimal
-- Footer: Ft5 statement close
-- Section rhythm: stacked stage label → heading → body, with hairline divisions
+- Hero: asymmetric split with a Tier-A brief card, offset below the copy baseline; no fake browser chrome
+- Navigation: N10 floating-on-scroll morph — full-bleed bar cross-fades into a detached plate past 80px
+- Footer: Ft1 mast-headed — wordmark, tagline, inline links
+- Section rhythm: heading → body, single column, deliberately uneven padding between sections
+- **No section eyebrows.** No `01 / LABEL` kickers, and never a label beside a heading. Stage identity is carried by the heading itself.
+- Accent is reserved for CTAs, the active scroll position, and numerals
+
+## Marketing motion
+
+Three primitives, and no more:
+
+1. **Nav morph** — one cross-fade past an 80px threshold. Constant height, transform-only offset, one curve. Desktop only.
+2. **Hero entrance** — one orchestrated stagger on load, 70ms per DOM index, capped under 500ms total.
+3. **Scroll-synced stage meter** — `IntersectionObserver` on a narrow viewport band reports the active panel to the pinned pane.
+
+No section fade-ins, no infinite loops, no parallax. Nothing below the nav shifts when the nav morphs; no layout property is ever transitioned.
 
 ## Theme (Lumen-adjacent)
 
@@ -40,7 +53,9 @@ Mapped in `frontend/styles/app-dashboard.css` as `--app-*` tokens.
 - Body / UI: `var(--font-sans)` (DM Sans)
 - Mono / metrics: `var(--font-mono)` (DM Mono)
 
-## Motion
+Mono is the outlier register and carries exactly one role: **figures**. Counters, panel indices, layer numbers, tabular data. Never labels, never body copy, never kickers.
+
+## App motion
 
 - Easing: `cubic-bezier(0.22, 1, 0.36, 1)` as `--app-ease`
 - Durations: 160ms UI, 480ms reveals, 2.4–3.2s ambient loaders
@@ -55,8 +70,10 @@ Mapped in `frontend/styles/app-dashboard.css` as `--app-*` tokens.
 
 ## CTA voice
 
-- Primary: filled indigo, 6px radius, medium weight label
-- Secondary: hairline border, canvas fill, hover muted wash
+- Primary: filled indigo, 6px radius, medium weight label. Hover inverts the fill to ink — one signal, never a fill change plus a lift plus an icon slide.
+- Secondary (app): hairline border, canvas fill, hover muted wash
+- Secondary (marketing): typographic link — label, hairline underline, arrow. Hover slides the arrow only.
+- Every affordance is `white-space: nowrap` and at least 2.75rem tall
 
 ## What app pages share
 
