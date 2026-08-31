@@ -4,13 +4,15 @@ Locked design system for Briefly. Marketing, dashboard and in-app surfaces read 
 
 ## Genre
 
-editorial-minimal — warm paper, serif display, restrained indigo accent. A morning journal, not a SaaS control panel.
+Art Deco editorial — ivory paper, deep teal ink, restrained gold geometry. A composed private intelligence salon, not a SaaS control panel.
 
 ## Hallmark passes
 
 - **v1** — Workbench tokens, OKLCH palette, stacked-page loaders
 - **v2** — Airier rhythm, border-only surfaces, sidebar accent rail, redundant chrome removed
 - **v3** — Marketing redesign: Feature Stack loop, scroll-synced stage meters, N10 nav morph, all section eyebrows removed
+- **v4** — Marketing rebuilt as Split Studio: floating pill nav, alternating proof pairs, letter-close footer, generous display leading
+- **v5** — Art Deco Grand Salon: symmetric masthead, framed hero brief, jewel-toned memory chamber, asymmetric action composition, expanded footer
 
 ## App macrostructure
 
@@ -18,38 +20,39 @@ editorial-minimal — warm paper, serif display, restrained indigo accent. A mor
 
 ## Marketing macrostructure
 
-**Feature Stack** — an asymmetric split hero, then the product loop as three scroll-synced stages: decide → remember → act. Each stage pins a one-word verb on the left while its panels scroll past on the right. Product direction is presented as gated layers, never as a list of unshipped claims.
+**Grand Salon (custom)** — a symmetrical arrival opens into asymmetric editorial compositions. Geometric rules and framed content provide the Art Deco register; product information remains direct and contemporary.
 
-- Hero: asymmetric split with a Tier-A brief card, offset below the copy baseline; no fake browser chrome
-- Navigation: N10 floating-on-scroll morph — full-bleed bar cross-fades into a detached plate past 80px
-- Footer: Ft1 mast-headed — wordmark, tagline, inline links
-- Section rhythm: heading → body, single column, deliberately uneven padding between sections
-- **No section eyebrows.** No `01 / LABEL` kickers, and never a label beside a heading. Stage identity is carried by the heading itself.
-- Accent is reserved for CTAs, the active scroll position, and numerals
+- Hero: centered ornament line, left-biased statement, and a Tier-A framed brief; no fake browser chrome
+- Navigation: symmetric masthead — page links left, wordmark center, access right
+- Footer: expanded masthead directory — large wordmark, three spacious link groups, split metadata row
+- Section rhythm: grand arrival → compact source register → editorial method → jewel memory chamber → asymmetric actions → gated direction → centered invitation
+- **No section eyebrows.** No `01 / LABEL` kickers, and never a label beside a heading
+- Gold is reserved for CTAs, rules, diamonds, and numerals; deep teal carries large surfaces
+- Display line-height never drops below 1.02. Footer groups stack before their links become cramped
 
 ## Marketing motion
 
 Three primitives, and no more:
 
-1. **Nav morph** — one cross-fade past an 80px threshold. Constant height, transform-only offset, one curve. Desktop only.
-2. **Hero entrance** — one orchestrated stagger on load, 70ms per DOM index, capped under 500ms total.
-3. **Scroll-synced stage meter** — `IntersectionObserver` on a narrow viewport band reports the active panel to the pinned pane.
+1. **Hero entrance** — one orchestrated stagger on load, 70ms per DOM index, capped under 500ms total
+2. **Section reveal** — composed content groups fade up once when they first enter view
+3. **CTA hover** — primary fill inverts to ink; secondary slides its arrow only
 
-No section fade-ins, no infinite loops, no parallax. Nothing below the nav shifts when the nav morphs; no layout property is ever transitioned.
+No section-wide fade-ins, no infinite loops, no parallax. No layout property is ever transitioned.
 
-## Theme (Lumen-adjacent)
+## Theme (custom Art Deco)
 
-- `--color-paper` canvas: warm near-white
-- `--color-paper-2` sidebar: cool grey-violet wash
-- `--color-ink` primary text: deep blue-grey
-- `--color-accent` action: refined indigo (~278°)
-- `--color-brand` mark: warm gold (~65°)
+- `--color-paper` canvas: warm ivory (~82°)
+- `--color-paper-2` surface: champagne wash (~82°)
+- `--color-ink` primary text: deep teal (~205°)
+- `--color-accent` action and ornament: restrained gold (~78°)
+- `--color-jewel` feature chamber and footer: deep teal (~195°)
 
 Mapped in `frontend/styles/app-dashboard.css` as `--app-*` tokens.
 
 ## Typography
 
-- Display / page titles: `var(--font-serif)` (Playfair Display), weight 600, roman only
+- Display / page titles: `var(--font-art-deco)` (Cormorant Garamond), weights 600–700, roman only
 - Body / UI: `var(--font-sans)` (DM Sans)
 - Mono / metrics: `var(--font-mono)` (DM Mono)
 

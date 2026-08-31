@@ -1,25 +1,28 @@
 /* Briefly landing tokens · locked to design.md */
 .market-landing {
-  --color-paper: oklch(98.4% 0.008 85);
-  --color-paper-2: oklch(95.8% 0.014 83);
-  --color-paper-3: oklch(92.8% 0.022 80);
-  --color-ink: oklch(21% 0.028 270);
-  --color-ink-2: oklch(39% 0.026 270);
-  --color-muted: oklch(44% 0.022 270);
-  --color-rule: oklch(85% 0.018 80);
-  --color-rule-strong: oklch(70% 0.03 275);
-  --color-accent: oklch(43% 0.17 278);
-  --color-accent-soft: oklch(91% 0.05 278);
-  --color-accent-ink: oklch(98% 0.008 85);
-  --color-focus: oklch(55% 0.19 278);
+  --color-paper: oklch(97.5% 0.016 82);
+  --color-paper-2: oklch(94.5% 0.025 82);
+  --color-paper-3: oklch(90.5% 0.034 80);
+  --color-ink: oklch(19% 0.035 205);
+  --color-ink-2: oklch(36% 0.032 205);
+  --color-muted: oklch(46% 0.025 200);
+  --color-rule: oklch(82% 0.045 78);
+  --color-rule-strong: oklch(61% 0.09 78);
+  --color-accent: oklch(66% 0.12 78);
+  --color-accent-soft: oklch(91% 0.055 80);
+  --color-accent-ink: oklch(18% 0.032 205);
+  --color-focus: oklch(53% 0.13 200);
+  --color-jewel: oklch(27% 0.065 195);
+  --color-jewel-2: oklch(33% 0.075 195);
+  --color-jewel-ink: oklch(96% 0.018 82);
   --color-success: oklch(48% 0.11 155);
   --color-error: oklch(52% 0.18 25);
-  --color-shadow: oklch(21% 0.028 270 / 0.12);
-  --color-accent-veil: oklch(43% 0.17 278 / 0.22);
-  --color-paper-veil: oklch(98.4% 0.008 85 / 0.72);
-  --color-paper-veil-strong: oklch(98.4% 0.008 85 / 0.9);
+  --color-shadow: oklch(19% 0.035 205 / 0.14);
+  --color-accent-veil: oklch(66% 0.12 78 / 0.24);
+  --color-paper-veil: oklch(97.5% 0.016 82 / 0.76);
+  --color-paper-veil-strong: oklch(97.5% 0.016 82 / 0.92);
 
-  --font-display: var(--font-serif), Georgia, serif;
+  --font-display: var(--font-art-deco), Georgia, serif;
   --font-body: var(--font-sans), system-ui, sans-serif;
   --font-mono: var(--font-mono), ui-monospace, monospace;
 
@@ -43,7 +46,7 @@
   --text-2xl: 2.5rem;
   --text-3xl: clamp(2.25rem, 4.6vw, 3.75rem);
   --text-display-s: clamp(2.5rem, 6vw, 4.75rem);
-  --text-display: clamp(3rem, 7.4vw, 6.5rem);
+  --text-display: clamp(3rem, 7vw, 5.25rem);
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
@@ -69,22 +72,25 @@
 }
 
 .market-landing[data-theme="dark"] {
-  --color-paper: oklch(15% 0.018 270);
-  --color-paper-2: oklch(19% 0.022 270);
-  --color-paper-3: oklch(23% 0.026 270);
-  --color-ink: oklch(95% 0.009 85);
-  --color-ink-2: oklch(78% 0.016 82);
-  --color-muted: oklch(67% 0.018 80);
-  --color-rule: oklch(29% 0.026 272);
-  --color-rule-strong: oklch(43% 0.05 278);
-  --color-accent: oklch(70% 0.13 278);
-  --color-accent-soft: oklch(25% 0.06 278);
-  --color-accent-ink: oklch(14% 0.02 270);
-  --color-focus: oklch(76% 0.14 278);
+  --color-paper: oklch(14% 0.028 205);
+  --color-paper-2: oklch(18% 0.035 202);
+  --color-paper-3: oklch(22% 0.042 198);
+  --color-ink: oklch(95% 0.018 82);
+  --color-ink-2: oklch(79% 0.025 82);
+  --color-muted: oklch(68% 0.03 82);
+  --color-rule: oklch(31% 0.055 190);
+  --color-rule-strong: oklch(54% 0.09 78);
+  --color-accent: oklch(76% 0.11 78);
+  --color-accent-soft: oklch(25% 0.055 78);
+  --color-accent-ink: oklch(14% 0.028 205);
+  --color-focus: oklch(76% 0.12 190);
+  --color-jewel: oklch(20% 0.055 195);
+  --color-jewel-2: oklch(25% 0.068 195);
+  --color-jewel-ink: oklch(96% 0.018 82);
   --color-success: oklch(69% 0.12 155);
   --color-error: oklch(72% 0.16 25);
-  --color-shadow: oklch(5% 0.012 270 / 0.5);
-  --color-accent-veil: oklch(70% 0.13 278 / 0.28);
-  --color-paper-veil: oklch(15% 0.018 270 / 0.68);
-  --color-paper-veil-strong: oklch(19% 0.022 270 / 0.88);
+  --color-shadow: oklch(5% 0.02 205 / 0.5);
+  --color-accent-veil: oklch(76% 0.11 78 / 0.28);
+  --color-paper-veil: oklch(14% 0.028 205 / 0.72);
+  --color-paper-veil-strong: oklch(18% 0.035 202 / 0.9);
 }

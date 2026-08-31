@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
-import { Playfair_Display, DM_Sans, DM_Mono } from "next/font/google";
+import {
+  Cormorant_Garamond,
+  Playfair_Display,
+  DM_Sans,
+  DM_Mono,
+} from "next/font/google";
 import { PwaRegistrar } from "@/components/PwaRegistrar";
 import "./globals.css";
 import "../styles/app-dashboard.css";
@@ -7,6 +12,13 @@ import "../styles/app-dashboard.css";
 const playfair = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-serif",
+  display: "swap",
+});
+
+const cormorant = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-art-deco",
   display: "swap",
 });
 
@@ -49,7 +61,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${playfair.variable} ${dmSans.variable} ${dmMono.variable}`}
+        className={`${playfair.variable} ${cormorant.variable} ${dmSans.variable} ${dmMono.variable}`}
       >
         <PwaRegistrar />
         {children}
