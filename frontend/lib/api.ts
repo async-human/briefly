@@ -845,7 +845,7 @@ export type CaptureTokenCreated = CaptureToken & {
   token: string;
 };
 
-export type KnowledgeGraphNodeType = "topic" | "source" | "item" | "thought" | "thread";
+export type KnowledgeGraphNodeType = "topic" | "source" | "item" | "thought" | "thread" | "entity";
 
 export type KnowledgeGraphNode = {
   id: string;
@@ -968,6 +968,7 @@ export type KnowledgeGraphResponse = {
     item_count: number;
     thought_count: number;
     source_count: number;
+    entity_count?: number;
     edge_count: number;
     time_window_days?: number;
     thread_focus?: boolean;
@@ -975,6 +976,47 @@ export type KnowledgeGraphResponse = {
     items_displayed?: number;
     digests_scanned?: number;
     similarity_edges_capped?: boolean;
+  };
+};
+
+export type EntityHubConnected = {
+  id: string;
+  label: string;
+  type: KnowledgeGraphNodeType;
+  kind?: string | null;
+  edge_label?: string | null;
+};
+
+export type EntityHubTimelineEntry = {
+  when: string;
+  title: string;
+  node_id?: string | null;
+  linked: string[];
+  source?: string | null;
+};
+
+export type EntityHubMemory = {
+  text: string;
+  kind: string;
+  saved_at: string;
+  node_id?: string | null;
+};
+
+export type EntityHub = {
+  id: string;
+  name: string;
+  kind: string;
+  type: KnowledgeGraphNodeType;
+  summary: string;
+  watching: boolean;
+  watched_id: string | null;
+  timeline: EntityHubTimelineEntry[];
+  connected: EntityHubConnected[];
+  memory: EntityHubMemory[];
+  meta: {
+    url?: string | null;
+    source_id?: string | null;
+    source_name?: string | null;
   };
 };
 
@@ -1255,6 +1297,13 @@ export const api = {
   getKnowledgeGraph: (days?: number) => {
     const qs = days ? `?days=${days}` : "";
     return request<KnowledgeGraphResponse>(`/api/v1/graph${qs}`);
+  },
+  getEntityHub: (params: { nodeId?: string; q?: string; days?: number }) => {
+    const qs = new URLSearchParams();
+    if (params.nodeId) qs.set("node_id", params.nodeId);
+    if (params.q) qs.set("q", params.q);
+    if (params.days) qs.set("days", String(params.days));
+    return request<EntityHub>(`/api/v1/graph/hub?${qs.toString()}`);
   },
   graphTopicAction: (body: { topic: string; action: "boost" | "mute" }) =>
     request<{ topic: string; action: string; strength: number }>(

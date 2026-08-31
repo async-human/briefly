@@ -7,7 +7,6 @@ import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
 import { AppSidebar } from "./AppSidebar";
 import { BrainDumpFab } from "./BrainDumpFab";
-import { LearnedToastProvider } from "./LearnedToast";
 import { FreeTierBanner } from "@/components/billing/FreeTierBanner";
 import { ensureDesktopOrbLinked } from "@/lib/orbDesktopLink";
 import { MobileOrbOverlay } from "@/components/mobile/MobileOrbOverlay";
@@ -38,7 +37,6 @@ export function DashboardShell({ children, userName, avatarUrl }: DashboardShell
   }, []);
 
   return (
-    <LearnedToastProvider>
     <div className="app-shell" data-theme={theme} suppressHydrationWarning>
       <AppSidebar
         userName={userName}
@@ -78,6 +76,5 @@ export function DashboardShell({ children, userName, avatarUrl }: DashboardShell
         <MobileOrbOverlay />
       </div>
     </div>
-    </LearnedToastProvider>
   );
 }

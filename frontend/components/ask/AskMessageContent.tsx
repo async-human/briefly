@@ -1,11 +1,24 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import type { AskCitation } from "@/lib/api";
-import { graphItemUrl, graphThoughtUrl } from "@/lib/graphLinks";
+import { useGraphHub } from "@/components/graph/GraphHubContext";
+
+function AskHubLink({ citation }: { citation: AskCitation }) {
+  const { openHub } = useGraphHub();
+  const prefix = citation.kind === "brain_dump" || citation.kind === "thought" ? "thought" : "item";
+  return (
+    <button
+      type="button"
+      className="ask-source-action ask-source-action-button"
+      onClick={() => openHub({ nodeId: `${prefix}:${citation.content_id}`, query: citation.title })}
+    >
+      Connections
+    </button>
+  );
+}
 
 function refNumber(ref: string): number {
   const n = parseInt(ref.replace(/^S/, ""), 10);
@@ -107,11 +120,6 @@ export function CitationSources({ citations }: { citations: AskCitation[] }) {
 
   const openCite = citations.find((c) => c.ref === openRef) ?? null;
   const openN = openCite ? refNumber(openCite.ref) : 0;
-  const graphHref = openCite
-    ? openCite.kind === "brain_dump" || openCite.kind === "thought"
-      ? graphThoughtUrl(openCite.content_id)
-      : graphItemUrl(openCite.content_id)
-    : null;
 
   return (
     <div className="ask-sources">
@@ -165,10 +173,8 @@ export function CitationSources({ citations }: { citations: AskCitation[] }) {
                 Open
               </a>
             ) : null}
-            {openCite.content_id && !openCite.content_id.startsWith("digest-item") && graphHref ? (
-              <Link href={graphHref} className="ask-source-action">
-                Graph
-              </Link>
+            {openCite.content_id && !openCite.content_id.startsWith("digest-item") ? (
+              <AskHubLink citation={openCite} />
             ) : null}
             <button
               type="button"

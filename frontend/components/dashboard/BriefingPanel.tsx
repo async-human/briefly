@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { api, type AutoSuggestion, type Digest, type DigestItem, type Source } from "@/lib/api";
 import {
   groupDigestItemsBySection,
@@ -28,9 +27,8 @@ import { SourceIcon } from "@/components/SourceIcon";
 import { OutcomeBriefHeader, SafeToIgnorePanel } from "./OutcomeBriefHeader";
 import { getDigestOutcome, splitTopPriorityItems } from "@/lib/digestOutcome";
 import { formatHeroHeadline, formatHeroWhy, formatPreviewHeadline } from "@/lib/formatHeadline";
-import { graphItemUrl } from "@/lib/graphLinks";
-import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { askAboutContent } from "@/lib/askLinks";
+import { InlineGraphContext } from "@/components/graph/InlineGraphContext";
 import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
 import { GeneratingProgressRing } from "@/components/loading/GeneratingProgressRing";
 import { YouTubeItemBadge } from "@/components/dashboard/YouTubeItemBadge";
@@ -487,7 +485,6 @@ function BriefingHeroItem({
   item: DigestItem;
   digestId: string;
 }) {
-  const router = useRouter();
   const youtubeBadge = getYouTubeBadge(item);
   const headline = formatHeroHeadline(item.headline);
   const why = item.why_it_matters ? formatHeroWhy(item.why_it_matters) : null;
@@ -519,10 +516,10 @@ function BriefingHeroItem({
             <span aria-hidden>⚠</span> {item.contradiction_explanation}
           </p>
         )}
-        {item.memory_reference && (
-          <p className="briefing-hero-memory">⟳ {item.memory_reference}</p>
-        )}
       </Link>
+      {item.memory_reference || item.memory_connections?.length ? (
+        <InlineGraphContext item={item} />
+      ) : null}
       <div className="briefing-hero-actions">
         {item.content_id && (
           <Link
@@ -535,15 +532,6 @@ function BriefingHeroItem({
         <Link href={`/dashboard/read/${digestId}?item=${item.id}`} className="briefing-hero-read">
           Read full brief →
         </Link>
-        {item.content_id && (
-          <button
-            type="button"
-            className="briefing-graph-link"
-            onClick={() => router.push(graphItemUrl(item.content_id!))}
-          >
-            Graph
-          </button>
-        )}
       </div>
     </article>
   );
@@ -560,15 +548,12 @@ function BriefingPreviewItem({
   index: number;
   digestId?: string;
 }) {
-  const router = useRouter();
   const why = item.why_it_matters
     ? item.why_it_matters.length > 100
       ? item.why_it_matters.slice(0, 97).trimEnd() + "…"
       : item.why_it_matters
     : null;
   const previewHeadline = formatPreviewHeadline(item.headline);
-
-  const hasMemory = Boolean(item.memory_reference || item.memory_connections?.length);
   const youtubeBadge = getYouTubeBadge(item);
 
   const content = (
@@ -579,22 +564,6 @@ function BriefingPreviewItem({
           <YouTubeItemBadge item={item} variant="compact" />
           {!youtubeBadge && item.source_name ? (
             <p className="briefing-preview-meta">{item.source_name}</p>
-          ) : null}
-          {hasMemory && (
-            <span className="briefing-preview-memory-dot" title="Briefly remembers this story" aria-label="You've been following this story" />
-          )}
-          {item.content_id ? (
-            <button
-              type="button"
-              className="briefing-graph-link"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                router.push(graphItemUrl(item.content_id!));
-              }}
-            >
-              Graph
-            </button>
           ) : null}
         </div>
         <h3
@@ -610,6 +579,7 @@ function BriefingPreviewItem({
         {item.confidence_signal && (
           <p className="briefing-preview-confidence">◈ {item.confidence_signal}</p>
         )}
+        <InlineGraphContext item={item} compact />
       </div>
       {digestId ? <span className="briefing-preview-chevron" aria-hidden>→</span> : null}
     </>

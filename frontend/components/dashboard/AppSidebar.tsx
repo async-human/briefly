@@ -53,7 +53,7 @@ const NAV = [
   },
   {
     href: "/graph",
-    label: "Graph",
+    label: "Network",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" aria-hidden>
         <circle cx="6" cy="18" r="2.5" stroke="currentColor" strokeWidth="1.5" />

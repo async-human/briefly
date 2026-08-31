@@ -17,7 +17,8 @@ import {
   sectionBadgeClass,
 } from "@/lib/digestSections";
 import { askAboutContent } from "@/lib/askLinks";
-import { graphItemUrl } from "@/lib/graphLinks";
+import { useGraphHub } from "@/components/graph/GraphHubContext";
+import { InlineGraphContext } from "@/components/graph/InlineGraphContext";
 import { useLearnedToast } from "@/components/dashboard/LearnedToast";
 import { copyMarkdownNote } from "@/lib/markdownNote";
 import { guessTrackName } from "@/lib/trackName";
@@ -144,6 +145,7 @@ function ReadingCard({
 }) {
   const [whyOpen, setWhyOpen] = useState(false);
   const [noteState, setNoteState] = useState<"idle" | "copying" | "success" | "error">("idle");
+  const { openHub } = useGraphHub();
   const firstMemory = item.memory_connections?.[0];
   const memoryText = item.memory_reference || firstMemory?.description || null;
   const coverageNote = item.duplicate_count > 1
@@ -262,7 +264,10 @@ function ReadingCard({
           transition={{ duration: 0.35, ease: EASE }}
         >
           <span className="read-memory-callout-icon" aria-hidden>⟳</span>
-          <span className="read-memory-callout-text">{memoryText}</span>
+          <div className="read-memory-callout-body">
+            <span className="read-memory-callout-text">{memoryText}</span>
+            <InlineGraphContext item={item} compact />
+          </div>
         </motion.div>
       )}
 
@@ -380,9 +385,19 @@ function ReadingCard({
               >
                 Ask about this
               </Link>
-              <Link href={graphItemUrl(item.content_id)} className="read-graph-link read-graph-link-why">
-                View in graph
-              </Link>
+              <button
+                type="button"
+                className="read-graph-link read-graph-link-why"
+                onClick={() =>
+                  openHub(
+                    item.content_id
+                      ? { nodeId: `item:${item.content_id}` }
+                      : { query: item.headline },
+                  )
+                }
+              >
+                Why this connects
+              </button>
             </motion.div>
           ) : null}
         </div>

@@ -48,6 +48,7 @@ export function applyHubLayout(nodes: LayoutNode[], links: LayoutLink[]): void {
   const items = nodes.filter((n) => n.type === "item");
   const sources = nodes.filter((n) => n.type === "source");
   const thoughts = nodes.filter((n) => n.type === "thought");
+  const entities = nodes.filter((n) => n.type === "entity");
   const topicIds = topics.map((t) => t.id);
 
   const topicRadius = 55 + topics.length * 6;
@@ -136,6 +137,42 @@ export function applyHubLayout(nodes: LayoutNode[], links: LayoutLink[]): void {
     thought.x = (base.x ?? 0) + Math.cos(angle) * 36;
     thought.y = (base.y ?? 0) + Math.sin(angle) * 36;
   });
+
+  const entitiesByTopic = new Map<string, LayoutNode[]>();
+  const orphanEntities: LayoutNode[] = [];
+  for (const entity of entities) {
+    let hubId: string | null = null;
+    for (const link of links) {
+      const src = linkNodeId(link.source);
+      const tgt = linkNodeId(link.target);
+      if (src === entity.id && topicIds.includes(tgt)) hubId = tgt;
+      else if (tgt === entity.id && topicIds.includes(src)) hubId = src;
+      if (hubId) break;
+    }
+    if (hubId) {
+      if (!entitiesByTopic.has(hubId)) entitiesByTopic.set(hubId, []);
+      entitiesByTopic.get(hubId)!.push(entity);
+    } else {
+      orphanEntities.push(entity);
+    }
+  }
+
+  Array.from(entitiesByTopic.entries()).forEach(([tid, group]) => {
+    const hub = topicPos.get(tid) ?? { x: 0, y: 0 };
+    const clusterR = 28 + Math.sqrt(group.length) * 10;
+    group.forEach((entity, i) => {
+      const angle = (2 * Math.PI * i) / group.length + Math.PI / 6;
+      entity.x = hub.x + Math.cos(angle) * clusterR;
+      entity.y = hub.y + Math.sin(angle) * clusterR;
+    });
+  });
+
+  orphanEntities.forEach((entity, i) => {
+    const angle = (2 * Math.PI * i) / Math.max(orphanEntities.length, 1) + Math.PI / 5;
+    const r = Math.max(topicRadius * 0.45, 32);
+    entity.x = Math.cos(angle) * r;
+    entity.y = Math.sin(angle) * r;
+  });
 }
 
 export function releaseFixedAnchors(nodes: LayoutNode[]): void {
@@ -163,6 +200,10 @@ export function linkDistance(link: LayoutLink): number {
       return 44;
     case "related_to":
       return 88;
+    case "watches":
+      return 42;
+    case "mentioned_with":
+      return 50;
     default:
       return 60;
   }

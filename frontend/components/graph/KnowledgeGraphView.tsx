@@ -4,12 +4,10 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ForceGraphMethods } from "react-force-graph-2d";
 import type { KnowledgeGraphNode, KnowledgeGraphNodeType, KnowledgeGraphResponse } from "@/lib/api";
-import { api } from "@/lib/api";
-import { applyThreadFocusFilter } from "@/lib/graphFilter";
-import Link from "next/link";
-import { askAboutContent } from "@/lib/askLinks";
+import { applyExplorerLens, applyThreadFocusFilter, DEFAULT_EXPLORER_LENS, searchMatchIds, type ExplorerLens } from "@/lib/graphFilter";
 import type { GraphTimeRange, GraphViewFilter } from "@/lib/graphLinks";
 import { applyHubLayout, linkDistance, type LayoutLink, type LayoutNode } from "@/lib/graphLayout";
+import { useGraphHub } from "./GraphHubContext";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
 
@@ -19,6 +17,7 @@ const NODE_COLORS: Record<KnowledgeGraphNodeType, string> = {
   item: "#3B82F6",
   thought: "#F59E0B",
   thread: "#EC4899",
+  entity: "#06B6D4",
 };
 
 const NODE_LABELS: Record<KnowledgeGraphNodeType, string> = {
@@ -27,9 +26,10 @@ const NODE_LABELS: Record<KnowledgeGraphNodeType, string> = {
   item: "Articles",
   thought: "Your thoughts",
   thread: "Story threads",
+  entity: "Watched",
 };
 
-const ANCHOR_TYPES = new Set<KnowledgeGraphNodeType>(["topic", "thread", "source"]);
+const ANCHOR_TYPES = new Set<KnowledgeGraphNodeType>(["topic", "thread", "source", "entity"]);
 
 const EDGE_LEGEND: { type: string; label: string; hint: string }[] = [
   { type: "belongs_to", label: "Brief → topic", hint: "Article matched an interest in your brief" },
@@ -39,6 +39,8 @@ const EDGE_LEGEND: { type: string; label: string; hint: string }[] = [
   { type: "related_to", label: "Article ↔ article", hint: "Semantically similar (embedding match)" },
   { type: "relates_to", label: "Thought → topic", hint: "Your note relates to an interest" },
   { type: "captures", label: "Source → thought", hint: "Brain dump you saved" },
+  { type: "mentioned_with", label: "Watched ↔ article", hint: "A company or person you watch appears in this story" },
+  { type: "watches", label: "Watched → topic", hint: "A watched name sits in an interest cluster" },
 ];
 
 function truncateLabel(label: string, max: number): string {
@@ -81,8 +83,7 @@ function shouldShowCanvasLabel(
   return globalScale >= 0.72;
 }
 
-const ALL_TYPES: KnowledgeGraphNodeType[] = ["topic", "source", "item", "thought", "thread"];
-const THREAD_FOCUS_TYPES: KnowledgeGraphNodeType[] = ["thread", "item", "topic"];
+const ALL_TYPES: KnowledgeGraphNodeType[] = ["entity", "topic", "thread", "source", "item", "thought"];
 const TIME_RANGES: { label: string; value: GraphTimeRange | null }[] = [
   { label: "All", value: null },
   { label: "7d", value: 7 },
@@ -133,36 +134,6 @@ function drawNodeLabel(
 
 type ForceNode = LayoutNode;
 
-function connectionsForNode(
-  nodeId: string,
-  links: LayoutLink[],
-  nodesById: Map<string, KnowledgeGraphNode>,
-) {
-  return links
-    .filter((link) => link.source === nodeId || link.target === nodeId)
-    .map((link) => {
-      const outbound = link.source === nodeId;
-      const otherId = outbound ? link.target : link.source;
-      const other = nodesById.get(otherId);
-      return {
-        id: `${link.type}:${otherId}`,
-        label: link.label ?? link.type ?? "Connected",
-        otherLabel: other?.label ?? otherId,
-        otherType: other?.type,
-        edgeType: link.type,
-      };
-    })
-    .sort((a, b) => a.otherLabel.localeCompare(b.otherLabel));
-}
-
-const FILTER_SHORT: Record<KnowledgeGraphNodeType, string> = {
-  topic: "Topics",
-  source: "Sources",
-  item: "Articles",
-  thought: "Thoughts",
-  thread: "Threads",
-};
-
 function useMobileLayout() {
   const [mobile, setMobile] = useState(false);
 
@@ -191,38 +162,6 @@ function useCanHover() {
   return canHover;
 }
 
-function nodeDetail(node: KnowledgeGraphNode): { label: string; value: string }[] {
-  const meta = node.meta;
-  const rows: { label: string; value: string }[] = [];
-
-  if (node.type === "topic") {
-    if (meta.strength_pct != null) rows.push({ label: "Strength", value: `${meta.strength_pct}%` });
-    if (meta.item_count != null) rows.push({ label: "Items tracked", value: String(meta.item_count) });
-    if (meta.source) rows.push({ label: "Origin", value: String(meta.source) });
-  } else if (node.type === "thread") {
-    if (meta.appearances != null) rows.push({ label: "Appearances", value: String(meta.appearances) });
-    if (meta.latest_headline) rows.push({ label: "Latest", value: String(meta.latest_headline) });
-    if (meta.health) rows.push({ label: "Status", value: String(meta.health) });
-  } else if (node.type === "source") {
-    if (meta.source_type) rows.push({ label: "Type", value: String(meta.source_type) });
-    if (meta.weight != null) rows.push({ label: "Weight", value: String(meta.weight) });
-  } else if (node.type === "item") {
-    if (meta.source_name) rows.push({ label: "Source", value: String(meta.source_name) });
-    if (meta.digest_date) rows.push({ label: "Briefing", value: String(meta.digest_date) });
-    if (meta.connection_sentence) rows.push({ label: "Connection", value: String(meta.connection_sentence) });
-    else if (meta.why_relevant) rows.push({ label: "Why relevant", value: String(meta.why_relevant) });
-    if (meta.summary) rows.push({ label: "Summary", value: String(meta.summary) });
-  } else if (node.type === "thought") {
-    if (meta.intent_type) rows.push({ label: "Intent", value: String(meta.intent_type) });
-    if (Array.isArray(meta.keywords) && meta.keywords.length) {
-      rows.push({ label: "Keywords", value: meta.keywords.join(", ") });
-    }
-    if (meta.summary) rows.push({ label: "Summary", value: String(meta.summary) });
-  }
-
-  return rows;
-}
-
 type KnowledgeGraphViewProps = {
   data: KnowledgeGraphResponse;
   initialFocusNodeId?: string | null;
@@ -238,36 +177,31 @@ export function KnowledgeGraphView({
   viewFilter,
   timeRangeDays,
   onViewChange,
-  onGraphUpdated,
 }: KnowledgeGraphViewProps) {
   const graphRef = useRef<ForceGraphMethods | undefined>(undefined);
   const [didFit, setDidFit] = useState(false);
   const mobile = useMobileLayout();
   const canHover = useCanHover();
+  const { openHub, closeHub, target } = useGraphHub();
   const threadFocus = viewFilter === "thread";
-  const [activeTypes, setActiveTypes] = useState<Set<KnowledgeGraphNodeType>>(
-    () => new Set(threadFocus ? THREAD_FOCUS_TYPES : ALL_TYPES),
-  );
-
-  useEffect(() => {
-    setActiveTypes(new Set(threadFocus ? THREAD_FOCUS_TYPES : ALL_TYPES));
-    setSelected(null);
-  }, [threadFocus]);
-
-  const viewData = useMemo(
-    () => (threadFocus ? applyThreadFocusFilter(data) : data),
-    [data, threadFocus],
-  );
+  const [lens, setLens] = useState<ExplorerLens>(DEFAULT_EXPLORER_LENS);
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<KnowledgeGraphNode | null>(null);
   const [hovered, setHovered] = useState<KnowledgeGraphNode | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
-  const [actionPending, setActionPending] = useState(false);
-  const [actionMessage, setActionMessage] = useState("");
+
+  useEffect(() => {
+    setSelected(null);
+  }, [threadFocus]);
+
+  const viewData = useMemo(() => {
+    const base = threadFocus ? applyThreadFocusFilter(data) : data;
+    if (threadFocus) return base;
+    return applyExplorerLens(base, lens);
+  }, [data, threadFocus, lens]);
 
   const filtered = useMemo(() => {
-    const nodes = viewData.nodes
-      .filter((n) => activeTypes.has(n.type))
-      .map((n) => ({ ...n })) as LayoutNode[];
+    const nodes = viewData.nodes.map((n) => ({ ...n })) as LayoutNode[];
     const nodeIds = new Set(nodes.map((n) => n.id));
     const links: LayoutLink[] = viewData.edges
       .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target))
@@ -280,50 +214,43 @@ export function KnowledgeGraphView({
       }));
     applyHubLayout(nodes, links);
     return { nodes, links };
-  }, [viewData, activeTypes]);
+  }, [viewData]);
 
-  const nodesById = useMemo(
-    () => new Map(viewData.nodes.map((n) => [n.id, n])),
-    [viewData.nodes],
-  );
-
-  const toggleType = useCallback((type: KnowledgeGraphNodeType) => {
-    setActiveTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) {
-        if (next.size === 1) return prev;
-        next.delete(type);
-      } else {
-        next.add(type);
-      }
-      return next;
-    });
+  const toggleLens = useCallback((key: keyof ExplorerLens) => {
+    setLens((prev) => ({ ...prev, [key]: !prev[key] }));
     setSelected(null);
   }, []);
 
-  const handleNodeClick = useCallback((node: ForceNode) => {
-    setSelected({
-      id: node.id,
-      type: node.type,
-      label: node.label,
-      size: node.size,
-      meta: node.meta,
-    });
-  }, []);
-
-  const focusNode =
-    filtered.nodes.find((n) => n.id === selected?.id) ??
-    viewData.nodes.find((n) => n.id === selected?.id) ??
-    selected;
+  const handleNodeClick = useCallback(
+    (node: ForceNode) => {
+      const next = {
+        id: node.id,
+        type: node.type,
+        label: node.label,
+        size: node.size,
+        meta: node.meta,
+      };
+      setSelected(next);
+      openHub({ nodeId: node.id });
+    },
+    [openHub],
+  );
 
   useEffect(() => {
     if (!initialFocusNodeId) return;
     const node = viewData.nodes.find((n) => n.id === initialFocusNodeId);
     if (node) {
       setSelected(node);
+      openHub({ nodeId: node.id });
       setDidFit(false);
     }
-  }, [initialFocusNodeId, viewData]);
+  }, [initialFocusNodeId, viewData, openHub]);
+
+  useEffect(() => {
+    if (!target?.nodeId) return;
+    const node = viewData.nodes.find((n) => n.id === target.nodeId);
+    if (node) setSelected(node);
+  }, [target?.nodeId, viewData]);
 
   useEffect(() => {
     if (!initialFocusNodeId || !didFit) return;
@@ -339,58 +266,18 @@ export function KnowledgeGraphView({
     return () => window.clearTimeout(timer);
   }, [initialFocusNodeId, didFit, mobile]);
 
-  async function runTopicAction(action: "boost" | "mute") {
-    if (!focusNode || focusNode.type !== "topic") return;
-    setActionPending(true);
-    setActionMessage("");
-    try {
-      const res = await api.graphTopicAction({ topic: focusNode.label, action });
-      setActionMessage(
-        action === "boost"
-          ? `Boosted — ${Math.round(res.strength * 100)}% strength`
-          : "Muted — fewer items like this in future briefs",
-      );
-      onGraphUpdated?.();
-    } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : "Action failed");
-    } finally {
-      setActionPending(false);
-    }
-  }
-
-  async function runSourceAction(action: "prioritize" | "deprioritize") {
-    if (!focusNode || focusNode.type !== "source") return;
-    const sourceId = focusNode.meta.source_id;
-    if (typeof sourceId !== "string") return;
-    setActionPending(true);
-    setActionMessage("");
-    try {
-      await api.graphSourceAction({ source_id: sourceId, action });
-      setActionMessage(
-        action === "prioritize"
-          ? "Source prioritized for future briefs"
-          : "Source deprioritized",
-      );
-      onGraphUpdated?.();
-    } catch (err) {
-      setActionMessage(err instanceof Error ? err.message : "Action failed");
-    } finally {
-      setActionPending(false);
-    }
-  }
-
   const hoveredId = hovered?.id ?? null;
   const selectedId = selected?.id ?? null;
 
-  const focusIds = useMemo(
-    () => (selectedId ? neighborIds(selectedId, filtered.links) : null),
-    [selectedId, filtered.links],
+  const searchIds = useMemo(
+    () => searchMatchIds(filtered.nodes, filtered.links, search),
+    [filtered.nodes, filtered.links, search],
   );
 
-  const nodeConnections = useMemo(
-    () => (selectedId ? connectionsForNode(selectedId, filtered.links, nodesById) : []),
-    [selectedId, filtered.links, nodesById],
-  );
+  const focusIds = useMemo(() => {
+    if (selectedId) return neighborIds(selectedId, filtered.links);
+    return searchIds && searchIds.size > 0 ? searchIds : null;
+  }, [selectedId, filtered.links, searchIds]);
 
   const accuracyNote = useMemo(() => {
     const stats = data.stats;
@@ -439,7 +326,7 @@ export function KnowledgeGraphView({
 
   useEffect(() => {
     setDidFit(false);
-  }, [filtered.nodes.length, activeTypes]);
+  }, [filtered.nodes.length, lens, search]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => tuneGraphForces(), 0);
@@ -454,15 +341,6 @@ export function KnowledgeGraphView({
     const timer = window.setTimeout(() => graph.pauseAnimation(), 120);
     return () => window.clearTimeout(timer);
   }, [hoveredId, selectedId]);
-
-  useEffect(() => {
-    if (!mobile || !focusNode) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [mobile, focusNode]);
 
   const fitPadding = mobile ? 80 : 48;
 
@@ -543,115 +421,10 @@ export function KnowledgeGraphView({
     return l.type === "related_to" ? 0.22 : 0;
   }, []);
 
-  const inspectorContent = focusNode ? (
-    <>
-      <div className="kg-inspector-head">
-        <span
-          className="kg-inspector-badge"
-          style={{ background: `${NODE_COLORS[focusNode.type]}22`, color: NODE_COLORS[focusNode.type] }}
-        >
-          {NODE_LABELS[focusNode.type].replace(/s$/, "")}
-        </span>
-        <button type="button" className="kg-inspector-close" onClick={() => setSelected(null)} aria-label="Close">
-          ×
-        </button>
-      </div>
-      {mobile ? <div className="kg-sheet-handle" aria-hidden /> : null}
-      <h3 className="kg-inspector-title">{focusNode.label}</h3>
-      <dl className="kg-inspector-meta">
-        {nodeDetail(focusNode).map((row) => (
-          <div key={row.label} className="kg-inspector-row">
-            <dt>{row.label}</dt>
-            <dd>{row.value}</dd>
-          </div>
-        ))}
-      </dl>
-      {nodeConnections.length > 0 ? (
-        <div className="kg-inspector-connections">
-          <p className="kg-inspector-connections-title">Connections ({nodeConnections.length})</p>
-          <ul className="kg-inspector-connections-list">
-            {nodeConnections.map((conn) => (
-              <li key={conn.id} className="kg-inspector-connection">
-                <span
-                  className="kg-inspector-connection-dot"
-                  style={{
-                    background: conn.otherType ? NODE_COLORS[conn.otherType] : "var(--app-muted)",
-                  }}
-                />
-                <span className="kg-inspector-connection-text">
-                  <span className="kg-inspector-connection-edge">{conn.label}</span>
-                  <span className="kg-inspector-connection-node">{conn.otherLabel}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {focusNode.type === "item" || focusNode.type === "thought" ? (
-        <Link
-          href={askAboutContent(
-            focusNode.id.replace(/^(item|thought):/, ""),
-            undefined,
-            focusNode.label,
-          )}
-          className="dash-btn dash-btn-secondary kg-inspector-link"
-        >
-          Ask about this
-        </Link>
-      ) : null}
-      {focusNode.type === "item" && focusNode.meta.url ? (
-        <a
-          href={String(focusNode.meta.url)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="dash-btn dash-btn-secondary kg-inspector-link"
-        >
-          Open article
-        </a>
-      ) : null}
-      {focusNode.type === "topic" ? (
-        <div className="kg-inspector-actions">
-          <button
-            type="button"
-            className="kg-action-btn kg-action-btn-primary"
-            disabled={actionPending}
-            onClick={() => void runTopicAction("boost")}
-          >
-            Boost in briefs
-          </button>
-          <button
-            type="button"
-            className="kg-action-btn"
-            disabled={actionPending}
-            onClick={() => void runTopicAction("mute")}
-          >
-            Mute topic
-          </button>
-        </div>
-      ) : null}
-      {focusNode.type === "source" && focusNode.meta.source_id ? (
-        <div className="kg-inspector-actions">
-          <button
-            type="button"
-            className="kg-action-btn kg-action-btn-primary"
-            disabled={actionPending}
-            onClick={() => void runSourceAction("prioritize")}
-          >
-            Prioritize source
-          </button>
-          <button
-            type="button"
-            className="kg-action-btn"
-            disabled={actionPending}
-            onClick={() => void runSourceAction("deprioritize")}
-          >
-            Deprioritize
-          </button>
-        </div>
-      ) : null}
-      {actionMessage ? <p className="kg-action-feedback">{actionMessage}</p> : null}
-    </>
-  ) : null;
+  const linkLabel = useCallback((link: object) => {
+    const l = link as { label?: string | null; type?: string };
+    return l.label || l.type || "";
+  }, []);
 
   return (
     <div className={`kg-stage${mobile ? " kg-stage-mobile" : ""}${focusIds ? " kg-stage-focused" : ""}`}>
@@ -669,7 +442,7 @@ export function KnowledgeGraphView({
                 ? "No story threads yet — keep reading and Briefly will map evolving narratives here."
                 : timeRangeDays
                   ? `Nothing in the last ${timeRangeDays} days. Try a wider time range or keep reading.`
-                  : "Turn on a node type below, or keep reading to grow your graph."}
+                  : "Nothing matches these filters. Try Topics, or turn on Articles."}
             </p>
           </div>
         ) : (
@@ -694,10 +467,14 @@ export function KnowledgeGraphView({
             linkWidth={linkWidth}
             linkColor={linkColor}
             linkCurvature={linkCurvature}
+            linkLabel={linkLabel}
             linkDirectionalParticles={0}
             onNodeClick={(node) => handleNodeClick(node as ForceNode)}
             onNodeHover={canHover ? (node) => setHovered(node as KnowledgeGraphNode | null) : undefined}
-            onBackgroundClick={() => setSelected(null)}
+            onBackgroundClick={() => {
+              setSelected(null);
+              closeHub();
+            }}
             onEngineStop={() => {
               if (!didFit) {
                 graphRef.current?.zoomToFit(400, fitPadding);
@@ -711,10 +488,17 @@ export function KnowledgeGraphView({
           />
         )}
 
-        {canHover && hovered && !focusNode ? (
+        {canHover && hovered ? (
           <div className="kg-hover-tip" role="status">
             <span className="kg-hover-tip-dot" style={{ background: NODE_COLORS[hovered.type] }} />
-            {hovered.label}
+            <span>
+              {hovered.label}
+              <span className="kg-hover-tip-kind">
+                {hovered.type === "entity"
+                  ? String(hovered.meta.kind || "watched")
+                  : NODE_LABELS[hovered.type].replace(/s$/, "")}
+              </span>
+            </span>
           </div>
         ) : null}
 
@@ -725,8 +509,8 @@ export function KnowledgeGraphView({
                 ? "Tap empty space to show full graph"
                 : "Click empty space to show full graph"
               : mobile
-                ? "Tap a node to inspect connections"
-                : "Topics anchor the map · click a node to inspect"}
+                ? "Tap a node to open its profile"
+                : "Clusters stay quiet until you click — open a node for the story"}
           </p>
         ) : null}
 
@@ -742,7 +526,7 @@ export function KnowledgeGraphView({
           {legendOpen ? (
             <div className="kg-legend-body">
               <p className="kg-legend-intro">
-                Topics sit at the center; articles cluster around the interest they matched in your brief.
+                Topics and watched names sit in clusters. Articles stay hidden until you ask for them.
               </p>
               <ul className="kg-legend-nodes">
                 {ALL_TYPES.map((type) => (
@@ -767,14 +551,14 @@ export function KnowledgeGraphView({
 
       <div className="kg-float-bar">
         <div className="kg-float-controls">
-          <div className="kg-view-pills" role="group" aria-label="Graph view mode">
+          <div className="kg-view-pills" role="group" aria-label="Explorer view">
             <button
               type="button"
               className={`kg-view-pill${!threadFocus ? " is-active" : ""}`}
               aria-pressed={!threadFocus}
               onClick={() => onViewChange?.({ filter: null })}
             >
-              Full map
+              Network
             </button>
             <button
               type="button"
@@ -801,28 +585,62 @@ export function KnowledgeGraphView({
               );
             })}
           </div>
-          <div className="kg-filters-scroll">
-            <div className="kg-filters" role="group" aria-label="Filter node types">
-              {(threadFocus ? THREAD_FOCUS_TYPES : ALL_TYPES).map((type) => {
-                const on = activeTypes.has(type);
-                const count = viewData.nodes.filter((n) => n.type === type).length;
-                return (
-                  <button
-                    key={type}
-                    type="button"
-                    className={`kg-filter-btn${on ? " is-active" : ""}`}
-                    onClick={() => toggleType(type)}
-                    aria-pressed={on}
-                    title={NODE_LABELS[type]}
-                  >
-                    <span className="kg-filter-dot" style={{ background: NODE_COLORS[type] }} />
-                    <span className="kg-filter-label">{mobile ? FILTER_SHORT[type] : NODE_LABELS[type]}</span>
-                    <span className="kg-filter-count">{count}</span>
-                  </button>
-                );
-              })}
+          <label className="kg-search">
+            <span className="sr-only">Search the network</span>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search"
+              aria-label="Highlight related nodes"
+            />
+          </label>
+          {!threadFocus ? (
+            <div className="kg-filters-scroll">
+              <div className="kg-filters" role="group" aria-label="Filter clusters">
+                <button
+                  type="button"
+                  className={`kg-filter-btn${lens.companies ? " is-active" : ""}`}
+                  aria-pressed={lens.companies}
+                  onClick={() => toggleLens("companies")}
+                >
+                  Companies
+                </button>
+                <button
+                  type="button"
+                  className={`kg-filter-btn${lens.people ? " is-active" : ""}`}
+                  aria-pressed={lens.people}
+                  onClick={() => toggleLens("people")}
+                >
+                  People
+                </button>
+                <button
+                  type="button"
+                  className={`kg-filter-btn${lens.topics ? " is-active" : ""}`}
+                  aria-pressed={lens.topics}
+                  onClick={() => toggleLens("topics")}
+                >
+                  Topics
+                </button>
+                <button
+                  type="button"
+                  className={`kg-filter-btn${lens.watchedOnly ? " is-active" : ""}`}
+                  aria-pressed={lens.watchedOnly}
+                  onClick={() => toggleLens("watchedOnly")}
+                >
+                  Only watched
+                </button>
+                <button
+                  type="button"
+                  className={`kg-filter-btn${lens.articles ? " is-active" : ""}`}
+                  aria-pressed={lens.articles}
+                  onClick={() => toggleLens("articles")}
+                >
+                  Articles
+                </button>
+              </div>
             </div>
-          </div>
+          ) : null}
           <button
             type="button"
             className="kg-fit-btn"
@@ -833,20 +651,6 @@ export function KnowledgeGraphView({
           </button>
         </div>
       </div>
-
-      {focusNode ? (
-        <>
-          <button
-            type="button"
-            className="kg-sheet-backdrop"
-            aria-label="Close details"
-            onClick={() => setSelected(null)}
-          />
-          <aside className="kg-inspector kg-inspector-drawer is-open" aria-live="polite">
-            {inspectorContent}
-          </aside>
-        </>
-      ) : null}
     </div>
   );
 }

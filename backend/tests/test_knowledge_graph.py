@@ -11,8 +11,15 @@ from briefly_api.services.knowledge_graph import (
     _slug,
     _topic_match_score,
     filter_graph_by_days,
+    text_mentions,
 )
 from briefly_api.services.topic_matching import topics_for_digest_item
+
+
+def test_text_mentions_requires_word_boundary_for_short_terms():
+    assert text_mentions("Stripe updated enterprise pricing", ["Stripe"])
+    assert text_mentions("Meta released Llama", ["Meta"])
+    assert not text_mentions("metaphorical language model", ["Meta"])
 
 
 def test_slug_normalizes_labels():

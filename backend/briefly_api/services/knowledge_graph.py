@@ -25,8 +25,10 @@ from briefly_api.db.models import (
     Source,
     UserMemory,
     UserProfile,
+    WatchedEntity,
 )
 from briefly_api.services.profile_utils import cluster_label, iter_topic_clusters
+from briefly_api.services.watch.catalog import match_terms_for
 
 from briefly_api.services.connectors.types import INTERNAL_SOURCE_TYPES
 SIMILARITY_THRESHOLD = 0.72
@@ -35,6 +37,7 @@ MAX_THREADS = 10
 MAX_SOURCES = 18
 MAX_ITEMS = 70
 MAX_THOUGHTS = 20
+MAX_ENTITIES = 40
 MAX_SIMILARITY_EDGES = 60
 
 
@@ -78,11 +81,13 @@ def filter_graph_by_days(graph: KnowledgeGraph, days: int) -> KnowledgeGraph:
             ts = _parse_iso_dt(node.meta.get("last_seen_at") or node.meta.get("first_seen"))
             if ts and ts >= cutoff:
                 kept.add(node.id)
+        elif node.type == "entity":
+            kept.add(node.id)
 
     if not kept:
         return KnowledgeGraph(nodes=[], edges=[], stats={**graph.stats, "time_window_days": days})
 
-    anchor_types = {"topic", "thread", "source"}
+    anchor_types = {"topic", "thread", "source", "entity"}
     node_by_id = {n.id: n for n in graph.nodes}
     changed = True
     while changed:
@@ -110,9 +115,27 @@ def filter_graph_by_days(graph: KnowledgeGraph, days: int) -> KnowledgeGraph:
         "item_count": sum(1 for n in nodes if n.type == "item"),
         "thought_count": sum(1 for n in nodes if n.type == "thought"),
         "source_count": sum(1 for n in nodes if n.type == "source"),
+        "entity_count": sum(1 for n in nodes if n.type == "entity"),
         "edge_count": len(edges),
     }
     return KnowledgeGraph(nodes=nodes, edges=edges, stats=stats)
+
+
+def text_mentions(blob: str, terms: list[str]) -> bool:
+    """True if any watch term appears in text. Short terms need a word boundary."""
+    if not blob or not terms:
+        return False
+    low = blob.lower()
+    for term in terms:
+        t = (term or "").lower().strip()
+        if len(t) < 3:
+            continue
+        if len(t) <= 4:
+            if re.search(rf"\b{re.escape(t)}\b", low):
+                return True
+        elif t in low:
+            return True
+    return False
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -250,6 +273,49 @@ async def build_knowledge_graph(
                 },
             )
         )
+
+    watched_result = await db.execute(
+        select(WatchedEntity)
+        .where(WatchedEntity.user_id == user_id, WatchedEntity.is_active.is_(True))
+        .order_by(WatchedEntity.created_at.desc())
+        .limit(MAX_ENTITIES)
+    )
+    watched_rows = watched_result.scalars().all()
+    entity_terms: list[tuple[str, list[str]]] = []
+
+    for ent in watched_rows:
+        node_id = f"entity:{ent.id}"
+        terms = match_terms_for(
+            ent.name,
+            ent.kind,
+            list(ent.keywords or []),
+            list(ent.aliases or []),
+        )
+        builder.add_node(
+            GraphNode(
+                id=node_id,
+                type="entity",
+                label=ent.name,
+                size=11,
+                meta={
+                    "kind": ent.kind,
+                    "watched_id": ent.id,
+                    "watching": True,
+                    "keywords": list(ent.keywords or [])[:8],
+                },
+            )
+        )
+        entity_terms.append((node_id, terms))
+        for topic in topic_labels:
+            score = _topic_match_score(ent.name, topic)
+            if score >= 0.34:
+                builder.add_edge(
+                    node_id,
+                    builder.topic_id(topic),
+                    "watches",
+                    0.4 + score * 0.4,
+                    label="watching",
+                )
 
     thread_result = await db.execute(
         select(UserMemory)
@@ -455,6 +521,7 @@ async def build_knowledge_graph(
                     "was_saved": bool(raw and (raw.meta or {}).get("saved")),
                     "connection_sentence": enrichment.connection_sentence if enrichment else None,
                     "why_relevant": enrichment.why_relevant if enrichment else None,
+                    "memory_reference": cand.get("memory_reference"),
                     "is_capture": cand.get("is_capture", False),
                 },
             )
@@ -528,6 +595,17 @@ async def build_knowledge_graph(
                         label=conn.get("description") or "Thread connection",
                     )
 
+        mention_blob = f"{headline} {cand['summary'] or ''}"
+        for entity_id, terms in entity_terms:
+            if text_mentions(mention_blob, terms):
+                builder.add_edge(
+                    entity_id,
+                    node_id,
+                    "mentioned_with",
+                    0.55,
+                    label="mentioned with",
+                )
+
     brain_source = next((s for s in sources if s.source_type == "brain_dump"), None)
     if brain_source:
         dump_result = await db.execute(
@@ -574,6 +652,15 @@ async def build_knowledge_graph(
                         0.35 + score * 0.5,
                         label="Your interest",
                     )
+            for entity_id, terms in entity_terms:
+                if text_mentions(blob, terms):
+                    builder.add_edge(
+                        entity_id,
+                        node_id,
+                        "mentioned_with",
+                        0.5,
+                        label="mentioned with",
+                    )
 
     sim_edges_added = 0
     if selected_content_ids:
@@ -613,6 +700,7 @@ async def build_knowledge_graph(
         "item_count": sum(1 for n in nodes if n.type == "item"),
         "thought_count": sum(1 for n in nodes if n.type == "thought"),
         "source_count": sum(1 for n in nodes if n.type == "source"),
+        "entity_count": sum(1 for n in nodes if n.type == "entity"),
         "edge_count": len(edges),
         "items_total_candidates": len(item_candidates),
         "items_displayed": len(selected_items),

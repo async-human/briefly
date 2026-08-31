@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from briefly_api.auth.deps import get_current_user
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import User
+from briefly_api.services.entity_hub import build_entity_hub
 from briefly_api.services.graph_actions import boost_topic, mute_topic, set_source_graph_priority
 from briefly_api.services.knowledge_graph import build_knowledge_graph, graph_to_dict
 
@@ -34,6 +35,27 @@ async def get_knowledge_graph(
     profile = user.profile
     graph = await build_knowledge_graph(db, user.id, profile, days=days)
     return graph_to_dict(graph)
+
+
+@router.get("/graph/hub")
+async def get_entity_hub(
+    node_id: str | None = Query(default=None, max_length=200),
+    q: str | None = Query(default=None, max_length=200),
+    days: int | None = Query(default=None, ge=1, le=365),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    if not (node_id or (q and q.strip())):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide node_id or q.",
+        )
+    hub = await build_entity_hub(
+        db, user.id, user.profile, node_id=node_id, q=q, days=days
+    )
+    if hub is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entity not found.")
+    return hub
 
 
 @router.post("/graph/actions/topic")
