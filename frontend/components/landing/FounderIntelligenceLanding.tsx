@@ -345,27 +345,28 @@ export function FounderIntelligenceLanding() {
 
       <main id="top">
         <section className="mi-hero mi-shell" aria-labelledby="mi-hero-title">
-          <div className="mi-hero__copy">
-            <h1
-              id="mi-hero-title"
-              className="mi-enter"
-              style={{ "--i": 0 } as CSSProperties}
-            >
-              Your market moved overnight.
+          <div
+            className="mi-hero__heading mi-enter"
+            style={{ "--i": 0 } as CSSProperties}
+          >
+            <h1 id="mi-hero-title">
+              Know what moved.
+              <span>Decide what’s next.</span>
             </h1>
+          </div>
+
+          <div
+            className="mi-hero__intro mi-enter"
+            style={{ "--i": 1 } as CSSProperties}
+          >
             <p
-              className="mi-hero__lede mi-enter"
-              style={{ "--i": 1 } as CSSProperties}
+              className="mi-hero__lede"
             >
-              <strong>Briefly already read it.</strong> One personal
-              intelligence brief for AI founders and solo builders — curated
-              from the sources that move your market, connected to what came
-              before, and shaped into your next decision.
+              Briefly turns the sources shaping your market into one personal,
+              cited intelligence brief — connected to what came before and
+              clear about what to do next.
             </p>
-            <div
-              className="mi-hero__actions mi-enter"
-              style={{ "--i": 2 } as CSSProperties}
-            >
+            <div className="mi-hero__actions">
               <a className="mi-btn mi-btn--lg" href="/login">
                 Build my founder brief
                 <ArrowIcon />
@@ -375,17 +376,14 @@ export function FounderIntelligenceLanding() {
                 <ArrowIcon />
               </a>
             </div>
-            <p
-              className="mi-hero__note mi-enter"
-              style={{ "--i": 3 } as CSSProperties}
-            >
+            <p className="mi-hero__note">
               Built for a small founding cohort. Signal first; features second.
             </p>
           </div>
 
           <div
             className="mi-hero__aside mi-enter"
-            style={{ "--i": 4 } as CSSProperties}
+            style={{ "--i": 2 } as CSSProperties}
           >
             <figure
               className="mi-card"

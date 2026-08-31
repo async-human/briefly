@@ -1,6 +1,6 @@
 /* Hallmark · macrostructure: Feature Stack · genre: editorial-minimal · design-system: design.md · designed-as-app
  * nav: N10 floating-on-scroll morph · knobs: threshold=80px, shape=full-width plate, backdrop=blur+saturate, offset=transform
- * footer: Ft1 mast-headed · knobs: wordmark=display-2xl, tagline=roman-display, links=inline-right
+ * footer: Ft1 expanded masthead · knobs: brand=full-width, directory=three-column, meta=split-row
  * F2 sticky-scroll knobs: pinned=left, pane=typographic panels, steps=6/4/3 · enrichment: Tier-A brief card
  * motion primitives (3): nav-morph · hero-entrance · scroll-synced stage meter. No layout property is transitioned.
  * eyebrows: 0 · pre-emit critique: P5 H5 E5 S5 R5 V4
@@ -320,27 +320,34 @@
    baseline so the fold has a deliberate break rather than two tidy halves.  */
 
 .mi-hero {
-  padding-block: var(--space-2xl) var(--space-3xl);
+  padding-block: var(--space-3xl);
   display: grid;
   gap: var(--space-2xl);
 }
 
-.mi-hero__copy {
-  max-width: 46rem;
+.mi-hero__heading {
+  max-width: 72rem;
 }
 
-/* Two lines at 1280x800, three on a wide desktop. Sized so the headline,
-   lede and primary CTA all clear the fold on a 13-inch laptop. */
 .mi-hero h1 {
   max-width: 18ch;
-  font-size: var(--text-display-s);
-  line-height: 1.04;
+  font-size: min(var(--text-display-s), 12vw);
+  line-height: 1;
   letter-spacing: -0.05em;
+}
+
+.mi-hero h1 span {
+  display: block;
+  color: var(--color-ink-2);
+}
+
+.mi-hero__intro {
+  max-width: 38rem;
+  align-self: start;
 }
 
 .mi-hero__lede {
   max-width: 56ch;
-  margin-block-start: var(--space-xl);
   color: var(--color-ink-2);
   font-size: var(--text-md);
   line-height: 1.65;
@@ -369,6 +376,7 @@
   min-width: 0;
   display: grid;
   gap: var(--space-xs);
+  align-self: start;
 }
 
 .mi-hero__caption {
@@ -796,12 +804,11 @@
 }
 
 .mi-foot__main {
-  display: grid;
-  gap: var(--space-2xl);
+  display: block;
 }
 
 .mi-foot__brand {
-  max-width: 32rem;
+  max-width: 42rem;
 }
 
 .mi-foot__wordmark {
@@ -843,9 +850,12 @@
 }
 
 .mi-foot__nav {
+  margin-block-start: var(--space-2xl);
+  padding-block-start: var(--space-lg);
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-xl) var(--space-lg);
+  border-block-start: var(--rule-hair) solid var(--color-rule);
 }
 
 .mi-foot__group {
@@ -988,6 +998,7 @@
 
   .mi-foot__nav {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-xl) var(--space-2xl);
   }
 
   .mi-foot__bottom {
@@ -1024,18 +1035,21 @@
   .mi-hero {
     padding-block: var(--space-3xl) var(--space-4xl);
     grid-template-columns: minmax(0, 1.1fr) minmax(22rem, 0.9fr);
-    gap: var(--space-3xl);
+    column-gap: var(--space-3xl);
+    row-gap: var(--space-2xl);
     align-items: start;
+  }
+
+  .mi-hero__heading {
+    grid-column: 1 / -1;
+  }
+
+  .mi-hero__intro {
+    grid-column: 1;
   }
 
   .mi-hero__aside {
-    margin-block-start: var(--space-xl);
-  }
-
-  .mi-foot__main {
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-    gap: var(--space-4xl);
-    align-items: start;
+    grid-column: 2;
   }
 
   .mi-stage {
@@ -1078,9 +1092,9 @@
 
 @media (min-width: 90rem) {
   .mi-hero h1 {
-    max-width: 14ch;
+    max-width: 18ch;
     font-size: var(--text-display);
-    line-height: 1.02;
+    line-height: 1;
     letter-spacing: -0.055em;
   }
 }
