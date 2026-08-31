@@ -6488,6 +6488,16 @@ a.saved-capture-title:hover {
   color: var(--app-ink);
 }
 
+.app-shell .discover-content-refresh:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.app-shell .discover-content-refresh:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 2px;
+}
+
 .app-shell .discover-content-loading,
 .app-shell .discover-content-scanning {
   display: flex;
@@ -6500,6 +6510,106 @@ a.saved-capture-title:hover {
 
 .app-shell .discover-content-scanning p {
   margin: 0;
+}
+
+.app-shell .discover-content-refresh-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 18rem;
+  animation: hm-panel-enter 0.4s var(--app-ease-out) both;
+}
+
+.app-shell .discover-content-refresh-lead {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.app-shell .discover-content-refresh-title {
+  margin: 0 0 0.2rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-style: normal;
+  color: var(--app-ink);
+}
+
+.app-shell .discover-content-refresh-label {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--app-muted);
+}
+
+.app-shell .discover-content-empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--app-muted);
+}
+
+.app-shell .discover-content-list-ready {
+  animation: hm-panel-enter 0.45s var(--app-ease-out) both;
+}
+
+.app-shell .discover-content-card-skel {
+  pointer-events: none;
+  min-height: 6.5rem;
+}
+
+.app-shell .discover-skel {
+  display: block;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--app-muted) 16%, var(--app-surface));
+  animation: discover-skel-pulse 1.6s var(--app-ease-out) infinite;
+}
+
+.app-shell .discover-skel-badge {
+  width: 5.5rem;
+  height: 1.05rem;
+  border-radius: 999px;
+}
+
+.app-shell .discover-skel-title {
+  width: min(86%, 28rem);
+  height: 0.95rem;
+  margin-top: 0.7rem;
+}
+
+.app-shell .discover-skel-line {
+  width: 100%;
+  height: 0.65rem;
+  margin-top: 0.55rem;
+}
+
+.app-shell .discover-skel-short {
+  width: 62%;
+}
+
+.app-shell .discover-content-card-skel .discover-skel:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.app-shell .discover-content-card-skel .discover-skel:nth-child(3) {
+  animation-delay: 0.24s;
+}
+.app-shell .discover-content-card-skel .discover-skel:nth-child(4) {
+  animation-delay: 0.36s;
+}
+
+@keyframes discover-skel-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .discover-skel {
+    animation: none;
+  }
+  .app-shell .discover-content-refresh-stage,
+  .app-shell .discover-content-list-ready {
+    animation: none;
+  }
 }
 
 .app-shell .discover-content-spinner {
