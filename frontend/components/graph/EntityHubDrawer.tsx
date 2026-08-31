@@ -29,6 +29,7 @@ export function EntityHubDrawer() {
   const { target, closeHub, openHub, refreshWatched } = useGraphHub();
   const { showLearned } = useLearnedToast();
   const pathname = usePathname();
+  const onGraphPage = pathname === "/graph";
   const router = useRouter();
   const [hub, setHub] = useState<EntityHub | null>(null);
   const [loading, setLoading] = useState(false);
@@ -77,17 +78,16 @@ export function EntityHubDrawer() {
       if (event.key === "Escape") closeHub();
     };
     window.addEventListener("keydown", onKey);
+    const lockScroll = !onGraphPage;
     const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (lockScroll) document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
+      if (lockScroll) document.body.style.overflow = prev;
     };
-  }, [target, closeHub]);
+  }, [target, closeHub, onGraphPage]);
 
   if (!target) return null;
-
-  const onGraphPage = pathname === "/graph";
 
   async function trackEntity() {
     if (!hub || hub.watching || tracking) return;
@@ -106,13 +106,18 @@ export function EntityHubDrawer() {
 
   return (
     <>
-      <button
-        type="button"
-        className="kg-sheet-backdrop"
-        aria-label="Close profile"
-        onClick={closeHub}
-      />
-      <aside className="kg-inspector-drawer hub-drawer is-open" aria-live="polite">
+      {!onGraphPage ? (
+        <button
+          type="button"
+          className="kg-sheet-backdrop"
+          aria-label="Close profile"
+          onClick={closeHub}
+        />
+      ) : null}
+      <aside
+        className={`kg-inspector-drawer hub-drawer is-open${onGraphPage ? " hub-drawer-docked" : ""}`}
+        aria-live="polite"
+      >
         <div className="kg-sheet-handle" aria-hidden />
         <div className="kg-inspector-head">
           <span className="kg-inspector-badge hub-kind">

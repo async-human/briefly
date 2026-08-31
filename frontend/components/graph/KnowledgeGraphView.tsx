@@ -109,35 +109,35 @@ type GraphPaint = {
 };
 
 const PAINT_LIGHT: GraphPaint = {
-  dimNode: "rgba(72, 76, 92, 0.55)",
-  dimAlpha: 0.42,
-  idleAlpha: 0.94,
-  neighborAlpha: 0.98,
-  ring: "rgba(22, 20, 16, 0.55)",
-  nodeStroke: "rgba(22, 20, 16, 0.22)",
-  link: "rgba(68, 58, 168, 0.48)",
-  linkDim: "rgba(68, 58, 168, 0.18)",
-  linkActive: "rgba(68, 58, 168, 0.9)",
+  dimNode: "rgba(92, 78, 210, 0.55)",
+  dimAlpha: 0.78,
+  idleAlpha: 1,
+  neighborAlpha: 1,
+  ring: "rgba(22, 20, 16, 0.62)",
+  nodeStroke: "rgba(22, 20, 16, 0.28)",
+  link: "rgba(68, 58, 168, 0.55)",
+  linkDim: "rgba(68, 58, 168, 0.32)",
+  linkActive: "rgba(68, 58, 168, 0.95)",
   labelBg: "#ffffff",
   labelBorder: "rgba(22, 20, 16, 0.16)",
   labelText: "#161310",
-  dimLabel: "rgba(22, 20, 16, 0.8)",
+  dimLabel: "rgba(22, 20, 16, 0.78)",
 };
 
 const PAINT_DARK: GraphPaint = {
-  dimNode: "rgba(176, 184, 204, 0.5)",
-  dimAlpha: 0.34,
-  idleAlpha: 0.94,
-  neighborAlpha: 0.98,
-  ring: "rgba(244, 242, 238, 0.86)",
+  dimNode: "rgba(176, 184, 255, 0.7)",
+  dimAlpha: 0.7,
+  idleAlpha: 1,
+  neighborAlpha: 1,
+  ring: "rgba(244, 242, 238, 0.9)",
   nodeStroke: "rgba(0, 0, 0, 0.45)",
-  link: "rgba(160, 170, 255, 0.48)",
-  linkDim: "rgba(160, 170, 255, 0.16)",
-  linkActive: "rgba(176, 186, 255, 0.92)",
-  labelBg: "rgba(22, 24, 32, 0.94)",
-  labelBorder: "rgba(244, 242, 238, 0.16)",
+  link: "rgba(160, 170, 255, 0.58)",
+  linkDim: "rgba(160, 170, 255, 0.32)",
+  linkActive: "rgba(176, 186, 255, 0.95)",
+  labelBg: "rgba(22, 24, 32, 0.96)",
+  labelBorder: "rgba(244, 242, 238, 0.18)",
   labelText: "#f4f2ee",
-  dimLabel: "rgba(244, 242, 238, 0.82)",
+  dimLabel: "rgba(244, 242, 238, 0.86)",
 };
 
 function drawNodeLabel(
@@ -394,6 +394,13 @@ export function KnowledgeGraphView({
     return () => window.clearTimeout(timer);
   }, [hoveredId, selectedId, paint]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 40);
+    return () => window.clearTimeout(timer);
+  }, [target?.nodeId]);
+
   const fitPadding = mobile ? 80 : 48;
 
   const renderNode = useCallback(
@@ -406,7 +413,9 @@ export function KnowledgeGraphView({
       const emphasized = isHovered || isSelected || (focusIds && isNeighbor);
 
       const size =
-        Math.sqrt(Math.max(n.size, 4)) * (mobile ? 2.6 : 2.2) * (inFocus ? 1 : 0.82);
+        Math.sqrt(Math.max(n.size, 4)) *
+        (mobile ? 2.8 : 2.4) *
+        (isSelected ? 1.38 : isNeighbor ? 1.08 : inFocus ? 1 : 0.92);
 
       const x = n.x ?? 0;
       const y = n.y ?? 0;
@@ -421,7 +430,7 @@ export function KnowledgeGraphView({
 
       ctx.beginPath();
       ctx.arc(x, y, size, 0, 2 * Math.PI);
-      ctx.fillStyle = inFocus ? NODE_COLORS[n.type] : paint.dimNode;
+      ctx.fillStyle = NODE_COLORS[n.type];
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.strokeStyle = paint.nodeStroke;
@@ -523,7 +532,9 @@ export function KnowledgeGraphView({
             linkColor={linkColor}
             linkCurvature={linkCurvature}
             linkLabel={linkLabel}
-            linkDirectionalParticles={0}
+            linkDirectionalParticles={selectedId && filtered.links.length < 90 ? 2 : 0}
+            linkDirectionalParticleWidth={1.6}
+            linkDirectionalParticleSpeed={0.005}
             onNodeClick={(node) => handleNodeClick(node as ForceNode)}
             onNodeHover={canHover ? (node) => setHovered(node as KnowledgeGraphNode | null) : undefined}
             onBackgroundClick={() => {
