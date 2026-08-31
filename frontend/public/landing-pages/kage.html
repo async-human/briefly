@@ -286,7 +286,7 @@ html[data-theme="light"] .card-lines .n{
   color:#d8d0c4;
 }
 html[data-theme="light"] .word-fb{
-  background:linear-gradient(#1a1612, #0e0c0a); -webkit-background-clip:text; background-clip:text;
+  background:linear-gradient(#ffb22a, #ba560c); -webkit-background-clip:text; background-clip:text;
 }
 html[data-theme="light"] .hero-side .v{ color:rgba(20,17,14,.72); }
 html[data-theme="light"] body[data-layout-hero="b"] .hero-side .v{ color:rgba(20,17,14,.78); }
@@ -3386,8 +3386,8 @@ function buildWordmark() {
       if (stroke) {
         x.lineJoin = 'round';
         x.miterLimit = 2;
-        x.lineWidth = 7;
-        x.strokeStyle = 'rgb(6,5,4)';
+        x.lineWidth = 5;
+        x.strokeStyle = stroke === true ? 'rgb(6,5,4)' : stroke;
         x.strokeText(g.ch, PAD + g.l, PAD + g.asc);
       }
       x.fillText(g.ch, PAD + g.l, PAD + g.asc);
@@ -3398,11 +3398,13 @@ function buildWordmark() {
       [.52, 'rgb(198,214,203)'],
       [1, 'rgb(150,170,157)']
     ], false), { aniso: 16 });
+    /* Morning metal: lantern gold. Same family as the sun and the tōrō,
+       so the word lifts off the dark forest instead of sitting in it. */
     const texDay = tx(paint([
-      [0, 'rgb(12,10,8)'],
-      [.45, 'rgb(8,6,5)'],
-      [1, 'rgb(4,3,2)']
-    ], true), { aniso: 16 });
+      [0, 'rgb(255, 178, 42)'],
+      [.4, 'rgb(224, 124, 18)'],
+      [1, 'rgb(186, 86, 12)']
+    ], false), { aniso: 16 });
 
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(cw, chh),
       new THREE.MeshBasicMaterial({ map: texNight, transparent: true,
@@ -4859,9 +4861,9 @@ function applyWorldTheme(mode) {
       if (g.userData.texDay && g.userData.texNight) {
         g.material.map = day ? g.userData.texDay : g.userData.texNight;
       }
-      g.material.color.set(0xffffff);
+      g.material.color.set(day ? 0xffc34a : 0xffffff);
       g.material.fog = !day;
-      g.material.alphaTest = day ? .42 : 0;
+      g.material.alphaTest = day ? .18 : 0;
       g.material.needsUpdate = true;
     });
   }
