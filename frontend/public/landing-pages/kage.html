@@ -298,71 +298,26 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
 .card:hover .card-fr{ outline-color:rgba(223,231,224,.30); }
 .card:nth-child(1) .card-fr{
   background:
-    linear-gradient(180deg,rgba(10,9,8,.08) 36%,rgba(10,9,8,.78) 100%),
-    radial-gradient(70% 55% at 48% 38%, rgba(196,154,60,.16), transparent 68%),
-    #120f0e;
+    linear-gradient(180deg,rgba(3,6,9,.04) 36%,rgba(3,6,9,.72) 100%),
+    url('secret-pathways-assets/generated/kage-approach.webp') center / cover no-repeat;
 }
 .card:nth-child(2) .card-fr{
   background:
-    linear-gradient(180deg,rgba(10,9,8,.08) 36%,rgba(10,9,8,.78) 100%),
-    radial-gradient(60% 50% at 70% 48%, rgba(221,185,106,.14), transparent 64%),
-    #120f0e;
+    linear-gradient(180deg,rgba(3,6,9,.06) 36%,rgba(3,6,9,.74) 100%),
+    url('secret-pathways-assets/generated/kage-lantern-court.webp') center / cover no-repeat;
 }
 .card:nth-child(3) .card-fr{
   background:
-    linear-gradient(180deg,rgba(10,9,8,.08) 36%,rgba(10,9,8,.78) 100%),
-    radial-gradient(55% 45% at 50% 20%, rgba(201,184,150,.12), transparent 62%),
-    #120f0e;
+    linear-gradient(180deg,rgba(3,6,9,.05) 36%,rgba(3,6,9,.74) 100%),
+    url('secret-pathways-assets/generated/kage-moonwater.webp') center / cover no-repeat;
 }
-.card-fr::after{ content:''; position:absolute; inset:0; z-index:0;
-  background:linear-gradient(transparent 42%, rgba(10,9,8,.38) 78%, rgba(10,9,8,.72)); pointer-events:none; }
-.card-body{
-  position:absolute; inset:0; z-index:3;
-  display:flex; flex-direction:column; justify-content:flex-start;
-  padding:22px 20px 68px; pointer-events:none;
-}
-body[data-layout-gallery="b"] .card:first-child .card-list{
-  flex:1; display:flex; flex-direction:column; justify-content:space-evenly;
-}
-.card-kicker{
-  margin:0 0 18px; font-size:9px; font-weight:500; letter-spacing:.22em;
-  text-transform:uppercase; color:var(--vermilion);
-}
-.card-list, .card-thread{ list-style:none; margin:0; padding:0; display:grid; gap:0; }
-.card-list li{
-  display:flex; align-items:baseline; gap:14px;
-  padding:11px 0; border-top:1px solid var(--line-soft);
-  color:var(--bone); font-size:clamp(13px,1.15vw,16px); letter-spacing:.01em;
-}
-.card-list li:last-child{ border-bottom:1px solid var(--line-soft); }
-.card-list li span{
-  flex:none; width:1.8em; color:var(--muted);
-  font-size:10px; letter-spacing:.16em; font-variant-numeric:tabular-nums;
-}
-.card-thread li{
-  padding:8px 0 10px; border-top:1px solid var(--line-soft);
-}
-.card-thread li:last-child{ border-bottom:1px solid var(--line-soft); }
-.card-thread time{
-  display:block; margin-bottom:3px;
-  font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted);
-}
-.card-thread b{
-  display:block; font-size:13px; font-weight:400; letter-spacing:.02em; color:var(--bone);
-}
-.card-thread p{
-  margin:4px 0 0; color:var(--bone-dim); font-size:11.5px; line-height:1.4;
-}
-.card-q{
-  margin:0 0 14px; color:var(--bone);
-  font-size:clamp(15px,1.35vw,20px); line-height:1.35; letter-spacing:-.015em;
-}
-.card-a{
-  margin:0; color:var(--bone-dim); font-size:13px; line-height:1.55; max-width:28ch;
-}
-.card-cite{
-  margin-top:auto; padding-top:16px;
-  font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted);
+.card-fr::after{ content:''; position:absolute; inset:0;
+  background:linear-gradient(transparent 46%, rgba(4,6,9,.80)); pointer-events:none; }
+.card-cap{
+  position:absolute; left:16px; right:16px; bottom:46px; z-index:3;
+  margin:0; max-width:34ch; pointer-events:none;
+  font-size:12px; line-height:1.45; color:var(--bone-dim);
+  text-shadow:0 1px 14px rgba(3,6,8,.9);
 }
 /* The fabric overdraws its card by CL_BLEED on every side so the billow and
    the contact shadow have somewhere to go, so the frame cannot clip it. The
@@ -442,7 +397,7 @@ body[data-layout-gallery="b"] .card:first-child .card-list{
 .no-webgl .hero::after{ content:''; position:absolute; left:0; right:0; bottom:0; height:34%;
   pointer-events:none; background:linear-gradient(transparent, rgba(3,5,8,.72) 52%, rgba(3,5,8,.96)); }
 .no-webgl .sec::before, .no-webgl #pathways::before, .no-webgl #eternity::before{ background:none; }
-.card-lab{ position:absolute; left:16px; right:16px; bottom:14px; z-index:4;
+.card-lab{ position:absolute; left:16px; right:16px; bottom:14px; z-index:2;
   display:flex; align-items:flex-end; justify-content:space-between; gap:10px; }
 .card-lab b{ font-size:clamp(13px,1.15vw,17px); font-weight:400; letter-spacing:.02em; text-transform:uppercase; }
 .card-lab .jp{ font-size:11px; letter-spacing:.3em; color:rgba(223,231,224,.62); }
@@ -647,7 +602,7 @@ body[data-layout-gallery="b"] .card{ transform:none; display:flex; flex-directio
 body[data-layout-gallery="b"] .card-fr{ aspect-ratio:auto; flex:1 1 auto; min-height:0; }
 body[data-layout-gallery="b"] .card:first-child{ grid-row:1 / 3; }
 body[data-layout-gallery="b"] .card:first-child .card-fr{ flex:0 0 auto; height:min(72vh,760px); }
-body[data-layout-gallery="b"] .card:not(:first-child) .card-fr{ min-height:300px; }
+body[data-layout-gallery="b"] .card:not(:first-child) .card-fr{ min-height:200px; }
 
 /* — chapters B · atlas: a two-then-three plate grid instead of a syllabus.
      Number and title sit at the top of each plate, the running time drops to
@@ -911,8 +866,8 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
   body[data-layout-gallery="b"] .cards{ grid-template-columns:1fr; grid-template-rows:auto; }
   body[data-layout-gallery="b"] .card:first-child{ grid-row:auto; }
   body[data-layout-gallery="b"] .card-fr{ flex:0 0 auto; height:auto; }
-  body[data-layout-gallery="b"] .card:first-child .card-fr{ height:auto; aspect-ratio:auto; min-height:min(72vh,560px); }
-  body[data-layout-gallery="b"] .card:not(:first-child) .card-fr{ aspect-ratio:auto; min-height:340px; }
+  body[data-layout-gallery="b"] .card:first-child .card-fr{ height:auto; aspect-ratio:4 / 5; }
+  body[data-layout-gallery="b"] .card:not(:first-child) .card-fr{ aspect-ratio:16 / 10; min-height:0; }
 
   body[data-layout-curriculum="b"] .cur{ grid-template-columns:1fr; }
   body[data-layout-curriculum="b"] .les:nth-child(n){ grid-column:auto; min-height:0; padding:20px; }
@@ -1111,46 +1066,27 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
   <div class="cards" id="cards">
     <article class="card" data-rv="up" data-cursor>
       <div class="card-fr">
-        <i class="glow" style="--gx:80.2%; --gy:23.9%; --gr:22%; --gt:6.1s; --gt2:9.7s; --gc1:rgba(221,185,106,.45); --gc2:rgba(196,154,60,.22)"></i>
-        <div class="card-body">
-          <p class="card-kicker">Sources in every morning</p>
-          <ol class="card-list">
-            <li><span>01</span> Newsletters</li>
-            <li><span>02</span> Product launches</li>
-            <li><span>03</span> Show HN</li>
-            <li><span>04</span> Research</li>
-            <li><span>05</span> Competitors</li>
-            <li><span>06</span> Founder feeds</li>
-          </ol>
-        </div>
+        <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
+        <i class="glow" style="--gx:80.2%; --gy:23.9%; --gr:22%; --gt:6.1s; --gt2:9.7s; --gc1:rgba(221,185,106,.50); --gc2:rgba(196,154,60,.24)"></i>
+        <p class="card-cap">Newsletters, launches, Show HN, research, founder feeds — in every morning.</p>
         <div class="card-lab"><b>Founder pack</b><span class="jp">Intake</span></div>
       </div>
       <div class="card-meta"><span>RSS · newsletters · Show HN</span><span>01 / 03</span></div>
     </article>
     <article class="card" data-rv="up" data-cursor>
       <div class="card-fr">
-        <i class="glow glow--flame" style="--gx:88%; --gy:18%; --gr:14%; --gt:3.7s; --gt2:5.3s; --gc1:rgba(232,210,150,.55); --gc2:rgba(196,154,60,.28)"></i>
-        <div class="card-body">
-          <p class="card-kicker">One name, three mornings</p>
-          <ol class="card-thread">
-            <li><time>Jun 18</time><b>First signal</b><p>Competitor hires for agent infrastructure.</p></li>
-            <li><time>Jul 09</time><b>Thread holds</b><p>Changelog adds long-running tasks.</p></li>
-            <li><time>Today</time><b>Connected</b><p>A pricing launch changes the likely move.</p></li>
-          </ol>
-        </div>
+        <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
+        <i class="glow glow--flame" style="--gx:70.5%; --gy:47.2%; --gr:14%; --gt:3.7s; --gt2:5.3s; --gc1:rgba(232,210,150,.62); --gc2:rgba(196,154,60,.30)"></i>
+        <p class="card-cap">A June hire becomes a pricing launch in today’s brief.</p>
         <div class="card-lab"><b>Watching</b><span class="jp">Scored</span></div>
       </div>
       <div class="card-meta"><span>Jun hire → Jul changelog → today</span><span>02 / 03</span></div>
     </article>
     <article class="card" data-rv="up" data-cursor>
       <div class="card-fr">
-        <i class="glow" style="--gx:48.0%; --gy:16.8%; --gr:20%; --gt:7.3s; --gt2:11.2s; --gc1:rgba(201,184,150,.42); --gc2:rgba(143,102,36,.22)"></i>
-        <div class="card-body">
-          <p class="card-kicker">Asked of your own briefs</p>
-          <p class="card-q">What have I read about agent pricing?</p>
-          <p class="card-a">A vendor cut inference cost and opened a batch tier — the same thread as the June hire, with the source trail still attached.</p>
-          <p class="card-cite">Announcement · pricing docs · two analyses</p>
-        </div>
+        <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
+        <i class="glow" style="--gx:48.0%; --gy:16.8%; --gr:20%; --gt:7.3s; --gt2:11.2s; --gc1:rgba(201,184,150,.52); --gc2:rgba(168,128,48,.24)"></i>
+        <p class="card-cap">What have I read about agent pricing? Cited, from your own trail.</p>
         <div class="card-lab"><b>Ask Briefly</b><span class="jp">Cited</span></div>
       </div>
       <div class="card-meta"><span>What have I read about this?</span><span>03 / 03</span></div>
