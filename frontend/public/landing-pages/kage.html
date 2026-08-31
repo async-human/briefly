@@ -9,7 +9,8 @@
 <link rel="stylesheet" href="secret-pathways-assets/fonts.css">
 <script>
 try {
-  if (localStorage.getItem('briefly-kage-theme') === 'light') {
+  var qTheme = new URLSearchParams(location.search).get('theme');
+  if (qTheme === 'light' || (qTheme !== 'dark' && localStorage.getItem('briefly-kage-theme') === 'light')) {
     document.documentElement.setAttribute('data-theme', 'light');
   }
 } catch (e) {}
@@ -55,7 +56,7 @@ html[data-theme="light"]{
   --copy-strong:#161310;
   --copy-faint:#241e18;
   --panel:#f3eee6;
-  --scrim-hero:linear-gradient(rgba(243,238,230,.96), rgba(243,238,230,.78) 48%, rgba(243,238,230,.28));
+  --scrim-hero:linear-gradient(rgba(243,238,230,.42), rgba(243,238,230,.12) 28%, transparent 58%);
   --sky-page:#c9d4dc;
 }
 *,*::before,*::after{box-sizing:border-box}
@@ -265,11 +266,6 @@ html[data-theme="light"] #vignette{
 }
 html[data-theme="light"] #grain{ opacity:.022; mix-blend-mode:multiply; }
 html[data-theme="light"] .nav::before{ background:rgba(243,238,230,.92); }
-html[data-theme="light"] .hero::after{
-  content:''; position:absolute; left:0; right:0; bottom:0; height:42%;
-  pointer-events:none; z-index:1;
-  background:linear-gradient(transparent, rgba(243,238,230,.55) 48%, rgba(243,238,230,.9));
-}
 html[data-theme="light"] .foot::before{
   background:linear-gradient(rgba(243,238,230,.82), #ebe4d6 36%, #ebe4d6);
 }
@@ -2372,8 +2368,13 @@ function texGrassCutout(seed, opt) {
   x.beginPath(); x.moveTo(0, H);
   for (let i = 0; i < W; i += 3) x.lineTo(i, surf(i));
   x.lineTo(W, surf(W - 1)); x.lineTo(W, H); x.closePath();
+  const day = !!opt.day;
   const bg = x.createLinearGradient(0, H - H * peak, 0, H);
-  bg.addColorStop(0, '#1a2416'); bg.addColorStop(.38, '#0e150c'); bg.addColorStop(1, '#040604');
+  if (day) {
+    bg.addColorStop(0, '#5cad3a'); bg.addColorStop(.38, '#3d8c28'); bg.addColorStop(1, '#2a6a1c');
+  } else {
+    bg.addColorStop(0, '#1a2416'); bg.addColorStop(.38, '#0e150c'); bg.addColorStop(1, '#040604');
+  }
   x.fillStyle = bg; x.fill();
   x.save(); x.clip();
   x.globalCompositeOperation = 'overlay'; x.globalAlpha = .5;
@@ -2413,10 +2414,17 @@ function texGrassCutout(seed, opt) {
     const ndl = sat((-(dx * il) * LIGHT[0] - (dy * il) * LIGHT[1]) * .5 + .5);
     const open = Math.pow(1 - b.depth, 1.35);
     let l = .10 + .46 * open + .34 * ndl * open;
+    if (day) l = .42 + .48 * open + .22 * ndl * open;
     const warm = sat(open * 1.25 - .42) * (opt.warm !== undefined ? opt.warm : 1);
-    const r = (10 + 78 * l + 44 * warm) * (opt.tintR || 1);
-    const g = (16 + 106 * l + 24 * warm) * (opt.tintG || 1);
-    const bl = (12 + 80 * l + 16 * warm) * (opt.tintB || 1);
+    const r = day
+      ? (62 + 110 * l + 90 * warm)
+      : (10 + 78 * l + 44 * warm) * (opt.tintR || 1);
+    const g = day
+      ? (128 + 110 * l + 18 * warm)
+      : (16 + 106 * l + 24 * warm) * (opt.tintG || 1);
+    const bl = day
+      ? (28 + 40 * l)
+      : (12 + 80 * l + 16 * warm) * (opt.tintB || 1);
     x.fillStyle = hex(r, g, bl);
     x.beginPath();
     x.moveTo(bx - w, b.by);
@@ -2428,10 +2436,18 @@ function texGrassCutout(seed, opt) {
   /* --- grade: red bounce from the sun, cold sky on the crest ------- */
   x.globalCompositeOperation = 'source-atop';
   const rb = x.createLinearGradient(opt.bounceFrom || W, 0, opt.bounceTo || 0, 0);
-  rb.addColorStop(0, 'rgba(180,40,16,.24)'); rb.addColorStop(.55, 'rgba(140,32,14,.07)'); rb.addColorStop(1, 'rgba(0,0,0,0)');
+  if (day) {
+    rb.addColorStop(0, 'rgba(255,196,48,.30)'); rb.addColorStop(.55, 'rgba(210,168,40,.10)'); rb.addColorStop(1, 'rgba(0,0,0,0)');
+  } else {
+    rb.addColorStop(0, 'rgba(180,40,16,.24)'); rb.addColorStop(.55, 'rgba(140,32,14,.07)'); rb.addColorStop(1, 'rgba(0,0,0,0)');
+  }
   x.fillStyle = rb; x.fillRect(0, 0, W, H);
   const sk = x.createLinearGradient(0, H - H * peak * 1.05, 0, H);
-  sk.addColorStop(0, 'rgba(146,182,180,.13)'); sk.addColorStop(.5, 'rgba(0,0,0,0)'); sk.addColorStop(1, 'rgba(0,0,0,.70)');
+  if (day) {
+    sk.addColorStop(0, 'rgba(186,220,120,.18)'); sk.addColorStop(.5, 'rgba(0,0,0,0)'); sk.addColorStop(1, 'rgba(36,80,18,.16)');
+  } else {
+    sk.addColorStop(0, 'rgba(146,182,180,.13)'); sk.addColorStop(.5, 'rgba(0,0,0,0)'); sk.addColorStop(1, 'rgba(0,0,0,.70)');
+  }
   x.fillStyle = sk; x.fillRect(0, 0, W, H);
   x.globalCompositeOperation = 'source-over';
   return c;
@@ -2503,7 +2519,9 @@ function texRockCutout(seed, opt) {
 }
 
 /* a maple bough leaning into the top of frame */
-function texBranchCutout(seed) {
+function texBranchCutout(seed, opt) {
+  opt = opt || {};
+  const day = !!opt.day;
   const W = 1536, H = 1024;
   const c = cvs(W, H), x = c.getContext('2d');
   const rnd = mulberry32(seed);
@@ -2539,7 +2557,11 @@ function texBranchCutout(seed) {
     tx.drawImage(leafImg, 0, 0);
     tx.globalCompositeOperation = 'source-in';
     const v = l[4];
-    tx.fillStyle = hex(168 + v * 52, 128 + v * 36, 48 + v * 22);
+    tx.fillStyle = day
+      ? (v < .42
+          ? hex(62 + v * 48, 150 + v * 80, 36 + v * 24)
+          : hex(232 + v * 20, 168 + v * 52, 24 + v * 20))
+      : hex(168 + v * 52, 128 + v * 36, 48 + v * 22);
     tx.fillRect(0, 0, 128, 128);
     tx.globalCompositeOperation = 'source-over';
     x.save(); x.translate(l[0], l[1]); x.rotate(l[2]);
@@ -3219,6 +3241,8 @@ function buildMaple(seed, x, z, scale) {
   });
   inst.instanceMatrix.needsUpdate = true;
   inst.castShadow = false; inst.frustumCulled = false;
+  WORLD.mapleLeaves = WORLD.mapleLeaves || [];
+  WORLD.mapleLeaves.push(leafMat);
 
   const g = new THREE.Group();
   g.add(trunk); g.add(inst);
@@ -3294,17 +3318,20 @@ function cutoutMaterial(canvasEl, sway) {
 function buildForeground() {
   /* the plane widths are sized against the frustum at their own depth: a
      26-unit sheet two metres from the lens only shows its middle tenth */
+  const farOpt  = { crest: .30, peak: .46, wide: .42, blades: 11000, len: 34, warm: .70, crest2: .46, crest3: .40 };
+  const midOpt  = { crest: .60, peak: .55, wide: .40, blades: 13000, len: 40, warm: .95, crest2: -.44, crest3: .34 };
+  const nearOpt = { crest: .42, peak: .62, wide: .48, blades: 16000, len: 50, warm: .85, crest2: .42, crest3: .44 };
   const layers = [
-    /* name        canvas                                                                     x     y     z     w     h   sway */
-    ['grassFar',  texGrassCutout(101, { crest: .30, peak: .46, wide: .42, blades: 11000, len: 34, warm: .70, crest2: .46, crest3: .40 }),
-                  -3.4,  2.85, -0.4, 24, 12, .040],
+    /* name        canvas                                                                     x     y     z     w     h   sway   day canvas */
+    ['grassFar',  texGrassCutout(101, farOpt),
+                  -3.4,  2.85, -0.4, 24, 12, .040, texGrassCutout(101, Object.assign({}, farOpt,  { day: true }))],
     ['rockLeft',  texRockCutout(404, { blobs: [[.24, .78, .48, .38], [.58, .94, .46, .30], [.84, 1.06, .42, .28]] }),
                   -7.2,  2.55,  1.8, 17, 11.3, .010],
-    ['grassMid',  texGrassCutout(202, { crest: .60, peak: .55, wide: .40, blades: 13000, len: 40, warm: .95, crest2: -.44, crest3: .34 }),
-                   3.9,  2.86,  3.6, 15,  7.5, .062],
-    ['grassNear', texGrassCutout(303, { crest: .42, peak: .62, wide: .48, blades: 16000, len: 50, warm: .85, crest2: .42, crest3: .44 }),
-                  -1.9,  2.92,  5.6, 12,  6, .092],
-    ['bough',     texBranchCutout(505), 4.6, 2.95, 6.4, 13, 8.7, .045],
+    ['grassMid',  texGrassCutout(202, midOpt),
+                   3.9,  2.86,  3.6, 15,  7.5, .062, texGrassCutout(202, Object.assign({}, midOpt,  { day: true }))],
+    ['grassNear', texGrassCutout(303, nearOpt),
+                  -1.9,  2.92,  5.6, 12,  6, .092, texGrassCutout(303, Object.assign({}, nearOpt, { day: true }))],
+    ['bough',     texBranchCutout(505), 4.6, 2.95, 6.4, 13, 8.7, .045, texBranchCutout(505, { day: true })],
     ['rockNear',  texRockCutout(606, { blobs: [[.18, .86, .54, .44], [.54, 1.02, .50, .36], [.86, .92, .40, .32]] }),
                   -6.6,  1.70,  6.0, 9, 6, .008]
   ];
@@ -3315,6 +3342,8 @@ function buildForeground() {
     m.renderOrder = 20 + WORLD.fg.length;
     m.name = L[0];
     m.frustumCulled = false;
+    m.userData.texNight = m.material.map;
+    if (L[8]) m.userData.texDay = tx(L[8], { aniso: 16 });
     scene.add(m);
     WORLD.fg.push(m);
   });
@@ -3392,19 +3421,6 @@ function buildWordmark() {
   scene.add(group);
   WORD.group = group;
   WORD.ink = { xMin: xMin, xMax: xMax, cx: (xMin + xMax) / 2, w: xMax - xMin, asc: ascMax };
-  const plate = new THREE.Mesh(
-    new THREE.PlaneGeometry(WORD.ink.w * 1.2, WORD.ink.asc * 2.2),
-    new THREE.MeshBasicMaterial({
-      map: tx(texGlow('rgba(243,238,230,1)', 'rgba(243,238,230,.35)')),
-      color: 0xffffff, transparent: true, opacity: 0,
-      depthWrite: false, fog: false, toneMapped: false
-    })
-  );
-  plate.position.set(WORD.ink.cx, WORD.ink.asc * .22, -.45);
-  plate.renderOrder = 11;
-  plate.visible = false;
-  group.add(plate);
-  WORD.plate = plate;
 }
 const WORD = { glyphs: [], group: null, ink: null, reveal: 0 };
 
@@ -4456,10 +4472,9 @@ function layoutWord() {
   tmpCam.position.copy(hp);
   tmpCam.lookAt(ht);
   tmpCam.updateProjectionMatrix(); tmpCam.updateMatrixWorld(true);
-  const wordZ = theme === 'light' ? 11.8 : WORD_Z;
   const hit = (nx, ny) => {
     const v = new THREE.Vector3(nx, ny, .5).unproject(tmpCam).sub(tmpCam.position).normalize();
-    return tmpCam.position.clone().addScaledVector(v, (wordZ - tmpCam.position.z) / v.z);
+    return tmpCam.position.clone().addScaledVector(v, (WORD_Z - tmpCam.position.z) / v.z);
   };
   const L = hit(-1, 0), R = hit(1, 0);
   /* Judge the frame by its shape, not its width. What forces the word up and
@@ -4471,13 +4486,13 @@ function layoutWord() {
      as the six-letter word could afford to, decapitates the K and the E. The
      narrow branch is held a little inside the edge because a phone frame has
      no gutter to lose the tracking that trails the final letter into. */
-  const fill = narrow ? .96 : (theme === 'light' ? .90 : 1.00);
+  const fill = narrow ? .96 : 1.00;
   const s = (R.x - L.x) * fill / WORD.ink.w;
   /* on a tall frame the mounds sit near mid-height, so the baseline has to
      ride above them or the whole word disappears into the grass */
-  const base = hit(0, narrow ? -.16 : (theme === 'light' ? -.46 : -.585));
+  const base = hit(0, narrow ? -.16 : -.585);
   WORD.group.scale.setScalar(s);
-  WORD.group.position.set(-WORD.ink.cx * s, base.y, wordZ);
+  WORD.group.position.set(-WORD.ink.cx * s, base.y, WORD_Z);
   WORD.rise = WORD.ink.asc * s * 1.25;
 }
 
@@ -4764,14 +4779,18 @@ function wireFocus() {
 }
 
 const THEME_KEY = 'briefly-kage-theme';
-let theme = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+let theme = (function () {
+  const q = Q.get('theme');
+  if (q === 'light' || q === 'dark') return q;
+  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+})();
 
 function applyWorldTheme(mode) {
   const day = mode === 'light';
   if (renderer) renderer.setClearColor(day ? 0xc9d4dc : 0x05070a, 1);
   if (scene && scene.fog) {
     scene.fog.color.set(day ? 0xc5d0d6 : 0x050a0e);
-    scene.fog.density = day ? 0.011 : 0.0168;
+    scene.fog.density = day ? 0.0055 : 0.0168;
     if (scene.background) scene.background.set(day ? 0xb8c6ce : 0x060a0d);
   }
   if (WORLD.sky && WORLD.texDaySky && WORLD.texNightSky) {
@@ -4786,9 +4805,9 @@ function applyWorldTheme(mode) {
   }
   if (WORLD.moonHalo) WORLD.moonHalo.scale.setScalar(day ? 1.18 : 1);
   if (WORLD.hemi) {
-    WORLD.hemi.color.set(day ? 0xc8dcec : 0x53838f);
-    WORLD.hemi.groundColor.set(day ? 0x8a7a58 : 0x060a08);
-    WORLD.hemi.intensity = day ? .62 : .13;
+    WORLD.hemi.color.set(day ? 0xd8eccc : 0x53838f);
+    WORLD.hemi.groundColor.set(day ? 0x5a9a38 : 0x060a08);
+    WORLD.hemi.intensity = day ? .92 : .13;
   }
   if (WORLD.moonKey) {
     WORLD.moonKey.color.set(day ? 0xffe6b0 : 0xe8c48a);
@@ -4800,21 +4819,40 @@ function applyWorldTheme(mode) {
   }
   if (WORLD.key) {
     WORLD.key.color.set(day ? 0xf0e6d0 : 0xb6dbe4);
-    WORLD.key.intensity = day ? 1.72 : 1.22;
+    WORLD.key.intensity = day ? 2.05 : 1.22;
   }
   if (WORLD.fill) {
     WORLD.fill.color.set(day ? 0xe8d4a8 : 0x86c6d2);
-    WORLD.fill.intensity = day ? 1.8 : .95;
+    WORLD.fill.intensity = day ? 2.15 : .95;
   }
   if (WORLD.haze) {
     WORLD.haze.forEach(h => {
       if (h.userData.op0 === undefined) h.userData.op0 = h.material.opacity;
-      h.material.opacity = day ? h.userData.op0 * .22 : h.userData.op0;
+      h.material.opacity = day ? h.userData.op0 * .62 : h.userData.op0;
     });
   }
-  if (WORD.plate) {
-    WORD.plate.visible = day;
-    WORD.plate.material.opacity = day ? .55 : 0;
+  if (WORLD.fg) {
+    WORLD.fg.forEach(m => {
+      if (m.userData.texDay && m.userData.texNight) {
+        m.material.map = day ? m.userData.texDay : m.userData.texNight;
+        m.material.needsUpdate = true;
+      }
+      m.material.fog = !day;
+    });
+  }
+  if (WORLD.mapleLeaves) {
+    WORLD.mapleLeaves.forEach((mat, i) => {
+      const gold = i % 2 === 1;
+      mat.color.set(day ? (gold ? 0xf0a018 : 0x3aaa32) : 0x3a2e18);
+      mat.emissive.set(day ? (gold ? 0xd07008 : 0x1a6a14) : 0x1a1408);
+      mat.emissiveIntensity = day ? .48 : .10;
+    });
+  }
+  if (WORLD.leaves && WORLD.leaves.mesh) {
+    const mat = WORLD.leaves.mesh.material;
+    mat.color.set(day ? 0xffc028 : 0x4a3a1c);
+    mat.emissive.set(day ? 0xff8a10 : 0x6a5420);
+    mat.emissiveIntensity = day ? .62 : .38;
   }
   if (WORD.glyphs) {
     WORD.glyphs.forEach(g => {
@@ -4827,12 +4865,11 @@ function applyWorldTheme(mode) {
       g.material.needsUpdate = true;
     });
   }
-  if (WORD.group) layoutWord();
   if (POST.comp && POST.comp.uniforms) {
     const u = POST.comp.uniforms;
     if (u.uBloom) u.uBloom.value = day ? .16 : .34;
     if (u.uExp) u.uExp.value = day ? .84 : .62;
-    if (u.uSat) u.uSat.value = day ? 1.0 : 1.05;
+    if (u.uSat) u.uSat.value = day ? 1.16 : 1.05;
     if (u.uVig) u.uVig.value = day ? .42 : 1;
     if (u.uGrain) u.uGrain.value = day ? .010 : .020;
     if (u.uCA) u.uCA.value = day ? .35 : 1;
@@ -5099,14 +5136,14 @@ function updateWorld(dt) {
       const st = clamp((WORD.reveal - i * .075) / .62, 0, 1);
       const e = easeOut(st);
       g.position.y = g.userData.baseY - (1 - e) * (WORD.ink.asc * 1.15);
-      g.material.opacity = e * (1 - near * (theme === 'light' ? .28 : .96));
+      g.material.opacity = e * (1 - near * .96);
       g.visible = g.material.opacity > .004;
     });
   }
   /* the cut-out layers dissolve as the camera reaches them, so the path can
      walk straight through the garden instead of steering around the veil */
   if (WORLD.fg) WORLD.fg.forEach(m => {
-    const a = smooth(.9, 4.6, camera.position.z - m.position.z) * (theme === 'light' ? .22 : 1);
+    const a = smooth(.9, 4.6, camera.position.z - m.position.z);
     m.material.opacity = a;
     m.visible = a > .006;
   });
