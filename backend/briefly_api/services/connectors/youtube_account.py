@@ -64,6 +64,7 @@ class YoutubeAccountConnector(BaseConnector):
         if not db or not meta or not meta.get("user_id"):
             raise ValueError("YouTube account source requires an authenticated user connection.")
 
+        from briefly_api.auth.google import GoogleTokenRevoked
         from briefly_api.auth.youtube import get_youtube_connection, refresh_youtube_access_token
         from briefly_api.services.youtube import fetch_youtube_content
 
@@ -71,7 +72,10 @@ class YoutubeAccountConnector(BaseConnector):
         if not connection:
             raise ValueError("YouTube is not connected. Connect YouTube in onboarding or settings.")
 
-        access_token = await refresh_youtube_access_token(connection, settings)
+        try:
+            access_token = await refresh_youtube_access_token(connection, settings)
+        except GoogleTokenRevoked as exc:
+            raise ValueError("YouTube access expired. Reconnect YouTube in Settings.") from exc
         await db.commit()
 
         max_total = min(limit, 40)

@@ -99,7 +99,14 @@ async def get_recent_digest_items(
     """Return digest items from the last N days as plain dicts."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     result = await session.execute(
-        select(DigestItem, Digest.digest_date)
+        select(
+            Digest.digest_date,
+            DigestItem.headline,
+            DigestItem.summary,
+            DigestItem.source_name,
+            DigestItem.source_url,
+            DigestItem.relevance_score,
+        )
         .join(Digest, DigestItem.digest_id == Digest.id)
         .where(
             Digest.user_id == user_id,
@@ -112,13 +119,13 @@ async def get_recent_digest_items(
     return [
         {
             "digest_date": digest_date,
-            "headline": item.headline,
-            "summary": item.summary,
-            "source_name": item.source_name,
-            "source_url": item.source_url,
-            "relevance_score": item.relevance_score,
+            "headline": headline,
+            "summary": summary,
+            "source_name": source_name,
+            "source_url": source_url,
+            "relevance_score": relevance_score,
         }
-        for item, digest_date in rows
+        for digest_date, headline, summary, source_name, source_url, relevance_score in rows
     ]
 
 

@@ -29,6 +29,20 @@ _FETCH_TIMEOUT_EMAIL_SEC = 90.0
 _MAX_CONCURRENT_FETCHES = 8
 
 
+def _is_expected_fetch_failure(exc: BaseException) -> bool:
+    """RSS 404s and revoked Google grants are user/source issues, not crashes."""
+    if isinstance(exc, ValueError):
+        return True
+    name = type(exc).__name__
+    if name in {"HTTPStatusError", "GoogleTokenRevoked"}:
+        return True
+    text = str(exc).lower()
+    return any(
+        token in text
+        for token in ("400 bad request", "invalid_grant", "http 404", "http 403")
+    )
+
+
 def _fetch_limit(
     source_type: str,
     max_items: int,
@@ -138,8 +152,16 @@ async def collect_from_sources(
                     log.warning("Fetch timed out for source %s (%s)", source.identifier, source.source_type)
                     return source, None, f"Timed out fetching {label}"
                 except Exception as exc:
-                    log.exception("Failed to fetch source %s (%s)", source.identifier, source.source_type)
                     label = display_name or source.identifier
+                    if _is_expected_fetch_failure(exc):
+                        log.warning(
+                            "Failed to fetch source %s (%s): %s",
+                            source.identifier,
+                            source.source_type,
+                            exc,
+                        )
+                    else:
+                        log.exception("Failed to fetch source %s (%s)", source.identifier, source.source_type)
                     return source, None, f"Could not fetch {label}: {exc}"
 
     results = await asyncio.gather(*[_fetch_one(s) for s in active], return_exceptions=True)

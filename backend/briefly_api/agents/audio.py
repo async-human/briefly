@@ -9,6 +9,9 @@ The generated WAV is saved to disk and a public URL is stored in ctx
 so DeliveryAgent can include a "Listen to your briefing" link in the email.
 
 Disabled by default — set AUDIO_ENABLED=true in .env to activate.
+
+Never download the TTS model during briefing generation. HuggingFace fetches
+block persist (and the dashboard spinner) for minutes on ephemeral web disks.
 """
 from __future__ import annotations
 
@@ -22,6 +25,29 @@ from briefly_api.config import get_settings
 log = logging.getLogger(__name__)
 
 _VALID_VOICES = frozenset({*(f"M{i}" for i in range(1, 6)), *(f"F{i}" for i in range(1, 6))})
+_SUPERTONIC_CACHE = Path.home() / ".cache" / "supertonic3"
+
+
+def _supertonic_model_ready() -> bool:
+    onnx = _SUPERTONIC_CACHE / "onnx"
+    return onnx.is_dir() and any(onnx.rglob("*.onnx"))
+
+
+def should_skip_tts(
+    *,
+    process_role: str,
+    audio_enabled: bool,
+    is_pro: bool,
+    model_ready: bool,
+) -> str | None:
+    """Return a skip reason, or None if in-process TTS should run."""
+    if not audio_enabled and not is_pro:
+        return "disabled"
+    if process_role == "web":
+        return "web_process"
+    if not model_ready:
+        return "model_not_cached"
+    return None
 
 
 def _normalize_voice(voice_name: str) -> str:
@@ -78,7 +104,7 @@ def _synthesize(script: str, output_path: str, voice_name: str) -> bool:
 
         from supertonic import TTS  # noqa: PLC0415
 
-        tts = TTS(auto_download=True)
+        tts = TTS(auto_download=False)
         style = tts.get_voice_style(voice_name=_normalize_voice(voice_name))
         wav, duration = tts.synthesize(script, voice_style=style, lang="en")
         tts.save_audio(wav, output_path)
@@ -96,7 +122,15 @@ async def run(ctx: PipelineContext) -> PipelineContext:
     s = get_settings()
 
     is_pro = getattr(ctx.user, "is_pro", False)
-    if not s.audio_enabled and not is_pro:
+    skip = should_skip_tts(
+        process_role=s.process_role,
+        audio_enabled=s.audio_enabled,
+        is_pro=is_pro,
+        model_ready=_supertonic_model_ready(),
+    )
+    if skip:
+        if skip != "disabled":
+            log.info("AudioAgent: skipping TTS (%s) — brief stays text-only", skip)
         return ctx
 
     if not ctx.digest_items:

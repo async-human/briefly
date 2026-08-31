@@ -319,78 +319,83 @@ function DashboardContent() {
 
       <ProactiveAlertsBanner />
 
-      <div className="dash-primary-zone">
-        <div className="dash-primary-head">
-          <h2 className="dash-primary-label">Today&apos;s briefing</h2>
-          {digest && (digest.items?.length ?? 0) > 0 && (
-            <button
-              type="button"
-              className="brief-me-btn"
-              onClick={() => {
-                stopAllBrieflyAudio();
-                unlockAudioPlayback();
-                setBriefingOpen(true);
-              }}
-            >
-              Listen
-            </button>
-          )}
-          {digest && (digest.items?.length ?? 0) > 0 && (
-            <button
-              type="button"
-              className="brief-me-btn brief-me-btn-ghost"
-              onClick={() => setEmailOpen(true)}
-            >
-              ✉ Draft email
-            </button>
-          )}
-          <button
-            type="button"
-            className="dash-connections-trigger"
-            onClick={() => setConnectionsOpen(true)}
-            aria-haspopup="dialog"
-            aria-label={`Manage connections, ${sourcesDesc}`}
-            title={sourcesDesc}
-          >
-            <span className="dash-connections-trigger-label">Connections</span>
-          </button>
-        </div>
-        <section className="dash-surface dash-surface-briefing" aria-labelledby="briefing-surface-title">
-          <h2 id="briefing-surface-title" className="sr-only">
-            Today&apos;s briefing
-          </h2>
-          <div className="dash-surface-body dash-surface-body-flush">
-            <BriefingPanel
-              digest={digest}
-              sources={fetchableSources}
-              sourcesCount={fetchableSources.length}
-              generating={generating}
-              generatingLabel={generatingLabel}
-              generatingElapsedSec={generatingElapsedSec}
-              generateError={generateError}
-              generateWarnings={generateWarnings}
-              onRegenerate={() => {
-                if (me) clearBriefingGeneratedToday(me.user.id);
-                runGenerate();
-              }}
-            />
-            <DiscoverContentPanel onSourceAdded={handleSourceAdded} />
+      <div className="dash-feed-workbench">
+        <div className="dash-feed-main">
+          <div className="dash-primary-zone">
+            <div className="dash-primary-head">
+              <h2 className="dash-primary-label">Today&apos;s briefing</h2>
+              {digest && (digest.items?.length ?? 0) > 0 && (
+                <button
+                  type="button"
+                  className="brief-me-btn"
+                  onClick={() => {
+                    stopAllBrieflyAudio();
+                    unlockAudioPlayback();
+                    setBriefingOpen(true);
+                  }}
+                >
+                  Listen
+                </button>
+              )}
+              {digest && (digest.items?.length ?? 0) > 0 && (
+                <button
+                  type="button"
+                  className="brief-me-btn brief-me-btn-ghost"
+                  onClick={() => setEmailOpen(true)}
+                >
+                  ✉ Draft email
+                </button>
+              )}
+              <button
+                type="button"
+                className="dash-connections-trigger"
+                onClick={() => setConnectionsOpen(true)}
+                aria-haspopup="dialog"
+                aria-label={`Manage connections, ${sourcesDesc}`}
+                title={sourcesDesc}
+              >
+                <span className="dash-connections-trigger-label">Connections</span>
+              </button>
+            </div>
+            <section className="dash-surface dash-surface-briefing" aria-labelledby="briefing-surface-title">
+              <h2 id="briefing-surface-title" className="sr-only">
+                Today&apos;s briefing
+              </h2>
+              <div className="dash-surface-body dash-surface-body-flush">
+                <BriefingPanel
+                  digest={digest}
+                  sources={fetchableSources}
+                  sourcesCount={fetchableSources.length}
+                  generating={generating}
+                  generatingLabel={generatingLabel}
+                  generatingElapsedSec={generatingElapsedSec}
+                  generateError={generateError}
+                  generateWarnings={generateWarnings}
+                  onRegenerate={() => {
+                    if (me) clearBriefingGeneratedToday(me.user.id);
+                    runGenerate();
+                  }}
+                />
+                <DiscoverContentPanel onSourceAdded={handleSourceAdded} />
+              </div>
+            </section>
           </div>
-        </section>
+        </div>
+
+        <aside className="dash-feed-rail" aria-label="Today around the brief">
+          {me.calendar_connected ? (
+            <CalendarMeetingsPanel calendarConnected={me.calendar_connected} />
+          ) : (
+            <CalendarConnectNudge />
+          )}
+          <DashboardInsightsDrawer
+            intel={intel}
+            digest={digest}
+            streak={me.reading_streak ?? 0}
+            declaredInterests={me.profile?.interests?.map((i) => i.topic).filter(Boolean) ?? []}
+          />
+        </aside>
       </div>
-
-      {me.calendar_connected && (
-        <CalendarMeetingsPanel calendarConnected={me.calendar_connected} />
-      )}
-
-      <DashboardInsightsDrawer
-        intel={intel}
-        digest={digest}
-        streak={me.reading_streak ?? 0}
-        declaredInterests={me.profile?.interests?.map((i) => i.topic).filter(Boolean) ?? []}
-      />
-
-      {!me.calendar_connected && <CalendarConnectNudge />}
 
       <ConnectionsDrawer
         open={connectionsOpen}

@@ -86,6 +86,8 @@ async def init_db() -> None:
         for stmt in (
             "ALTER TABLE digest_items ADD COLUMN IF NOT EXISTS contradiction_flag BOOLEAN NOT NULL DEFAULT FALSE",
             "ALTER TABLE digest_items ADD COLUMN IF NOT EXISTS contradiction_explanation TEXT",
+            "ALTER TABLE digest_items ADD COLUMN IF NOT EXISTS who_it_affects TEXT",
+            "ALTER TABLE digest_items ADD COLUMN IF NOT EXISTS suggested_action TEXT",
         ):
             try:
                 await conn.execute(text(stmt))

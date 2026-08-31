@@ -7,6 +7,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.auth.gmail import get_gmail_connection, refresh_gmail_access_token
+from briefly_api.auth.google import GoogleTokenRevoked
 from briefly_api.config import Settings
 from briefly_api.db.models import ContentStatus, RawContent
 from briefly_api.services.articles import NormalizedContent
@@ -128,6 +129,11 @@ class EmailConnector(BaseConnector):
                             len(items), normalized,
                         )
                         return items
+                except GoogleTokenRevoked:
+                    log.warning(
+                        "EmailConnector: Gmail access expired for %s — reconnect Gmail in Settings",
+                        normalized,
+                    )
                 except Exception as exc:
                     log.warning("EmailConnector: Gmail fetch failed for %s: %s", normalized, exc)
 

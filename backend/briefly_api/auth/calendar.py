@@ -10,7 +10,12 @@ from jose import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from briefly_api.auth.google import GOOGLE_TOKEN_URL, generate_oauth_state
+from briefly_api.auth.google import (
+    GOOGLE_TOKEN_URL,
+    GoogleTokenRevoked,
+    generate_oauth_state,
+    raise_if_google_refresh_rejected,
+)
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.models import OAuthConnection, User
 from briefly_api.security.oauth_tokens import (
@@ -20,11 +25,6 @@ from briefly_api.security.oauth_tokens import (
 )
 
 log = logging.getLogger(__name__)
-
-
-class GoogleTokenRevoked(Exception):
-    """Refresh token is expired, revoked, or otherwise unusable."""
-
 
 CALENDAR_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 CALENDAR_SCOPES = (
@@ -111,13 +111,7 @@ async def refresh_calendar_access_token(
             },
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        if resp.status_code in (400, 401):
-            log.warning(
-                "Google Calendar refresh rejected (%s) — reconnect Calendar in Settings. body=%s",
-                resp.status_code,
-                resp.text[:300],
-            )
-            raise GoogleTokenRevoked("Google Calendar refresh token is no longer valid")
+        raise_if_google_refresh_rejected(resp, "Calendar")
         resp.raise_for_status()
         tokens = resp.json()
 

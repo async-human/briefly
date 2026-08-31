@@ -523,6 +523,42 @@ async def _briefing_worker(user_id: str) -> None:
             )
         except asyncio.TimeoutError:
             log.error("Briefing worker timed out (>4 min) for user %s", user_id)
+            from briefly_api.db.engine import get_session_factory
+            from briefly_api.services.briefing import user_local_date
+
+            saved = None
+            try:
+                async with get_session_factory()() as fresh:
+                    loaded = await fresh.execute(
+                        select(Digest)
+                        .options(selectinload(Digest.items))
+                        .where(
+                            Digest.user_id == user_id,
+                            Digest.digest_date == user_local_date(user),
+                        )
+                    )
+                    saved = loaded.scalar_one_or_none()
+            except Exception:
+                log.warning("Could not load digest after briefing timeout", exc_info=True)
+            saved_count = 0
+            if saved:
+                saved_count = (saved.total_items_shown or 0) or len(saved.items or [])
+            if saved and saved_count > 0:
+                await report_briefing_progress(
+                    user_id,
+                    status="complete",
+                    step="done",
+                    label="Briefing ready!",
+                    digest_id=saved.id,
+                )
+                from briefly_api.services.briefing_generation import clear_force_refresh_flag
+                await clear_force_refresh_flag(user_id)
+                log.info(
+                    "Briefing worker timed out after persist for user %s (digest_id=%s)",
+                    user_id,
+                    saved.id,
+                )
+                return
             msg = "Briefing took too long to generate. Please try again."
             await report_briefing_progress(
                 user_id,
@@ -577,9 +613,11 @@ async def get_briefing_generation_status(
     meta = dict(profile.ingestion_meta or {})
     gen = dict(meta.get("briefing_generation") or {"status": "idle"})
 
-    # Auto-clear zombie "running" left by a crashed worker so clients can restart.
+    # Persist happens before optional TTS. If today's brief is already in the
+    # DB, unlock the dashboard even if audio/email is still finishing.
     if gen.get("status") == "running":
         started_raw = gen.get("started_at", "")
+        started_dt: datetime | None = None
         age_minutes = 999.0
         if started_raw:
             try:
@@ -588,29 +626,52 @@ async def get_briefing_generation_status(
                     started_dt = started_dt.replace(tzinfo=timezone.utc)
                 age_minutes = (datetime.now(timezone.utc) - started_dt).total_seconds() / 60
             except Exception:
+                started_dt = None
                 age_minutes = 999.0
-        if age_minutes > 6:
-            local_today = local_date_string(profile.digest_timezone or "UTC")
-            today_digest = await db.scalar(
-                select(Digest.id).where(
-                    Digest.user_id == user.id,
-                    Digest.digest_date == local_today,
-                )
-            )
-            if not today_digest:
-                now = datetime.now(timezone.utc).isoformat()
-                gen = {
-                    "status": "error",
-                    "step": "error",
-                    "label": "Briefing failed.",
-                    "error": "Briefing generation timed out. Please refresh to try again.",
-                    "started_at": gen.get("started_at"),
-                    "updated_at": now,
-                }
-                meta["briefing_generation"] = gen
-                profile.ingestion_meta = meta
-                flag_modified(profile, "ingestion_meta")
-                await db.commit()
+        local_today = local_date_string(profile.digest_timezone or "UTC")
+        today_row = await db.execute(
+            select(Digest)
+            .options(selectinload(Digest.items))
+            .where(Digest.user_id == user.id, Digest.digest_date == local_today)
+        )
+        today_digest = today_row.scalar_one_or_none()
+        today_items = 0
+        if today_digest:
+            today_items = (today_digest.total_items_shown or 0) or len(today_digest.items or [])
+        digest_from_this_run = False
+        if today_digest and today_items > 0 and today_digest.created_at and started_dt:
+            created = today_digest.created_at
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            digest_from_this_run = created >= started_dt - timedelta(seconds=15)
+        if digest_from_this_run and today_digest:
+            now = datetime.now(timezone.utc).isoformat()
+            gen = {
+                "status": "complete",
+                "step": "done",
+                "label": "Briefing ready!",
+                "digest_id": today_digest.id,
+                "started_at": gen.get("started_at"),
+                "updated_at": now,
+            }
+            meta["briefing_generation"] = gen
+            profile.ingestion_meta = meta
+            flag_modified(profile, "ingestion_meta")
+            await db.commit()
+        elif age_minutes > 6:
+            now = datetime.now(timezone.utc).isoformat()
+            gen = {
+                "status": "error",
+                "step": "error",
+                "label": "Briefing failed.",
+                "error": "Briefing generation timed out. Please refresh to try again.",
+                "started_at": gen.get("started_at"),
+                "updated_at": now,
+            }
+            meta["briefing_generation"] = gen
+            profile.ingestion_meta = meta
+            flag_modified(profile, "ingestion_meta")
+            await db.commit()
 
     digest_out: DigestOut | None = None
     digest_id = gen.get("digest_id")

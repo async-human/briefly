@@ -1,7 +1,6 @@
 """Add the remaining Phase 1 six-point brief fields."""
 
 from alembic import op
-import sqlalchemy as sa
 
 revision = "014"
 down_revision = "013"
@@ -10,10 +9,16 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("digest_items", sa.Column("who_it_affects", sa.Text(), nullable=True))
-    op.add_column("digest_items", sa.Column("suggested_action", sa.Text(), nullable=True))
+    # Idempotent — ensure_migrations may stamp 014 before this DDL runs, and
+    # init_db() also adds these columns on boot.
+    op.execute(
+        "ALTER TABLE digest_items ADD COLUMN IF NOT EXISTS who_it_affects TEXT"
+    )
+    op.execute(
+        "ALTER TABLE digest_items ADD COLUMN IF NOT EXISTS suggested_action TEXT"
+    )
 
 
 def downgrade() -> None:
-    op.drop_column("digest_items", "suggested_action")
-    op.drop_column("digest_items", "who_it_affects")
+    op.execute("ALTER TABLE digest_items DROP COLUMN IF EXISTS suggested_action")
+    op.execute("ALTER TABLE digest_items DROP COLUMN IF EXISTS who_it_affects")

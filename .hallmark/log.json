@@ -2,6 +2,18 @@
   {
     "date": "2026-08-31",
     "scope": "app-page",
+    "target": "frontend dashboard + settings devices",
+    "verb": "redesign",
+    "macrostructure": "Workbench · wide canvas + sticky rail",
+    "theme": "custom Art Deco app system (design.md, locked)",
+    "theme_axes": "light / classical-serif / warm-gold",
+    "enrichment": "none",
+    "motion": "card-lift · details-collapse",
+    "brief": "Use the empty gutters: two-column briefing workbench, clickable story cards, grouped collapsible device tokens."
+  },
+  {
+    "date": "2026-08-31",
+    "scope": "app-page",
     "target": "frontend dashboard",
     "verb": "redesign",
     "macrostructure": "Workbench · priority-first canvas",

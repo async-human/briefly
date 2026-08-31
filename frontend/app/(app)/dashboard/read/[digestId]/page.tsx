@@ -4,7 +4,7 @@ import "@/styles/read-page.css";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type Digest, type DigestItem } from "@/lib/api";
 import { SourceIcon } from "@/components/SourceIcon";
@@ -679,8 +679,10 @@ function ReadingSkeleton() {
 export default function ReadingPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showLearned } = useLearnedToast();
   const digestId = params.digestId as string;
+  const openedItem = searchParams.get("item");
 
   const [digest, setDigest]       = useState<Digest | null>(null);
   const [streak, setStreak]       = useState(0);
@@ -726,6 +728,12 @@ export default function ReadingPage() {
       })
       .catch(() => router.replace("/dashboard"));
   }, [digestId, router]);
+
+  useEffect(() => {
+    if (!digest || !openedItem) return;
+    const idx = digest.items.findIndex((item) => item.id === openedItem);
+    if (idx >= 0) setCurrentIndex(idx);
+  }, [digest, openedItem]);
 
   useEffect(() => {
     void api

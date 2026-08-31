@@ -14,12 +14,13 @@ Art Deco editorial — ivory paper, deep teal ink, restrained gold geometry. A c
 - **v4** — Marketing rebuilt as Split Studio: floating pill nav, alternating proof pairs, letter-close footer, generous display leading
 - **v5** — Art Deco Grand Salon: symmetric masthead, framed hero brief, jewel-toned memory chamber, asymmetric action composition, expanded footer
 - **v6** — Dashboard priority pass: open greeting, urgent-signal restraint, briefing-first canvas, quiet utilities, optional intelligence depth
+- **v7** — Workbench uses the canvas: wide briefing + sticky rail, story cards, collapsible device groups
 
 ## App macrostructure
 
 **Workbench** — sidebar navigation + primary canvas + secondary sources rail. Function carries the page; no hero enrichment.
 
-Dashboard order is fixed by decision value: greeting → urgent signal when present → today’s briefing → meeting context → optional intelligence depth → connection setup. Setup prompts never displace the daily brief.
+On wide viewports the canvas is a two-column workbench: today’s briefing fills the main column; meetings and optional intelligence sit in a sticky rail. Story cards are the interaction surface. Setup prompts never displace the daily brief.
 
 ## Marketing macrostructure
 

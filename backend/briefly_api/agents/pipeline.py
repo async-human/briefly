@@ -54,6 +54,25 @@ from briefly_api.db.queries import (
 log = logging.getLogger(__name__)
 
 
+def _public_pipeline_error(exc: BaseException) -> str:
+    """Keep SQLAlchemy internals out of the dashboard."""
+    text = str(exc)
+    missing_column = (
+        "UndefinedColumnError" in type(exc).__name__
+        or "UndefinedColumnError" in text
+        or "who_it_affects" in text
+        or "suggested_action" in text
+    )
+    if missing_column and "does not exist" in text:
+        return (
+            "Database is missing a new brief field. Redeploy the API so it can add "
+            "the columns, then hit Refresh."
+        )
+    if "ProgrammingError" in text or "SQL:" in text or "sqlalchemy" in text.lower():
+        return "Briefing couldn't be generated. Try Refresh."
+    return "Briefing couldn't be generated. Try Refresh."
+
+
 async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
     """
     Run the full Briefly pipeline for one user.
@@ -81,7 +100,7 @@ async def run_for_user(user_id: str, run_date: str | None = None) -> dict:
         return {"success": False, "error": "Briefing took too long to generate. Please try again — it will be faster next time."}
     except Exception as exc:
         log.exception("Pipeline failed for user %s", user_id)
-        return {"success": False, "error": f"Briefing pipeline error: {exc}"}
+        return {"success": False, "error": _public_pipeline_error(exc)}
 
 
 async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
@@ -206,10 +225,10 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
         ctx = await _run_agent("BrainDumpInjectorAgent", brain_dump_injector.run, ctx)
         ctx = await _run_agent("BrowserCaptureInjectorAgent", browser_capture_injector.run, ctx)
         ctx = await _run_agent("CitationVerifierAgent",  citation_verifier.run, ctx)
-        ctx = await _run_agent("AudioAgent",             audio.run,            ctx)
-        ctx = await _run_agent("DeliveryAgent",          delivery.run,         ctx)
 
-        # ── Persist digest to DB ──────────────────────────────────────────────
+        # Persist before TTS. AudioAgent used to download Supertonic from
+        # HuggingFace on the web process, which blocked this write for minutes
+        # and left the dashboard spinning on a brief that was already written.
         if not ctx.digest_items or ctx.total_shown <= 0:
             if ctx.selected_item_ids:
                 log.error(
@@ -270,6 +289,10 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
                 from briefly_api.services.content_ingestion import mark_contents_processed
                 await mark_contents_processed(session, content_ids)
                 await session.commit()
+
+        ctx = await _run_agent("AudioAgent",             audio.run,            ctx)
+        ctx = await _run_agent("DeliveryAgent",          delivery.run,         ctx)
+        await _finalize_digest_delivery(session, digest_id, ctx)
 
         # ── Post-delivery learning & discovery ───────────────────────────────
         # These agents improve future digests but have zero effect on what the
@@ -690,6 +713,27 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
         await session.commit()
 
     return digest_id
+
+
+async def _finalize_digest_delivery(session, digest_id: str, ctx: PipelineContext) -> None:
+    """Patch Resend id / listen URL after optional TTS + email."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    digest = await session.get(Digest, digest_id)
+    if not digest:
+        return
+    message_id = ctx.__dict__.get("resend_message_id")
+    if message_id:
+        digest.resend_message_id = message_id
+        digest.status = DigestStatus.sent
+    meta = dict(digest.meta or {})
+    if ctx.audio_url:
+        meta["audio_url"] = ctx.audio_url
+    meta["stage_timings"] = ctx.__dict__.get("stage_timings", {})
+    digest.meta = meta
+    flag_modified(digest, "meta")
+    digest.pipeline_duration_ms = ctx.pipeline_duration_ms
+    await session.commit()
 
 
 async def run_post_pipeline_agents_job(payload: dict) -> None:

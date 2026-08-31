@@ -11,6 +11,40 @@ const PLATFORM_OPTIONS = [
   { value: "desktop", label: "Desktop app" },
 ];
 
+const VISIBLE_GROUPS = 4;
+const VISIBLE_TOKENS = 3;
+
+type DeviceGroup = {
+  key: string;
+  name: string;
+  platform: string | null;
+  tokens: CaptureToken[];
+};
+
+function groupTokens(tokens: CaptureToken[]): DeviceGroup[] {
+  const sorted = [...tokens].sort((a, b) => {
+    const aT = a.last_used_at || a.created_at;
+    const bT = b.last_used_at || b.created_at;
+    return bT.localeCompare(aT);
+  });
+  const map = new Map<string, DeviceGroup>();
+  for (const token of sorted) {
+    const key = `${token.name}\0${token.platform ?? ""}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.tokens.push(token);
+    } else {
+      map.set(key, {
+        key,
+        name: token.name,
+        platform: token.platform,
+        tokens: [token],
+      });
+    }
+  }
+  return [...map.values()];
+}
+
 function formatWhen(iso: string | null): string {
   if (!iso) return "Never";
   return new Date(iso).toLocaleDateString(undefined, {
@@ -31,6 +65,9 @@ export function CaptureDevicesCard() {
   const [copied, setCopied] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [localTokenPrefix, setLocalTokenPrefix] = useState<string | null>(null);
+  const [showAllGroups, setShowAllGroups] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
+  const [revokingUnused, setRevokingUnused] = useState(false);
 
   const load = useCallback(async () => {
     setError("");
@@ -95,6 +132,41 @@ export function CaptureDevicesCard() {
     }
   }
 
+  async function handleRevokeUnused() {
+    const unused = tokens.filter(
+      (t) => !t.last_used_at && t.token_prefix !== localTokenPrefix,
+    );
+    if (!unused.length) return;
+    const ok = window.confirm(
+      `Revoke ${unused.length} unused device token${unused.length === 1 ? "" : "s"}? This cannot be undone.`,
+    );
+    if (!ok) return;
+    setRevokingUnused(true);
+    setError("");
+    try {
+      const results = await Promise.allSettled(
+        unused.map((t) => api.revokeCaptureToken(t.id)),
+      );
+      const revoked = new Set(
+        unused.filter((_, i) => results[i].status === "fulfilled").map((t) => t.id),
+      );
+      setTokens((prev) => prev.filter((t) => !revoked.has(t.id)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not revoke unused tokens.");
+    } finally {
+      setRevokingUnused(false);
+    }
+  }
+
+  function toggleGroupTokens(key: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   async function handleCopyToken() {
     if (!freshToken?.token) return;
     await navigator.clipboard.writeText(freshToken.token);
@@ -108,6 +180,13 @@ export function CaptureDevicesCard() {
     setLocalTokenPrefix(freshToken.token.slice(0, 9));
     setFreshToken(null);
   }
+
+  const groups = groupTokens(tokens);
+  const visibleGroups = showAllGroups ? groups : groups.slice(0, VISIBLE_GROUPS);
+  const hiddenGroupCount = groups.length - visibleGroups.length;
+  const unusedCount = tokens.filter(
+    (t) => !t.last_used_at && t.token_prefix !== localTokenPrefix,
+  ).length;
 
   return (
     <div className="capture-devices" id="capture-devices">
@@ -183,28 +262,114 @@ export function CaptureDevicesCard() {
       ) : tokens.length === 0 ? (
         <p className="settings-field-hint">No device tokens yet.</p>
       ) : (
-        <ul className="capture-devices-list">
-          {tokens.map((token) => (
-            <li key={token.id} className="capture-devices-item">
-              <div className="capture-devices-item-main">
-                <span className="capture-devices-item-name">{token.name}</span>
-                <span className="capture-devices-item-meta">
-                  {token.token_prefix}…
-                  {token.platform ? ` · ${token.platform}` : ""}
-                  {" · "}Last used {formatWhen(token.last_used_at)}
-                </span>
-              </div>
-              <button
-                type="button"
-                className="capture-devices-revoke"
-                onClick={() => void handleRevoke(token.id)}
-                disabled={revokingId === token.id}
-              >
-                {revokingId === token.id ? "Revoking…" : "Revoke"}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="capture-devices-toolbar">
+            <p className="capture-devices-count">
+              {tokens.length} token{tokens.length === 1 ? "" : "s"}
+              {groups.length > 1 ? ` · ${groups.length} device types` : ""}
+            </p>
+            <div className="capture-devices-toolbar-actions">
+              {unusedCount > 1 && (
+                <button
+                  type="button"
+                  className="dash-btn dash-btn-secondary"
+                  onClick={() => void handleRevokeUnused()}
+                  disabled={revokingUnused}
+                >
+                  {revokingUnused ? "Revoking…" : `Revoke ${unusedCount} unused`}
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="capture-devices-list">
+            {visibleGroups.map((group) => {
+              const latest = group.tokens[0];
+              const showAll = expandedGroups.has(group.key);
+              const shown = showAll ? group.tokens : group.tokens.slice(0, VISIBLE_TOKENS);
+              const more = group.tokens.length - shown.length;
+              return (
+                <details
+                  key={group.key}
+                  className="capture-devices-group"
+                  defaultOpen={group.tokens.length <= VISIBLE_TOKENS}
+                >
+                  <summary className="capture-devices-group-summary">
+                    <span>
+                      <span className="capture-devices-group-name">{group.name}</span>
+                      <span className="capture-devices-group-meta">
+                        {group.tokens.length} token{group.tokens.length === 1 ? "" : "s"}
+                        {group.platform ? ` · ${group.platform}` : ""}
+                        {" · "}Last used {formatWhen(latest.last_used_at)}
+                      </span>
+                    </span>
+                    <span className="capture-devices-group-chevron" aria-hidden>
+                      ›
+                    </span>
+                  </summary>
+                  <ul className="capture-devices-group-body">
+                    {shown.map((token) => (
+                      <li key={token.id} className="capture-devices-item">
+                        <div className="capture-devices-item-main">
+                          <span className="capture-devices-item-name">
+                            {token.token_prefix}…
+                            {token.token_prefix === localTokenPrefix ? " · this browser" : ""}
+                          </span>
+                          <span className="capture-devices-item-meta">
+                            Last used {formatWhen(token.last_used_at)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="capture-devices-revoke"
+                          onClick={() => void handleRevoke(token.id)}
+                          disabled={revokingId === token.id}
+                        >
+                          {revokingId === token.id ? "Revoking…" : "Revoke"}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {more > 0 && (
+                    <button
+                      type="button"
+                      className="dash-btn dash-btn-secondary capture-devices-more"
+                      onClick={() => toggleGroupTokens(group.key)}
+                    >
+                      Show {more} more
+                    </button>
+                  )}
+                  {showAll && group.tokens.length > VISIBLE_TOKENS && (
+                    <button
+                      type="button"
+                      className="dash-btn dash-btn-secondary capture-devices-more"
+                      onClick={() => toggleGroupTokens(group.key)}
+                    >
+                      Show fewer
+                    </button>
+                  )}
+                </details>
+              );
+            })}
+          </div>
+          {hiddenGroupCount > 0 && (
+            <button
+              type="button"
+              className="dash-btn dash-btn-secondary capture-devices-more-types"
+              onClick={() => setShowAllGroups(true)}
+            >
+              Show {hiddenGroupCount} more device type{hiddenGroupCount === 1 ? "" : "s"}
+            </button>
+          )}
+          {showAllGroups && groups.length > VISIBLE_GROUPS && (
+            <button
+              type="button"
+              className="dash-btn dash-btn-secondary capture-devices-more-types"
+              onClick={() => setShowAllGroups(false)}
+            >
+              Show fewer device types
+            </button>
+          )}
+        </>
       )}
     </div>
   );

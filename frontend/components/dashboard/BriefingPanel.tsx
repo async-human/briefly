@@ -36,7 +36,7 @@ import { GeneratingProgressRing } from "@/components/loading/GeneratingProgressR
 import { YouTubeItemBadge } from "@/components/dashboard/YouTubeItemBadge";
 import { getYouTubeBadge } from "@/lib/youtubeBadge";
 
-const PREVIEW_LIMIT = 5;
+const PREVIEW_LIMIT = 12;
 
 type SourcesSidebarProps = {
   ingestionEmail: string;
@@ -494,33 +494,35 @@ function BriefingHeroItem({
 
   return (
     <article className="briefing-hero-item">
-      <div className="briefing-hero-meta">
-        <span className="briefing-hero-badge">Top story</span>
-        <YouTubeItemBadge item={item} variant="compact" />
-        {item.source_name && !youtubeBadge && (
-          <span className="briefing-hero-source">{item.source_name}</span>
+      <Link href={`/dashboard/read/${digestId}?item=${item.id}`} className="briefing-hero-hit">
+        <div className="briefing-hero-meta">
+          <span className="briefing-hero-badge">Top story</span>
+          <YouTubeItemBadge item={item} variant="compact" />
+          {item.source_name && !youtubeBadge && (
+            <span className="briefing-hero-source">{item.source_name}</span>
+          )}
+        </div>
+        <h3
+          className="briefing-hero-headline"
+          title={headline.truncated ? headline.full : undefined}
+        >
+          {headline.display}
+        </h3>
+        {why && (
+          <p className="briefing-hero-why">{why}</p>
         )}
-      </div>
-      <h3
-        className="briefing-hero-headline"
-        title={headline.truncated ? headline.full : undefined}
-      >
-        {headline.display}
-      </h3>
-      {why && (
-        <p className="briefing-hero-why">{why}</p>
-      )}
-      {item.confidence_signal && (
-        <p className="briefing-hero-confidence">◈ {item.confidence_signal}</p>
-      )}
-      {item.contradiction_flag && item.contradiction_explanation && (
-        <p className="briefing-hero-contradiction">
-          <span aria-hidden>⚠</span> {item.contradiction_explanation}
-        </p>
-      )}
-      {item.memory_reference && (
-        <p className="briefing-hero-memory">⟳ {item.memory_reference}</p>
-      )}
+        {item.confidence_signal && (
+          <p className="briefing-hero-confidence">◈ {item.confidence_signal}</p>
+        )}
+        {item.contradiction_flag && item.contradiction_explanation && (
+          <p className="briefing-hero-contradiction">
+            <span aria-hidden>⚠</span> {item.contradiction_explanation}
+          </p>
+        )}
+        {item.memory_reference && (
+          <p className="briefing-hero-memory">⟳ {item.memory_reference}</p>
+        )}
+      </Link>
       <div className="briefing-hero-actions">
         {item.content_id && (
           <Link
@@ -530,7 +532,7 @@ function BriefingHeroItem({
             Ask about this
           </Link>
         )}
-        <Link href={`/dashboard/read/${digestId}`} className="briefing-hero-read">
+        <Link href={`/dashboard/read/${digestId}?item=${item.id}`} className="briefing-hero-read">
           Read full brief →
         </Link>
         {item.content_id && (
@@ -615,7 +617,7 @@ function BriefingPreviewItem({
 
   if (digestId) {
     return (
-      <Link href={`/dashboard/read/${digestId}`} className="briefing-preview-item briefing-preview-link">
+      <Link href={`/dashboard/read/${digestId}?item=${item.id}`} className="briefing-preview-item briefing-preview-link">
         {content}
       </Link>
     );
@@ -788,7 +790,9 @@ export function BriefingPanel({
         <h2 className="briefing-empty-title">Briefly is preparing your outcome</h2>
         <p className="briefing-empty-desc">
           {generateError
-            ? generateError
+            ? /sqlalchemy|UndefinedColumn|SQL:|ProgrammingError/i.test(generateError)
+              ? "Database is still applying a brief-field update. Redeploy the API, then Refresh."
+              : generateError
             : sourcesCount > 0
               ? "We read your sources overnight — your personalized brief will arrive shortly."
               : "Connect Gmail and Briefly will deliver your first brief — no source management needed."}

@@ -62,12 +62,26 @@ async def _current_revision() -> str | None:
         return result.scalar()
 
 
-async def _revision_004_schema_ready() -> bool:
-    return await _column_exists("digest_items", "contradiction_flag")
-
-
 async def _revision_005_schema_ready() -> bool:
     return await _table_exists("background_jobs")
+
+
+async def _head_schema_ready() -> bool:
+    return (
+        await _column_exists("digest_items", "who_it_affects")
+        and await _column_exists("digest_items", "suggested_action")
+    )
+
+
+async def _apply_014_columns() -> None:
+    async with engine.begin() as conn:
+        await conn.execute(
+            text("ALTER TABLE digest_items ADD COLUMN IF NOT EXISTS who_it_affects TEXT")
+        )
+        await conn.execute(
+            text("ALTER TABLE digest_items ADD COLUMN IF NOT EXISTS suggested_action TEXT")
+        )
+    log.info("Applied digest_items.who_it_affects / suggested_action")
 
 
 def _run_alembic(*args: str) -> int:
@@ -79,10 +93,6 @@ def _run_alembic(*args: str) -> int:
 async def ensure_migrations() -> None:
     revision = await _current_revision()
 
-    if revision == _HEAD:
-        log.info("Alembic already at head (%s)", _HEAD)
-        return
-
     if revision is None and await _table_exists("users"):
         log.info(
             "Legacy database detected (users table exists, no Alembic revision) — stamping %s",
@@ -92,16 +102,23 @@ async def ensure_migrations() -> None:
             raise SystemExit(1)
         revision = _STAMP_IF_LEGACY
 
-    if revision == _STAMP_IF_LEGACY and await _revision_005_schema_ready():
-        log.info("005 schema already present — stamping head without upgrade")
-        if _run_alembic("stamp", _HEAD) != 0:
+    # create_all() may have created 005 objects while Alembic was still at 003/004.
+    # Stamp 005 only — never jump to HEAD, which skips later ALTER TABLE migrations.
+    if revision in (_STAMP_IF_LEGACY, "004") and await _revision_005_schema_ready():
+        log.info("005 schema already present — stamping 005, then upgrading")
+        if _run_alembic("stamp", "005") != 0:
             raise SystemExit(1)
-        return
+        revision = "005"
 
-    if revision == "004" and await _revision_005_schema_ready():
-        log.info("005 schema already present — stamping head without upgrade")
-        if _run_alembic("stamp", _HEAD) != 0:
-            raise SystemExit(1)
+    if revision == _HEAD:
+        if await _head_schema_ready():
+            log.info("Alembic already at head (%s)", _HEAD)
+            return
+        log.warning(
+            "Alembic is stamped %s but six-point columns are missing — applying them",
+            _HEAD,
+        )
+        await _apply_014_columns()
         return
 
     if revision:
@@ -110,13 +127,44 @@ async def ensure_migrations() -> None:
         log.info("Fresh database — running all migrations")
 
     rc = _run_alembic("upgrade", "head")
-    if rc != 0:
-        if await _revision_005_schema_ready():
-            log.warning("upgrade failed but 005 schema is present — stamping head")
-            if _run_alembic("stamp", _HEAD) != 0:
+    if rc == 0:
+        return
+
+    # DuplicateTableError on 013: table already exists from create_all(). Stamp
+    # 013 if needed and retry so 014 can run.
+    current = await _current_revision()
+    if current in ("012", "013") and await _table_exists("telegram_accounts"):
+        if current == "012":
+            log.warning("013 objects already exist — stamping 013 and retrying upgrade")
+            if _run_alembic("stamp", "013") != 0:
                 raise SystemExit(1)
+        rc = _run_alembic("upgrade", "head")
+        if rc == 0:
             return
-        raise SystemExit(rc)
+        current = await _current_revision()
+
+    if not await _head_schema_ready():
+        log.warning("Upgrade failed — applying six-point columns directly")
+        await _apply_014_columns()
+        if await _head_schema_ready():
+            if current in ("013", _HEAD):
+                if _run_alembic("stamp", _HEAD) != 0:
+                    raise SystemExit(1)
+            else:
+                log.info(
+                    "Six-point columns applied; Alembic remains at %s until 013 can run",
+                    current,
+                )
+            return
+        log.error(
+            "Alembic upgrade failed (exit %s) and head schema is still incomplete. "
+            "init_db() will try ADD COLUMN IF NOT EXISTS on boot.",
+            rc,
+        )
+        return
+
+    if _run_alembic("stamp", _HEAD) != 0:
+        raise SystemExit(1)
 
 
 def main() -> None:

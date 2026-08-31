@@ -15,7 +15,11 @@ from jose import jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from briefly_api.auth.google import GOOGLE_TOKEN_URL, generate_oauth_state
+from briefly_api.auth.google import (
+    GOOGLE_TOKEN_URL,
+    generate_oauth_state,
+    raise_if_google_refresh_rejected,
+)
 from briefly_api.config import Settings
 from briefly_api.db.models import OAuthConnection, Source, User
 from briefly_api.security.oauth_tokens import (
@@ -98,6 +102,7 @@ async def refresh_youtube_access_token(connection: OAuthConnection, settings: Se
             },
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
+        raise_if_google_refresh_rejected(resp, "YouTube")
         resp.raise_for_status()
         tokens = resp.json()
 
