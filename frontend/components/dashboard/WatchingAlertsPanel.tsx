@@ -13,6 +13,13 @@ function timeLabel(iso: string | null): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function isActionable(action: string | undefined): boolean {
+  if (!action) return false;
+  const t = action.trim();
+  if (!t) return false;
+  return !/^none(\s+immediate)?\.?$/i.test(t);
+}
+
 function detectorLabel(kind: string | null | undefined): string | null {
   if (kind === "pricing_positioning") return "Pricing / positioning";
   if (kind === "model_api") return "Model / API";
