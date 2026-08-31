@@ -126,6 +126,7 @@ async def fetch_entity_hits(
     *,
     min_interval_minutes: int,
     since: datetime | None,
+    force: bool = False,
 ) -> tuple[list[WatchHit], int]:
     sources = (
         await session.execute(
@@ -144,7 +145,7 @@ async def fetch_entity_hits(
     cutoff = now - timedelta(minutes=max(5, min_interval_minutes))
 
     for src in sources:
-        if src.last_fetched:
+        if not force and src.last_fetched:
             lf = src.last_fetched if src.last_fetched.tzinfo else src.last_fetched.replace(tzinfo=timezone.utc)
             if lf > cutoff:
                 continue

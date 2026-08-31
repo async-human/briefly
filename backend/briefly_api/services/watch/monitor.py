@@ -147,12 +147,13 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
     except Exception:
         log.debug("Watch discover skipped for %s", entity.name, exc_info=True)
 
-    lookback = now - timedelta(hours=36)
+    lookback = now - timedelta(days=7) if force else now - timedelta(hours=36)
     external, sources_checked = await fetch_entity_hits(
         session,
         entity,
         min_interval_minutes=s.watch_rss_min_interval_minutes,
         since=lookback,
+        force=force,
     )
     pool = await _pool_hits(session, entity.user_id, entity, lookback)
     combined = dedupe_hits(external + pool)

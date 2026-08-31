@@ -1185,6 +1185,12 @@ export const api = {
     request<WatchedAlert[]>(
       `/api/v1/watched-alerts${unreadOnly ? "?unread_only=true" : ""}`,
     ),
+  scanWatchedEntities: () =>
+    request<{ entities: number; new_alerts: number; alerts: WatchedAlert[] }>(
+      "/api/v1/watched-entities/scan",
+      { method: "POST" },
+      90000,
+    ),
   markWatchedAlertRead: (id: string) =>
     request<void>(`/api/v1/watched-alerts/${id}/read`, { method: "POST" }),
   markWatchedAlertsReadAll: () =>

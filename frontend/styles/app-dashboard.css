@@ -10579,8 +10579,18 @@ a.saved-capture-title:hover {
   cursor: pointer;
 }
 
-.watching-alerts-clear:hover {
-  color: var(--app-ink);
+.watching-alerts-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.watching-alerts-empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--app-ink-2);
 }
 
 .watching-alerts-list {

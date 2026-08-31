@@ -15,7 +15,9 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
   const [name, setName] = useState("");
   const [kind, setKind] = useState("company");
   const [busy, setBusy] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
+  const [note, setNote] = useState("");
 
   useEffect(() => {
     void api
@@ -40,6 +42,32 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
       setError(err instanceof Error ? err.message : "Could not add.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function checkNow() {
+    if (scanning) return;
+    setScanning(true);
+    setError("");
+    setNote("Checking sources…");
+    try {
+      const result = await api.scanWatchedEntities();
+      const unreadByEntity = new Map<string, number>();
+      for (const alert of result.alerts.filter((a) => !a.is_read)) {
+        unreadByEntity.set(alert.entity_id, (unreadByEntity.get(alert.entity_id) ?? 0) + 1);
+      }
+      setEntities((prev) =>
+        prev.map((ent) => ({ ...ent, unread_count: unreadByEntity.get(ent.id) ?? 0 })),
+      );
+      setNote(
+        result.new_alerts > 0
+          ? `Found ${result.new_alerts} new update${result.new_alerts === 1 ? "" : "s"}. Open Today to read them.`
+          : "Checked sources. Nothing new scored high enough to alert.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not check sources.");
+    } finally {
+      setScanning(false);
     }
   }
 
@@ -74,6 +102,16 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
         <button type="submit" className="dash-btn dash-btn-primary" disabled={busy || !name.trim()}>
           Watch
         </button>
+        {entities.length > 0 && (
+          <button
+            type="button"
+            className="dash-btn dash-btn-secondary"
+            onClick={() => void checkNow()}
+            disabled={scanning}
+          >
+            {scanning ? "Checking…" : "Check now"}
+          </button>
+        )}
       </form>
 
       {entities.length > 0 ? (
@@ -103,6 +141,7 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
         </p>
       )}
 
+      {note && <p className="watched-empty">{note}</p>}
       {error && <p className="push-card-msg push-card-msg--err">{error}</p>}
     </div>
   );

@@ -214,6 +214,39 @@ async def list_alerts(
     return [_serialize_alert(alert, ent) for alert, ent in rows]
 
 
+class WatchScanOut(BaseModel):
+    entities: int
+    new_alerts: int
+    alerts: list[EntityAlertOut]
+
+
+@router.post("/watched-entities/scan", response_model=WatchScanOut)
+async def scan_watched(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> WatchScanOut:
+    """Run a watch scan now (does not wait for the 15-minute worker)."""
+    from briefly_api.services.watch.monitor import run_for_user
+
+    result = await run_for_user(db, user.id, force=True)
+    await db.commit()
+
+    rows = (
+        await db.execute(
+            select(EntityAlert, WatchedEntity)
+            .join(WatchedEntity, WatchedEntity.id == EntityAlert.entity_id)
+            .where(EntityAlert.user_id == user.id)
+            .order_by(EntityAlert.created_at.desc())
+            .limit(20)
+        )
+    ).all()
+    return WatchScanOut(
+        entities=int(result.get("entities") or 0),
+        new_alerts=int(result.get("alerts") or 0),
+        alerts=[_serialize_alert(alert, ent) for alert, ent in rows],
+    )
+
+
 @router.post("/watched-alerts/{alert_id}/read", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def mark_alert_read(
     alert_id: str,
