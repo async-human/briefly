@@ -253,6 +253,9 @@ html[data-theme="light"] #pathways::before{
 html[data-theme="light"] #lessons::before{
   background:rgba(243,238,230,.97);
 }
+html[data-theme="light"] #pricing::before{
+  background:rgba(243,238,230,.97);
+}
 html[data-theme="light"] #eternity::before{
   background:linear-gradient(rgba(243,238,230,.7), #ebe4d6 72%);
 }
@@ -621,7 +624,63 @@ html[data-theme="light"].no-webgl .hero::after, html[data-theme="light"] .no-web
   transform:scaleX(0); transform-origin:left; transition:transform .7s var(--ease-out); }
 .les:hover .bar{ transform:scaleX(1); }
 
-/* — chapter IV: eternity */
+/* — chapter IV: pricing */
+.pricing-intro{
+  display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,.72fr);
+  gap:clamp(28px,5vw,90px); align-items:end; margin-bottom:clamp(34px,6vh,72px);
+}
+.pricing-intro h2{ max-width:13ch; }
+.pricing-grid{
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px;
+  background:var(--line); border:1px solid var(--line);
+}
+.pricing-plan{
+  position:relative; display:flex; flex-direction:column; min-height:590px;
+  padding:clamp(24px,3.2vw,48px); background:var(--ink-2); overflow:hidden;
+}
+.pricing-plan--pro::before{
+  content:''; position:absolute; left:0; right:0; top:0; height:2px;
+  background:linear-gradient(90deg,var(--vermilion),var(--ember),transparent 88%);
+}
+.pricing-plan-top{ display:flex; align-items:center; justify-content:space-between; gap:18px; }
+.pricing-name{
+  margin:0; font-size:11px; font-weight:500; letter-spacing:.22em;
+  text-transform:uppercase; color:var(--bone);
+}
+.pricing-badge{
+  padding:6px 9px; border:1px solid var(--vermilion); border-radius:100px;
+  font-size:8px; font-weight:500; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--vermilion); white-space:nowrap;
+}
+.pricing-price{ display:flex; align-items:flex-end; gap:14px; margin-top:clamp(24px,4vh,42px); }
+.pricing-price b{
+  font-size:clamp(54px,6.2vw,92px); line-height:.82; font-weight:300;
+  letter-spacing:-.055em; font-variant-numeric:tabular-nums;
+}
+.pricing-price span{
+  padding-bottom:4px; font-size:10px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--muted);
+}
+.pricing-annual{
+  margin:14px 0 0; font-size:10px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--vermilion);
+}
+.pricing-tagline{ margin:24px 0 0; max-width:36ch; color:var(--copy-strong); font-size:14px; line-height:1.62; }
+.pricing-features{ list-style:none; margin:clamp(30px,5vh,52px) 0 0; padding:0; }
+.pricing-features li{
+  display:grid; grid-template-columns:20px minmax(0,1fr); gap:10px; align-items:baseline;
+  padding:11px 0; border-top:1px solid var(--line-soft);
+  color:var(--copy); font-size:13px;
+}
+.pricing-features li:last-child{ border-bottom:1px solid var(--line-soft); }
+.pricing-features i{ font-style:normal; color:var(--vermilion); font-size:11px; }
+.pricing-plan .arrowlink{ margin-top:auto; padding-top:34px; align-self:flex-start; }
+.pricing-note{
+  margin:24px 0 0; text-align:center; font-size:10px; line-height:1.6;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--muted);
+}
+
+/* — chapter V: eternity */
 .fin{ min-height:100svh; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; }
 .fin .eyebrow{ margin-bottom:26px; }
 .fin h2{ font-size:clamp(38px,7.4vw,124px); line-height:.94; letter-spacing:-.03em; text-transform:uppercase; }
@@ -723,12 +782,15 @@ html[data-theme="light"].no-webgl .hero::after, html[data-theme="light"] .no-web
   .cards{ grid-template-columns:1fr; gap:14px; }
   .card:nth-child(2),.card:nth-child(3){ transform:none; }
   .gate-stats{ flex-wrap:wrap; gap:20px 34px; }
+  .pricing-intro{ grid-template-columns:1fr; align-items:start; }
+  .pricing-grid{ grid-template-columns:1fr; }
+  .pricing-plan{ min-height:0; }
   .foot-grid{ grid-template-columns:1fr; }
   .hero-cue{ display:none; }
 }
 /* ================================================== section layouts (B set)
-   The six sections ship their B compositions — hero split, story spread,
-   gardens mosaic, chapter atlas, gallery closing, manifesto footer. They are
+   The seven sections ship their B compositions — hero split, story spread,
+   gardens mosaic, chapter atlas, pricing ledger, gallery closing, manifesto footer. They are
    keyed off stable body data attributes so the rules above keep reading as
    the plain grammar of the page and every B override stays in one block.   */
 
@@ -1138,6 +1200,7 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
     <a class="nav-link" href="#gate" data-cursor><span>Brief</span><span class="alt">Today</span></a>
     <a class="nav-link" href="#pathways" data-cursor><span>Memory</span><span class="alt">Thread</span></a>
     <a class="nav-link" href="#lessons" data-cursor><span>Method</span><span class="alt">Fields</span></a>
+    <a class="nav-link" href="#pricing" data-cursor><span>Pricing</span><span class="alt">Plans</span></a>
     <a class="nav-link" href="#eternity" data-cursor><span>Access</span><span class="alt">Join</span></a>
   </nav>
   <button class="sky-toggle" id="sky-toggle" type="button" data-cursor aria-pressed="false" aria-label="Switch to light theme">
@@ -1380,7 +1443,63 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
 </section>
 
 <!-- ============================================================ chapter IV -->
-<section class="sec fin" id="eternity" data-cam="4">
+<section class="sec" id="pricing" data-cam="4">
+  <div class="sec-head" data-rv="fade">
+    <span class="k"><b>04</b> — Pricing</span><span class="rule"></span><span class="k jp">Plans</span>
+  </div>
+  <div class="pricing-intro">
+    <h2 class="display h-sec" data-rv="up">Start free. Upgrade when it becomes indispensable.</h2>
+    <p class="body-lg" data-rv="up">Free is enough to experience a decision-ready briefing. Pro removes the limits and
+      gives Briefly the history, sources, and tools to become part of how you operate.</p>
+  </div>
+  <div class="pricing-grid" data-rv="up">
+    <article class="pricing-plan">
+      <div class="pricing-plan-top">
+        <p class="pricing-name">Free</p>
+      </div>
+      <div class="pricing-price"><b>$0</b><span>Forever</span></div>
+      <p class="pricing-annual">No credit card required · upgrade anytime</p>
+      <p class="pricing-tagline">Everything you need to feel the value of a focused, cited briefing.</p>
+      <ul class="pricing-features">
+        <li><i>01</i><span>3 source connections</span></li>
+        <li><i>02</i><span>5 items per briefing</span></li>
+        <li><i>03</i><span>Gmail, YouTube, Reddit, and RSS</span></li>
+        <li><i>04</i><span>7-day history</span></li>
+        <li><i>05</i><span>Email delivery</span></li>
+      </ul>
+      <a class="arrowlink" href="/login" target="_top" data-cursor>
+        <span>Get started free</span>
+        <span class="ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="currentColor" stroke-width="1.3"/></svg></span>
+      </a>
+    </article>
+    <article class="pricing-plan pricing-plan--pro">
+      <div class="pricing-plan-top">
+        <p class="pricing-name">Pro</p>
+        <span class="pricing-badge">Founding price</span>
+      </div>
+      <div class="pricing-price"><b>$9</b><span>Per month</span></div>
+      <p class="pricing-annual">Or $90/year · save 17% · first 200 members lock it in</p>
+      <p class="pricing-tagline">The complete Briefly experience, including V2, V3, and V4 as they ship.</p>
+      <ul class="pricing-features">
+        <li><i>01</i><span>Unlimited source connections and history</span></li>
+        <li><i>02</i><span>Full briefings with 8–14 items</span></li>
+        <li><i>03</i><span>All source types, including Readwise</span></li>
+        <li><i>04</i><span>Interest learning that improves daily</span></li>
+        <li><i>05</i><span>Manual capture for links, notes, and documents</span></li>
+        <li><i>06</i><span>Ask Briefly across your accumulated knowledge</span></li>
+        <li><i>07</i><span>Audio briefs for your commute</span></li>
+      </ul>
+      <a class="arrowlink" href="/upgrade" target="_top" data-cursor>
+        <span>Get Pro — $9/month</span>
+        <span class="ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="currentColor" stroke-width="1.3"/></svg></span>
+      </a>
+    </article>
+  </div>
+  <p class="pricing-note" data-rv="fade">Cancel anytime. Export your sources, briefings, and history — no lock-in.</p>
+</section>
+
+<!-- ============================================================ chapter V -->
+<section class="sec fin" id="eternity" data-cam="5">
   <!-- foreground: the closing horizon: hill, ruins, grass, and the last branch -->
   <div class="fg" data-fg="eternity" aria-hidden="true">
     <span class="fg-el fg-hill" data-fg-in="up">
@@ -1407,7 +1526,7 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
 </section>
 
 <!-- ============================================================ footer -->
-<footer class="foot" data-cam="5">
+<footer class="foot" data-cam="6">
   <!-- foreground: one planting along the lower edge of the colophon -->
   <div class="fg" data-fg="foot" aria-hidden="true">
     <span class="fg-el fg-bush" data-fg-in="up">
@@ -1435,6 +1554,7 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
       <li><a href="#gate" data-cursor>Decision brief</a></li>
       <li><a href="#pathways" data-cursor>Decision memory</a></li>
       <li><a href="#lessons" data-cursor>Decision method</a></li>
+      <li><a href="#pricing" data-cursor>Pricing &amp; plans</a></li>
       <li><a href="#eternity" data-cursor>Connect tracked sources</a></li>
     </ul></div>
     <div><h4>Write-back</h4><ul>
@@ -4396,8 +4516,9 @@ const CAM = [
   { p: [ -5.6, 2.35, 11.6 ], t: [  1.2, 5.60, -14.0 ], fov: 48 },  /* 1 the sanmon  */
   { p: [  1.2, 3.60,  2.2 ], t: [ -0.6, 7.50, -22.0 ], fov: 40 },  /* 2 gardens     */
   { p: [  5.2, 2.10, -3.4 ], t: [ -2.6, 7.00, -20.0 ], fov: 46 },  /* 3 craft       */
-  { p: [  0.0, 7.60, -16.0 ], t: [  0.0, 13.0, -40.0 ], fov: 42 }, /* 4 afterlight  */
-  { p: [  0.0, 10.5, -20.0 ], t: [  0.0, 3.00, -34.0 ], fov: 46 }  /* 5 footer      */
+  { p: [  5.2, 2.10, -3.4 ], t: [ -2.6, 7.00, -20.0 ], fov: 46 },  /* 4 pricing     */
+  { p: [  0.0, 7.60, -16.0 ], t: [  0.0, 13.0, -40.0 ], fov: 42 }, /* 5 afterlight  */
+  { p: [  0.0, 10.5, -20.0 ], t: [  0.0, 3.00, -34.0 ], fov: 46 }  /* 6 footer      */
 ];
 const RIG = { prog: 0, smooth: 0, mx: 0, my: 0, tmx: 0, tmy: 0, intro: 0, focus: -1, focusAmt: 0 };
 let curveP, curveT, tmpCam;
@@ -4689,7 +4810,7 @@ function wireHeroExit() {
 function wireNav() {
   let last = 0;
   const rail = $('#rail');
-  const names = ['Opening', 'Specimen brief', 'Market memory', 'Six-point method', 'Connect', 'Colophon'];
+  const names = ['Opening', 'Specimen brief', 'Market memory', 'Six-point method', 'Pricing', 'Connect', 'Colophon'];
   SECS.forEach((s, i) => {
     const b = document.createElement('button');
     b.innerHTML = '<i></i>'; b.title = names[i] || '';
