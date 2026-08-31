@@ -7,6 +7,7 @@ import type { KnowledgeGraphNode, KnowledgeGraphNodeType, KnowledgeGraphResponse
 import { applyExplorerLens, applyThreadFocusFilter, DEFAULT_EXPLORER_LENS, searchMatchIds, type ExplorerLens } from "@/lib/graphFilter";
 import type { GraphTimeRange, GraphViewFilter } from "@/lib/graphLinks";
 import { applyHubLayout, linkDistance, type LayoutLink, type LayoutNode } from "@/lib/graphLayout";
+import { useAppTheme } from "@/components/app/AppThemeProvider";
 import { useGraphHub } from "./GraphHubContext";
 
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
@@ -91,6 +92,54 @@ const TIME_RANGES: { label: string; value: GraphTimeRange | null }[] = [
   { label: "90d", value: 90 },
 ];
 
+type GraphPaint = {
+  dimNode: string;
+  dimAlpha: number;
+  idleAlpha: number;
+  neighborAlpha: number;
+  ring: string;
+  nodeStroke: string;
+  link: string;
+  linkDim: string;
+  linkActive: string;
+  labelBg: string;
+  labelBorder: string;
+  labelText: string;
+  dimLabel: string;
+};
+
+const PAINT_LIGHT: GraphPaint = {
+  dimNode: "rgba(72, 76, 92, 0.55)",
+  dimAlpha: 0.42,
+  idleAlpha: 0.94,
+  neighborAlpha: 0.98,
+  ring: "rgba(22, 20, 16, 0.55)",
+  nodeStroke: "rgba(22, 20, 16, 0.22)",
+  link: "rgba(68, 58, 168, 0.48)",
+  linkDim: "rgba(68, 58, 168, 0.18)",
+  linkActive: "rgba(68, 58, 168, 0.9)",
+  labelBg: "#ffffff",
+  labelBorder: "rgba(22, 20, 16, 0.16)",
+  labelText: "#161310",
+  dimLabel: "rgba(22, 20, 16, 0.8)",
+};
+
+const PAINT_DARK: GraphPaint = {
+  dimNode: "rgba(176, 184, 204, 0.5)",
+  dimAlpha: 0.34,
+  idleAlpha: 0.94,
+  neighborAlpha: 0.98,
+  ring: "rgba(244, 242, 238, 0.86)",
+  nodeStroke: "rgba(0, 0, 0, 0.45)",
+  link: "rgba(160, 170, 255, 0.48)",
+  linkDim: "rgba(160, 170, 255, 0.16)",
+  linkActive: "rgba(176, 186, 255, 0.92)",
+  labelBg: "rgba(22, 24, 32, 0.94)",
+  labelBorder: "rgba(244, 242, 238, 0.16)",
+  labelText: "#f4f2ee",
+  dimLabel: "rgba(244, 242, 238, 0.82)",
+};
+
 function drawNodeLabel(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -98,6 +147,7 @@ function drawNodeLabel(
   y: number,
   globalScale: number,
   emphasized: boolean,
+  paint: GraphPaint,
 ) {
   const fontSize = emphasized
     ? Math.max(10, Math.min(12, 12 / globalScale))
@@ -117,17 +167,17 @@ function drawNodeLabel(
     const h = fontSize + padY * 2;
     const left = x - w / 2;
     const top = y;
-    ctx.fillStyle = "rgba(255, 255, 255, 0.94)";
-    ctx.strokeStyle = "rgba(15, 15, 15, 0.1)";
+    ctx.fillStyle = paint.labelBg;
+    ctx.strokeStyle = paint.labelBorder;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(left, top, w, h, 4);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = "#1a1a1a";
+    ctx.fillStyle = paint.labelText;
     ctx.fillText(display, x, top + padY);
   } else {
-    ctx.fillStyle = "rgba(26, 26, 26, 0.72)";
+    ctx.fillStyle = paint.dimLabel;
     ctx.fillText(display, x, y);
   }
 }
@@ -182,6 +232,8 @@ export function KnowledgeGraphView({
   const [didFit, setDidFit] = useState(false);
   const mobile = useMobileLayout();
   const canHover = useCanHover();
+  const { theme } = useAppTheme();
+  const paint = theme === "dark" ? PAINT_DARK : PAINT_LIGHT;
   const { openHub, closeHub, target } = useGraphHub();
   const threadFocus = viewFilter === "thread";
   const [lens, setLens] = useState<ExplorerLens>(DEFAULT_EXPLORER_LENS);
@@ -340,7 +392,7 @@ export function KnowledgeGraphView({
     graph.resumeAnimation();
     const timer = window.setTimeout(() => graph.pauseAnimation(), 120);
     return () => window.clearTimeout(timer);
-  }, [hoveredId, selectedId]);
+  }, [hoveredId, selectedId, paint]);
 
   const fitPadding = mobile ? 80 : 48;
 
@@ -360,7 +412,7 @@ export function KnowledgeGraphView({
       const y = n.y ?? 0;
 
       ctx.save();
-      ctx.globalAlpha = inFocus ? (isSelected ? 1 : isNeighbor ? 0.92 : 0.78) : 0.1;
+      ctx.globalAlpha = inFocus ? (isSelected ? 1 : isNeighbor ? paint.neighborAlpha : paint.idleAlpha) : paint.dimAlpha;
 
       if (isSelected) {
         ctx.shadowColor = NODE_COLORS[n.type];
@@ -369,37 +421,40 @@ export function KnowledgeGraphView({
 
       ctx.beginPath();
       ctx.arc(x, y, size, 0, 2 * Math.PI);
-      ctx.fillStyle = inFocus ? NODE_COLORS[n.type] : "rgba(148, 155, 175, 0.55)";
+      ctx.fillStyle = inFocus ? NODE_COLORS[n.type] : paint.dimNode;
       ctx.fill();
       ctx.shadowBlur = 0;
+      ctx.strokeStyle = paint.nodeStroke;
+      ctx.lineWidth = 1 / Math.max(globalScale, 0.5);
+      ctx.stroke();
 
       if (emphasized && inFocus) {
         ctx.beginPath();
         ctx.arc(x, y, size + (isSelected ? 3.5 : 2), 0, 2 * Math.PI);
-        ctx.strokeStyle = isSelected ? NODE_COLORS[n.type] : "rgba(255, 255, 255, 0.95)";
+        ctx.strokeStyle = isSelected ? NODE_COLORS[n.type] : paint.ring;
         ctx.lineWidth = (isSelected ? 2.5 : 1.5) / globalScale;
         ctx.stroke();
       }
 
       if (shouldShowCanvasLabel(n, globalScale, hoveredId, selectedId, focusIds) && n.label) {
-        drawNodeLabel(ctx, n.label, x, y + size + 4 / globalScale, globalScale, Boolean(emphasized));
+        drawNodeLabel(ctx, n.label, x, y + size + 4 / globalScale, globalScale, Boolean(emphasized), paint);
       }
 
       ctx.restore();
     },
-    [hoveredId, selectedId, focusIds, mobile],
+    [hoveredId, selectedId, focusIds, mobile, paint],
   );
 
   const linkColor = useCallback(
     (link: object) => {
       const l = link as { source?: string | ForceNode; target?: string | ForceNode };
-      if (!focusIds || !l.source || !l.target) return "rgba(94, 106, 210, 0.22)";
+      if (!focusIds || !l.source || !l.target) return paint.link;
       const src = linkEndpointId(l.source);
       const tgt = linkEndpointId(l.target);
       const active = focusIds.has(src) && focusIds.has(tgt);
-      return active ? "rgba(94, 106, 210, 0.72)" : "rgba(94, 106, 210, 0.04)";
+      return active ? paint.linkActive : paint.linkDim;
     },
-    [focusIds],
+    [focusIds, paint],
   );
 
   const linkWidth = useCallback(
@@ -411,7 +466,7 @@ export function KnowledgeGraphView({
       const src = linkEndpointId(l.source);
       const tgt = linkEndpointId(l.target);
       const active = focusIds.has(src) && focusIds.has(tgt);
-      return (active ? base * 1.65 : base * 0.35) * thin;
+      return (active ? base * 1.65 : base * 0.7) * thin;
     },
     [focusIds],
   );
