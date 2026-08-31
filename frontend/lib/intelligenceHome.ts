@@ -121,6 +121,22 @@ function metricFor(args: {
   detector?: string | null;
 }): GlanceMetric | null {
   if (args.kind === "change") {
+    const prev = (args.previousState || "").trim();
+    const next = (args.newState || "").trim();
+    if (prev && next && prev.toLowerCase() !== next.toLowerCase()) {
+      const fromPct = prev.match(/(\d+(?:\.\d+)?)\s*%/);
+      const toPct = next.match(/(\d+(?:\.\d+)?)\s*%/);
+      if (fromPct && toPct && fromPct[1] !== toPct[1]) {
+        const from = Number(fromPct[1]);
+        const to = Number(toPct[1]);
+        return {
+          value: `${Math.round(from)}% → ${Math.round(to)}%`,
+          hint: args.detector === "model_api" ? "API" : "pricing",
+          direction: to < from ? "down" : to > from ? "up" : undefined,
+        };
+      }
+      return null;
+    }
     const fromText = extractPercentDelta(
       args.previousState,
       args.newState,

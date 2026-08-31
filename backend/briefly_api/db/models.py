@@ -977,6 +977,41 @@ class MarketSignal(Base):
     )
 
 
+class EntitySnapshot(Base):
+    """Versioned observed state for a watched entity + detector aspect.
+
+    Append-only. The latest row for (user, entity, aspect) is what Briefly
+    believed last — used as previous_state when a new signal arrives.
+    """
+
+    __tablename__ = "entity_snapshots"
+    __table_args__ = (
+        Index("ix_entity_snapshots_latest", "user_id", "entity_id", "aspect", "observed_at"),
+        Index("ix_entity_snapshots_entity", "entity_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    entity_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("watched_entities.id", ondelete="CASCADE"), index=True
+    )
+    aspect: Mapped[str] = mapped_column(String(40), nullable=False)
+    # pricing_positioning | model_api | product_release
+    state_text: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url: Mapped[str] = mapped_column(Text, default="")
+    signal_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("signals.id", ondelete="SET NULL"), nullable=True
+    )
+    observed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class DecisionThread(Base):
     """A persistent strategic question or hypothesis — Sprint 5 moat object.
 

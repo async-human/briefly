@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from briefly_api.db.models import MarketSignal, SignalEvidence, SignalImpact
 from briefly_api.services.operating_context import questions_hit_by_text, who_affected_from_context
-from briefly_api.services.signals.detectors import DetectorResult
+from briefly_api.services.signals.detectors import DETECTOR_TYPES, DetectorResult
 from briefly_api.services.watch.relevance import canonicalize_url
 
 log = logging.getLogger(__name__)
@@ -64,13 +64,31 @@ async def persist_market_signal(
     """Insert a market signal (idempotent on user+entity+url). Returns id or None."""
     if not source_url:
         return None
-    previous = detector.previous_state or await prior_state_for(
-        session,
-        user_id=user_id,
-        entity_id=entity_id,
-        detector_type=detector.detector_type,
-        source_url=source_url,
-    )
+    from briefly_api.services.signals.snapshots import record_snapshot, resolve_states
+
+    write_snapshot = False
+    if detector.detector_type in DETECTOR_TYPES and entity_id:
+        previous, new_state, write_snapshot = await resolve_states(
+            session,
+            user_id=user_id,
+            entity_id=entity_id,
+            aspect=detector.detector_type,
+            proposed_new=detector.new_state or detector.extracted_claim or title,
+            source_url=source_url,
+        )
+        if detector.previous_state:
+            previous = detector.previous_state[:500]
+    else:
+        previous = detector.previous_state or await prior_state_for(
+            session,
+            user_id=user_id,
+            entity_id=entity_id,
+            detector_type=detector.detector_type,
+            source_url=source_url,
+        )
+        new_state = (detector.new_state or "")[:500]
+    previous = (previous or "")[:500]
+    new_state = (new_state or "")[:500]
     signal_id = str(uuid.uuid4())
     stmt = (
         pg_insert(MarketSignal)
@@ -82,7 +100,7 @@ async def persist_market_signal(
             title=(title or "")[:500],
             what_changed=(what_changed or detector.extracted_claim)[:800],
             previous_state=previous[:500],
-            new_state=detector.new_state[:500],
+            new_state=new_state[:500],
             confidence=float(detector.confidence or 0),
             status="candidate",
             source_url=source_url,
@@ -153,8 +171,21 @@ async def persist_market_signal(
             signal_id=inserted,
             blob=blob,
             previous_state=previous,
-            new_state=detector.new_state,
+            new_state=new_state,
         )
     except Exception:
         log.exception("Failed to link signal %s to decision threads", inserted)
+    if write_snapshot and entity_id:
+        try:
+            await record_snapshot(
+                session,
+                user_id=user_id,
+                entity_id=entity_id,
+                aspect=detector.detector_type,
+                state_text=new_state,
+                source_url=source_url,
+                signal_id=inserted,
+            )
+        except Exception:
+            log.exception("Failed to record entity snapshot for signal %s", inserted)
     return inserted

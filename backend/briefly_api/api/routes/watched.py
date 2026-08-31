@@ -32,6 +32,13 @@ router = APIRouter(tags=["watched"])
 _VALID_KINDS = {"company", "topic", "person", "product"}
 
 
+class EntityStateOut(BaseModel):
+    aspect: str
+    label: str
+    state: str
+    observed_at: datetime | None = None
+
+
 class WatchedEntityOut(BaseModel):
     id: str
     name: str
@@ -40,6 +47,7 @@ class WatchedEntityOut(BaseModel):
     aliases: list[str] = []
     unread_count: int = 0
     relationship_to_user: str = "watch"
+    last_states: list[EntityStateOut] = []
 
 
 class WatchedEntityIn(BaseModel):
@@ -85,7 +93,11 @@ class EntityAlertOut(BaseModel):
     created_at: datetime | None
 
 
-def _serialize_entity(r: WatchedEntity, unread: int = 0) -> WatchedEntityOut:
+def _serialize_entity(
+    r: WatchedEntity,
+    unread: int = 0,
+    last_states: list | None = None,
+) -> WatchedEntityOut:
     return WatchedEntityOut(
         id=r.id,
         name=r.name,
@@ -94,6 +106,7 @@ def _serialize_entity(r: WatchedEntity, unread: int = 0) -> WatchedEntityOut:
         aliases=list(r.aliases or []),
         unread_count=unread,
         relationship_to_user=getattr(r, "relationship_to_user", None) or "watch",
+        last_states=[EntityStateOut.model_validate(s) for s in (last_states or [])],
     )
 
 
@@ -246,7 +259,14 @@ async def list_watched(
         )
     ).scalars().all()
     unread = await _unread_map(db, user.id)
-    return [_serialize_entity(r, unread.get(r.id, 0)) for r in rows]
+    snaps: dict[str, list] = {}
+    try:
+        from briefly_api.services.signals.snapshots import latest_by_entities
+
+        snaps = await latest_by_entities(db, user.id, [r.id for r in rows])
+    except Exception:
+        snaps = {}
+    return [_serialize_entity(r, unread.get(r.id, 0), snaps.get(r.id) or []) for r in rows]
 
 
 @router.post("/watched-entities", response_model=WatchedEntityOut, status_code=status.HTTP_201_CREATED)

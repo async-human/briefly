@@ -11053,6 +11053,43 @@ a.saved-capture-title:hover {
   color: var(--app-ink, #1e293b);
 }
 
+.watched-known {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.watched-known li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+  align-items: baseline;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+  line-height: 1.4;
+}
+
+.watched-known-name {
+  font-weight: 600;
+  color: var(--app-ink-secondary);
+}
+
+.watched-known-label {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--app-brand);
+}
+
+.watched-known-state {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .watched-empty {
   margin: 0;
   font-size: 0.82rem;

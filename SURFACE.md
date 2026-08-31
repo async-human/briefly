@@ -53,7 +53,7 @@ Respect `prefers-reduced-motion`.
 
 ## Visuals must beat text
 
-A price drop, a momentum sparkline, a belief-confidence shift, or a May → June → Today story line — only when the numbers are real. Decision-thread confidence is Laplace-smoothed from supporting vs contradicting evidence. If we do not have previous state, source count, or confidence, omit the visual. Never invent a metric.
+A price drop, a momentum sparkline, a belief-confidence shift, or a May → June → Today story line — only when the numbers are real. Decision-thread confidence is Laplace-smoothed from supporting vs contradicting evidence. Entity snapshots supply last-known pricing / API / product state so a change card can show previous → new. If we do not have previous state, source count, or confidence, omit the visual. Never invent a metric.
 
 ## What stays off the home screen
 

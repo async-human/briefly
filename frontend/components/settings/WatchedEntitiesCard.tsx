@@ -10,6 +10,12 @@ const KINDS = [
   { value: "product", label: "Product" },
 ];
 
+function shortKnown(text: string, max = 72): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
+}
+
 export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) {
   const [entities, setEntities] = useState<WatchedEntity[]>([]);
   const [name, setName] = useState("");
@@ -52,13 +58,20 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
     setNote("Checking sources…");
     try {
       const result = await api.scanWatchedEntities();
+      const fresh = await api.listWatchedEntities().catch(() => null);
       const unreadByEntity = new Map<string, number>();
       for (const alert of result.alerts.filter((a) => !a.is_read)) {
         unreadByEntity.set(alert.entity_id, (unreadByEntity.get(alert.entity_id) ?? 0) + 1);
       }
-      setEntities((prev) =>
-        prev.map((ent) => ({ ...ent, unread_count: unreadByEntity.get(ent.id) ?? 0 })),
-      );
+      if (fresh) {
+        setEntities(
+          fresh.map((ent) => ({ ...ent, unread_count: unreadByEntity.get(ent.id) ?? ent.unread_count ?? 0 })),
+        );
+      } else {
+        setEntities((prev) =>
+          prev.map((ent) => ({ ...ent, unread_count: unreadByEntity.get(ent.id) ?? 0 })),
+        );
+      }
       setNote(
         result.new_alerts > 0
           ? `Found ${result.new_alerts} new update${result.new_alerts === 1 ? "" : "s"}. Open Today to read them.`
@@ -115,6 +128,7 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
       </form>
 
       {entities.length > 0 ? (
+        <>
         <ul className="watched-list">
           {entities.map((ent) => (
             <li key={ent.id} className="watched-chip">
@@ -133,6 +147,22 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
             </li>
           ))}
         </ul>
+        {entities.some((ent) => (ent.last_states?.length ?? 0) > 0) ? (
+          <ul className="watched-known">
+            {entities.flatMap((ent) => {
+              const latest = ent.last_states?.[0];
+              if (!latest?.state) return [];
+              return [
+                <li key={`${ent.id}-known`}>
+                  <span className="watched-known-name">{ent.name}</span>
+                  <span className="watched-known-label">{latest.label}</span>
+                  <span className="watched-known-state">{shortKnown(latest.state)}</span>
+                </li>,
+              ];
+            })}
+          </ul>
+        ) : null}
+        </>
       ) : (
         <p className="watched-empty">
           {compact

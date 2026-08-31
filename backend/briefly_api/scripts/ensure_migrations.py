@@ -17,7 +17,7 @@ from briefly_api.db.engine import engine
 
 log = logging.getLogger(__name__)
 
-_HEAD = "017"
+_HEAD = "018"
 # Last revision whose objects are already created by Base.metadata.create_all()
 _STAMP_IF_LEGACY = "003"
 
@@ -74,6 +74,7 @@ async def _head_schema_ready() -> bool:
         and await _column_exists("user_profiles", "operating_context")
         and await _table_exists("signals")
         and await _table_exists("decision_threads")
+        and await _table_exists("entity_snapshots")
     )
 
 
