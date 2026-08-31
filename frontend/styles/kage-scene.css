@@ -2,7 +2,7 @@ html:has(.shader-frame),
 html:has(.shader-frame) body {
   height: 100%;
   overflow: hidden;
-  background: #080808;
+  background: #0a0908;
 }
 
 .shader-frame {
@@ -11,7 +11,7 @@ html:has(.shader-frame) body {
   height: 100dvh;
   min-height: 100%;
   overflow: hidden;
-  background: #080808;
+  background: #0a0908;
 }
 
 .shader-frame .threeui-background,

@@ -5,21 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Briefly — The market, distilled before morning</title>
 <meta name="description" content="One cited intelligence brief for AI founders and solo builders, drawn from the sources that move your market.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305070a'/%3E%3Ccircle cx='16' cy='17' r='8' fill='%23e0231c'/%3E%3Crect x='4' y='8' width='24' height='2.6' fill='%23dfe7e0'/%3E%3Crect x='7' y='13' width='18' height='2' fill='%23dfe7e0'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0908'/%3E%3Cpath d='M10.25 7.5v17' stroke='%23f6f4f1' stroke-width='1.75' stroke-linecap='round'/%3E%3Cpath d='M14 10.75h10.25' stroke='%23c49a3c' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="secret-pathways-assets/fonts.css">
 <style>
 /* ============================================================= tokens */
 :root{
-  --ink:#05070a;          /* page black */
-  --ink-2:#0a0e12;        /* raised black */
-  --bone:#dfe7e0;         /* the pale sage white of the wordmark */
-  --bone-dim:#aab4ad;
-  --muted:#78837c;
-  --line:rgba(223,231,224,.13);
-  --line-soft:rgba(223,231,224,.07);
-  --vermilion:#e0231c;
-  --ember:#ff5a3c;
-  --gold:#c9a24a;
+  --ink:#0a0908;
+  --ink-2:#120f0e;
+  --bone:#f6f4f1;
+  --bone-dim:#c4b8a8;
+  --muted:#8c8680;
+  --line:rgba(246,244,241,.13);
+  --line-soft:rgba(246,244,241,.07);
+  --vermilion:#c49a3c;
+  --ember:#ddb96a;
+  --gold:#c9b896;
   --pad:clamp(20px, 3.4vw, 56px);
   --nav-h:84px;
   --ease:cubic-bezier(.22,.61,.36,1);
@@ -160,6 +160,19 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
 .nav-burger i:nth-child(2){ top:11px; width:17px; }
 .nav-burger:hover i:nth-child(2){ width:26px; }
 .nav-burger:hover i:nth-child(1){ width:17px; }
+.nav-cta{
+  flex:0 0 auto; margin-left:clamp(10px,1.6vw,20px); padding:7px 13px;
+  border:1px solid var(--line); color:var(--bone); text-decoration:none;
+  font-size:10px; font-weight:500; letter-spacing:.18em; text-transform:uppercase;
+  transition:border-color .3s, background .3s, color .3s;
+}
+.nav-cta:hover{ border-color:var(--bone-dim); background:rgba(223,231,224,.06); }
+.nav-cta:focus-visible{ outline:2px solid var(--vermilion); outline-offset:3px; }
+.brief-spec{ display:grid; gap:14px; margin:22px 0 0; }
+.brief-spec p{ margin:0; font-size:14px; line-height:1.55; color:#b7c2ba; text-shadow:0 1px 16px rgba(3,6,8,.9); }
+.brief-spec b{ display:block; margin-bottom:4px; font-size:9px; font-weight:500; letter-spacing:.2em; text-transform:uppercase; color:var(--vermilion); }
+.peek{ display:none !important; }
+.fg-wall, .fg-pine, .fg-sakura, .fg-leaves, .fg-lantern, .fg-ruins{ display:none !important; }
 
 /* ============================================================= hero */
 .hero{ position:relative; min-height:100svh; padding:0 var(--pad); display:flex; flex-direction:column; }
@@ -284,18 +297,21 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
 .card:hover .card-fr{ outline-color:rgba(223,231,224,.30); }
 .card:nth-child(1) .card-fr{
   background:
-    linear-gradient(180deg,rgba(3,6,9,.04) 36%,rgba(3,6,9,.72) 100%),
-    url('secret-pathways-assets/generated/kage-approach.webp') center / cover no-repeat;
+    linear-gradient(180deg,rgba(10,9,8,.08) 36%,rgba(10,9,8,.78) 100%),
+    radial-gradient(70% 55% at 48% 38%, rgba(196,154,60,.16), transparent 68%),
+    #120f0e;
 }
 .card:nth-child(2) .card-fr{
   background:
-    linear-gradient(180deg,rgba(3,6,9,.06) 36%,rgba(3,6,9,.74) 100%),
-    url('secret-pathways-assets/generated/kage-lantern-court.webp') center / cover no-repeat;
+    linear-gradient(180deg,rgba(10,9,8,.08) 36%,rgba(10,9,8,.78) 100%),
+    radial-gradient(60% 50% at 70% 48%, rgba(221,185,106,.14), transparent 64%),
+    #120f0e;
 }
 .card:nth-child(3) .card-fr{
   background:
-    linear-gradient(180deg,rgba(3,6,9,.05) 36%,rgba(3,6,9,.74) 100%),
-    url('secret-pathways-assets/generated/kage-moonwater.webp') center / cover no-repeat;
+    linear-gradient(180deg,rgba(10,9,8,.08) 36%,rgba(10,9,8,.78) 100%),
+    radial-gradient(55% 45% at 50% 20%, rgba(201,184,150,.12), transparent 62%),
+    #120f0e;
 }
 .card-fr::after{ content:''; position:absolute; inset:0;
   background:linear-gradient(transparent 46%, rgba(4,6,9,.80)); pointer-events:none; }
@@ -358,9 +374,9 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
 /* fixed, or the gradient is measured against a 6000-pixel body box and the
    moon ends up somewhere around the curriculum table */
 .no-webgl body{ background:
-  radial-gradient(11vw 11vw at 73% 17%, rgba(232,52,28,.95), rgba(158,20,16,.62) 44%, rgba(96,12,12,.20) 64%, transparent 72%),
-  radial-gradient(38vw 32vw at 50% 46%, rgba(228,104,24,.40), rgba(122,42,10,.18) 54%, transparent 74%),
-  radial-gradient(120% 80% at 50% 0%, rgba(120,150,158,.16), transparent 60%), #05070a;
+  radial-gradient(11vw 11vw at 73% 17%, rgba(196,154,60,.55), rgba(143,102,36,.28) 44%, rgba(80,58,20,.12) 64%, transparent 72%),
+  radial-gradient(38vw 32vw at 50% 46%, rgba(201,184,150,.18), rgba(18,15,14,.4) 54%, transparent 74%),
+  radial-gradient(120% 80% at 50% 0%, rgba(246,244,241,.06), transparent 60%), #0a0908;
   background-attachment:fixed; }
 .no-webgl .peek-fr{ background:linear-gradient(160deg,#162326,#0b1013 55%,#241010); }
 .no-webgl .word-fb{
@@ -399,7 +415,7 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
   cursor:pointer; transition:padding .5s var(--ease-out);
 }
 .les::before{ content:''; position:absolute; left:calc(var(--pad) * -1); right:0; top:0; bottom:0;
-  background:linear-gradient(90deg, rgba(224,35,28,.09), transparent 46%);
+  background:linear-gradient(90deg, rgba(196,154,60,.12), transparent 46%);
   opacity:0; transition:opacity .55s var(--ease); pointer-events:none; }
 .les:hover::before{ opacity:1; }
 .les:hover{ padding-left:clamp(8px,1.2vw,18px); }
@@ -501,6 +517,8 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
      that whole time measured against the bar. */
   .nav.menu-open{ transform:none; transition:none; }
   .nav-burger{ margin-left:auto; }
+  .nav-cta{ margin-left:auto; }
+  .nav-burger{ margin-left:12px; }
   .nav-burger.active i:nth-child(1){ top:7px; width:26px; transform:rotate(45deg); }
   .nav-burger.active i:nth-child(2){ top:7px; width:26px; transform:rotate(-45deg); }
   html.nav-open,html.nav-open body{ overflow:hidden; }
@@ -598,7 +616,8 @@ body[data-layout-curriculum="b"] .les{
 }
 body[data-layout-curriculum="b"] .les:nth-child(-n+2){ grid-column:span 3; }
 body[data-layout-curriculum="b"] .les:nth-child(n+3){ grid-column:span 2; }
-body[data-layout-curriculum="b"] .les::before{ left:0; background:linear-gradient(145deg,rgba(224,35,28,.13),transparent 58%); }
+body[data-layout-curriculum="b"] .les:nth-child(6){ grid-column:1 / -1; min-height:160px; }
+body[data-layout-curriculum="b"] .les::before{ left:0; background:linear-gradient(145deg,rgba(196,154,60,.14),transparent 58%); }
 body[data-layout-curriculum="b"] .les:hover{ padding-left:32px; }
 body[data-layout-curriculum="b"] .les h3{ font-size:clamp(20px,2vw,30px); }
 body[data-layout-curriculum="b"] .les p{ display:block; max-width:34ch; }
@@ -895,9 +914,11 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
 <div id="pre">
   <div class="pre-in">
     <div class="pre-mark">
-      <svg viewBox="0 0 44 44" fill="none" aria-hidden="true">
-        <circle cx="22" cy="24" r="9.5" stroke="#e0231c" stroke-width="1.2"/>
-        <path d="M6 12h32M9.5 17h25M22 8v28" stroke="#dfe7e0" stroke-width="1.2"/>
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M10.25 7.5v17" stroke="#dfe7e0" stroke-width="1.75" stroke-linecap="round"/>
+        <path d="M14 10.75h10.25" stroke="#c49a3c" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M14 15.5h7.75" stroke="#c49a3c" stroke-width="1.5" stroke-linecap="round" stroke-opacity=".78"/>
+        <path d="M14 20.25h4.75" stroke="#c49a3c" stroke-width="1.4" stroke-linecap="round" stroke-opacity=".58"/>
       </svg>
     </div>
     <div class="pre-jp jp">BRIEFLY</div>
@@ -911,19 +932,21 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
 <!-- ============================================================ nav -->
 <header class="nav" id="nav">
   <a class="brand" href="#top" data-cursor>
-    <svg viewBox="0 0 44 44" fill="none" aria-hidden="true">
-      <circle cx="22" cy="25" r="8.6" fill="#e0231c" fill-opacity=".9"/>
-      <path d="M5 13h34M9 18.4h26M22 8.5v27" stroke="#dfe7e0" stroke-width="1.5"/>
-      <path d="M14 35.5h16" stroke="#dfe7e0" stroke-width="1.2" stroke-opacity=".6"/>
+    <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path d="M10.25 7.5v17" stroke="#dfe7e0" stroke-width="1.75" stroke-linecap="round"/>
+      <path d="M14 10.75h10.25" stroke="#c49a3c" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M14 15.5h7.75" stroke="#c49a3c" stroke-width="1.5" stroke-linecap="round" stroke-opacity=".78"/>
+      <path d="M14 20.25h4.75" stroke="#c49a3c" stroke-width="1.4" stroke-linecap="round" stroke-opacity=".58"/>
     </svg>
     <span class="brand-tx"><b>BRIEFLY</b><i>FOUNDER INTELLIGENCE</i></span>
   </a>
   <nav class="nav-links" id="navlinks">
     <a class="nav-link" href="#gate" data-cursor><span>Brief</span><span class="alt">Today</span></a>
-    <a class="nav-link" href="#pathways" data-cursor><span>Memory</span><span class="alt">Graph</span></a>
-    <a class="nav-link" href="#lessons" data-cursor><span>Method</span><span class="alt">Action</span></a>
+    <a class="nav-link" href="#pathways" data-cursor><span>Memory</span><span class="alt">Thread</span></a>
+    <a class="nav-link" href="#lessons" data-cursor><span>Method</span><span class="alt">Fields</span></a>
     <a class="nav-link" href="#eternity" data-cursor><span>Access</span><span class="alt">Join</span></a>
   </nav>
+  <a class="nav-cta" href="/login" target="_top" data-cursor>Sign in</a>
   <button class="nav-burger" aria-label="Menu" data-cursor><i></i><i></i></button>
 </header>
 
@@ -932,14 +955,18 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
 <!-- ============================================================ hero -->
 <section class="hero" id="hero" data-cam="0">
   <div class="hero-top">
-    <div class="eyebrow" data-rv="fade"><span class="dot"></span> Founder intelligence · 08:00</div>
+    <div class="eyebrow" data-rv="fade"><span class="dot"></span> Personal brief · 08:00</div>
     <h1 class="display h-hero">
       <span class="mask-line"><span>The market,</span></span>
       <span class="mask-line"><span>distilled</span></span>
       <span class="mask-line"><span>before morning.</span></span>
     </h1>
-    <p class="hero-sub body" data-rv="up">One cited brief for AI founders, drawn from the
-      sources that actually move your market.</p>
+    <p class="hero-sub body" data-rv="up">Newsletters, launches, Show HN, research, and founder
+      feeds — in one cited pack you can act on before the day fills up.</p>
+    <a class="arrowlink" href="/login" target="_top" data-rv="fade" data-cursor>
+      <span>Build my founder brief</span>
+      <span class="ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
+    </a>
   </div>
 
   <div class="hero-spacer"></div>
@@ -948,28 +975,28 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
     <div class="hero-cue" data-rv="fade"><span>Scroll to enter</span><span class="track"><i></i></span></div>
     <div class="chapters" id="chips">
       <div class="chip" data-chip="0" data-rv="up" data-cursor><span class="num">01</span>
-        <span class="tx"><b>Sources</b><p>Newsletters, launches, Show HN, research, competitor feeds.</p></span></div>
+        <span class="tx"><b>Intake</b><p>Newsletters, Show HN, launches, research, founder feeds.</p></span></div>
       <div class="chip" data-chip="1" data-rv="up" data-cursor><span class="num">02</span>
-        <span class="tx"><b>Memory</b><p>Companies and threads that carry from one morning to the next.</p></span></div>
+        <span class="tx"><b>Thread</b><p>A June hire becomes a pricing launch in today’s brief.</p></span></div>
       <div class="chip" data-chip="2" data-rv="up" data-cursor><span class="num">03</span>
-        <span class="tx"><b>Method</b><p>What changed, why it matters, who it hits, what to do.</p></span></div>
+        <span class="tx"><b>Six fields</b><p>Changed, stake, who, past context, action, sources.</p></span></div>
       <div class="chip" data-chip="3" data-rv="up" data-cursor><span class="num">04</span>
-        <span class="tx"><b>Watch</b><p>An interrupt when something you track actually ships.</p></span></div>
+        <span class="tx"><b>Watch</b><p>Keep the name. Interrupt only when it actually ships.</p></span></div>
     </div>
   </div>
 
-  <a class="peek" href="#pathways" data-view="3" data-rv="fade" data-cursor aria-label="Preview: this morning’s brief">
+  <a class="peek" href="#gate" data-view="3" data-rv="fade" data-cursor aria-label="Preview: specimen morning brief">
     <!-- data-frame, or the live view is blitted over the whole anchor and
          runs on down behind the caption instead of stopping at the frame -->
     <span class="peek-fr" data-frame></span>
     <span class="peek-play"><svg viewBox="0 0 22 22" fill="none"><path d="M8 5.6 16.4 11 8 16.4z" fill="#dfe7e0"/></svg></span>
-    <span class="peek-cap"><b class="jp">08:00</b><i>This morning’s brief</i></span>
+    <span class="peek-cap"><b class="jp">Infra</b><i>Agent pricing, this morning</i></span>
   </a>
 
   <div class="word-fb" aria-hidden="true">BRIEFLY</div>
 
   <div class="hero-side" data-rv="up">
-    <span class="v jp">BRIEFLY</span>
+    <span class="v jp">08:00 BRIEF</span>
   </div>
 </section>
 
@@ -988,28 +1015,30 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
     </span>
   </div>
   <div class="sec-head" data-rv="fade">
-    <span class="k"><b>01</b> — The brief</span><span class="rule"></span><span class="k jp">08:00</span>
+    <span class="k"><b>01</b> — Specimen brief</span><span class="rule"></span><span class="k jp">Infra</span>
   </div>
   <div class="gate-grid">
-    <h2 class="display h-sec" data-rv="up">One morning. One market. One decision worth making.</h2>
+    <h2 class="display h-sec" data-rv="up">The agent cost curve just shifted.</h2>
     <div class="gate-copy">
-      <p class="lead" data-rv="up">Briefly starts where the feed ends: a personal intelligence pack for
-        AI founders and solo builders, assembled from the sources that move your market, and written
-        so you can act before the day fills up.</p>
-      <p class="body" data-rv="up">Each brief names what changed, why it matters, who it affects, the
-        thread it continues, and the next move — with the source trail still attached. Nothing here is
-        a digest of everything. It is the part you would miss if it stopped.</p>
+      <p class="lead" data-rv="up">Illustrative 08:00 brief. Three announcements point to a cheaper,
+        longer-running agent stack — and a narrower window for teams still pricing against last quarter.</p>
+      <div class="brief-spec" data-rv="up">
+        <p><b>What changed</b> A model vendor cut agent inference pricing and opened a new batch tier.</p>
+        <p><b>Why it matters</b> The economics of your autonomous workflow just moved in your favour.</p>
+        <p><b>Who it affects</b> AI-native SaaS teams with long-running research and support agents.</p>
+        <p><b>Suggested action</b> Re-run the unit model before the next investor update.</p>
+      </div>
       <a class="arrowlink" href="#pathways" data-rv="fade" data-cursor>
-        <span>See how memory compounds</span>
+        <span>How the thread was built</span>
         <span class="ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
       </a>
     </div>
   </div>
   <div class="gate-stats" data-rv="up">
-    <div><b>06</b><span>Point brief</span></div>
-    <div><b>08:00</b><span>Each morning</span></div>
-    <div><b>Ask</b><span>With citations</span></div>
-    <div><b>∞</b><span>Market memory</span></div>
+    <div><b>Show HN</b><span>Founder launches</span></div>
+    <div><b>RSS</b><span>Newsletters in</span></div>
+    <div><b>Track</b><span>Persistent watch</span></div>
+    <div><b>Ask</b><span>Cited answers</span></div>
   </div>
 </section>
 
@@ -1031,32 +1060,32 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
     </span>
   </div>
   <div class="sec-head" data-rv="fade">
-    <span class="k"><b>02</b> — Memory</span><span class="rule"></span><span class="k jp">Graph</span>
+    <span class="k"><b>02</b> — Market memory</span><span class="rule"></span><span class="k jp">Thread</span>
   </div>
   <div class="cards" id="cards">
     <article class="card" data-rv="up" data-view="0" data-cursor>
       <div class="card-fr" data-frame>
                 <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
-        <i class="glow" style="--gx:80.2%; --gy:23.9%; --gr:22%; --gt:6.1s; --gt2:9.7s; --gc1:rgba(255,142,108,.50); --gc2:rgba(212,56,38,.24)"></i>
-        <div class="card-lab"><b>Sources</b><span class="jp">Intake</span></div>
+        <i class="glow" style="--gx:80.2%; --gy:23.9%; --gr:22%; --gt:6.1s; --gt2:9.7s; --gc1:rgba(221,185,106,.45); --gc2:rgba(196,154,60,.22)"></i>
+        <div class="card-lab"><b>Founder pack</b><span class="jp">Intake</span></div>
       </div>
-      <div class="card-meta"><span>What you already read</span><span>01 / 03</span></div>
+      <div class="card-meta"><span>RSS · newsletters · Show HN</span><span>01 / 03</span></div>
     </article>
     <article class="card" data-rv="up" data-view="1" data-cursor>
       <div class="card-fr" data-frame>
                 <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
-        <i class="glow glow--flame" style="--gx:70.5%; --gy:47.2%; --gr:14%; --gt:3.7s; --gt2:5.3s; --gc1:rgba(255,198,124,.62); --gc2:rgba(226,118,40,.30)"></i>
-        <div class="card-lab"><b>Watching</b><span class="jp">Alert</span></div>
+        <i class="glow glow--flame" style="--gx:70.5%; --gy:47.2%; --gr:14%; --gt:3.7s; --gt2:5.3s; --gc1:rgba(232,210,150,.55); --gc2:rgba(196,154,60,.28)"></i>
+        <div class="card-lab"><b>Watching</b><span class="jp">Scored</span></div>
       </div>
-      <div class="card-meta"><span>When a tracked name ships</span><span>02 / 03</span></div>
+      <div class="card-meta"><span>Jun hire → Jul changelog → today</span><span>02 / 03</span></div>
     </article>
     <article class="card" data-rv="up" data-view="2" data-cursor>
       <div class="card-fr" data-frame>
                 <span class="card-ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg></span>
-        <i class="glow" style="--gx:48.0%; --gy:16.8%; --gr:20%; --gt:7.3s; --gt2:11.2s; --gc1:rgba(255,138,104,.52); --gc2:rgba(208,54,36,.24)"></i>
-        <div class="card-lab"><b>Ask</b><span class="jp">Cited</span></div>
+        <i class="glow" style="--gx:48.0%; --gy:16.8%; --gr:20%; --gt:7.3s; --gt2:11.2s; --gc1:rgba(201,184,150,.42); --gc2:rgba(143,102,36,.22)"></i>
+        <div class="card-lab"><b>Ask Briefly</b><span class="jp">Cited</span></div>
       </div>
-      <div class="card-meta"><span>What you have already seen</span><span>03 / 03</span></div>
+      <div class="card-meta"><span>What have I read about this?</span><span>03 / 03</span></div>
     </article>
   </div>
 </section>
@@ -1076,43 +1105,49 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
     </span>
   </div>
   <div class="sec-head" data-rv="fade">
-    <span class="k"><b>03</b> — Method</span><span class="rule"></span><span class="k jp">Six</span>
+    <span class="k"><b>03</b> — Six-point method</span><span class="rule"></span><span class="k jp">Fields</span>
   </div>
   <div class="cur-head">
-    <h2 class="display h-sec" data-rv="up">Six fields. One brief. Nothing extra.</h2>
-    <p class="body-lg" data-rv="up">Briefly does not stop at what happened. Every meaningful signal is
-      carried through consequence, context, and a next move — with the source still attached.</p>
+    <h2 class="display h-sec" data-rv="up">The same brief, field by field.</h2>
+    <p class="body-lg" data-rv="up">Not a digest. Each field is a job: name the move, the stake, the
+      people, the history you already hold, the next operating step, and the sources that prove it.</p>
   </div>
   <div class="cur" id="cur">
     <div class="les" data-les="0" data-cursor>
       <span class="k">01</span>
       <h3>What changed<em class="jp">Signal</em></h3>
-      <p>The development that actually moved overnight, not the whole feed.</p>
+      <p>A model vendor cut agent inference pricing and opened a new batch tier.</p>
       <span class="t">Cited</span><i class="bar"></i>
     </div>
     <div class="les" data-les="1" data-cursor>
       <span class="k">02</span>
       <h3>Why it matters<em class="jp">Stake</em></h3>
-      <p>Consequence for the company you are building, stated in one line.</p>
+      <p>The economics of your autonomous workflow just moved in your favour.</p>
       <span class="t">Cited</span><i class="bar"></i>
     </div>
     <div class="les" data-les="2" data-cursor>
       <span class="k">03</span>
       <h3>Who it affects<em class="jp">Who</em></h3>
-      <p>The people, stacks, and markets in the blast radius.</p>
+      <p>AI-native SaaS teams with long-running research and support agents.</p>
       <span class="t">Cited</span><i class="bar"></i>
     </div>
     <div class="les" data-les="3" data-cursor>
       <span class="k">04</span>
       <h3>Past context<em class="jp">Thread</em></h3>
-      <p>The companies and decisions this continues from your own memory.</p>
+      <p>This reverses the margin pressure flagged in your August 12 briefing.</p>
       <span class="t">Linked</span><i class="bar"></i>
     </div>
     <div class="les" data-les="4" data-cursor>
       <span class="k">05</span>
       <h3>Suggested action<em class="jp">Move</em></h3>
-      <p>Track the company, save it to memory, or take the next operating step.</p>
+      <p>Track the vendor, save it to memory, or re-run the unit model before Thursday.</p>
       <span class="t">Act</span><i class="bar"></i>
+    </div>
+    <div class="les" data-les="5" data-cursor>
+      <span class="k">06</span>
+      <h3>Source trail<em class="jp">Cite</em></h3>
+      <p>Primary announcement, pricing docs, and two independent analyses — still attached.</p>
+      <span class="t">Open</span><i class="bar"></i>
     </div>
   </div>
 </section>
@@ -1135,11 +1170,11 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
     </span>
   </div>
   <div class="eyebrow" data-rv="fade">Founding access</div>
-  <h2 class="display" data-rv="up">Begin</h2>
-  <p class="body-lg" data-rv="up">Bring the market, companies, and questions you track. Briefly
-    turns them into one morning intelligence ritual — and gets sharper as your context compounds.</p>
+  <h2 class="display" data-rv="up">Connect</h2>
+  <p class="body-lg" data-rv="up">Connect the sources you already read. Briefly turns them into the
+    08:00 brief — then Ask, Watching, and market memory use the same trail.</p>
   <a class="cta" href="/login" target="_top" data-rv="fade" data-cursor>
-    <i></i><span>Build my first brief</span>
+    <i></i><span>Build my founder brief</span>
     <svg viewBox="0 0 14 14" fill="none" width="13" height="13"><path d="M3 11 11 3M5 3h6v6" stroke="#dfe7e0" stroke-width="1.3"/></svg>
   </a>
 </section>
@@ -1160,24 +1195,26 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
   </div>
   <div class="foot-grid">
     <div class="foot-brand">
-      <svg viewBox="0 0 44 44" fill="none" width="34" height="34" aria-hidden="true">
-        <circle cx="22" cy="25" r="8.6" fill="#e0231c" fill-opacity=".9"/>
-        <path d="M5 13h34M9 18.4h26M22 8.5v27" stroke="#dfe7e0" stroke-width="1.5"/>
+      <svg viewBox="0 0 32 32" fill="none" width="34" height="34" aria-hidden="true">
+        <path d="M10.25 7.5v17" stroke="#dfe7e0" stroke-width="1.75" stroke-linecap="round"/>
+        <path d="M14 10.75h10.25" stroke="#c49a3c" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M14 15.5h7.75" stroke="#c49a3c" stroke-width="1.5" stroke-linecap="round" stroke-opacity=".78"/>
+        <path d="M14 20.25h4.75" stroke="#c49a3c" stroke-width="1.4" stroke-linecap="round" stroke-opacity=".58"/>
       </svg>
-      <p>Stop carrying the market in your head. Personal, cited intelligence for AI founders
-        and solo builders — one brief each morning.</p>
+      <p>Stop carrying the market in your head. One cited 08:00 brief for AI founders —
+        from the sources you already trust, with the thread still attached.</p>
     </div>
-    <div><h4>On the page</h4><ul>
-      <li><a href="#gate" data-cursor>The brief</a></li>
-      <li><a href="#pathways" data-cursor>Memory</a></li>
-      <li><a href="#lessons" data-cursor>Method</a></li>
-      <li><a href="#eternity" data-cursor>Access</a></li>
+    <div><h4>The loop</h4><ul>
+      <li><a href="#gate" data-cursor>Specimen brief</a></li>
+      <li><a href="#pathways" data-cursor>Market memory</a></li>
+      <li><a href="#lessons" data-cursor>Six-point method</a></li>
+      <li><a href="#eternity" data-cursor>Connect sources</a></li>
     </ul></div>
-    <div><h4>In the product</h4><ul>
-      <li><a href="#lessons" data-cursor>Track a company</a></li>
+    <div><h4>Write-back</h4><ul>
+      <li><a href="#lessons" data-cursor>Track this company</a></li>
       <li><a href="#pathways" data-cursor>Save to memory</a></li>
       <li><a href="#pathways" data-cursor>Ask Briefly</a></li>
-      <li><a href="#pathways" data-cursor>Watch for a ship</a></li>
+      <li><a href="#lessons" data-cursor>Open the source trail</a></li>
     </ul></div>
     <div><h4>Account</h4><ul>
       <li><a href="/login" target="_top" data-cursor>Sign in</a></li>
@@ -1188,8 +1225,8 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
   </div>
   <div class="foot-base">
     <span>© 2026 Briefly</span>
-    <span class="jp">Intelligence for AI founders</span>
-    <span>Cited · Morning · Memory</span>
+    <span class="jp">Cited intelligence for AI founders</span>
+    <span>08:00 · Six fields · Memory</span>
   </div>
 </footer>
 
@@ -2241,7 +2278,7 @@ function texBranchCutout(seed) {
     tx.drawImage(leafImg, 0, 0);
     tx.globalCompositeOperation = 'source-in';
     const v = l[4];
-    tx.fillStyle = hex(96 + v * 96, 14 + v * 22, 16 + v * 18);
+    tx.fillStyle = hex(168 + v * 52, 128 + v * 36, 48 + v * 22);
     tx.fillRect(0, 0, 128, 128);
     tx.globalCompositeOperation = 'source-over';
     x.save(); x.translate(l[0], l[1]); x.rotate(l[2]);
@@ -2715,14 +2752,14 @@ function buildMoon() {
        is decoded out of sRGB before this multiplies it, so the tint has to be
        written in linear, where the same look is ≈ .21. Reading the ratio
        straight off the reference is what left the moon a pale pink. */
-    new THREE.MeshBasicMaterial({ map: tx(texMoon()), color: hdr(3.6, .64, .61),
+    new THREE.MeshBasicMaterial({ map: tx(texMoon()), color: hdr(2.55, 1.85, .92),
       transparent: true, depthWrite: false, fog: false, toneMapped: false }));
   disc.position.set(MOON.x, MOON.y, MOON.z); disc.renderOrder = 1;
   scene.add(disc); WORLD.moon = disc;
 
   /* the air around it — a wide, weak corona that the bloom picks up */
   const halo = new THREE.Mesh(new THREE.PlaneGeometry(MOON.r * 6.4, MOON.r * 6.4),
-    new THREE.MeshBasicMaterial({ map: tx(texGlow('rgba(255,124,112,.90)', 'rgba(206,52,48,.26)')),
+    new THREE.MeshBasicMaterial({ map: tx(texGlow('rgba(232,210,150,.88)', 'rgba(168,128,48,.22)')),
       transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: .44 }));
   halo.position.set(MOON.x, MOON.y, MOON.z - .3); halo.renderOrder = 0;
   scene.add(halo); WORLD.moonHalo = halo;
@@ -2804,6 +2841,7 @@ function buildTorii() {
      BASE*scale above the court. Drop it by exactly that and the feet land. */
   const GS = .72;
   g.position.set(0, -BASE * GS, -8.6); g.scale.setScalar(GS);
+  g.visible = false;
   scene.add(g); WORLD.torii = g;
 }
 
@@ -2895,8 +2933,8 @@ function buildMaple(seed, x, z, scale) {
 
   const leafGeo = new THREE.PlaneGeometry(.36, .36);
   const leafMat = new THREE.MeshStandardMaterial({
-    map: tx(texLeaf()), color: 0x2b0406, alphaTest: .42, side: THREE.DoubleSide,
-    roughness: .86, metalness: 0, emissive: 0x080000, emissiveIntensity: .12
+    map: tx(texLeaf()), color: 0x3a2e18, alphaTest: .42, side: THREE.DoubleSide,
+    roughness: .86, metalness: 0, emissive: 0x1a1408, emissiveIntensity: .10
   });
   const per = LOW ? 5 : 9;
   const inst = new THREE.InstancedMesh(leafGeo, leafMat, tips.length * per);
@@ -3190,10 +3228,8 @@ function buildLeafFall() {
   const N = LOW ? 110 : 260;
   const mat = new THREE.MeshStandardMaterial({
     map: tx(texLeaf()), alphaTest: .42, side: THREE.DoubleSide,
-    color: 0x40080a, roughness: .84, metalness: 0,
-    /* green and blue driven to nothing: the composite tone-maps at the end,
-       and an emissive red with any green in it comes back out of that pink */
-    emissive: 0x780200, emissiveIntensity: .72
+    color: 0x4a3a1c, roughness: .84, metalness: 0,
+    emissive: 0x6a5420, emissiveIntensity: .38
   });
   const inst = new THREE.InstancedMesh(new THREE.PlaneGeometry(.40, .40), mat, N);
   inst.frustumCulled = false; inst.renderOrder = 5;
@@ -3892,7 +3928,7 @@ function buildLights() {
 
   /* moonlight: no shadow, no fill, purely a rim down the right-hand slope of
      every roof — without it the hall is a flat black cut-out against the sky */
-  const moonKey = new THREE.DirectionalLight(0xff6a42, .52);
+  const moonKey = new THREE.DirectionalLight(0xe8c48a, .52);
   moonKey.position.set(26, 30, -60);
   moonKey.target.position.set(0, 8, -40); scene.add(moonKey.target);
   scene.add(moonKey);
@@ -3909,7 +3945,7 @@ function buildLights() {
 
   /* the moon throws almost nothing, but a trace of red high on the right
      keeps it attached to the scene instead of floating on top of it */
-  const moonL = new THREE.PointLight(0xff3a1c, 3.0, 46, 2);
+  const moonL = new THREE.PointLight(0xd4a84a, 2.4, 46, 2);
   moonL.position.set(11.0, 17.0, -24.0); scene.add(moonL); WORLD.moonLight = moonL;
 
   const fill = new THREE.PointLight(0x86c6d2, 0.95, 30, 2);
@@ -4329,7 +4365,7 @@ function wireHeroExit() {
 function wireNav() {
   let last = 0;
   const rail = $('#rail');
-  const names = ['Opening', 'The brief', 'Memory', 'Method', 'Access', 'Colophon'];
+  const names = ['Opening', 'Specimen brief', 'Market memory', 'Six-point method', 'Connect', 'Colophon'];
   SECS.forEach((s, i) => {
     const b = document.createElement('button');
     b.innerHTML = '<i></i>'; b.title = names[i] || '';
