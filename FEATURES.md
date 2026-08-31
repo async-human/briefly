@@ -4,7 +4,7 @@ Living log of what is **in the product**, mapped to the destination in [`FEEDLY_
 
 Update this file whenever a capability ships, is reshaped, or is deliberately parked. A rising feature count is not progress unless it moves a signal, a decision, or a retained user.
 
-**Last updated:** 2026-08-31 (`500998f` on `main`, plus this file)
+**Last updated:** 2026-08-31 (direction doc expanded to the full Feedly analysis)
 
 ---
 
