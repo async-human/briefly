@@ -88,14 +88,6 @@ export function EntityHubDrawer() {
   if (!target) return null;
 
   const onGraphPage = pathname === "/graph";
-  const trackKind =
-    hub?.type === "entity" || hub?.kind === "company" || hub?.kind === "person" || hub?.kind === "product"
-      ? hub.kind === "person"
-        ? "person"
-        : hub.kind === "product"
-          ? "product"
-          : "company"
-      : "topic";
 
   async function trackEntity() {
     if (!hub || hub.watching || tracking) return;

@@ -5,6 +5,11 @@ html:has(.shader-frame) body {
   background: #0a0908;
 }
 
+html:has(.shader-frame[data-theme="light"]),
+html:has(.shader-frame[data-theme="light"]) body {
+  background: #f3eee6;
+}
+
 .shader-frame {
   position: relative;
   width: 100%;
@@ -12,6 +17,10 @@ html:has(.shader-frame) body {
   min-height: 100%;
   overflow: hidden;
   background: #0a0908;
+}
+
+.shader-frame[data-theme="light"] {
+  background: #f3eee6;
 }
 
 .shader-frame .threeui-background,

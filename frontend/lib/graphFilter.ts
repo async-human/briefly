@@ -48,7 +48,7 @@ export function applyExplorerLens(
       if (kept.has(edge.target)) kept.add(edge.source);
     }
     kept = new Set(
-      [...kept].filter((id) => {
+      Array.from(kept).filter((id) => {
         const node = data.nodes.find((n) => n.id === id);
         return node ? nodePassesLens(node, { ...lens, watchedOnly: false }) || node.type === "entity" : false;
       }),

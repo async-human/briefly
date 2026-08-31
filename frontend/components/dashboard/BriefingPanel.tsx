@@ -33,6 +33,7 @@ import { BriefLoaderArt } from "@/components/loading/BriefLoaderArt";
 import { GeneratingProgressRing } from "@/components/loading/GeneratingProgressRing";
 import { YouTubeItemBadge } from "@/components/dashboard/YouTubeItemBadge";
 import { getYouTubeBadge } from "@/lib/youtubeBadge";
+import { BrieflyLogo } from "@/components/BrieflyLogo";
 
 const PREVIEW_LIMIT = 12;
 
