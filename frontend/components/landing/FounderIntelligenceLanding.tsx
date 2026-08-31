@@ -505,22 +505,52 @@ export function FounderIntelligenceLanding() {
       </main>
 
       <footer className="mi-foot">
-        <div className="mi-foot__band mi-shell">
-          <div>
-            <p className="mi-foot__wordmark">Briefly</p>
+        <div className="mi-foot__main mi-shell">
+          <div className="mi-foot__brand">
+            <a className="mi-foot__wordmark" href="#top" aria-label="Briefly home">
+              <span className="mi-wordmark__mark" aria-hidden>
+                B
+              </span>
+              <span>Briefly</span>
+            </a>
             <p className="mi-foot__tagline">
               Stop carrying the market in your head.
             </p>
+            <p className="mi-foot__description">
+              Personal, cited market intelligence for AI founders and solo
+              builders.
+            </p>
           </div>
-          <nav className="mi-foot__links" aria-label="Footer">
-            <a href="/privacy">Privacy</a>
-            <a href="/terms">Terms</a>
-            <a href="/login">Sign in</a>
+
+          <nav className="mi-foot__nav" aria-label="Footer navigation">
+            <div className="mi-foot__group">
+              <p>Explore</p>
+              <a href="#loop">The intelligence loop</a>
+              <a href="#brief">Decision briefs</a>
+              <a href="#memory">Market memory</a>
+              <a href="#direction">Product direction</a>
+            </div>
+            <div className="mi-foot__group">
+              <p>Access</p>
+              <a href="/login">Founding access</a>
+              <a href="/login">Sign in</a>
+            </div>
+            <div className="mi-foot__group">
+              <p>Legal</p>
+              <a href="/privacy">Privacy</a>
+              <a href="/terms">Terms</a>
+            </div>
           </nav>
         </div>
-        <p className="mi-foot__meta mi-shell">
-          Briefly · {year} · Intelligence for AI founders
-        </p>
+
+        <div className="mi-foot__bottom mi-shell">
+          <p>© {year} Briefly</p>
+          <p>Intelligence for AI founders</p>
+          <a href="#top">
+            Back to top
+            <span aria-hidden>↑</span>
+          </a>
+        </div>
       </footer>
     </div>
   );
