@@ -1,10 +1,5 @@
-import { FounderIntelligenceLanding } from "@/components/landing/FounderIntelligenceLanding";
-import { LandingPageShell } from "@/components/landing/LandingPageShell";
+import { Scene } from "@/components/landing/KageScene";
 
 export default function Home() {
-  return (
-    <LandingPageShell>
-      <FounderIntelligenceLanding />
-    </LandingPageShell>
-  );
+  return <Scene />;
 }
