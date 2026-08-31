@@ -15,6 +15,7 @@ type AppPageHeaderProps = {
   status?: ReactNode;
   actions?: ReactNode;
   stats?: AppStatChip[];
+  compact?: boolean;
 };
 
 export function AppPageHeader({
@@ -24,9 +25,10 @@ export function AppPageHeader({
   status,
   actions,
   stats,
+  compact,
 }: AppPageHeaderProps) {
   return (
-    <header className="dash-page-header">
+    <header className={`dash-page-header${compact ? " dash-page-header--compact" : ""}`}>
       <div className="dash-page-header-main">
         {eyebrow ? <p className="dash-page-eyebrow">{eyebrow}</p> : null}
         <h1 className="dash-page-title">{title}</h1>

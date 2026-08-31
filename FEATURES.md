@@ -1,10 +1,10 @@
 # Briefly — implemented features
 
-Living log of what is **in the product**, mapped to the destination in [`FEEDLY_DIRECTION.md`](FEEDLY_DIRECTION.md) and the gates in [`MOAT_ROADMAP.md`](MOAT_ROADMAP.md).
+Living log of what is **in the product**, mapped to the destination in [`FEEDLY_DIRECTION.md`](FEEDLY_DIRECTION.md), the gates in [`MOAT_ROADMAP.md`](MOAT_ROADMAP.md), and the home-screen rule in [`SURFACE.md`](SURFACE.md).
 
 Update this file whenever a capability ships, is reshaped, or is deliberately parked. A rising feature count is not progress unless it moves a signal, a decision, or a retained user.
 
-**Last updated:** 2026-08-31 (direction doc expanded to the full Feedly analysis)
+**Last updated:** 2026-08-31 (Morning Pulse glance layer on the dashboard)
 
 ---
 
@@ -122,7 +122,8 @@ Grouped by the decision loop, not by UI page.
 
 | Feature | Where | Limit |
 |---|---|---|
-| Dashboard, read mode, history, settings | existing app routes | Surface freeze: no new top-level pages |
+| Dashboard glance (Morning Pulse + ≤3 Intelligence Cards) | `/dashboard` | Surface freeze: no new top-level pages. No fake momentum % or belief bars. Watching scan lives on the pulse, not a widget |
+| Read mode, history, settings | existing app routes | Surface freeze: no new top-level pages |
 | Founder-positioned landing | `FounderIntelligenceLanding.tsx` | |
 | Founding-member billing | upgrade page | Roadmap test price is $49–$99; product still $9 founding |
 
@@ -148,6 +149,9 @@ Do not start these because the last file compiled.
 
 | Date | Commit | What shipped |
 |---|---|---|
+| 2026-08-31 | (this) | Morning Pulse + Intelligence Cards on the dashboard; `SURFACE.md` (3–5 things, three questions, three layers). No new routes or widgets |
+| 2026-08-31 | `77d9f01` | Full Feedly analysis in `FEEDLY_DIRECTION.md`; `FEATURES.md` is the implementation log |
+| 2026-08-31 | `a98f566` | First `FEATURES.md` + condensed Feedly note |
 | 2026-08-31 | `500998f` | `MOAT_ROADMAP.md` at repo root |
 | 2026-08-31 | `a716d5b` | Evidence bundles on the brief; watching alerts pinned into What’s new; signal ratings; `signals/eval` |
 | 2026-08-31 | `f472450` | Restore `isActionable` (Vercel typecheck) |

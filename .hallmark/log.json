@@ -2,6 +2,18 @@
   {
     "date": "2026-08-31",
     "scope": "app-page",
+    "target": "frontend dashboard glance",
+    "verb": "redesign",
+    "macrostructure": "Workbench · Morning Pulse + Intelligence Cards",
+    "theme": "custom Art Deco app system (design.md, locked)",
+    "theme_axes": "light / classical-serif / warm-gold",
+    "enrichment": "none",
+    "motion": "constellation-draw · state-shift",
+    "brief": "Calm glance layer: 3–5 things, one Intelligence Card grammar, progressive disclosure. No widget farm, no invented metrics."
+  },
+  {
+    "date": "2026-08-31",
+    "scope": "app-page",
     "target": "frontend dashboard + settings devices",
     "verb": "redesign",
     "macrostructure": "Workbench · wide canvas + sticky rail",

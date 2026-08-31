@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { getTimeGreeting, type TimeGreeting } from "@/lib/greeting";
 import { AppPageHeader } from "./AppPageHeader";
 
 type DashboardToolbarProps = {
@@ -18,8 +16,6 @@ type DashboardToolbarProps = {
 };
 
 export function DashboardToolbar({
-  name,
-  dateLabel,
   itemCount,
   savedMinutes,
   sourceCount,
@@ -27,19 +23,10 @@ export function DashboardToolbar({
   generating,
   onRefresh,
 }: DashboardToolbarProps) {
-  const [greeting, setGreeting] = useState<TimeGreeting | null>(null);
-
-  useEffect(() => {
-    setGreeting(getTimeGreeting());
-  }, []);
-
   const hasBrief = Boolean(digestId && !generating && (itemCount ?? 0) > 0);
 
   const stats = !generating
     ? [
-        ...(itemCount != null
-          ? [{ value: itemCount, label: "stories selected" }]
-          : []),
         ...(savedMinutes != null && savedMinutes > 0
           ? [{ value: `~${savedMinutes}m`, label: "reading distilled" }]
           : []),
@@ -48,8 +35,8 @@ export function DashboardToolbar({
 
   return (
     <AppPageHeader
-      title={`${greeting?.label ?? "Hello"}, ${name}`}
-      subtitle={dateLabel}
+      compact
+      title="Dashboard"
       status={
         generating ? (
           <p className="dash-page-status">
