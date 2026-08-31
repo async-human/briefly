@@ -54,7 +54,8 @@ html[data-theme="light"]{
   --copy:#2a241c;
   --copy-strong:#161310;
   --copy-faint:#241e18;
-  --scrim-hero:linear-gradient(rgba(243,238,230,.94), rgba(243,238,230,.62) 52%, rgba(243,238,230,.18));
+  --panel:#f3eee6;
+  --scrim-hero:linear-gradient(rgba(243,238,230,.96), rgba(243,238,230,.78) 48%, rgba(243,238,230,.28));
   --sky-page:#c9d4dc;
 }
 *,*::before,*::after{box-sizing:border-box}
@@ -226,8 +227,34 @@ html[data-theme="light"] .body,
 html[data-theme="light"] .hero-sub,
 html[data-theme="light"] .gate-copy .lead,
 html[data-theme="light"] .brief-spec p,
-html[data-theme="light"] .les p,
-html[data-theme="light"] .chip b{ text-shadow:none; font-weight:400; }
+html[data-theme="light"] .chip b{ text-shadow:none; font-weight:500; color:var(--bone); }
+html[data-theme="light"] .nav-link{ color:var(--bone); }
+html[data-theme="light"] .arrowlink{ font-weight:600; color:var(--bone); }
+html[data-theme="light"] body[data-layout-curriculum="b"] .cur{
+  background:var(--line); border-color:var(--line);
+}
+html[data-theme="light"] body[data-layout-curriculum="b"] .les{
+  background:var(--panel);
+}
+html[data-theme="light"] body[data-layout-curriculum="b"] .les h3,
+html[data-theme="light"] body[data-layout-curriculum="b"] .les p,
+html[data-theme="light"] body[data-layout-curriculum="b"] .les .k,
+html[data-theme="light"] body[data-layout-curriculum="b"] .les .t{
+  color:var(--bone); text-shadow:none; font-weight:500;
+}
+html[data-theme="light"] body[data-layout-curriculum="b"] .les h3 em{ color:var(--vermilion); }
+html[data-theme="light"] .sec::before{
+  background:rgba(243,238,230,.96);
+}
+html[data-theme="light"] #pathways::before{
+  background:rgba(243,238,230,.92);
+}
+html[data-theme="light"] #lessons::before{
+  background:rgba(243,238,230,.97);
+}
+html[data-theme="light"] #eternity::before{
+  background:linear-gradient(rgba(243,238,230,.7), #ebe4d6 72%);
+}
 html[data-theme="light"] .chip p{ color:var(--copy-faint); }
 html[data-theme="light"] .foot li a{ color:var(--copy); }
 html[data-theme="light"] .foot li a:hover{ color:var(--bone); }
@@ -242,15 +269,6 @@ html[data-theme="light"] .hero::after{
   content:''; position:absolute; left:0; right:0; bottom:0; height:42%;
   pointer-events:none; z-index:1;
   background:linear-gradient(transparent, rgba(243,238,230,.55) 48%, rgba(243,238,230,.9));
-}
-html[data-theme="light"] .sec::before{
-  background:radial-gradient(110% 62% at 30% 50%, rgba(243,238,230,.97), rgba(243,238,230,.9) 42%, rgba(243,238,230,.72) 74%, rgba(243,238,230,.4));
-}
-html[data-theme="light"] #pathways::before{
-  background:radial-gradient(108% 64% at 50% 50%, rgba(243,238,230,.94), rgba(243,238,230,.78) 50%, rgba(243,238,230,.45));
-}
-html[data-theme="light"] #eternity::before{
-  background:radial-gradient(82% 58% at 50% 46%, rgba(243,238,230,.55), rgba(243,238,230,.88) 56%, rgba(235,228,216,.97) 82%, #ebe4d6);
 }
 html[data-theme="light"] .foot::before{
   background:linear-gradient(rgba(243,238,230,.82), #ebe4d6 36%, #ebe4d6);
@@ -3374,6 +3392,19 @@ function buildWordmark() {
   scene.add(group);
   WORD.group = group;
   WORD.ink = { xMin: xMin, xMax: xMax, cx: (xMin + xMax) / 2, w: xMax - xMin, asc: ascMax };
+  const plate = new THREE.Mesh(
+    new THREE.PlaneGeometry(WORD.ink.w * 1.2, WORD.ink.asc * 2.2),
+    new THREE.MeshBasicMaterial({
+      map: tx(texGlow('rgba(243,238,230,1)', 'rgba(243,238,230,.35)')),
+      color: 0xffffff, transparent: true, opacity: 0,
+      depthWrite: false, fog: false, toneMapped: false
+    })
+  );
+  plate.position.set(WORD.ink.cx, WORD.ink.asc * .22, -.45);
+  plate.renderOrder = 11;
+  plate.visible = false;
+  group.add(plate);
+  WORD.plate = plate;
 }
 const WORD = { glyphs: [], group: null, ink: null, reveal: 0 };
 
@@ -4425,9 +4456,10 @@ function layoutWord() {
   tmpCam.position.copy(hp);
   tmpCam.lookAt(ht);
   tmpCam.updateProjectionMatrix(); tmpCam.updateMatrixWorld(true);
+  const wordZ = theme === 'light' ? 11.8 : WORD_Z;
   const hit = (nx, ny) => {
     const v = new THREE.Vector3(nx, ny, .5).unproject(tmpCam).sub(tmpCam.position).normalize();
-    return tmpCam.position.clone().addScaledVector(v, (WORD_Z - tmpCam.position.z) / v.z);
+    return tmpCam.position.clone().addScaledVector(v, (wordZ - tmpCam.position.z) / v.z);
   };
   const L = hit(-1, 0), R = hit(1, 0);
   /* Judge the frame by its shape, not its width. What forces the word up and
@@ -4439,13 +4471,13 @@ function layoutWord() {
      as the six-letter word could afford to, decapitates the K and the E. The
      narrow branch is held a little inside the edge because a phone frame has
      no gutter to lose the tracking that trails the final letter into. */
-  const fill = narrow ? .96 : 1.00;
+  const fill = narrow ? .96 : (theme === 'light' ? .90 : 1.00);
   const s = (R.x - L.x) * fill / WORD.ink.w;
   /* on a tall frame the mounds sit near mid-height, so the baseline has to
      ride above them or the whole word disappears into the grass */
-  const base = hit(0, narrow ? -.16 : (theme === 'light' ? -.38 : -.585));
+  const base = hit(0, narrow ? -.16 : (theme === 'light' ? -.46 : -.585));
   WORD.group.scale.setScalar(s);
-  WORD.group.position.set(-WORD.ink.cx * s, base.y, WORD_Z);
+  WORD.group.position.set(-WORD.ink.cx * s, base.y, wordZ);
   WORD.rise = WORD.ink.asc * s * 1.25;
 }
 
@@ -4780,6 +4812,10 @@ function applyWorldTheme(mode) {
       h.material.opacity = day ? h.userData.op0 * .22 : h.userData.op0;
     });
   }
+  if (WORD.plate) {
+    WORD.plate.visible = day;
+    WORD.plate.material.opacity = day ? .55 : 0;
+  }
   if (WORD.glyphs) {
     WORD.glyphs.forEach(g => {
       if (g.userData.texDay && g.userData.texNight) {
@@ -5070,7 +5106,7 @@ function updateWorld(dt) {
   /* the cut-out layers dissolve as the camera reaches them, so the path can
      walk straight through the garden instead of steering around the veil */
   if (WORLD.fg) WORLD.fg.forEach(m => {
-    const a = smooth(.9, 4.6, camera.position.z - m.position.z) * (theme === 'light' ? .48 : 1);
+    const a = smooth(.9, 4.6, camera.position.z - m.position.z) * (theme === 'light' ? .22 : 1);
     m.material.opacity = a;
     m.visible = a > .006;
   });
