@@ -389,6 +389,13 @@ export type DigestItem = {
   new_state?: string | null;
   signal_label?: string | null;
   evidence?: EvidencePiece[];
+  decision_thread_id?: string | null;
+  decision_title?: string | null;
+  decision_belief?: string | null;
+  decision_confidence?: number | null;
+  decision_previous_confidence?: number | null;
+  decision_status?: string | null;
+  decision_stance?: string | null;
 };
 
 export type DigestStats = {
@@ -1271,6 +1278,18 @@ export const api = {
       `/api/v1/signals/${encodeURIComponent(signalId)}/feedback`,
       { method: "POST", body: JSON.stringify({ label, note: note || null }) },
     ),
+  listDecisionThreads: () =>
+    request<DecisionThread[]>("/api/v1/decision-threads"),
+  createDecisionThread: (body: { question: string; belief?: string }) =>
+    request<DecisionThread>("/api/v1/decision-threads", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  patchDecisionThread: (id: string, body: { belief?: string; status?: string }) =>
+    request<DecisionThread>(`/api/v1/decision-threads/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
   getCalendarUpcoming: () =>
     request<{
       connected: boolean;
@@ -1577,6 +1596,19 @@ export const api = {
     request<EmailDraft>(`/api/v1/email-drafts/${id}/send`, { method: "POST" }, 30000),
 };
 
+export type DecisionThread = {
+  id: string;
+  title: string;
+  question: string;
+  belief: string | null;
+  confidence: number | null;
+  previous_confidence: number | null;
+  status: string;
+  source: string;
+  stance?: string | null;
+  updated_at?: string | null;
+};
+
 export type WatchedEntity = {
   id: string;
   name: string;
@@ -1612,6 +1644,13 @@ export type WatchedAlert = {
   signal_label?: string | null;
   evidence?: EvidencePiece[];
   created_at: string | null;
+  decision_thread_id?: string | null;
+  decision_title?: string | null;
+  decision_belief?: string | null;
+  decision_confidence?: number | null;
+  decision_previous_confidence?: number | null;
+  decision_status?: string | null;
+  decision_stance?: string | null;
 };
 
 export type EmailDraft = {

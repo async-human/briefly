@@ -21,6 +21,21 @@ async def digest_to_out(digest: Digest, db: AsyncSession) -> DigestOut:
     except Exception:
         bundles = {}
     items_out: list[DigestItemOut] = []
+    signal_ids = [
+        str(bundle.get("signal_id"))
+        for bundle in bundles.values()
+        if bundle.get("signal_id")
+    ]
+    snaps: dict = {}
+    digest_fields = None
+    try:
+        from briefly_api.services.decisions.threads import digest_fields as _digest_fields
+        from briefly_api.services.decisions.threads import snapshots_for_signals
+
+        digest_fields = _digest_fields
+        snaps = await snapshots_for_signals(db, digest.user_id, signal_ids)
+    except Exception:
+        snaps = {}
     for orm_item in items:
         item = DigestItemOut.model_validate(orm_item)
         summary = why_this_summary(
@@ -29,6 +44,8 @@ async def digest_to_out(digest: Digest, db: AsyncSession) -> DigestOut:
         )
         bundle = bundles.get(orm_item.id) or {}
         pieces = list(bundle.get("pieces") or [])
+        sid = bundle.get("signal_id")
+        thread_fields = digest_fields(snaps.get(str(sid))) if sid and digest_fields else {}
         items_out.append(
             item.model_copy(
                 update={
@@ -40,6 +57,7 @@ async def digest_to_out(digest: Digest, db: AsyncSession) -> DigestOut:
                     "new_state": bundle.get("new_state") or None,
                     "signal_label": bundle.get("label"),
                     "evidence": pieces,
+                    **thread_fields,
                 }
             )
         )

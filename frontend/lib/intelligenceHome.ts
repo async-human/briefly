@@ -32,6 +32,8 @@ export type IntelligenceObject = {
   urgent?: boolean;
   action?: string | null;
   metric?: GlanceMetric | null;
+  belief?: string | null;
+  previousConfidence?: number | null;
 };
 
 export type PulseNode = {
@@ -115,6 +117,7 @@ function metricFor(args: {
   newState?: string | null;
   corroborating?: number;
   confidence?: number | null;
+  previousConfidence?: number | null;
   detector?: string | null;
 }): GlanceMetric | null {
   if (args.kind === "change") {
@@ -134,10 +137,64 @@ function metricFor(args: {
   if (args.kind === "pattern" && args.corroborating && args.corroborating > 1) {
     return { value: String(args.corroborating), hint: "sources" };
   }
-  if (args.kind === "decision" && args.confidence != null) {
-    return { value: `${Math.round(args.confidence * 100)}%`, hint: "confidence" };
+  if (args.kind === "decision") {
+    if (
+      args.previousConfidence != null &&
+      args.confidence != null &&
+      args.previousConfidence !== args.confidence
+    ) {
+      const from = Math.round(args.previousConfidence * 100);
+      const to = Math.round(args.confidence * 100);
+      return {
+        value: `${from}% → ${to}%`,
+        hint: "belief",
+        direction: to < from ? "down" : to > from ? "up" : undefined,
+      };
+    }
+    if (args.confidence != null) {
+      return { value: `${Math.round(args.confidence * 100)}%`, hint: "belief" };
+    }
   }
   return null;
+}
+
+type ThreadTouch = {
+  id: string | null;
+  title: string | null;
+  belief: string | null;
+  confidence: number | null;
+  previous: number | null;
+  status: string | null;
+  stance: string | null;
+};
+
+function threadOf(item: DigestItem | WatchedAlert): ThreadTouch {
+  return {
+    id: item.decision_thread_id || null,
+    title: item.decision_title || null,
+    belief: item.decision_belief || null,
+    confidence: typeof item.decision_confidence === "number" ? item.decision_confidence : null,
+    previous:
+      typeof item.decision_previous_confidence === "number"
+        ? item.decision_previous_confidence
+        : null,
+    status: item.decision_status || null,
+    stance: item.decision_stance || null,
+  };
+}
+
+function isDecisionTouch(item: DigestItem | WatchedAlert): boolean {
+  const t = threadOf(item);
+  return Boolean(t.id && (t.stance === "contradicting" || t.status === "reconsider"));
+}
+
+function threadImpact(thread: ThreadTouch): string | undefined {
+  const name = (thread.title || "").trim();
+  if (!name || name.length > 48) return undefined;
+  if (thread.stance === "contradicting" || thread.status === "reconsider") {
+    return `Conflicts with ${name}.`;
+  }
+  return `Touches your ${name} decision.`;
 }
 
 function itemMatchingAlert(digest: Digest | null, alert: WatchedAlert): DigestItem | undefined {
@@ -151,20 +208,22 @@ function itemMatchingAlert(digest: Digest | null, alert: WatchedAlert): DigestIt
 }
 
 function fromAlert(alert: WatchedAlert, digest: Digest | null): IntelligenceObject {
-  const kind: IntelKind = alert.detector_type ? "change" : "pattern";
+  const thread = threadOf(alert);
+  const isDecision = isDecisionTouch(alert);
+  const kind: IntelKind = isDecision ? "decision" : alert.detector_type ? "change" : "pattern";
   const why = (alert.why_it_matters || alert.what_changed || "").trim();
   const match = itemMatchingAlert(digest, alert);
   const digestId = digest?.id ?? null;
-  const connected = alert.entity_name;
-  const confidence = confidenceOf(alert);
+  const connected = thread.title || alert.entity_name;
+  const confidence = isDecision ? thread.confidence : confidenceOf(alert);
   const corroborating = alert.related_urls?.length || undefined;
   return {
     id: `alert:${alert.id}`,
     kind,
-    label: kind === "change" ? "Important change" : "Emerging pattern",
+    label: kind === "decision" ? "Reconsider?" : kind === "change" ? "Important change" : "Emerging pattern",
     title: alert.title,
     why: why || `Update on ${alert.entity_name}.`,
-    impact: impactLine(kind, connected),
+    impact: threadImpact(thread) || impactLine(kind, connected),
     connected,
     confidence,
     digestId,
@@ -185,6 +244,8 @@ function fromAlert(alert: WatchedAlert, digest: Digest | null): IntelligenceObje
     corroborating,
     urgent: Boolean(alert.is_urgent),
     action: alert.action && !/^none/i.test(alert.action) ? alert.action : null,
+    belief: thread.belief,
+    previousConfidence: thread.previous,
     metric: metricFor({
       kind,
       title: alert.title,
@@ -193,34 +254,34 @@ function fromAlert(alert: WatchedAlert, digest: Digest | null): IntelligenceObje
       newState: alert.new_state,
       corroborating,
       confidence,
+      previousConfidence: thread.previous,
       detector: alert.detector_type,
     }),
   };
 }
 
 function fromItem(item: DigestItem, digestId: string): IntelligenceObject {
-  const isDecision = Boolean(item.contradiction_flag || item.evolution_note);
+  const thread = threadOf(item);
+  const isDecision = isDecisionTouch(item) || Boolean(item.contradiction_flag || item.evolution_note);
   const isPattern = !isDecision && (item.duplicate_count || 0) > 1;
   const kind: IntelKind = isDecision ? "decision" : isPattern ? "pattern" : "change";
   const detector = detectorLabel(item.detector_type);
   const why = (item.why_it_matters || item.summary || "").trim();
   const connected =
+    thread.title ||
     item.memory_reference ||
     item.memory_connections?.[0]?.description ||
     detector ||
     undefined;
-  const confidence = confidenceOf(item);
+  const confidence = isDecision ? thread.confidence : confidenceOf(item);
   const corroborating = item.duplicate_count > 1 ? item.duplicate_count : item.evidence?.length;
-  const title = kind === "decision" && item.evolution_note
-    ? item.headline
-    : item.headline;
   return {
     id: `item:${item.id}`,
     kind,
     label: kind === "decision" ? "Reconsider?" : kind === "pattern" ? "Emerging pattern" : "Important change",
-    title,
+    title: item.headline,
     why: why || item.headline,
-    impact: impactLine(kind, connected),
+    impact: threadImpact(thread) || impactLine(kind, connected),
     connected,
     confidence,
     digestId,
@@ -236,6 +297,8 @@ function fromItem(item: DigestItem, digestId: string): IntelligenceObject {
     newState: item.new_state || null,
     corroborating,
     action: item.suggested_action || null,
+    belief: thread.belief,
+    previousConfidence: thread.previous,
     metric: metricFor({
       kind,
       title: item.headline,
@@ -244,6 +307,7 @@ function fromItem(item: DigestItem, digestId: string): IntelligenceObject {
       newState: item.new_state,
       corroborating,
       confidence,
+      previousConfidence: thread.previous,
       detector: item.detector_type,
     }),
   };
@@ -257,6 +321,9 @@ function pickCards(
   const fromWatch = unread.slice(0, 3).map((a) => fromAlert(a, digest));
   const items = digest?.items ?? [];
   const digestId = digest?.id;
+  const threadDecisions = digestId
+    ? items.filter((i) => isDecisionTouch(i)).map((i) => fromItem(i, digestId))
+    : [];
   const decisions = digestId
     ? items.filter((i) => i.contradiction_flag || i.evolution_note).map((i) => fromItem(i, digestId))
     : [];
@@ -276,7 +343,7 @@ function pickCards(
   };
 
   take(fromWatch.find((c) => c.kind === "change") || fromWatch[0]);
-  take(decisions[0]);
+  take(threadDecisions[0] || decisions[0]);
   take(patterned.find((c) => !seen.has(c.title.toLowerCase())) || fromWatch.find((c) => c.kind !== "change"));
   for (const obj of [...fromWatch, ...rest]) take(obj);
   return picked;
@@ -307,8 +374,11 @@ export function buildMorningPulse(input: {
   const unread = input.alerts.filter((a) => !a.is_read);
   const changeCount = unread.length || cards.filter((c) => c.kind === "change").length;
   const decisionCount =
-    (input.digest?.items ?? []).filter((i) => i.contradiction_flag || i.evolution_note).length ||
-    cards.filter((c) => c.kind === "decision").length;
+    (input.digest?.items ?? []).filter(
+      (i) => isDecisionTouch(i) || i.contradiction_flag || i.evolution_note,
+    ).length
+    || unread.filter((a) => isDecisionTouch(a)).length
+    || cards.filter((c) => c.kind === "decision").length;
   const urgentCount = unread.filter((a) => a.is_urgent).length;
 
   const nodes: PulseNode[] = input.entities.slice(0, MAX_NODES).map((ent) => ({

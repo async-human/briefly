@@ -30,7 +30,7 @@ Use one **Intelligence Card**. Its grammar changes:
 
 - **Change** — a state transition (price, launch, API).
 - **Pattern** — emerging coverage with real source counts, never a fake trend %.
-- **Decision** — something previously believed may need a second look (contradiction, conflicting evidence).
+- **Decision** — something previously believed may need a second look (a linked Decision Thread with contradicting evidence, or a contradiction flag). Confidence movement (`62% → 50%`) only when both previous and current scores exist.
 
 Same footprint. Different visual grammar.
 
@@ -53,7 +53,7 @@ Respect `prefers-reduced-motion`.
 
 ## Visuals must beat text
 
-A price drop, a momentum sparkline, a belief-confidence shift, or a May → June → Today story line — only when the numbers are real. If we do not have previous state, source count, or confidence, omit the visual. Never invent a metric.
+A price drop, a momentum sparkline, a belief-confidence shift, or a May → June → Today story line — only when the numbers are real. Decision-thread confidence is Laplace-smoothed from supporting vs contradicting evidence. If we do not have previous state, source count, or confidence, omit the visual. Never invent a metric.
 
 ## What stays off the home screen
 

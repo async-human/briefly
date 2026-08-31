@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from briefly_api.services.operating_context import (
+    distinctive_tokens,
     format_operating_context,
     has_operating_context,
     merge_operating_context,
@@ -53,3 +54,6 @@ def test_questions_hit_by_distinctive_tokens():
     hits = questions_hit_by_text(ctx, "Anthropic cut API prices for their model providers")
     assert hits
     assert not questions_hit_by_text(ctx, "City council debates parking")
+    assert distinctive_tokens("Should we change model providers this quarter?") == [
+        "change", "model", "providers", "quarter",
+    ]

@@ -977,6 +977,88 @@ class MarketSignal(Base):
     )
 
 
+class DecisionThread(Base):
+    """A persistent strategic question or hypothesis — Sprint 5 moat object.
+
+    Distinct from FollowUpThread (Ask chat). This is what the founder currently
+    believes, the evidence for and against, and how confidence has moved.
+    """
+
+    __tablename__ = "decision_threads"
+    __table_args__ = (
+        Index("ix_decision_threads_user", "user_id", "status"),
+        UniqueConstraint("user_id", "question", name="uq_decision_thread_question"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(80), nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    current_belief: Mapped[str] = mapped_column(Text, default="")
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    previous_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="open")
+    # open | reconsider | resolved | paused
+    source: Mapped[str] = mapped_column(String(20), default="user")
+    # onboarding | user | inferred
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ThreadSignal(Base):
+    """A market signal attached to a Decision Thread, with a stance."""
+
+    __tablename__ = "thread_signals"
+    __table_args__ = (
+        Index("ix_thread_signals_thread", "thread_id"),
+        Index("ix_thread_signals_signal", "signal_id"),
+        UniqueConstraint("thread_id", "signal_id", name="uq_thread_signal"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    thread_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("decision_threads.id", ondelete="CASCADE"), index=True
+    )
+    signal_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("signals.id", ondelete="CASCADE"), index=True
+    )
+    stance: Mapped[str] = mapped_column(String(20), default="related")
+    # supporting | contradicting | related
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ThreadUpdate(Base):
+    """A versioned snapshot of belief and confidence on a Decision Thread."""
+
+    __tablename__ = "thread_updates"
+    __table_args__ = (
+        Index("ix_thread_updates_thread", "thread_id", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    thread_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("decision_threads.id", ondelete="CASCADE"), index=True
+    )
+    belief: Mapped[str] = mapped_column(Text, default="")
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    previous_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+    signal_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("signals.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class SignalEvidence(Base):
     """Source-level provenance for a market signal."""
 

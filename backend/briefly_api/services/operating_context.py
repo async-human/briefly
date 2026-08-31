@@ -22,6 +22,11 @@ CONTEXT_KEYS = (
 _MAX_TAGS = 12
 _MAX_QUESTIONS = 5
 _MAX_TEXT = 500
+_STOP = {
+    "the", "a", "an", "and", "or", "to", "of", "for", "in", "on", "is",
+    "we", "our", "should", "do", "does", "are", "be", "this", "that",
+    "with", "from", "about", "what", "how", "why", "when",
+}
 
 
 def _clip(value: Any, limit: int = _MAX_TEXT) -> str:
@@ -160,6 +165,19 @@ def format_operating_context(ctx: dict[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
+def distinctive_tokens(text: str) -> list[str]:
+    """Content words (≥4 chars, not stopwords) used to match questions to evidence."""
+    tokens: list[str] = []
+    seen: set[str] = set()
+    for raw in (text or "").split():
+        token = raw.strip("?,.!").lower()
+        if len(token) < 4 or token in _STOP or token in seen:
+            continue
+        seen.add(token)
+        tokens.append(token)
+    return tokens
+
+
 def questions_hit_by_text(ctx: dict[str, Any] | None, text: str) -> list[str]:
     """Return strategic questions whose distinctive words appear in text."""
     data = normalize_operating_context(ctx or {})
@@ -167,18 +185,9 @@ def questions_hit_by_text(ctx: dict[str, Any] | None, text: str) -> list[str]:
     if not blob:
         return []
     hits: list[str] = []
-    stop = {
-        "the", "a", "an", "and", "or", "to", "of", "for", "in", "on", "is",
-        "we", "our", "should", "do", "does", "are", "be", "this", "that",
-        "with", "from", "about", "what", "how", "why", "when",
-    }
     for question in data["strategic_questions"]:
-        tokens = [
-            t.strip("?,.!").lower()
-            for t in question.split()
-            if len(t.strip("?,.!")) >= 4 and t.strip("?,.!").lower() not in stop
-        ]
-        if tokens and any(t in blob for t in tokens):
+        tokens = distinctive_tokens(question)
+        if tokens and any(token in blob for token in tokens):
             hits.append(question)
     return hits
 

@@ -226,6 +226,13 @@ class DigestItemOut(BaseModel):
     new_state: str | None = None
     signal_label: str | None = None
     evidence: list[dict] = Field(default_factory=list)
+    decision_thread_id: str | None = None
+    decision_title: str | None = None
+    decision_belief: str | None = None
+    decision_confidence: float | None = None
+    decision_previous_confidence: float | None = None
+    decision_status: str | None = None
+    decision_stance: str | None = None
 
     model_config = {"from_attributes": True}
 

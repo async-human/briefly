@@ -83,6 +83,20 @@ async def run(ctx: PipelineContext) -> PipelineContext:
 
     try:
         profile_summary      = _build_profile_summary(ctx.user.profile, ctx.user.topic_clusters)
+        try:
+            session = ctx.db_session
+            if session:
+                from briefly_api.services.decisions.threads import (
+                    format_threads_for_prompt,
+                    list_threads as list_decision_threads,
+                )
+
+                threads = await list_decision_threads(session, ctx.user.user_id)
+                block = format_threads_for_prompt(threads)
+                if block:
+                    profile_summary = f"{profile_summary}\n\n{block}"
+        except Exception:
+            log.debug("decision threads prompt skipped", exc_info=True)
         behavioral_fp_text   = ctx.behavioral_fingerprint_text or "No behavioral data yet."
         recent_context       = _build_recent_context(ctx.user.recent_digest_items)
         story_threads_text   = _build_story_threads_summary(ctx.user.active_story_threads)

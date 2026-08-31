@@ -72,6 +72,7 @@ from briefly_api.services.operating_context import (
     normalize_operating_context,
     seed_tracked_entities_from_context,
 )
+from briefly_api.services.decisions.threads import seed_decision_threads_from_context
 from briefly_api.services.privacy_gmail import append_gmail_access_log, disconnect_gmail_privacy
 
 log = logging.getLogger(__name__)
@@ -170,6 +171,10 @@ async def update_onboarding_profile(
         if not (profile.goal or "").strip() and (ctx["company_name"] or ctx["product"]):
             bits = [p for p in (ctx["company_name"], ctx["product"]) if p]
             profile.goal = " — ".join(bits)
+        try:
+            await seed_decision_threads_from_context(db, user.id, profile.operating_context)
+        except Exception:
+            log.exception("Failed to seed decision threads for user %s", user.id)
     await db.commit()
     return await _build_onboarding_status(user, db)
 
@@ -211,6 +216,12 @@ async def complete_onboarding(
         )
     except Exception:
         log.exception("Failed to seed tracked entities for user %s", user.id)
+    try:
+        await seed_decision_threads_from_context(
+            db, user.id, user.profile.operating_context
+        )
+    except Exception:
+        log.exception("Failed to seed decision threads for user %s", user.id)
     await db.commit()
 
     # Seed the Personal Relevance Vector in the background — don't block the response.

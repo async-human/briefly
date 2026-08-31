@@ -75,6 +75,13 @@ class EntityAlertOut(BaseModel):
     new_state: str = ""
     signal_label: str | None = None
     evidence: list[dict] = Field(default_factory=list)
+    decision_thread_id: str | None = None
+    decision_title: str | None = None
+    decision_belief: str | None = None
+    decision_confidence: float | None = None
+    decision_previous_confidence: float | None = None
+    decision_status: str | None = None
+    decision_stance: str | None = None
     created_at: datetime | None
 
 
@@ -99,7 +106,11 @@ def _serialize_alert(
     new_state: str = "",
     signal_label: str | None = None,
     evidence: list[dict] | None = None,
+    thread: dict | None = None,
 ) -> EntityAlertOut:
+    from briefly_api.services.decisions.threads import digest_fields
+
+    extra = digest_fields(thread)
     return EntityAlertOut(
         id=row.id,
         entity_id=row.entity_id,
@@ -126,6 +137,7 @@ def _serialize_alert(
         signal_label=signal_label,
         evidence=list(evidence or []),
         created_at=row.created_at,
+        **extra,
     )
 
 
@@ -196,6 +208,18 @@ async def _alert_signal_map(db: AsyncSession, user_id: str, alerts: list[EntityA
         if bundle:
             out[alert.id] = bundle
     return out
+
+
+async def _thread_snaps_for_bundles(db: AsyncSession, user_id: str, bundles: dict[str, dict]) -> dict[str, dict]:
+    signal_ids = [str(b["signal_id"]) for b in bundles.values() if b.get("signal_id")]
+    if not signal_ids:
+        return {}
+    try:
+        from briefly_api.services.decisions.threads import snapshots_for_signals
+
+        return await snapshots_for_signals(db, user_id, signal_ids)
+    except Exception:
+        return {}
 
 
 async def _unread_map(db: AsyncSession, user_id: str) -> dict[str, int]:
@@ -322,18 +346,21 @@ async def list_alerts(
     rows = (await db.execute(stmt)).all()
     alerts = [alert for alert, _ent in rows]
     bundles = await _alert_signal_map(db, user.id, alerts)
+    snaps = await _thread_snaps_for_bundles(db, user.id, bundles)
     out: list[EntityAlertOut] = []
     for alert, ent in rows:
         bundle = bundles.get(alert.id) or {}
+        sid = bundle.get("signal_id")
         out.append(
             _serialize_alert(
                 alert,
                 ent,
-                signal_id=bundle.get("signal_id"),
+                signal_id=sid,
                 previous_state=bundle.get("previous_state") or "",
                 new_state=bundle.get("new_state") or "",
                 signal_label=bundle.get("label"),
                 evidence=list(bundle.get("pieces") or []),
+                thread=snaps.get(str(sid)) if sid else None,
             )
         )
     return out
@@ -367,18 +394,21 @@ async def scan_watched(
     ).all()
     alerts = [alert for alert, _ent in rows]
     bundles = await _alert_signal_map(db, user.id, alerts)
+    snaps = await _thread_snaps_for_bundles(db, user.id, bundles)
     serialized: list[EntityAlertOut] = []
     for alert, ent in rows:
         bundle = bundles.get(alert.id) or {}
+        sid = bundle.get("signal_id")
         serialized.append(
             _serialize_alert(
                 alert,
                 ent,
-                signal_id=bundle.get("signal_id"),
+                signal_id=sid,
                 previous_state=bundle.get("previous_state") or "",
                 new_state=bundle.get("new_state") or "",
                 signal_label=bundle.get("label"),
                 evidence=list(bundle.get("pieces") or []),
+                thread=snaps.get(str(sid)) if sid else None,
             )
         )
     return WatchScanOut(

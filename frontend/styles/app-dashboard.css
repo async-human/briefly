@@ -1793,6 +1793,50 @@
   color: var(--app-muted);
 }
 
+.app-shell .dash-surface-settings .settings-threads {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.app-shell .dash-surface-settings .settings-thread {
+  padding: 0.75rem 0 0;
+  border-top: 1px solid var(--app-border);
+}
+
+.app-shell .dash-surface-settings .settings-thread-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.app-shell .dash-surface-settings .settings-thread-title {
+  font-size: 0.875rem;
+  font-weight: 650;
+  color: var(--app-ink);
+}
+
+.app-shell .dash-surface-settings .settings-thread-conf {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  color: var(--app-brand);
+  white-space: nowrap;
+}
+
+.app-shell .dash-surface-settings .settings-thread-status {
+  font-size: 0.75rem;
+  color: var(--app-muted);
+  text-transform: lowercase;
+}
+
+.app-shell .dash-surface-settings .settings-thread-question {
+  margin: 0.2rem 0 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+}
+
 .app-shell .dash-surface-settings .onboard-input,
 .app-shell .dash-surface-settings .onboard-textarea,
 .app-shell .dash-surface-settings .onboard-time-input {
@@ -12492,6 +12536,14 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   color: var(--app-ink-secondary);
 }
 
+.glance-card-belief {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--app-ink);
+}
+
 .glance-card-metric {
   display: flex;
   flex-direction: column;
@@ -12509,6 +12561,11 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   line-height: 1;
   color: var(--app-brand);
   white-space: nowrap;
+}
+
+.glance-card-metric-value.is-range {
+  font-size: 1.05rem;
+  letter-spacing: -0.03em;
 }
 
 .glance-card-metric-hint {

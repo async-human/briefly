@@ -4,7 +4,7 @@ Living log of what is **in the product**, mapped to the destination in [`FEEDLY_
 
 Update this file whenever a capability ships, is reshaped, or is deliberately parked. A rising feature count is not progress unless it moves a signal, a decision, or a retained user.
 
-**Last updated:** 2026-08-31 (Morning Pulse glance layer on the dashboard)
+**Last updated:** 2026-08-31 (Decision Threads v0 — persistent questions, beliefs, Laplace confidence)
 
 ---
 
@@ -49,7 +49,7 @@ From the Feedly analysis. Status is against the *finished* version, not a first 
 | 2 | **Intelligence missions / tracked universe** | Briefly builds monitoring strategy from operating context. Universe evolves. | `partial` | Onboarding captures company / competitors / stack / questions and seeds `watched_entities`. User still adds watches by name. No auto-generated missions, no “track Tavily?” evolution. |
 | 3 | **Event clustering + delta** | One event, many sources; brief reports only what changed since last seen | `partial` | Cross-source article dedup exists. No event object, no overnight delta on a previously reported launch. |
 | 4 | **Company impact + evidence bundle** | Fact / inference / personal impact / recommendation, all cited | `partial` | Digest items expose source, claim, passage, corroboration, contradiction, detector, confidence. Read view and watching panel can rate Useful / Noise / Duplicate / Wrong. Layers are not yet labeled fact vs inference vs impact. |
-| 5 | **Decision Threads** | Persistent question, belief, evidence for/against, confidence, open questions | `not started` | Ask Briefly, memory connections, and knowledge graph exist. No `decision_threads` object. |
+| 5 | **Decision Threads** | Persistent question, belief, evidence for/against, confidence, open questions | `partial` | `decision_threads` + `thread_signals` + `thread_updates`. Seeded from strategic questions. Signals link by distinctive tokens. Confidence is Laplace from supporting vs contradicting counts — never invented. No `decisions` / `decision_outcomes` tables, no Ask-over-threads retrieval hybrid, no `/decisions` page. |
 
 ---
 
@@ -63,8 +63,8 @@ From the Feedly analysis. Status is against the *finished* version, not a first 
 | Deduplication | Event clustering + delta | Very high | Partial (article dedup only) |
 | Company Cards | Living entity memory inside brief / Ask | High | Not started (watching alerts + graph, no personal entity card) |
 | Emerging Trends | Personal weak-signal radar | High | Not started |
-| Ask AI | Temporal Ask Briefly | Very high | Partial (Ask exists; not over beliefs, threads, or outcomes) |
-| Boards | Decision Threads | Very high | Not started |
+| Ask AI | Temporal Ask Briefly | Very high | Partial (Ask prompt includes active Decision Threads; not retrieval over beliefs/outcomes) |
+| Boards | Decision Threads | Very high | Partial (v0 object on brief/glance/settings; no board UI) |
 | AI Actions | Action compiler (preview → approve → execute → outcome) | Later | Partial precursor (email drafts with approval) |
 | Automated newsletter | Adaptive brief by audience | Team phase | Parked |
 | Company lists | Dynamic tracked universe | High | Partial (static watches + onboarding seed) |
@@ -104,6 +104,7 @@ Grouped by the decision loop, not by UI page.
 | Six-point brief: what changed, why it matters, who it affects, suggested action, memory, confidence | digest items + read view + email | Writer copy; not always signal-backed |
 | Evidence bundle on digest items (sources, claim, passage, corroboration, contradiction, previous/new) | `digest_response.py`, read view | Fact vs inference vs impact not separated in UI |
 | Memory connections / “you’ve been tracking this” | writer + read callouts | Not Decision Threads |
+| Decision Threads v0 | `decision_threads`, `thread_signals`, `thread_updates`; `/api/v1/decision-threads`; glance + settings | Confidence only after linked evidence. No confirmed `decisions` / `decision_outcomes`. No `/decisions` page. Ask sees threads in the prompt, not a retrieval hybrid |
 | Citations and contradiction flags | citation verifier, enrichment cache | |
 | Knowledge graph | `/graph` | Parked as a priority surface; do not expand |
 
@@ -114,7 +115,7 @@ Grouped by the decision loop, not by UI page.
 | Decision events: opened, clicked, saved, asked, tracked, dismissed, acted, decision-changed | `/api/v1/feedback`, read view | Behavioral; not outcome-labeled |
 | Signal quality labels: useful, noise, duplicate, wrong | `/api/v1/signals/{id}/feedback`, read view + watching panel | Writes `signal_feedback`; no ranking loop yet |
 | Precision snapshot | `GET /api/v1/signals/eval` | Internal eval, not a user dashboard |
-| Ask Briefly with grounded citations | `/ask`, orb | Not temporal over decisions |
+| Ask Briefly with grounded citations | `/ask`, orb | Prompt includes active Decision Threads; not a retrieval hybrid over beliefs |
 | Email drafts with human approval | `email_drafts` | Not the action compiler |
 | Proactive / interrupting alerts (capped) | `agents/proactive/` | Not conditional semantic watches |
 
@@ -133,7 +134,6 @@ Grouped by the decision loop, not by UI page.
 
 Do not start these because the last file compiled.
 
-- Decision Threads v0
 - Action cards (team memo / investigation task) beyond email drafts
 - Fourth detector (funding, hires, GitHub breaking changes, website diffs)
 - Intelligence mission builder or Feedly-style AND/OR/NOT feeds
@@ -149,7 +149,8 @@ Do not start these because the last file compiled.
 
 | Date | Commit | What shipped |
 |---|---|---|
-| 2026-08-31 | (this) | Glance hierarchy: pill counts, framed Your World, denser cards, briefing recedes |
+| 2026-08-31 | (this) | Decision Threads v0: persistent question/belief, signal linking, Laplace confidence, glance “Reconsider?” from real movement |
+| 2026-08-31 | `3654773` | Glance hierarchy: pill counts, framed Your World, denser cards, briefing recedes |
 | 2026-08-31 | `cce23c0` | Morning Pulse + Intelligence Cards on the dashboard; `SURFACE.md` |
 | 2026-08-31 | `77d9f01` | Full Feedly analysis in `FEEDLY_DIRECTION.md`; `FEATURES.md` is the implementation log |
 | 2026-08-31 | `a98f566` | First `FEATURES.md` + condensed Feedly note |

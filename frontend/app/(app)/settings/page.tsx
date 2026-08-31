@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, type DecisionThread } from "@/lib/api";
 import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { AppThemeToggle } from "@/components/app/AppThemeToggle";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -153,6 +153,8 @@ export default function SettingsPage() {
   const [strategicGoals, setStrategicGoals] = useState("");
   const [risks, setRisks] = useState("");
   const [questions, setQuestions] = useState<string[]>(["", "", ""]);
+  const [threads, setThreads] = useState<DecisionThread[]>([]);
+  const [beliefDrafts, setBeliefDrafts] = useState<Record<string, string>>({});
   const [topics, setTopics] = useState<string[]>([]);
   const [neverShow, setNeverShow] = useState<string[]>([]);
   const [deliveryTime, setDeliveryTime] = useState("07:00");
@@ -186,8 +188,9 @@ export default function SettingsPage() {
     Promise.all([
       api.getMe(),
       api.getProfileIntelligence().catch(() => null),
+      api.listDecisionThreads().catch(() => [] as DecisionThread[]),
     ])
-      .then(([meData, intel]) => {
+      .then(([meData, intel, threadRows]) => {
         if (!meData.onboarding_completed) { router.replace("/onboarding"); return; }
         setMe({
           name: meData.user.name,
@@ -217,6 +220,10 @@ export default function SettingsPage() {
             setQuestions((ctx.strategic_questions ?? []).concat(["", "", ""]).slice(0, 5));
           }
         }
+        setThreads(threadRows);
+        const drafts: Record<string, string> = {};
+        for (const row of threadRows) drafts[row.id] = row.belief || "";
+        setBeliefDrafts(drafts);
         if (intel) {
           const fromReading = [
             ...intel.emerging_interests,
@@ -263,8 +270,38 @@ export default function SettingsPage() {
           strategic_questions: questions.map((q) => q.trim()).filter(Boolean),
         },
       });
+      const rows = await api.listDecisionThreads().catch(() => [] as DecisionThread[]);
+      setThreads(rows);
+      const drafts: Record<string, string> = { ...beliefDrafts };
+      for (const row of rows) {
+        if (drafts[row.id] == null) drafts[row.id] = row.belief || "";
+      }
+      setBeliefDrafts(drafts);
       flashSaved(setContextSaved);
     } finally { setContextSaving(false); }
+  }
+
+  async function saveBelief(thread: DecisionThread) {
+    const next = (beliefDrafts[thread.id] ?? "").trim();
+    if (next === (thread.belief || "")) return;
+    try {
+      const updated = await api.patchDecisionThread(thread.id, { belief: next });
+      setThreads((rows) => rows.map((row) => (row.id === updated.id ? updated : row)));
+    } catch {
+      /* keep the draft so they can retry */
+    }
+  }
+
+  function confidenceLabel(thread: DecisionThread): string | null {
+    if (thread.confidence == null) return null;
+    const curr = Math.round(thread.confidence * 100);
+    if (
+      thread.previous_confidence != null
+      && thread.previous_confidence !== thread.confidence
+    ) {
+      return `${Math.round(thread.previous_confidence * 100)}% → ${curr}%`;
+    }
+    return `${curr}%`;
   }
 
   async function saveInterests() {
@@ -596,6 +633,37 @@ export default function SettingsPage() {
                     placeholder={i === 0 ? "e.g. Should we change model providers this quarter?" : `Question ${i + 1}`}
                   />
                 ))}
+                {threads.length > 0 ? (
+                  <div className="settings-threads">
+                    <p className="settings-field-hint">
+                      Briefly keeps a living belief for each question. Confidence only appears after evidence lands — never invented.
+                    </p>
+                    {threads.map((thread) => (
+                      <div key={thread.id} className="settings-thread">
+                        <div className="settings-thread-head">
+                          <span className="settings-thread-title">{thread.title}</span>
+                          {confidenceLabel(thread) ? (
+                            <span className="settings-thread-conf">{confidenceLabel(thread)}</span>
+                          ) : (
+                            <span className="settings-thread-status">{thread.status}</span>
+                          )}
+                        </div>
+                        <p className="settings-thread-question">{thread.question}</p>
+                        <input
+                          type="text"
+                          className="onboard-input"
+                          value={beliefDrafts[thread.id] ?? ""}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setBeliefDrafts((prev) => ({ ...prev, [thread.id]: value }));
+                          }}
+                          onBlur={() => void saveBelief(thread)}
+                          placeholder="What you currently believe"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </Section>
 

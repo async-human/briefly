@@ -144,4 +144,17 @@ async def persist_market_signal(
         "Market signal %s detector=%s entity=%s",
         inserted, detector.detector_type, entity_id,
     )
+    try:
+        from briefly_api.services.decisions.threads import link_signal_to_threads
+
+        await link_signal_to_threads(
+            session,
+            user_id=user_id,
+            signal_id=inserted,
+            blob=blob,
+            previous_state=previous,
+            new_state=detector.new_state,
+        )
+    except Exception:
+        log.exception("Failed to link signal %s to decision threads", inserted)
     return inserted

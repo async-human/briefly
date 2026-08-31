@@ -15,6 +15,11 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
   const [rating, setRating] = useState(false);
   const panelId = useId();
   const conf = object.confidence != null ? Math.round(object.confidence * 100) : null;
+  const beliefMoved =
+    object.kind === "decision"
+    && object.previousConfidence != null
+    && object.confidence != null
+    && object.previousConfidence !== object.confidence;
   const kindClass =
     object.kind === "decision" ? "glance-card--decision"
       : object.kind === "pattern" ? "glance-card--pattern"
@@ -58,9 +63,21 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
       </button>
 
       <div id={panelId} className="glance-card-layer" hidden={!open}>
+        {object.belief ? (
+          <>
+            <span className="glance-card-kicker">Current belief</span>
+            <p className="glance-card-belief">{object.belief}</p>
+          </>
+        ) : null}
         <span className="glance-card-kicker">Why it matters</span>
         <p className="glance-card-why">{object.why}</p>
-        {conf != null ? (
+        {beliefMoved ? (
+          <p className="glance-conf">
+            {Math.round((object.previousConfidence as number) * 100)}% → {conf}% belief
+          </p>
+        ) : object.kind === "decision" && conf != null ? (
+          <p className="glance-conf">{conf}% belief</p>
+        ) : object.kind !== "decision" && conf != null ? (
           <p className="glance-conf">{conf}% confidence</p>
         ) : null}
         <div className="glance-card-actions">
@@ -108,7 +125,7 @@ function Metric({ object }: { object: IntelligenceObject }) {
           : "";
     return (
       <div className="glance-card-metric">
-        <span className="glance-card-metric-value">
+        <span className={`glance-card-metric-value${object.metric.value.includes("→") ? " is-range" : ""}`}>
           {arrow}{object.metric.value}
         </span>
         <span className="glance-card-metric-hint">{object.metric.hint}</span>

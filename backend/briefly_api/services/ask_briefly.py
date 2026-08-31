@@ -1207,6 +1207,18 @@ async def _prepare_ask(
             )
 
     profile_text = _profile_blurb(profile)
+    try:
+        from briefly_api.services.decisions.threads import (
+            format_threads_for_prompt,
+            list_threads as list_decision_threads,
+        )
+
+        threads = await list_decision_threads(db, user.id)
+        block = format_threads_for_prompt(threads)
+        if block:
+            profile_text = f"{profile_text}\n\n{block}"
+    except Exception:
+        pass
 
     history = list(thread.messages or [])[-_MAX_HISTORY:]
     llm_messages: list[Message] = []
