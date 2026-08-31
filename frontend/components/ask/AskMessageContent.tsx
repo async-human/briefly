@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import type { AskCitation } from "@/lib/api";
@@ -29,11 +30,8 @@ function scrollToCitation(ref: string) {
 }
 
 function openCitation(citation: AskCitation) {
-  if (citation.url) {
-    window.open(citation.url, "_blank", "noopener,noreferrer");
-    return;
-  }
-  scrollToCitation(citation.ref);
+  window.dispatchEvent(new CustomEvent("briefly:ask-cite", { detail: citation.ref }));
+  window.setTimeout(() => scrollToCitation(citation.ref), 40);
 }
 
 function InlineCitation({ citation }: { citation: AskCitation }) {
@@ -94,60 +92,94 @@ export function AskMessageContent({
 }
 
 export function CitationSources({ citations }: { citations: AskCitation[] }) {
+  const [openRef, setOpenRef] = useState<string | null>(null);
+
+  useEffect(() => {
+    function onCite(event: Event) {
+      const ref = (event as CustomEvent<string>).detail;
+      if (ref) setOpenRef(ref);
+    }
+    window.addEventListener("briefly:ask-cite", onCite);
+    return () => window.removeEventListener("briefly:ask-cite", onCite);
+  }, []);
+
   if (!citations.length) return null;
+
+  const openCite = citations.find((c) => c.ref === openRef) ?? null;
+  const openN = openCite ? refNumber(openCite.ref) : 0;
+  const graphHref = openCite
+    ? openCite.kind === "brain_dump" || openCite.kind === "thought"
+      ? graphThoughtUrl(openCite.content_id)
+      : graphItemUrl(openCite.content_id)
+    : null;
 
   return (
     <div className="ask-sources">
       <p className="ask-sources-label">Sources</p>
-      <div className="ask-sources-list">
+      <div className="ask-sources-pills">
         {citations.map((cite) => {
           const n = refNumber(cite.ref);
-          const graphHref =
-            cite.kind === "brain_dump" || cite.kind === "thought"
-              ? graphThoughtUrl(cite.content_id)
-              : graphItemUrl(cite.content_id);
-
+          const isOpen = openRef === cite.ref;
           return (
-            <article
+            <button
               key={`${cite.ref}-${cite.content_id}`}
               id={`ask-cite-${cite.ref}`}
-              className="ask-source-card"
+              type="button"
+              className={`ask-source-pill${isOpen ? " is-open" : ""}`}
+              aria-expanded={isOpen}
+              aria-controls={isOpen ? "ask-source-detail" : undefined}
+              title={cite.title}
+              onClick={() => setOpenRef(isOpen ? null : cite.ref)}
             >
-              <button
-                type="button"
-                className="ask-source-card-main"
-                onClick={() => openCitation(cite)}
-              >
-                <span className="ask-source-index">{n}</span>
-                <div className="ask-source-body">
-                  <span className="ask-source-origin">
-                    {cite.source_name ?? (cite.kind === "brain_dump" ? "Your thought" : "Saved")}
-                  </span>
-                  <span className="ask-source-title">{cite.title}</span>
-                  <span className="ask-source-snippet">{cite.snippet}</span>
-                </div>
-              </button>
-              <div className="ask-source-actions">
-                {cite.url ? (
-                  <a
-                    href={cite.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ask-source-action"
-                  >
-                    Open
-                  </a>
-                ) : null}
-                {cite.content_id && !cite.content_id.startsWith("digest-item") ? (
-                  <Link href={graphHref} className="ask-source-action">
-                    Graph
-                  </Link>
-                ) : null}
-              </div>
-            </article>
+              <span className="ask-source-pill-n">{n}</span>
+              <span className="ask-source-pill-title">{cite.title}</span>
+            </button>
           );
         })}
       </div>
+      {openCite ? (
+        <article
+          id="ask-source-detail"
+          className="ask-source-detail"
+        >
+          <div className="ask-source-detail-head">
+            <span className="ask-source-index">{openN}</span>
+            <div className="ask-source-body">
+              <span className="ask-source-origin">
+                {openCite.source_name ?? (openCite.kind === "brain_dump" ? "Your thought" : "Saved")}
+              </span>
+              <span className="ask-source-title">{openCite.title}</span>
+            </div>
+          </div>
+          {openCite.snippet ? (
+            <p className="ask-source-snippet">{openCite.snippet}</p>
+          ) : null}
+          <div className="ask-source-actions">
+            {openCite.url ? (
+              <a
+                href={openCite.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ask-source-action"
+              >
+                Open
+              </a>
+            ) : null}
+            {openCite.content_id && !openCite.content_id.startsWith("digest-item") && graphHref ? (
+              <Link href={graphHref} className="ask-source-action">
+                Graph
+              </Link>
+            ) : null}
+            <button
+              type="button"
+              className="ask-source-action ask-source-action-button"
+              onClick={() => setOpenRef(null)}
+            >
+              Close
+            </button>
+          </div>
+        </article>
+      ) : null}
     </div>
   );
 }

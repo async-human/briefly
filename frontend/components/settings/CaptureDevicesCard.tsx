@@ -42,7 +42,7 @@ function groupTokens(tokens: CaptureToken[]): DeviceGroup[] {
       });
     }
   }
-  return [...map.values()];
+  return Array.from(map.values());
 }
 
 function formatWhen(iso: string | null): string {
@@ -288,11 +288,7 @@ export function CaptureDevicesCard() {
               const shown = showAll ? group.tokens : group.tokens.slice(0, VISIBLE_TOKENS);
               const more = group.tokens.length - shown.length;
               return (
-                <details
-                  key={group.key}
-                  className="capture-devices-group"
-                  defaultOpen={group.tokens.length <= VISIBLE_TOKENS}
-                >
+                <details key={group.key} className="capture-devices-group">
                   <summary className="capture-devices-group-summary">
                     <span>
                       <span className="capture-devices-group-name">{group.name}</span>
