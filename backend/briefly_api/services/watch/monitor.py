@@ -256,6 +256,7 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
                 action=copy.action,
                 operating_context=operating_ctx,
                 alert_id=inserted,
+                related_urls=list(hit.related_urls or []),
             )
         except Exception:
             log.debug("Watch monitor: market signal persist failed", exc_info=True)

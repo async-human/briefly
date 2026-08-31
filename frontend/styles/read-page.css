@@ -362,6 +362,78 @@
   cursor: default;
 }
 
+.read-shell-v2 .read-evidence {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border, oklch(80% 0.02 70 / 0.5));
+}
+
+.read-shell-v2 .read-evidence-meta {
+  margin: 0.2rem 0 0.45rem;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, oklch(45% 0.02 70));
+}
+
+.read-shell-v2 .read-evidence-delta {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.read-shell-v2 .read-evidence-delta span {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.625rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted, oklch(45% 0.02 70));
+}
+
+.read-shell-v2 .read-evidence-delta span:first-child {
+  margin-top: 0;
+}
+
+.read-shell-v2 .read-evidence-passage {
+  margin: 0 0 0.5rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--border, oklch(80% 0.02 70));
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--text-secondary, inherit);
+}
+
+.read-shell-v2 .read-evidence-sources {
+  margin: 0 0 0.4rem;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.read-shell-v2 .read-evidence-sources a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.read-shell-v2 .read-evidence-contra {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-secondary, inherit);
+}
+
+.read-shell-v2 .read-signal-rate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
 .read-shell-v2 .read-confidence-signal {
   font-size: 0.6875rem;
   margin-top: 0.25rem;

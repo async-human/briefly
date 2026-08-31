@@ -1505,6 +1505,32 @@ async def record_feedback(
         meta=merged_meta,
     ))
 
+    try:
+        from briefly_api.services.signals.feedback import (
+            feedback_for_digest_item,
+            normalize_label,
+            record_signal_feedback,
+        )
+
+        label = normalize_label(raw_type)
+        if label:
+            linked = await feedback_for_digest_item(
+                db,
+                user_id=user.id,
+                digest_item_id=item.id,
+                source_url=item.source_url,
+            )
+            if linked:
+                await record_signal_feedback(
+                    db,
+                    user_id=user.id,
+                    signal_id=linked.id,
+                    label=label,
+                    note=str(meta.get("note") or item.headline or "")[:400] or None,
+                )
+    except Exception:
+        log.debug("feedback: market signal label failed", exc_info=True)
+
     source_id: str | None = None
     if item.content_id:
         from briefly_api.db.models import RawContent

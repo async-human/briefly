@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type WatchedAlert, type WatchedEntity } from "@/lib/api";
+import { detectorLabel, SIGNAL_RATE_OPTIONS } from "@/lib/detectors";
 
 function timeLabel(iso: string | null): string {
   if (!iso) return "";
@@ -18,13 +19,6 @@ function isActionable(action: string | undefined): boolean {
   const t = action.trim();
   if (!t) return false;
   return !/^none(\s+immediate)?\.?$/i.test(t);
-}
-
-function detectorLabel(kind: string | null | undefined): string | null {
-  if (kind === "pricing_positioning") return "Pricing / positioning";
-  if (kind === "model_api") return "Model / API";
-  if (kind === "product_release") return "Product release";
-  return null;
 }
 
 export function WatchingAlertsPanel() {
@@ -79,6 +73,20 @@ export function WatchingAlertsPanel() {
   async function markRead(id: string) {
     setAlerts((prev) => prev.filter((a) => a.id !== id));
     await api.markWatchedAlertRead(id).catch(() => undefined);
+  }
+
+  async function rateAlert(alert: WatchedAlert, label: string) {
+    if (!alert.signal_id || alert.signal_label === label) return;
+    setAlerts((prev) =>
+      prev.map((row) => (row.id === alert.id ? { ...row, signal_label: label } : row)),
+    );
+    try {
+      await api.rateSignal(alert.signal_id, label, alert.title);
+    } catch {
+      setAlerts((prev) =>
+        prev.map((row) => (row.id === alert.id ? { ...row, signal_label: alert.signal_label } : row)),
+      );
+    }
   }
 
   if (!loaded || entities.length === 0) return null;
@@ -166,16 +174,37 @@ export function WatchingAlertsPanel() {
                         {action}
                       </p>
                     ) : null}
+                    {alert.previous_state && alert.new_state ? (
+                      <p className="watching-alert-field">
+                        <span>Was → now</span>
+                        {alert.previous_state} → {alert.new_state}
+                      </p>
+                    ) : null}
                   </div>
                 )}
-                {(sourceOk || alert.related_urls.length > 0) && (
+                {alert.signal_id ? (
+                  <div className="watching-alert-rate" role="group" aria-label="Rate this signal">
+                    {SIGNAL_RATE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`watching-alert-rate-btn${alert.signal_label === opt.value ? " is-on" : ""}`}
+                        onClick={() => void rateAlert(alert, opt.value)}
+                        disabled={alert.signal_label === opt.value}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {(sourceOk || (alert.related_urls && alert.related_urls.length > 0)) && (
                   <div className="watching-alert-actions">
                     {sourceOk && (
                       <a href={alert.source_url} target="_blank" rel="noreferrer">
                         {alert.source_name || "Read source"}
                       </a>
                     )}
-                    {alert.related_urls.length > 0 && (
+                    {alert.related_urls && alert.related_urls.length > 0 && (
                       <span className="watching-alert-related">
                         +{alert.related_urls.length} other
                         {alert.related_urls.length === 1 ? "" : "s"}

@@ -743,6 +743,15 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
         )
         session.add(item)
 
+    await session.flush()
+    try:
+        from briefly_api.services.signals.attach import link_signals_to_digest, pin_watching_alerts
+
+        await pin_watching_alerts(session, digest_id, ctx)
+        await link_signals_to_digest(session, ctx.user.user_id, digest_id)
+    except Exception:
+        log.debug("Digest persist: signal attach failed", exc_info=True)
+
     await session.commit()
 
     injected_ids = ctx.__dict__.get("injected_brain_dump_ids") or []

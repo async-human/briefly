@@ -22,6 +22,7 @@ import { InlineGraphContext } from "@/components/graph/InlineGraphContext";
 import { useLearnedToast } from "@/components/dashboard/LearnedToast";
 import { copyMarkdownNote } from "@/lib/markdownNote";
 import { guessTrackName } from "@/lib/trackName";
+import { detectorLabel, SIGNAL_RATE_OPTIONS } from "@/lib/detectors";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Mode = "quick" | "deep";
@@ -126,9 +127,90 @@ function DislikeIcon() {
   );
 }
 
+function EvidenceBlock({
+  item,
+  onRate,
+}: {
+  item: DigestItem;
+  onRate?: (label: string) => void;
+}) {
+  const pieces = item.evidence || [];
+  const primary = pieces.find((p) => !p.is_contradictory) || pieces[0];
+  const extras = pieces.filter((p) => p !== primary && !p.is_contradictory && p.source_url);
+  const contra = pieces.filter((p) => p.is_contradictory);
+  const kind = detectorLabel(item.detector_type);
+  const hasState = Boolean(item.previous_state || item.new_state);
+  const hasPieces = pieces.length > 0;
+  if (!hasPieces && !hasState && !item.signal_id) return null;
+
+  const confidencePct = typeof item.signal_confidence === "number" && item.signal_confidence > 0
+    ? Math.round(item.signal_confidence * 100)
+    : null;
+
+  return (
+    <div className="read-evidence">
+      <span className="read-field-label">Evidence</span>
+      {kind || confidencePct != null ? (
+        <p className="read-evidence-meta">
+          {kind ? <span>{kind}</span> : null}
+          {kind && confidencePct != null ? " · " : null}
+          {confidencePct != null ? <span>{confidencePct}% confidence</span> : null}
+        </p>
+      ) : null}
+      {item.previous_state && item.new_state ? (
+        <p className="read-evidence-delta">
+          <span>Was</span> {item.previous_state}
+          <span>Now</span> {item.new_state}
+        </p>
+      ) : null}
+      {primary?.supporting_passage ? (
+        <blockquote className="read-evidence-passage">{primary.supporting_passage}</blockquote>
+      ) : null}
+      {(primary || extras.length > 0) && (
+        <ul className="read-evidence-sources">
+          {primary?.source_url ? (
+            <li>
+              <a href={primary.source_url} target="_blank" rel="noreferrer">
+                {primary.source_name || "Source"}
+              </a>
+            </li>
+          ) : null}
+          {extras.slice(0, 3).map((piece) => (
+            <li key={piece.source_url}>
+              <a href={piece.source_url} target="_blank" rel="noreferrer">
+                {piece.source_name || "Corroborating source"}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+      {contra.map((piece) => (
+        <p key={piece.source_url} className="read-evidence-contra">
+          Conflicting: {piece.extracted_claim || piece.supporting_passage}
+        </p>
+      ))}
+      {item.signal_id && onRate ? (
+        <div className="read-signal-rate" role="group" aria-label="Rate this signal">
+          {SIGNAL_RATE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={`read-decision-btn${item.signal_label === opt.value ? " is-on" : ""}`}
+              onClick={() => onRate(opt.value)}
+              disabled={item.signal_label === opt.value}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ReadingCard({
   item, mode, isSaved, isDisliked, isTracked, isRemembered, decided, acted, dismissed,
-  onSave, onDislike, onLike, onTrack, onRemember, onArticleClick, onAsk, onDecisionChanged, onAct, onDismiss,
+  onSave, onDislike, onLike, onTrack, onRemember, onArticleClick, onAsk, onDecisionChanged, onAct, onDismiss, onRateSignal,
   index, showMemoryCallout,
 }: {
   item: DigestItem;
@@ -150,6 +232,7 @@ function ReadingCard({
   onDecisionChanged: () => void;
   onAct: () => void;
   onDismiss: () => void;
+  onRateSignal: (label: string) => void;
   index: number;
   showMemoryCallout: boolean;
 }) {
@@ -335,6 +418,8 @@ function ReadingCard({
             <p className="read-six-point-text">{item.suggested_action}</p>
           </div>
         )}
+
+        <EvidenceBlock item={item} onRate={onRateSignal} />
 
         <div className="read-decision-row" role="group" aria-label="Decision feedback">
           <button
@@ -977,6 +1062,34 @@ export default function ReadingPage() {
       .catch(() => {});
   }, [currentIndex, items, digest, dismissed, showLearned]);
 
+  const rateCurrent = useCallback((label: string) => {
+    if (!digest) return;
+    const item = items[currentIndex];
+    if (!item?.signal_id || item.signal_label === label) return;
+    setDigest((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        items: prev.items.map((row) =>
+          row.id === item.id ? { ...row, signal_label: label } : row,
+        ),
+      };
+    });
+    api.rateSignal(item.signal_id, label, item.headline)
+      .then((r) => showLearned(r.learned_message || undefined))
+      .catch(() => {
+        setDigest((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            items: prev.items.map((row) =>
+              row.id === item.id ? { ...row, signal_label: item.signal_label } : row,
+            ),
+          };
+        });
+      });
+  }, [currentIndex, items, digest, showLearned]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handle = (e: KeyboardEvent) => {
@@ -1141,6 +1254,7 @@ export default function ReadingPage() {
               onDecisionChanged={markDecision}
               onAct={markActed}
               onDismiss={markDismissed}
+              onRateSignal={rateCurrent}
               index={currentIndex}
               showMemoryCallout={currentIndex === memoryCalloutIndex}
             />

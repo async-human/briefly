@@ -29,8 +29,16 @@ def build_learned_message(signal_type: str, *, source_name: str | None, headline
         return "Logged as an action. I'll look for follow-up evidence."
     if signal_type in ("decision_changed", "changed_my_decision"):
         return "Recorded. I'll treat this as a decision that new evidence can reopen."
-    if signal_type in ("dismissed", "dismiss"):
+    if signal_type in ("dismissed", "dismiss", "irrelevant"):
         return "Dismissed — similar signals will rank lower."
+    if signal_type in ("useful",):
+        return "Marked useful. I'll use this as a positive example for ranking."
+    if signal_type in ("duplicate",):
+        return "Marked duplicate. I'll collapse similar coverage next time."
+    if signal_type in ("incorrect", "wrong"):
+        return "Thanks — I'll treat that extraction as a miss."
+    if signal_type in ("acted_on",):
+        return "Logged as an action. I'll look for follow-up evidence."
 
     return None
 

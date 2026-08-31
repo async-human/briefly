@@ -11180,6 +11180,43 @@ a.saved-capture-title:hover {
   color: var(--app-muted);
 }
 
+.watching-alert-rate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+
+.watching-alert-rate-btn {
+  appearance: none;
+  border: 1px solid var(--app-border, oklch(80% 0.02 70));
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.6875rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.watching-alert-rate-btn:hover:not(:disabled) {
+  border-color: var(--app-accent, currentColor);
+}
+
+.watching-alert-rate-btn:focus-visible {
+  outline: 2px solid var(--app-accent, currentColor);
+  outline-offset: 2px;
+}
+
+.watching-alert-rate-btn.is-on {
+  border-color: transparent;
+  background: oklch(48% 0.12 278 / 0.12);
+}
+
+.watching-alert-rate-btn:disabled {
+  cursor: default;
+}
+
 @container (min-width: 34rem) {
   .watching-alert-fields {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

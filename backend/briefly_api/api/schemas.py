@@ -220,6 +220,11 @@ class DigestItemOut(BaseModel):
     score_breakdown: dict = Field(default_factory=dict)
     why_this_summary: str | None = None
     detector_type: str | None = None
+    signal_id: str | None = None
+    signal_confidence: float | None = None
+    previous_state: str | None = None
+    new_state: str | None = None
+    signal_label: str | None = None
     evidence: list[dict] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}

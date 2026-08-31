@@ -347,6 +347,15 @@ export type DigestOutcome = {
   items_scanned?: number;
 };
 
+export type EvidencePiece = {
+  source_url: string;
+  source_name?: string;
+  extracted_claim?: string;
+  supporting_passage?: string;
+  published_at?: string | null;
+  is_contradictory?: boolean;
+};
+
 export type DigestItem = {
   id: string;
   content_id?: string | null;
@@ -373,6 +382,13 @@ export type DigestItem = {
   was_disliked?: boolean;
   score_breakdown?: Record<string, unknown>;
   why_this_summary?: string | null;
+  detector_type?: string | null;
+  signal_id?: string | null;
+  signal_confidence?: number | null;
+  previous_state?: string | null;
+  new_state?: string | null;
+  signal_label?: string | null;
+  evidence?: EvidencePiece[];
 };
 
 export type DigestStats = {
@@ -1250,6 +1266,11 @@ export const api = {
     request<void>(`/api/v1/watched-alerts/${id}/read`, { method: "POST" }),
   markWatchedAlertsReadAll: () =>
     request<void>("/api/v1/watched-alerts/read-all", { method: "POST" }),
+  rateSignal: (signalId: string, label: string, note?: string) =>
+    request<{ ok: boolean; label: string; signal_id: string; learned_message?: string | null }>(
+      `/api/v1/signals/${encodeURIComponent(signalId)}/feedback`,
+      { method: "POST", body: JSON.stringify({ label, note: note || null }) },
+    ),
   getCalendarUpcoming: () =>
     request<{
       connected: boolean;
@@ -1585,6 +1606,11 @@ export type WatchedAlert = {
   sources_checked: number;
   detector_type?: string | null;
   confidence?: number;
+  signal_id?: string | null;
+  previous_state?: string;
+  new_state?: string;
+  signal_label?: string | null;
+  evidence?: EvidencePiece[];
   created_at: string | null;
 };
 

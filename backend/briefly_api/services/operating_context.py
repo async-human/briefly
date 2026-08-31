@@ -105,6 +105,20 @@ def merge_operating_context(existing: Any, patch: Any) -> dict[str, Any]:
     return normalize_operating_context(merged)
 
 
+def who_affected_from_context(ctx: dict[str, Any] | None) -> str:
+    """One-line 'who this moves' for signal impact and watching items."""
+    data = normalize_operating_context(ctx or {})
+    company = data["company_name"]
+    customers = data["target_customers"]
+    if company and customers:
+        return f"{company} and {customers[:80]}"
+    if company:
+        return company
+    if customers:
+        return customers[:80]
+    return ""
+
+
 def has_operating_context(ctx: dict[str, Any] | None) -> bool:
     data = normalize_operating_context(ctx or {})
     return bool(
