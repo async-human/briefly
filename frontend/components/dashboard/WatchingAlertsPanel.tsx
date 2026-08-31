@@ -13,6 +13,13 @@ function timeLabel(iso: string | null): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+function isActionable(action: string | undefined): boolean {
+  if (!action) return false;
+  const t = action.trim();
+  if (!t) return false;
+  return !/^none(\s+immediate)?\.?$/i.test(t);
+}
+
 export function WatchingAlertsPanel() {
   const [alerts, setAlerts] = useState<WatchedAlert[]>([]);
   const [entities, setEntities] = useState<WatchedEntity[]>([]);
@@ -109,58 +116,66 @@ export function WatchingAlertsPanel() {
         </p>
       ) : (
         <ul className="watching-alerts-list">
-          {alerts.map((alert) => (
-            <li key={alert.id} className="watching-alert-card">
-              <div className="watching-alert-meta">
-                <span className="watching-alert-entity">{alert.entity_name}</span>
-                {alert.is_urgent && <span className="watching-alert-urgent">Urgent</span>}
-                <span className="watching-alert-time">
-                  {timeLabel(alert.published_at || alert.created_at)}
-                </span>
-              </div>
-              <h3 className="watching-alert-headline">{alert.title}</h3>
-              {alert.what_changed && (
-                <p className="watching-alert-line">
-                  <span>What changed</span>
-                  {alert.what_changed}
-                </p>
-              )}
-              {alert.why_it_matters && (
-                <p className="watching-alert-line">
-                  <span>Why it matters</span>
-                  {alert.why_it_matters}
-                </p>
-              )}
-              {alert.action && (
-                <p className="watching-alert-line">
-                  <span>Action</span>
-                  {alert.action}
-                </p>
-              )}
-              <div className="watching-alert-actions">
-                {alert.source_url && !alert.source_url.startsWith("pool:") && (
-                  <a href={alert.source_url} target="_blank" rel="noreferrer">
-                    Read source
-                  </a>
-                )}
-                {alert.related_urls.length > 0 && (
-                  <span className="watching-alert-related">
-                    +{alert.related_urls.length} other source
-                    {alert.related_urls.length === 1 ? "" : "s"}
+          {alerts.map((alert) => {
+            const action = isActionable(alert.action) ? alert.action : "";
+            const sourceOk = Boolean(alert.source_url && !alert.source_url.startsWith("pool:"));
+            return (
+              <li key={alert.id} className="watching-alert-card">
+                <div className="watching-alert-meta">
+                  <span className="watching-alert-entity">{alert.entity_name}</span>
+                  {alert.is_urgent && <span className="watching-alert-urgent">Urgent</span>}
+                  <span className="watching-alert-time">
+                    {timeLabel(alert.published_at || alert.created_at)}
                   </span>
+                  <button
+                    type="button"
+                    className="watching-alert-dismiss"
+                    onClick={() => void markRead(alert.id)}
+                  >
+                    Mark read
+                  </button>
+                </div>
+                <h3 className="watching-alert-headline">{alert.title}</h3>
+                {(alert.what_changed || alert.why_it_matters || action) && (
+                  <div className="watching-alert-fields">
+                    {alert.what_changed ? (
+                      <p className="watching-alert-field">
+                        <span>Changed</span>
+                        {alert.what_changed}
+                      </p>
+                    ) : null}
+                    {alert.why_it_matters ? (
+                      <p className="watching-alert-field">
+                        <span>Why</span>
+                        {alert.why_it_matters}
+                      </p>
+                    ) : null}
+                    {action ? (
+                      <p className="watching-alert-field watching-alert-field--action">
+                        <span>Action</span>
+                        {action}
+                      </p>
+                    ) : null}
+                  </div>
                 )}
-                {alert.sources_checked > 0 && (
-                  <span className="watching-alert-related">
-                    Monitored {alert.sources_checked} source
-                    {alert.sources_checked === 1 ? "" : "s"}
-                  </span>
+                {(sourceOk || alert.related_urls.length > 0) && (
+                  <div className="watching-alert-actions">
+                    {sourceOk && (
+                      <a href={alert.source_url} target="_blank" rel="noreferrer">
+                        {alert.source_name || "Read source"}
+                      </a>
+                    )}
+                    {alert.related_urls.length > 0 && (
+                      <span className="watching-alert-related">
+                        +{alert.related_urls.length} other
+                        {alert.related_urls.length === 1 ? "" : "s"}
+                      </span>
+                    )}
+                  </div>
                 )}
-                <button type="button" onClick={() => void markRead(alert.id)}>
-                  Mark read
-                </button>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
       {alerts.length > 0 && scanNote && (
