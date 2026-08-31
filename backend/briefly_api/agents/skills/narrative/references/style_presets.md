@@ -1,6 +1,6 @@
 # Summary style presets
 
-Apply the user's `brief_style` and `brief_language` to **summary** and **why_it_matters_to_you** only.
+Apply the user's `brief_style` and `brief_language` to **summary**, **why_it_matters_to_you**, **who_it_affects**, and **suggested_action**.
 **Headlines stay in English** — citation integrity and link previews depend on stable titles.
 
 ## analyst (default)

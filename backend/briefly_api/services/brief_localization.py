@@ -47,6 +47,8 @@ async def localize_digest_to_hindi(
                 "content_id": d.content_id,
                 "summary": d.summary,
                 "why_it_matters_to_you": d.why_it_matters,
+                "who_it_affects": d.who_it_affects or "",
+                "suggested_action": d.suggested_action or "",
                 "memory_reference": d.memory_reference or "",
                 "confidence_signal": d.confidence_signal or "",
             }
@@ -58,7 +60,7 @@ async def localize_digest_to_hindi(
         "You translate Briefly digest copy into natural Hindi (Devanagari).\n"
         "Rules:\n"
         "- Translate subject_line, preview_text, summary, why_it_matters_to_you, "
-        "memory_reference, and confidence_signal.\n"
+        "who_it_affects, suggested_action, memory_reference, and confidence_signal.\n"
         "- Do NOT translate content_id values.\n"
         "- Keep company names, product names, and URLs in their common form.\n"
         "- Return ONLY valid JSON with the same structure as the input.\n"
@@ -98,6 +100,10 @@ async def localize_digest_to_hindi(
             draft.summary = str(row["summary"])
         if row.get("why_it_matters_to_you"):
             draft.why_it_matters = str(row["why_it_matters_to_you"])
+        if row.get("who_it_affects"):
+            draft.who_it_affects = str(row["who_it_affects"])
+        if row.get("suggested_action"):
+            draft.suggested_action = str(row["suggested_action"])
         if row.get("memory_reference"):
             draft.memory_reference = str(row["memory_reference"])
         if row.get("confidence_signal"):

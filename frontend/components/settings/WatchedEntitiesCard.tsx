@@ -9,7 +9,7 @@ const KINDS = [
   { value: "person", label: "Person" },
 ];
 
-export function WatchedEntitiesCard() {
+export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) {
   const [entities, setEntities] = useState<WatchedEntity[]>([]);
   const [name, setName] = useState("");
   const [kind, setKind] = useState("company");
@@ -48,7 +48,8 @@ export function WatchedEntitiesCard() {
   }
 
   return (
-    <div className="watched-card">
+    <div className={`watched-card${compact ? " watched-card--compact" : ""}`}>
+      {compact && <p className="watched-card-label">Watching</p>}
       <form className="watched-form" onSubmit={add}>
         <select
           className="watched-kind"
@@ -92,8 +93,9 @@ export function WatchedEntitiesCard() {
         </ul>
       ) : (
         <p className="watched-empty">
-          Nothing watched yet. Add a company or topic and Briefly will alert you when it ships
-          something — even from sources you don&apos;t follow.
+          {compact
+            ? "Track a company from a brief, or add one here."
+            : "Nothing watched yet. Add a company or topic and Briefly will alert you when it ships something — even from sources you don't follow."}
         </p>
       )}
 

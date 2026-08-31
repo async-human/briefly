@@ -55,7 +55,7 @@ from briefly_api.auth.deps import get_current_user
 from briefly_api.config import Settings, get_settings
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import (
-    BehavioralSignal, Digest, DigestItem, SignalType, Source, User, UserProfile,
+    BehavioralSignal, Digest, DigestItem, SignalType, Source, User, UserMemory, UserProfile,
 )
 from briefly_api.db.engine import SessionLocal
 from briefly_api.services.connectors.registry import detect_source, get_connector
@@ -1339,6 +1339,7 @@ _SIGNAL_MAP: dict[str, SignalType] = {
     "disliked":     SignalType.disliked,
     "clicked":      SignalType.clicked,
     "saved":        SignalType.saved,
+    "remembered":   SignalType.saved,
     "skipped":      SignalType.skipped,
     "followed_up":  SignalType.followed_up,
     "opened":       SignalType.opened,
@@ -1355,7 +1356,7 @@ async def record_feedback(
     if not signal_type:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown signal_type '{body.signal_type}'. Use: liked, disliked, clicked, saved.",
+            detail=f"Unknown signal_type '{body.signal_type}'. Use: liked, disliked, clicked, saved, remembered.",
         )
 
     # opened signal uses digest_item_id to carry digest_id (special case from frontend)
@@ -1381,7 +1382,7 @@ async def record_feedback(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Digest item not found.")
 
     # Update the item flags
-    if body.signal_type in ("liked", "saved"):
+    if body.signal_type in ("liked", "saved", "remembered"):
         item.was_saved = True
     elif body.signal_type == "disliked":
         item.was_disliked = True
@@ -1390,6 +1391,9 @@ async def record_feedback(
     elif body.signal_type == "followed_up":
         item.had_follow_up = True
         item.follow_up_depth = (item.follow_up_depth or 0) + 1
+
+    if body.signal_type == "remembered":
+        await _upsert_saved_memory(db, user.id, item)
 
     # Store signal record
     db.add(BehavioralSignal(
@@ -1414,12 +1418,12 @@ async def record_feedback(
             user, item.source_name, body.signal_type, db, source_id=source_id,
         )
 
-    if body.signal_type in ("liked", "saved", "disliked", "skipped") and user.profile:
+    if body.signal_type in ("liked", "saved", "remembered", "disliked", "skipped") and user.profile:
         from briefly_api.services.learned_adjustments import queue_adjustment
 
         queue_adjustment(
             user.profile,
-            signal_type=body.signal_type,
+            signal_type="saved" if body.signal_type == "remembered" else body.signal_type,
             source_name=item.source_name,
             headline=item.headline,
         )
@@ -1460,6 +1464,45 @@ async def record_feedback(
     return FeedbackOut(learned_message=learned)
 
 
+async def _upsert_saved_memory(db: AsyncSession, user_id: str, item: DigestItem) -> None:
+    key = (item.headline or item.id)[:512]
+    existing = (
+        await db.execute(
+            select(UserMemory).where(
+                UserMemory.user_id == user_id,
+                UserMemory.memory_type == "interest_signal",
+                UserMemory.key == key,
+            )
+        )
+    ).scalar_one_or_none()
+    payload = {
+        "headline": item.headline,
+        "summary": item.summary,
+        "why_it_matters": item.why_it_matters,
+        "who_it_affects": item.who_it_affects,
+        "suggested_action": item.suggested_action,
+        "source_name": item.source_name,
+        "source_url": item.source_url,
+        "digest_item_id": item.id,
+        "saved_by_user": True,
+    }
+    if existing:
+        existing.value = payload
+        existing.strength = min(1.0, (existing.strength or 1.0) + 0.15)
+        existing.occurrence_count = (existing.occurrence_count or 1) + 1
+        flag_modified(existing, "value")
+        return
+    db.add(
+        UserMemory(
+            user_id=user_id,
+            memory_type="interest_signal",
+            key=key,
+            value=payload,
+            strength=1.0,
+        )
+    )
+
+
 async def _bump_source_weight(
     user: User,
     source_name: str,
@@ -1473,7 +1516,7 @@ async def _bump_source_weight(
     weights: dict = dict(user.profile.source_weights or {})
     key = source_id or source_name.lower()
     current = weights.get(key, 0.5)
-    delta = 0.08 if signal_type == "liked" else -0.08 if signal_type == "disliked" else 0.02
+    delta = 0.08 if signal_type in ("liked", "saved", "remembered") else -0.08 if signal_type == "disliked" else 0.02
     weights[key] = round(min(1.0, max(0.1, current + delta)), 3)
     user.profile.source_weights = weights
 

@@ -657,6 +657,8 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
             headline=draft.headline,
             summary=draft.summary,
             why_it_matters=draft.why_it_matters,
+            who_it_affects=draft.who_it_affects or None,
+            suggested_action=draft.suggested_action or None,
             source_name=draft.source_name,
             source_url=draft.source_url,
             all_sources=draft.all_sources,

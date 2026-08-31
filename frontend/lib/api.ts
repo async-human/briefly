@@ -343,6 +343,8 @@ export type DigestItem = {
   headline: string;
   summary: string;
   why_it_matters: string;
+  who_it_affects?: string | null;
+  suggested_action?: string | null;
   source_name: string | null;
   source_url: string | null;
   all_sources: Record<string, unknown>[];

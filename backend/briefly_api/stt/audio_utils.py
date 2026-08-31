@@ -39,6 +39,8 @@ _FFMPEG_INPUT_STRATEGIES: list[list[str]] = [
     ["-probesize", "32M", "-analyzeduration", "32M", "-fflags", "+discardcorrupt"],
     ["-f", "webm", "-fflags", "+discardcorrupt"],
     ["-f", "matroska,webm", "-fflags", "+discardcorrupt"],
+    ["-f", "ogg", "-fflags", "+discardcorrupt"],
+    ["-f", "mp4", "-fflags", "+discardcorrupt"],
     ["-err_detect", "ignore_err"],
 ]
 
@@ -63,6 +65,24 @@ def input_suffix_for(content_type: str, filename: str) -> str:
 
 def _looks_like_webm(audio_bytes: bytes) -> bool:
     return len(audio_bytes) >= 4 and audio_bytes[:4] == b"\x1aE\xdf\xa3"
+
+
+def _suffixes_to_try(audio_bytes: bytes, declared: str) -> list[str]:
+    """Prefer a matching container, then fall back when the browser lied about MIME."""
+    if _looks_like_webm(audio_bytes):
+        return [".webm"]
+    if len(audio_bytes) >= 4 and audio_bytes[:4] == b"OggS":
+        return [".ogg"]
+    if len(audio_bytes) >= 4 and audio_bytes[:4] == b"RIFF":
+        return [".wav"]
+    if len(audio_bytes) >= 8 and audio_bytes[4:8] == b"ftyp":
+        return [".mp4", ".m4a"]
+
+    ordered = [declared]
+    for alt in (".webm", ".ogg", ".opus", ".mp4", ".m4a", ".wav"):
+        if alt not in ordered:
+            ordered.append(alt)
+    return ordered
 
 
 def _ffmpeg_to_wav(
@@ -106,35 +126,36 @@ def convert_to_wav(audio_bytes: bytes, *, input_suffix: str = ".webm") -> bytes 
     suffix = input_suffix if input_suffix.startswith(".") else f".{input_suffix}"
     if suffix == ".webm" and not _looks_like_webm(audio_bytes):
         log.warning(
-            "convert_to_wav: missing WebM header (bytes=%d, head=%r)",
+            "convert_to_wav: missing WebM header (bytes=%d, head=%r) — trying other containers",
             len(audio_bytes),
             audio_bytes[:8],
         )
 
     with tempfile.TemporaryDirectory() as tmp:
-        src = Path(tmp) / f"input{suffix}"
         dst = Path(tmp) / "output.wav"
-        src.write_bytes(audio_bytes)
-
         last_code: int | None = None
         last_stderr = ""
-        for input_args in _FFMPEG_INPUT_STRATEGIES:
-            dst.unlink(missing_ok=True)
-            try:
-                proc = subprocess.run(
-                    [ffmpeg, "-y", *input_args, "-i", str(src), *_WAV_OUTPUT_ARGS, str(dst)],
-                    capture_output=True,
-                    timeout=120,
-                    check=False,
-                )
-                last_code = proc.returncode
-                last_stderr = proc.stderr.decode("utf-8", errors="replace")
-                if proc.returncode == 0 and dst.exists():
-                    out = dst.read_bytes()
-                    if len(out) >= 128:
-                        return out
-            except (subprocess.TimeoutExpired, OSError) as exc:
-                log.debug("ffmpeg strategy %s error: %s", input_args[:2], exc)
+        for try_suffix in _suffixes_to_try(audio_bytes, suffix):
+            src = Path(tmp) / f"input{try_suffix}"
+            src.write_bytes(audio_bytes)
+            for input_args in _FFMPEG_INPUT_STRATEGIES:
+                dst.unlink(missing_ok=True)
+                try:
+                    proc = subprocess.run(
+                        [ffmpeg, "-y", *input_args, "-i", str(src), *_WAV_OUTPUT_ARGS, str(dst)],
+                        capture_output=True,
+                        timeout=120,
+                        check=False,
+                    )
+                    last_code = proc.returncode
+                    last_stderr = proc.stderr.decode("utf-8", errors="replace")
+                    if proc.returncode == 0 and dst.exists():
+                        out = dst.read_bytes()
+                        if len(out) >= 128:
+                            return out
+                except (subprocess.TimeoutExpired, OSError) as exc:
+                    log.debug("ffmpeg strategy %s error: %s", input_args[:2], exc)
+            src.unlink(missing_ok=True)
 
         log.warning(
             "ffmpeg conversion failed (code=%s, bytes=%d): %s",

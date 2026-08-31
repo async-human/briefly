@@ -9,7 +9,7 @@ export type AppStatChip = {
 };
 
 type AppPageHeaderProps = {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   subtitle?: string;
   status?: ReactNode;
@@ -28,7 +28,7 @@ export function AppPageHeader({
   return (
     <header className="dash-page-header">
       <div className="dash-page-header-main">
-        <p className="dash-page-eyebrow">{eyebrow}</p>
+        {eyebrow ? <p className="dash-page-eyebrow">{eyebrow}</p> : null}
         <h1 className="dash-page-title">{title}</h1>
         {subtitle ? <p className="dash-page-subtitle">{subtitle}</p> : null}
         {status}

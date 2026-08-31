@@ -319,15 +319,9 @@ function DashboardContent() {
 
       <ProactiveAlertsBanner />
 
-      {!me.calendar_connected ? (
-        <CalendarConnectNudge />
-      ) : (
-        <CalendarMeetingsPanel calendarConnected={me.calendar_connected} />
-      )}
-
       <div className="dash-primary-zone">
         <div className="dash-primary-head">
-          <p className="dash-primary-label">Today&apos;s briefing</p>
+          <h2 className="dash-primary-label">Today&apos;s briefing</h2>
           {digest && (digest.items?.length ?? 0) > 0 && (
             <button
               type="button"
@@ -338,7 +332,7 @@ function DashboardContent() {
                 setBriefingOpen(true);
               }}
             >
-              ▶ Brief me
+              Listen
             </button>
           )}
           {digest && (digest.items?.length ?? 0) > 0 && (
@@ -355,9 +349,10 @@ function DashboardContent() {
             className="dash-connections-trigger"
             onClick={() => setConnectionsOpen(true)}
             aria-haspopup="dialog"
+            aria-label={`Manage connections, ${sourcesDesc}`}
+            title={sourcesDesc}
           >
             <span className="dash-connections-trigger-label">Connections</span>
-            <span className="dash-connections-trigger-meta">{sourcesDesc}</span>
           </button>
         </div>
         <section className="dash-surface dash-surface-briefing" aria-labelledby="briefing-surface-title">
@@ -384,12 +379,18 @@ function DashboardContent() {
         </section>
       </div>
 
+      {me.calendar_connected && (
+        <CalendarMeetingsPanel calendarConnected={me.calendar_connected} />
+      )}
+
       <DashboardInsightsDrawer
         intel={intel}
         digest={digest}
         streak={me.reading_streak ?? 0}
         declaredInterests={me.profile?.interests?.map((i) => i.topic).filter(Boolean) ?? []}
       />
+
+      {!me.calendar_connected && <CalendarConnectNudge />}
 
       <ConnectionsDrawer
         open={connectionsOpen}

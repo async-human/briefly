@@ -50,6 +50,8 @@ def render_digest_html(
         headline = item.get("headline", "")
         summary = item.get("summary", "")
         why = item.get("why_it_matters", "")
+        who = item.get("who_it_affects") or ""
+        action = item.get("suggested_action") or ""
         source_name = item.get("source_name") or ""
         source_url = item.get("source_url") or ""
         memory_connections = item.get("memory_connections") or []
@@ -98,7 +100,20 @@ def render_digest_html(
                 memory_callout_html = _render_memory_callout(memory_text)
                 memory_callout_shown = True
 
-        # Confidence signal
+        who_html = ""
+        if who:
+            who_html = (
+                f'<p style="margin:10px 0 0;font-size:13px;color:#a0a0a0;line-height:1.55">'
+                f'<span style="color:#8a8a8a;font-size:10px;letter-spacing:0.08em;'
+                f'text-transform:uppercase;font-family:monospace">Who it affects</span><br>{who}</p>'
+            )
+        action_html = ""
+        if action:
+            action_html = (
+                f'<p style="margin:10px 0 0;font-size:13px;color:#c9b896;line-height:1.55">'
+                f'<span style="color:#8a8a8a;font-size:10px;letter-spacing:0.08em;'
+                f'text-transform:uppercase;font-family:monospace">Do this</span><br>{action}</p>'
+            )
         confidence_html = ""
         if confidence_signal:
             confidence_html = (
@@ -135,6 +150,8 @@ def render_digest_html(
     background:rgba(201,184,150,0.05);border-radius:0 6px 6px 0">
     <p style="margin:0;font-size:13px;color:#c9b896;line-height:1.6;font-style:italic">{why}</p>
   </blockquote>
+  {who_html}
+  {action_html}
   {confidence_html}
   {evolution_html}
   {memory_callout_html}

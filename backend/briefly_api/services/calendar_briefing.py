@@ -11,6 +11,7 @@ from sqlalchemy import select
 
 from briefly_api.auth.calendar import (
     CALENDAR_API,
+    GoogleTokenRevoked,
     get_calendar_connection,
     refresh_calendar_access_token,
 )
@@ -284,6 +285,9 @@ async def load_calendar_briefing(
             )
         else:
             events = await fetch_todays_events(access_token, timezone_str, run_date)
+    except GoogleTokenRevoked:
+        log.warning("Calendar briefing skipped for user %s — reconnect Google Calendar", user_id)
+        return None
     except Exception:
         log.debug("Calendar briefing load failed for user %s", user_id, exc_info=True)
         return None
@@ -306,6 +310,9 @@ async def load_upcoming_meetings(session, user_id: str) -> dict | None:
     try:
         access_token = await refresh_calendar_access_token(connection, settings)
         events = await fetch_upcoming_events(access_token, tz, days=2)
+    except GoogleTokenRevoked:
+        log.warning("Upcoming meetings skipped for user %s — reconnect Google Calendar", user_id)
+        return None
     except Exception:
         log.debug("load_upcoming_meetings failed for user %s", user_id, exc_info=True)
         return None
@@ -422,6 +429,9 @@ async def queue_imminent_meeting_prep(session, user_id: str) -> int:
     try:
         access_token = await refresh_calendar_access_token(connection, get_settings())
         events = await fetch_events_between(access_token, tz, now, window_end)
+    except GoogleTokenRevoked:
+        log.warning("queue_imminent_meeting_prep skipped for %s — reconnect Google Calendar", user_id)
+        return 0
     except Exception:
         log.debug("queue_imminent_meeting_prep: fetch failed for %s", user_id, exc_info=True)
         return 0

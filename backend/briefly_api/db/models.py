@@ -426,6 +426,8 @@ class DigestItem(Base):
     headline: Mapped[str] = mapped_column(Text, nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     why_it_matters: Mapped[str] = mapped_column(Text, nullable=False)  # personalised "why this matters to YOU"
+    who_it_affects: Mapped[str | None] = mapped_column(Text)
+    suggested_action: Mapped[str | None] = mapped_column(Text)
     source_name: Mapped[str | None] = mapped_column(String(255))
     source_url: Mapped[str | None] = mapped_column(Text)
 

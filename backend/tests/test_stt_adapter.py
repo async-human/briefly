@@ -42,3 +42,14 @@ def test_deepgram_keyterms_skips_stopwords():
     assert "Kubernetes" in terms
     assert "PostgreSQL" in terms
     assert "Ignore" not in terms
+
+
+def test_suffixes_to_try_prefers_real_container():
+    from briefly_api.stt.audio_utils import _suffixes_to_try
+
+    assert _suffixes_to_try(b"\x1aE\xdf\xa3rest", ".webm") == [".webm"]
+    assert _suffixes_to_try(b"OggS...." + b"\x00" * 8, ".webm") == [".ogg"]
+    guessed = _suffixes_to_try(b"C\xc3\x81\x03\xc0\x80\xfb\x03", ".webm")
+    assert guessed[0] == ".webm"
+    assert ".ogg" in guessed
+    assert ".mp4" in guessed

@@ -64,7 +64,8 @@ class NarrativeSkill:
             f"## Style preset\n"
             f"- brief_style: {style}\n"
             f"- brief_language: {language}\n"
-            f"Apply style_presets.md for summary and why_it_matters_to_you only.\n\n"
+            f"Apply style_presets.md for summary, why_it_matters_to_you, "
+            f"who_it_affects, and suggested_action only.\n\n"
         )
 
     @staticmethod
@@ -73,13 +74,15 @@ class NarrativeSkill:
         if language == "hi":
             return (
                 "LANGUAGE (mandatory): brief_language is hi.\n"
-                "- Write summary and why_it_matters_to_you in natural Hindi using Devanagari script.\n"
+                "- Write summary, why_it_matters_to_you, who_it_affects, and suggested_action "
+                "in natural Hindi using Devanagari script.\n"
                 "- Translate any English pre_computed_* hints into Hindi — do NOT copy them verbatim in English.\n"
                 "- headline MUST stay in English exactly as the source title (do not translate headlines).\n"
                 "- memory_reference and confidence_signal may be Hindi or short English proper nouns.\n"
             )
         return (
-            "LANGUAGE: brief_language is en. Write summary and why_it_matters_to_you in English.\n"
+            "LANGUAGE: brief_language is en. Write summary, why_it_matters_to_you, "
+            "who_it_affects, and suggested_action in English.\n"
             "Headlines stay in English.\n"
         )
 
@@ -168,6 +171,8 @@ class NarrativeSkill:
             f"- summary: 2 sentences max, factual — follow LANGUAGE rules above\n"
             f"- why_it_matters_to_you: 1-2 sentences — follow LANGUAGE rules; "
             f"adapt pre_computed hints to the target language\n"
+            f"- who_it_affects: 1 short sentence naming who this moves\n"
+            f"- suggested_action: 1 concrete next step this week\n"
             f"- source_name, source_url: required\n"
             f"- memory_reference: adapt pre_computed_connection or thread_update to target language\n"
             f"- confidence_signal: 1 short phrase or empty\n"

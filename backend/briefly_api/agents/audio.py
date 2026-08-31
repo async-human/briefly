@@ -62,6 +62,8 @@ def _build_script(ctx: PipelineContext) -> str:
         lines.append(item.summary.rstrip(".") + ".")
         if item.why_it_matters:
             lines.append(item.why_it_matters.rstrip(".") + ".")
+        if item.suggested_action:
+            lines.append(item.suggested_action.rstrip(".") + ".")
 
     lines.append("That's your Briefly for today. Have a great day.")
     return " ".join(lines)

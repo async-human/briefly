@@ -236,6 +236,8 @@ def _render_items_block(items: list[DigestItemDraft], section_name: str) -> str:
               <p style="margin:0 0 8px 0;font-size:14px;color:#5b47e0;line-height:1.5;font-style:italic;">
                 <strong style="font-style:normal;">Why this matters:</strong> {_esc(item.why_it_matters)}
               </p>
+              {f'<p style="margin:0 0 8px 0;font-size:13px;color:#444;line-height:1.5;"><strong>Who it affects:</strong> {_esc(item.who_it_affects)}</p>' if item.who_it_affects else ""}
+              {f'<p style="margin:0 0 8px 0;font-size:13px;color:#444;line-height:1.5;"><strong>Do this:</strong> {_esc(item.suggested_action)}</p>' if item.suggested_action else ""}
               <p style="margin:0;font-size:12px;color:#888;">
                 <a href="{item.source_url or '#'}" style="color:#888;">{_esc(item.source_name or '')}</a>
               </p>

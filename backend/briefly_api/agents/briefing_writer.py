@@ -200,6 +200,22 @@ def _draft_url(item: RawItem, written_url: str | None = None) -> str | None:
     return None
 
 
+def _fallback_who(item: RawItem, profile: dict) -> str:
+    role = (profile.get("role") or "").strip()
+    if role:
+        return f"{role}s tracking this story"
+    return "Operators following this market"
+
+
+def _fallback_action(item: RawItem, profile: dict) -> str:
+    goal = (profile.get("goal") or "").strip()
+    source = (item.source_name or "the source").strip()
+    if goal:
+        clipped = goal[:80].rstrip(".")
+        return f"Check whether this changes your plan to {clipped}."
+    return f"Read the {source} piece and decide if you need to act this week."
+
+
 def _fallback_drafts(items: list[RawItem], ctx: PipelineContext) -> list[DigestItemDraft]:
     drafts: list[DigestItemDraft] = []
     for pos, item in enumerate(items, start=1):
@@ -212,6 +228,8 @@ def _fallback_drafts(items: list[RawItem], ctx: PipelineContext) -> list[DigestI
                 headline=item.title,
                 summary=summary,
                 why_it_matters=_personalized_why_fallback(item, ctx.user.profile),
+                who_it_affects=_fallback_who(item, ctx.user.profile),
+                suggested_action=_fallback_action(item, ctx.user.profile),
                 source_name=item.source_name,
                 source_url=_draft_url(item),
                 all_sources=item.duplicate_sources,
@@ -440,6 +458,10 @@ def _drafts_from_llm(
                 "why_it_matters_to_you",
                 f"From {item.source_name}, in your briefing today.",
             ),
+            who_it_affects=(written.get("who_it_affects") or "").strip()
+            or _fallback_who(item, ctx.user.profile),
+            suggested_action=(written.get("suggested_action") or "").strip()
+            or _fallback_action(item, ctx.user.profile),
             source_name=written.get("source_name", source_item.source_name if source_item else item.source_name),
             source_url=_draft_url(source_item or item, written.get("source_url")),
             all_sources=source_item.duplicate_sources if source_item else [],

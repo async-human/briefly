@@ -59,6 +59,8 @@ class DigestItemDraft:
     why_it_matters: str    # THE most important field — personalised to user
     source_name: str
     source_url: str | None
+    who_it_affects: str = ""
+    suggested_action: str = ""
     all_sources: list[dict] = field(default_factory=list)
     duplicate_count: int = 1
     memory_connections: list[dict] = field(default_factory=list)

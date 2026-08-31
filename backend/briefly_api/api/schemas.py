@@ -183,6 +183,8 @@ class DigestItemOut(BaseModel):
     headline: str
     summary: str
     why_it_matters: str
+    who_it_affects: str | None = None
+    suggested_action: str | None = None
     source_name: str | None
     source_url: str | None
     all_sources: list[dict] = Field(default_factory=list)

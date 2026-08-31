@@ -23,7 +23,6 @@ export function DashboardToolbar({
   itemCount,
   savedMinutes,
   sourceCount,
-  streak,
   digestId,
   generating,
   onRefresh,
@@ -39,23 +38,16 @@ export function DashboardToolbar({
   const stats = !generating
     ? [
         ...(itemCount != null
-          ? [{ value: itemCount, label: "In brief" }]
+          ? [{ value: itemCount, label: "stories selected" }]
           : []),
         ...(savedMinutes != null && savedMinutes > 0
-          ? [{ value: `~${savedMinutes}m`, label: "Saved" }]
-          : []),
-        ...(sourceCount > 0
-          ? [{ value: sourceCount, label: "Connections" }]
-          : []),
-        ...(streak > 0
-          ? [{ value: streak, label: "Day streak", accent: true }]
+          ? [{ value: `~${savedMinutes}m`, label: "reading distilled" }]
           : []),
       ]
     : [];
 
   return (
     <AppPageHeader
-      eyebrow={greeting?.briefingLabel ?? "Today"}
       title={`${greeting?.label ?? "Hello"}, ${name}`}
       subtitle={dateLabel}
       status={

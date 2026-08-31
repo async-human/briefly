@@ -1,6 +1,7 @@
 """Google Calendar OAuth — readonly access for meeting-aware briefings."""
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
@@ -17,6 +18,13 @@ from briefly_api.security.oauth_tokens import (
     oauth_refresh_token,
     set_oauth_tokens,
 )
+
+log = logging.getLogger(__name__)
+
+
+class GoogleTokenRevoked(Exception):
+    """Refresh token is expired, revoked, or otherwise unusable."""
+
 
 CALENDAR_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 CALENDAR_SCOPES = (
@@ -103,6 +111,13 @@ async def refresh_calendar_access_token(
             },
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
+        if resp.status_code in (400, 401):
+            log.warning(
+                "Google Calendar refresh rejected (%s) — reconnect Calendar in Settings. body=%s",
+                resp.status_code,
+                resp.text[:300],
+            )
+            raise GoogleTokenRevoked("Google Calendar refresh token is no longer valid")
         resp.raise_for_status()
         tokens = resp.json()
 

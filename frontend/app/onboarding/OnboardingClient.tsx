@@ -9,6 +9,7 @@ import { clearToken } from "@/lib/auth";
 import { BrieflyLogo } from "@/components/BrieflyLogo";
 import { AddSourceForm } from "@/components/dashboard/AddSourceForm";
 import { FREE_SOURCE_LIMIT } from "@/lib/plans";
+import { FOUNDER_INTELLIGENCE_PACK, FOUNDER_PACK_BLURB } from "@/lib/founderSourcePack";
 import { GmailConsentModal } from "@/components/privacy/GmailConsentModal";
 import "@/styles/onboarding.css";
 
@@ -248,6 +249,8 @@ export default function OnboardingPage() {
   const [youtubeLoading, setYoutubeLoading] = useState(false);
   const [redditLoading, setRedditLoading] = useState(false);
   const [calendarLoading, setCalendarLoading] = useState(false);
+  const [packLoading, setPackLoading] = useState(false);
+  const [packAdded, setPackAdded] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState("");
   const [banner, setBanner] = useState("");
@@ -481,6 +484,34 @@ export default function OnboardingPage() {
       setBanner("Hacker News added to your sources.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add Hacker News");
+    }
+  }
+
+  async function handleAddFounderPack() {
+    if (warnIfSourceLimit("add the founder pack")) return;
+    setError("");
+    setPackLoading(true);
+    try {
+      const result = await api.bulkAddSources(
+        FOUNDER_INTELLIGENCE_PACK.map((s) => ({ identifier: s.identifier, name: s.name })),
+      );
+      setStatus(await api.getOnboardingStatus());
+      const added = result.added?.length ?? 0;
+      if (added === 0) {
+        setBanner("Those sources are already in your list, or your free slots are full.");
+      } else {
+        setPackAdded(true);
+        const skipped = result.skipped ?? 0;
+        setBanner(
+          skipped > 0
+            ? `Added ${added} founder sources. ${skipped} skipped — free plan has ${FREE_SOURCE_LIMIT} slots.`
+            : `Added ${added} founder sources.`,
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add founder pack");
+    } finally {
+      setPackLoading(false);
     }
   }
 
@@ -813,6 +844,17 @@ export default function OnboardingPage() {
               ) : null}
 
               <p className="onboard-source-section-label">What you read</p>
+              <button
+                type="button"
+                className={`onboard-founder-pack${packAdded ? " added" : ""}`}
+                onClick={() => void handleAddFounderPack()}
+                disabled={packLoading || packAdded || sourcesAtLimit}
+              >
+                <span className="onboard-founder-pack-title">
+                  {packAdded ? "Founder pack added" : packLoading ? "Adding pack…" : "Add AI Founder pack"}
+                </span>
+                <span className="onboard-founder-pack-blurb">{FOUNDER_PACK_BLURB}</span>
+              </button>
               <div className="onboard-source-grid">
                 <button
                   type="button"

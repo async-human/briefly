@@ -19,6 +19,8 @@ import {
 import { askAboutContent } from "@/lib/askLinks";
 import { graphItemUrl } from "@/lib/graphLinks";
 import { useLearnedToast } from "@/components/dashboard/LearnedToast";
+import { copyMarkdownNote } from "@/lib/markdownNote";
+import { guessTrackName } from "@/lib/trackName";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Mode = "quick" | "deep";
@@ -124,19 +126,24 @@ function DislikeIcon() {
 }
 
 function ReadingCard({
-  item, mode, isSaved, isDisliked, onSave, onDislike, onLike, index, showMemoryCallout,
+  item, mode, isSaved, isDisliked, isTracked, isRemembered, onSave, onDislike, onLike, onTrack, onRemember, index, showMemoryCallout,
 }: {
   item: DigestItem;
   mode: Mode;
   isSaved: boolean;
   isDisliked: boolean;
+  isTracked: boolean;
+  isRemembered: boolean;
   onSave: () => void;
   onDislike: () => void;
   onLike: () => void;
+  onTrack: () => void;
+  onRemember: () => void;
   index: number;
   showMemoryCallout: boolean;
 }) {
   const [whyOpen, setWhyOpen] = useState(false);
+  const [noteState, setNoteState] = useState<"idle" | "copying" | "success" | "error">("idle");
   const firstMemory = item.memory_connections?.[0];
   const memoryText = item.memory_reference || firstMemory?.description || null;
   const coverageNote = item.duplicate_count > 1
@@ -145,6 +152,17 @@ function ReadingCard({
   const hasDeepSummary = mode === "deep" && !!item.summary;
   const articleUrl = isReadableArticleUrl(item.source_url) ? item.source_url : null;
   const youtubeBadge = getYouTubeBadge(item);
+
+  async function handleCopyNote() {
+    setNoteState("copying");
+    try {
+      await copyMarkdownNote(item);
+      setNoteState("success");
+      window.setTimeout(() => setNoteState("idle"), 1800);
+    } catch {
+      setNoteState("error");
+    }
+  }
 
   return (
     <article className={`read-article${mode === "deep" ? " read-article--deep" : ""}`}>
@@ -177,6 +195,37 @@ function ReadingCard({
           )}
         </div>
         <div className="read-meta-toolbar" aria-label="Article actions">
+          <button
+            type="button"
+            className={`read-note-btn${isTracked ? " read-note-btn--success" : ""}`}
+            onClick={onTrack}
+            disabled={isTracked}
+          >
+            {isTracked ? "Tracking" : "Track"}
+          </button>
+          <button
+            type="button"
+            className={`read-note-btn${isRemembered ? " read-note-btn--success" : ""}`}
+            onClick={onRemember}
+            disabled={isRemembered}
+          >
+            {isRemembered ? "Remembered" : "Remember"}
+          </button>
+          <button
+            type="button"
+            className={`read-note-btn read-note-btn--${noteState}`}
+            onClick={() => void handleCopyNote()}
+            disabled={noteState === "copying"}
+            aria-live="polite"
+          >
+            {noteState === "copying"
+              ? "Copying…"
+              : noteState === "success"
+                ? "Copied"
+                : noteState === "error"
+                  ? "Try copy"
+                  : "Copy note"}
+          </button>
           <button
             type="button"
             className="read-ask-link"
@@ -239,6 +288,7 @@ function ReadingCard({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.1, ease: EASE }}
           >
+            <span className="read-field-label">What changed</span>
             {item.summary}
           </motion.p>
         )}
@@ -256,6 +306,20 @@ function ReadingCard({
           <span className="read-why-v2-label">Why this matters to you</span>
         </div>
         <p className="read-why-v2-text">{item.why_it_matters}</p>
+
+        {item.who_it_affects && (
+          <div className="read-six-point">
+            <span className="read-field-label">Who it affects</span>
+            <p className="read-six-point-text">{item.who_it_affects}</p>
+          </div>
+        )}
+
+        {item.suggested_action && (
+          <div className="read-six-point">
+            <span className="read-field-label">Do this</span>
+            <p className="read-six-point-text">{item.suggested_action}</p>
+          </div>
+        )}
 
         {/* Confidence signal — how Briefly knows this is relevant */}
         {item.confidence_signal && (
@@ -626,6 +690,8 @@ export default function ReadingPage() {
   const [mode, setMode]           = useState<Mode>("quick");
   const [saved, setSaved]         = useState<Set<string>>(new Set());
   const [disliked, setDisliked]   = useState<Set<string>>(new Set());
+  const [tracked, setTracked]     = useState<Set<string>>(new Set());
+  const [remembered, setRemembered] = useState<Set<string>>(new Set());
   const [isComplete, setIsComplete] = useState(false);
   const [elapsed, setElapsed]     = useState(0);
   // Track which item index gets the memory callout (first item with memory_reference or memory_connections)
@@ -660,6 +726,15 @@ export default function ReadingPage() {
       })
       .catch(() => router.replace("/dashboard"));
   }, [digestId, router]);
+
+  useEffect(() => {
+    void api
+      .listWatchedEntities()
+      .then((ents) => {
+        setTracked(new Set(ents.map((e) => e.name.trim().toLowerCase()).filter(Boolean)));
+      })
+      .catch(() => {});
+  }, []);
 
   // Stop speech when navigating to a different card
   useEffect(() => { stop(); }, [currentIndex, stop]);
@@ -745,6 +820,43 @@ export default function ReadingPage() {
       .then((r) => showLearned(r.learned_message))
       .catch(() => {});
   }, [currentIndex, items, digest, showLearned]);
+
+  const trackCurrent = useCallback(() => {
+    const item = items[currentIndex];
+    if (!item) return;
+    const name = guessTrackName(item);
+    if (!name) return;
+    const key = name.toLowerCase();
+    setTracked((prev) => new Set(Array.from(prev).concat(key)));
+    api.addWatchedEntity({ name, kind: "company" })
+      .then((created) => {
+        showLearned(`Tracking ${created.name}.`);
+      })
+      .catch(() => {
+        setTracked((prev) => {
+          const next = new Set(Array.from(prev));
+          next.delete(key);
+          return next;
+        });
+      });
+  }, [currentIndex, items, showLearned]);
+
+  const rememberCurrent = useCallback(() => {
+    if (!digest) return;
+    const item = items[currentIndex];
+    if (!item || remembered.has(item.id)) return;
+    setRemembered((prev) => new Set(Array.from(prev).concat(item.id)));
+    addToSaved(item.id);
+    api.recordFeedback({ signal_type: "remembered", digest_item_id: item.id, digest_id: digest.id })
+      .then((r) => showLearned(r.learned_message || "Saved to your market memory."))
+      .catch(() => {
+        setRemembered((prev) => {
+          const next = new Set(Array.from(prev));
+          next.delete(item.id);
+          return next;
+        });
+      });
+  }, [currentIndex, items, digest, remembered, addToSaved, showLearned]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -895,9 +1007,13 @@ export default function ReadingPage() {
               mode={mode}
               isSaved={saved.has(item.id)}
               isDisliked={disliked.has(item.id)}
+              isTracked={tracked.has(guessTrackName(item).toLowerCase())}
+              isRemembered={remembered.has(item.id)}
               onSave={toggleSave}
               onDislike={toggleDislike}
               onLike={toggleLike}
+              onTrack={trackCurrent}
+              onRemember={rememberCurrent}
               index={currentIndex}
               showMemoryCallout={currentIndex === memoryCalloutIndex}
             />

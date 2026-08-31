@@ -373,6 +373,51 @@
   margin-top: 4px;
 }
 
+.onboard-founder-pack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--ob-radius);
+  background: rgba(255, 255, 255, 0.55);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.onboard-founder-pack:hover:not(:disabled) {
+  border-color: var(--text-muted);
+}
+
+.onboard-founder-pack:focus-visible {
+  outline: 2px solid var(--accent, #6d5ef0);
+  outline-offset: 2px;
+}
+
+.onboard-founder-pack:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.onboard-founder-pack.added {
+  border-color: rgba(80, 140, 100, 0.35);
+}
+
+.onboard-founder-pack-title {
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+
+.onboard-founder-pack-blurb {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 .onboard-source-slots {
   margin-bottom: 16px;
   padding: 0.85rem 1rem;

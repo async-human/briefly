@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { AutoSuggestion, Source } from "@/lib/api";
 import { SourcesSidebar } from "./BriefingPanel";
+import { WatchedEntitiesCard } from "@/components/settings/WatchedEntitiesCard";
 
 type ConnectionsDrawerProps = {
   open: boolean;
@@ -94,6 +95,7 @@ export function ConnectionsDrawer({
             </header>
 
             <div className="connections-drawer-body">
+              <WatchedEntitiesCard compact />
               <SourcesSidebar
                 ingestionEmail={ingestionEmail}
                 sources={sources}

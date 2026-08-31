@@ -6,9 +6,11 @@ def build_learned_message(signal_type: str, *, source_name: str | None, headline
     source = (source_name or "this source").strip()
     topic_hint = _topic_from_headline(headline)
 
-    if signal_type in ("saved", "liked"):
+    if signal_type in ("saved", "liked", "remembered"):
         if topic_hint:
             return f"Got it — more like {topic_hint} in tomorrow's brief."
+        if signal_type == "remembered":
+            return "Saved to your market memory."
         return f"Noted — {source} is a priority for you now."
 
     if signal_type == "disliked":

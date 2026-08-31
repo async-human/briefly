@@ -1,6 +1,18 @@
 [
   {
     "date": "2026-08-31",
+    "scope": "app-page",
+    "target": "frontend dashboard",
+    "verb": "redesign",
+    "macrostructure": "Workbench · priority-first canvas",
+    "theme": "custom Art Deco app system (design.md, locked)",
+    "theme_axes": "light / classical-serif / warm-gold",
+    "enrichment": "none",
+    "motion": "page-transition · status-pulse · drawer-reveal",
+    "brief": "Dashboard hierarchy pass: brief and urgent signals lead, setup prompts move below the intelligence, decorative card chrome and redundant metrics are reduced."
+  },
+  {
+    "date": "2026-08-31",
     "scope": "single-page",
     "target": "frontend landing (app/page.tsx)",
     "verb": "redesign from generated prompt",
