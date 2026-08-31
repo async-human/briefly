@@ -24,6 +24,7 @@ export function DashboardToolbar({
   onRefresh,
 }: DashboardToolbarProps) {
   const hasBrief = Boolean(digestId && !generating && (itemCount ?? 0) > 0);
+  const hasRefresh = Boolean(onRefresh && sourceCount > 0);
 
   const stats = !generating
     ? [
@@ -32,6 +33,10 @@ export function DashboardToolbar({
           : []),
       ]
     : [];
+
+  if (!hasBrief && !hasRefresh && stats.length === 0 && !generating) {
+    return <h1 className="sr-only">Dashboard</h1>;
+  }
 
   return (
     <AppPageHeader
@@ -52,7 +57,7 @@ export function DashboardToolbar({
               Open briefing
             </Link>
           )}
-          {onRefresh && sourceCount > 0 && (
+          {hasRefresh && (
             <button
               type="button"
               className={`dash-btn dash-btn-secondary${generating ? " dash-btn-loading" : ""}`}
