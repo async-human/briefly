@@ -166,6 +166,9 @@ class PipelineContext:
     # Cross-domain connections surfaced weekly / in digest meta
     serendipity_connections: list[dict] = field(default_factory=list)
 
+    # Unread watched-entity alerts to pin in the morning brief / email
+    watching_alerts: list[dict] = field(default_factory=list)
+
     # Meeting-aware briefing (Google Calendar)
     calendar_briefing: dict | None = None
 

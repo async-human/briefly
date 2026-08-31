@@ -205,6 +205,7 @@ async def _run_pipeline(session, user_id: str, run_date: str, s) -> dict:
 
         from briefly_api.agents import serendipity as serendipity_agent
         ctx = await _run_agent("SerendipityAgent", serendipity_agent.run, ctx)
+        ctx = await _load_watching_alerts(session, ctx)
 
         ctx = await _run_agent("BriefingWriterAgent",    briefing_writer.run,  ctx)
         ctx = await _run_agent("ContentDiscoveryInjectorAgent", content_discovery_injector.run, ctx)
@@ -410,6 +411,47 @@ async def _load_proactive_context(session, ctx: PipelineContext) -> PipelineCont
         log.debug("Pipeline: proactive events load failed — continuing without", exc_info=True)
 
     return await _load_intelligence_layer(session, ctx)
+
+
+async def _load_watching_alerts(session, ctx: PipelineContext) -> PipelineContext:
+    """Pin unread watched-entity alerts into the morning brief."""
+    try:
+        from sqlalchemy import select as sa_select
+        from briefly_api.db.models import EntityAlert, WatchedEntity
+
+        rows = (
+            await session.execute(
+                sa_select(EntityAlert, WatchedEntity)
+                .join(WatchedEntity, WatchedEntity.id == EntityAlert.entity_id)
+                .where(
+                    EntityAlert.user_id == ctx.user.user_id,
+                    EntityAlert.is_read.is_(False),
+                )
+                .order_by(EntityAlert.is_urgent.desc(), EntityAlert.created_at.desc())
+                .limit(6)
+            )
+        ).all()
+        ctx.watching_alerts = [
+            {
+                "id": alert.id,
+                "entity_name": ent.name,
+                "entity_kind": ent.kind,
+                "title": alert.title,
+                "what_changed": alert.what_changed,
+                "why_it_matters": alert.why_it_matters,
+                "action": alert.action,
+                "source_url": alert.source_url,
+                "source_name": alert.source_name,
+                "is_urgent": alert.is_urgent,
+                "related_urls": list(alert.related_urls or []),
+                "sources_checked": alert.sources_checked,
+            }
+            for alert, ent in rows
+        ]
+    except Exception:
+        log.debug("Pipeline: watching alerts load failed", exc_info=True)
+        ctx.watching_alerts = []
+    return ctx
 
 
 async def _load_intelligence_layer(session, ctx: PipelineContext) -> PipelineContext:
@@ -639,6 +681,7 @@ async def _persist_digest(session, ctx: PipelineContext) -> str:
             "stage_timings": ctx.__dict__.get("stage_timings", {}),
             "outcome": outcome,
             "serendipity": list(getattr(ctx, "serendipity_connections", []) or []),
+            "watching": list(getattr(ctx, "watching_alerts", []) or []),
             "proactive_events": list(getattr(ctx, "proactive_events", []) or []),
             "calendar": getattr(ctx, "calendar_briefing", None),
             "blind_spots": list(getattr(ctx, "blind_spots", []) or []),

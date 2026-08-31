@@ -20,7 +20,6 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from briefly_api.config import get_settings
 from briefly_api.db.models import (
@@ -96,7 +95,14 @@ async def run_for_user(session, user_id: str) -> dict:
         session, user_id, recent_items, s
     )
 
-    watched_count = await _detect_watched_entities(session, user_id, recent_items)
+    watched_count = 0
+    try:
+        from briefly_api.services.watch.monitor import run_for_user as watch_run
+        watch_result = await watch_run(session, user_id)
+        watched_count = int(watch_result.get("alerts") or 0)
+    except Exception:
+        log.exception("ContentWatcherAgent: watch monitor failed for user %s", user_id)
+        watched_count = await _detect_watched_entities(session, user_id, recent_items)
 
     log.info(
         "ContentWatcherAgent: user=%s new=%d breaking=%d watched=%d",

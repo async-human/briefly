@@ -157,6 +157,16 @@ async def init_db() -> None:
             """))
         except Exception as exc:
             logger.warning("discovery backfill: %s", exc)
+        for stmt in (
+            "ALTER TABLE watched_entities ADD COLUMN IF NOT EXISTS aliases JSONB DEFAULT '[]'::jsonb",
+            "ALTER TABLE watched_entities ADD COLUMN IF NOT EXISTS priority INTEGER DEFAULT 1",
+            "ALTER TABLE watched_entities ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
+            "ALTER TABLE watched_entities ADD COLUMN IF NOT EXISTS last_checked TIMESTAMPTZ",
+        ):
+            try:
+                await conn.execute(text(stmt))
+            except Exception as exc:
+                logger.warning("watched_entities migration: %s", exc)
     logger.info("Database initialized (run `alembic upgrade head` for versioned migrations)")
     await verify_schema_columns()
 

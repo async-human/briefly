@@ -846,12 +846,73 @@ class WatchedEntity(Base):
         String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    kind: Mapped[str] = mapped_column(String(20), default="company")  # company | topic | person
+    kind: Mapped[str] = mapped_column(String(20), default="company")  # company | topic | person | product
     keywords: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    aliases: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    priority: Mapped[int] = mapped_column(Integer, default=1)  # 1=normal, 2=high
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    last_checked: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class EntitySource(Base):
+    """Where to look for updates on a watched entity (blog RSS, news query, GitHub)."""
+
+    __tablename__ = "entity_sources"
+    __table_args__ = (
+        Index("ix_entity_sources_entity", "entity_id"),
+        UniqueConstraint("entity_id", "url", name="uq_entity_source_url"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    entity_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("watched_entities.id", ondelete="CASCADE"), index=True
+    )
+    source_type: Mapped[str] = mapped_column(String(40), default="news")
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    last_fetched: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class EntityAlert(Base):
+    """A scored update for a watched entity — shown on the dashboard and in the brief."""
+
+    __tablename__ = "entity_alerts"
+    __table_args__ = (
+        Index("ix_entity_alerts_user_unread", "user_id", "is_read"),
+        Index("ix_entity_alerts_entity", "entity_id"),
+        UniqueConstraint("entity_id", "source_url", name="uq_entity_alert_source"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    entity_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("watched_entities.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    what_changed: Mapped[str] = mapped_column(Text, default="")
+    why_it_matters: Mapped[str] = mapped_column(Text, default="")
+    action: Mapped[str] = mapped_column(Text, default="")
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    source_name: Mapped[str] = mapped_column(String(200), default="")
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    relevance_score: Mapped[float] = mapped_column(Float, default=0.0)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_urgent: Mapped[bool] = mapped_column(Boolean, default=False)
+    related_urls: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    sources_checked: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class EmailDraft(Base):

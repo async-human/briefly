@@ -24,6 +24,7 @@ import { PageContentTransition } from "@/components/loading/PageContentTransitio
 import { useMinLoadTime } from "@/components/loading/useMinLoadTime";
 import { DashboardInsightsDrawer } from "@/components/dashboard/DashboardInsightsDrawer";
 import { ProactiveAlertsBanner } from "@/components/dashboard/ProactiveAlertsBanner";
+import { WatchingAlertsPanel } from "@/components/dashboard/WatchingAlertsPanel";
 import {
   CalendarConnectNudge,
   CalendarMeetingsPanel,
@@ -321,6 +322,7 @@ function DashboardContent() {
 
       <div className="dash-feed-workbench">
         <div className="dash-feed-main">
+          <WatchingAlertsPanel />
           <div className="dash-primary-zone">
             <div className="dash-primary-head">
               <h2 className="dash-primary-label">Today&apos;s briefing</h2>

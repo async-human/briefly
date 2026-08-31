@@ -1181,6 +1181,14 @@ export const api = {
 
   getProactiveEvents: () =>
     request<ProactiveEvent[]>("/api/v1/proactive-events"),
+  listWatchedAlerts: (unreadOnly = false) =>
+    request<WatchedAlert[]>(
+      `/api/v1/watched-alerts${unreadOnly ? "?unread_only=true" : ""}`,
+    ),
+  markWatchedAlertRead: (id: string) =>
+    request<void>(`/api/v1/watched-alerts/${id}/read`, { method: "POST" }),
+  markWatchedAlertsReadAll: () =>
+    request<void>("/api/v1/watched-alerts/read-all", { method: "POST" }),
   getCalendarUpcoming: () =>
     request<{
       connected: boolean;
@@ -1485,6 +1493,29 @@ export type WatchedEntity = {
   name: string;
   kind: string;
   keywords: string[];
+  aliases?: string[];
+  unread_count?: number;
+};
+
+export type WatchedAlert = {
+  id: string;
+  entity_id: string;
+  entity_name: string;
+  entity_kind: string;
+  title: string;
+  summary: string;
+  what_changed: string;
+  why_it_matters: string;
+  action: string;
+  source_url: string;
+  source_name: string;
+  published_at: string | null;
+  relevance_score: number;
+  is_read: boolean;
+  is_urgent: boolean;
+  related_urls: string[];
+  sources_checked: number;
+  created_at: string | null;
 };
 
 export type EmailDraft = {

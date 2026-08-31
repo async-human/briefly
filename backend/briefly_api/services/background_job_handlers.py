@@ -78,6 +78,12 @@ async def _research_task(payload: dict[str, Any]) -> None:
     await run_research_task(payload)
 
 
+async def _watch_scan(payload: dict[str, Any]) -> None:
+    from briefly_api.services.watch.monitor import run_watch_scan_job
+
+    await run_watch_scan_job(payload)
+
+
 def register_all_job_handlers() -> None:
     register_job_handler("post_pipeline_agents", _post_pipeline)
     register_job_handler("footprint_scan", _footprint)
@@ -88,3 +94,4 @@ def register_all_job_handlers() -> None:
     register_job_handler("weekly_reports", _weekly_reports)
     register_job_handler("account_deletion_cleanup", _account_deletion_cleanup)
     register_job_handler("research_task", _research_task)
+    register_job_handler("watch_scan", _watch_scan)

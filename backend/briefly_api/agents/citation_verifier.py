@@ -133,6 +133,35 @@ async def _render_html(ctx: PipelineContext) -> str:
             {blocks}
           </div>"""
 
+    watching = list(getattr(ctx, "watching_alerts", []) or [])
+    watching_html = ""
+    if watching:
+        blocks = ""
+        for alert in watching[:5]:
+            extra = ""
+            if alert.get("related_urls"):
+                extra = f' · +{len(alert["related_urls"])} other sources'
+            checked = alert.get("sources_checked") or 0
+            trust = f"Monitored {checked} source{'s' if checked != 1 else ''}" if checked else ""
+            blocks += (
+                f'<p style="margin:0 0 4px;font-size:11px;font-weight:700;color:#5b47e0;'
+                f'letter-spacing:0.08em;text-transform:uppercase;">{_esc(alert.get("entity_name") or "")}</p>'
+                f'<p style="margin:0 0 6px;font-size:15px;color:#1a1a1a;font-weight:600;">'
+                f'{_esc(alert.get("title") or "")}</p>'
+                f'<p style="margin:0 0 4px;font-size:13px;color:#444;line-height:1.55;">'
+                f'<strong>What changed:</strong> {_esc(alert.get("what_changed") or "")}</p>'
+                f'<p style="margin:0 0 4px;font-size:13px;color:#444;line-height:1.55;">'
+                f'<strong>Why it matters:</strong> {_esc(alert.get("why_it_matters") or "")}</p>'
+                f'<p style="margin:0 0 10px;font-size:13px;color:#444;line-height:1.55;">'
+                f'<strong>Action:</strong> {_esc(alert.get("action") or "None immediate")}'
+                f'{" · " + trust if trust else ""}{extra}</p>'
+            )
+        watching_html = f"""
+          <div style="margin:0 0 28px 0;padding:16px 18px;background:#f4f2ff;border-radius:10px;border-left:4px solid #5b47e0;">
+            <p style="margin:0 0 12px;font-size:11px;font-weight:700;color:#5b47e0;letter-spacing:1.5px;text-transform:uppercase;">Updates on what you're watching</p>
+            {blocks}
+          </div>"""
+
     top_html = ""
     if top_items:
         top_html = _render_items_block(top_items, "Your top 3 for today")
@@ -172,6 +201,7 @@ async def _render_html(ctx: PipelineContext) -> str:
         <tr><td style="padding:32px;">
           <p style="margin:0 0 24px 0;font-size:15px;color:#555;">Hey {_esc(user_name)},</p>
           {adjustment_html}
+          {watching_html}
           {serendipity_html}
           {sections_html}
           {closing_html}

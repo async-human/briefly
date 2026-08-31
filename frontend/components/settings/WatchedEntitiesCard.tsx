@@ -7,6 +7,7 @@ const KINDS = [
   { value: "company", label: "Company" },
   { value: "topic", label: "Topic" },
   { value: "person", label: "Person" },
+  { value: "product", label: "Product" },
 ];
 
 export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) {
@@ -81,6 +82,9 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
             <li key={ent.id} className="watched-chip">
               <span className="watched-chip-kind">{ent.kind}</span>
               <span className="watched-chip-name">{ent.name}</span>
+              {(ent.unread_count ?? 0) > 0 && (
+                <span className="watched-chip-count">{ent.unread_count}</span>
+              )}
               <button
                 type="button"
                 onClick={() => remove(ent.id)}

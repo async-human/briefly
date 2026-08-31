@@ -625,6 +625,16 @@ async def digest_scheduler_loop() -> None:
                     idempotency_key=f"proactive:{now_utc.strftime('%Y-%m-%d-%H')}-{now_utc.minute // 15}",
                 )
 
+            # ── Watched-entity monitor (every 15 min) ──────────────────────────
+            if s.watch_monitor_enabled and now_utc.minute % 15 == 0:
+                from briefly_api.services.background_jobs import enqueue_background_job
+
+                await enqueue_background_job(
+                    "watch_scan",
+                    {},
+                    idempotency_key=f"watch:{now_utc.strftime('%Y-%m-%d-%H')}-{now_utc.minute // 15}",
+                )
+
             # ── Weekly report emails (hourly poll; per-user Sunday logic inside) ─
             if s.weekly_report_email_enabled and now_utc.minute == 0:
                 from briefly_api.services.background_jobs import enqueue_background_job

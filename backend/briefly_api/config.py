@@ -260,6 +260,13 @@ class Settings(BaseSettings):
     # Runs every N hours; detects new pool items and breaking developments
     content_watcher_enabled: bool = True
     content_watcher_interval_hours: int = 4
+    # Watched-entity monitor (RSS + Google News + pool match)
+    watch_monitor_enabled: bool = True
+    watch_relevance_min_score: float = 0.7
+    watch_urgent_score: float = 0.85
+    watch_rss_min_interval_minutes: int = 20
+    watch_max_alerts_per_entity_per_run: int = 3
+    watch_max_unread_per_entity: int = 12
     # How many distinct sources covering the same topic within the window
     # constitutes a "breaking development"
     breaking_development_min_sources: int = 3

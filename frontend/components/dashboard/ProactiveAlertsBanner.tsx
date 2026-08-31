@@ -24,9 +24,10 @@ export function ProactiveAlertsBanner() {
     api.getProactiveEvents().then(setEvents).catch(() => setEvents([]));
   }, []);
 
-  if (!events.length) return null;
+  const visible = events.filter((e) => e.event_type !== "watched_entity");
+  if (!visible.length) return null;
 
-  const top = events[0];
+  const top = visible[0];
   return (
     <div className="proactive-alert-banner" role="status">
       <span className="proactive-alert-dot" aria-hidden />
