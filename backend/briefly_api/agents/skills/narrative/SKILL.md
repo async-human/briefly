@@ -28,6 +28,7 @@ You receive the user's profile in two layers:
 
 **Layer 1 — Onboarding profile** (what they said they want)
 - Role, goal, declared interests, never-show topics
+- Operating context when present: company, product, customers, competitors, tech/model stack, strategic goals, risks, and 3–5 active strategic questions. Prefer these over generic interests when writing why_it_matters_to_you, who_it_affects, and suggested_action.
 
 **Layer 2 — Behavioral fingerprint** (what their data shows)
 - Topics they actually engage with (follow-up depth, saves)

@@ -162,11 +162,38 @@ async def init_db() -> None:
             "ALTER TABLE watched_entities ADD COLUMN IF NOT EXISTS priority INTEGER DEFAULT 1",
             "ALTER TABLE watched_entities ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
             "ALTER TABLE watched_entities ADD COLUMN IF NOT EXISTS last_checked TIMESTAMPTZ",
+            "ALTER TABLE watched_entities ADD COLUMN IF NOT EXISTS relationship_to_user VARCHAR(40) DEFAULT 'watch'",
+            "ALTER TABLE watched_entities ADD COLUMN IF NOT EXISTS watch_reason TEXT",
+            "ALTER TABLE watched_entities ADD COLUMN IF NOT EXISTS monitoring_rules JSONB DEFAULT '{}'::jsonb",
+            "ALTER TABLE entity_alerts ADD COLUMN IF NOT EXISTS detector_type VARCHAR(40)",
+            "ALTER TABLE entity_alerts ADD COLUMN IF NOT EXISTS confidence DOUBLE PRECISION DEFAULT 0",
+            "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS operating_context JSONB DEFAULT '{}'::jsonb",
         ):
             try:
                 await conn.execute(text(stmt))
             except Exception as exc:
                 logger.warning("watched_entities migration: %s", exc)
+        try:
+            await conn.execute(
+                text("""
+                    DO $$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.columns
+                            WHERE table_schema = 'public'
+                              AND table_name = 'behavioral_signals'
+                              AND column_name = 'signal_type'
+                              AND udt_name = 'signaltype'
+                        ) THEN
+                            ALTER TABLE behavioral_signals
+                                ALTER COLUMN signal_type TYPE VARCHAR(50)
+                                USING signal_type::text;
+                        END IF;
+                    END $$;
+                """)
+            )
+        except Exception as exc:
+            logger.warning("behavioral_signals.signal_type migration: %s", exc)
     logger.info("Database initialized (run `alembic upgrade head` for versioned migrations)")
     await verify_schema_columns()
 

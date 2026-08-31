@@ -16,3 +16,10 @@ def test_disliked_message():
 
 def test_clicked_returns_none():
     assert build_learned_message("clicked", source_name="X", headline="Y") is None
+
+
+def test_decision_loop_messages():
+    assert "decision" in (build_learned_message("decision_changed", source_name=None, headline="X") or "").lower()
+    assert "action" in (build_learned_message("acted", source_name=None, headline="X") or "").lower()
+    assert "tracking" in (build_learned_message("tracked", source_name=None, headline="Anthropic") or "").lower()
+

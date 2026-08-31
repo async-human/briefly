@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.auth.deps import get_current_user
 from briefly_api.db.engine import get_db
-from briefly_api.db.models import EntityAlert, User, WatchedEntity
+from briefly_api.db.models import BehavioralSignal, EntityAlert, SignalType, User, WatchedEntity
 from briefly_api.services.watch.catalog import generate_aliases, match_terms_for, topic_terms
 
 router = APIRouter(tags=["watched"])
@@ -39,12 +39,15 @@ class WatchedEntityOut(BaseModel):
     keywords: list[str]
     aliases: list[str] = []
     unread_count: int = 0
+    relationship_to_user: str = "watch"
 
 
 class WatchedEntityIn(BaseModel):
     name: str
     kind: str = "company"
     keywords: list[str] = []
+    relationship_to_user: str = "watch"
+    watch_reason: str | None = None
 
 
 class EntityAlertOut(BaseModel):
@@ -65,6 +68,8 @@ class EntityAlertOut(BaseModel):
     is_urgent: bool
     related_urls: list[str]
     sources_checked: int
+    detector_type: str | None = None
+    confidence: float = 0.0
     created_at: datetime | None
 
 
@@ -76,6 +81,7 @@ def _serialize_entity(r: WatchedEntity, unread: int = 0) -> WatchedEntityOut:
         keywords=list(r.keywords or []),
         aliases=list(r.aliases or []),
         unread_count=unread,
+        relationship_to_user=getattr(r, "relationship_to_user", None) or "watch",
     )
 
 
@@ -98,6 +104,8 @@ def _serialize_alert(row: EntityAlert, entity: WatchedEntity) -> EntityAlertOut:
         is_urgent=bool(row.is_urgent),
         related_urls=list(row.related_urls or []),
         sources_checked=int(row.sources_checked or 0),
+        detector_type=getattr(row, "detector_type", None),
+        confidence=float(getattr(row, "confidence", 0) or 0),
         created_at=row.created_at,
     )
 
@@ -157,12 +165,25 @@ async def add_watched(
         keywords=keywords,
         aliases=aliases,
         is_active=True,
+        relationship_to_user=(body.relationship_to_user or "watch")[:40],
+        watch_reason=(body.watch_reason or None),
+        monitoring_rules={
+            "detectors": ["pricing_positioning", "model_api", "product_release"],
+        },
     )
     db.add(ent)
     await db.flush()
 
     from briefly_api.services.watch.sources import seed_sources
     await seed_sources(db, ent)
+
+    db.add(
+        BehavioralSignal(
+            user_id=user.id,
+            signal_type=SignalType.tracked,
+            meta={"entity": name, "kind": kind, "relationship": body.relationship_to_user},
+        )
+    )
     await db.commit()
     await db.refresh(ent)
 

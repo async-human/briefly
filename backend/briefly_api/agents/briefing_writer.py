@@ -201,6 +201,11 @@ def _draft_url(item: RawItem, written_url: str | None = None) -> str | None:
 
 
 def _fallback_who(item: RawItem, profile: dict) -> str:
+    ctx = profile.get("operating_context") or {}
+    company = (ctx.get("company_name") or "").strip()
+    customers = (ctx.get("target_customers") or "").strip()
+    if company and customers:
+        return f"{company} and {customers[:80]}"
     role = (profile.get("role") or "").strip()
     if role:
         return f"{role}s tracking this story"
@@ -208,7 +213,11 @@ def _fallback_who(item: RawItem, profile: dict) -> str:
 
 
 def _fallback_action(item: RawItem, profile: dict) -> str:
-    goal = (profile.get("goal") or "").strip()
+    ctx = profile.get("operating_context") or {}
+    questions = [q for q in (ctx.get("strategic_questions") or []) if str(q).strip()]
+    if questions:
+        return f"Check whether this changes: {str(questions[0]).strip()[:100]}"
+    goal = (profile.get("goal") or ctx.get("strategic_goals") or "").strip()
     source = (item.source_name or "the source").strip()
     if goal:
         clipped = goal[:80].rstrip(".")
@@ -559,6 +568,14 @@ def _build_profile_summary(profile: dict, topic_clusters: list[dict]) -> str:
         parts.append(f"Role: {profile['role']}")
     if profile.get("goal"):
         parts.append(f"Goal: {profile['goal']}")
+    try:
+        from briefly_api.services.operating_context import format_operating_context
+
+        ctx_block = format_operating_context(profile.get("operating_context"))
+        if ctx_block:
+            parts.append(ctx_block)
+    except Exception:
+        pass
     if profile.get("recent_insight"):
         parts.append(f"Depth of thinking they value (a recent insight that shaped them): {profile['recent_insight'][:250]}")
     interests = profile.get("interests", [])

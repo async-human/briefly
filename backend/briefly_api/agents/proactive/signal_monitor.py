@@ -34,14 +34,18 @@ from briefly_api.services import behavioral_fingerprint as fp_service
 log = logging.getLogger(__name__)
 
 # High-intent signal types that trigger immediate profile update
-_HIGH_INTENT = {SignalType.followed_up, SignalType.saved}
+_HIGH_INTENT = {SignalType.followed_up, SignalType.saved, SignalType.acted, SignalType.decision_changed}
 
 # Signal weight for immediate cluster reinforcement (different from LearningAgent's)
 _IMMEDIATE_DELTA = {
-    SignalType.followed_up: +0.06,
-    SignalType.saved:       +0.05,
-    SignalType.clicked:     +0.02,
-    SignalType.disliked:    -0.08,
+    SignalType.followed_up:       +0.06,
+    SignalType.saved:             +0.05,
+    SignalType.clicked:           +0.02,
+    SignalType.acted:             +0.08,
+    SignalType.decision_changed:  +0.10,
+    SignalType.tracked:           +0.04,
+    SignalType.disliked:          -0.08,
+    SignalType.dismissed:         -0.04,
 }
 
 # If a user has followed up N+ times on one topic in a session → proactive alert

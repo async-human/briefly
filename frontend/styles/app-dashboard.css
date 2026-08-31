@@ -11085,12 +11085,15 @@ a.saved-capture-title:hover {
   color: var(--app-accent);
 }
 
-.watching-alert-urgent {
+.watching-alert-detector {
   font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--app-warn-fg, #9a6b2f);
+  color: var(--app-muted);
+  border: 1px solid var(--app-border, rgba(0, 0, 0, 0.12));
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
 }
 
 .watching-alert-time {

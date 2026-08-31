@@ -161,6 +161,10 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
     click_rate = await _click_rate(session, entity.id)
     created = 0
     urgent_copy: tuple[str, str] | None = None
+    profile_row = (
+        await session.execute(select(UserProfile).where(UserProfile.user_id == entity.user_id))
+    ).scalar_one_or_none()
+    operating_ctx = dict(getattr(profile_row, "operating_context", None) or {})
 
     for hit in combined:
         if created >= s.watch_max_alerts_per_entity_per_run:
@@ -197,6 +201,16 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
         copy = await write_alert_copy(entity.name, entity.kind, hit, user_id=entity.user_id)
         is_urgent = copy.is_urgent or hit.is_official or score >= s.watch_urgent_score
 
+        from briefly_api.services.signals.detectors import classify_change
+
+        detector = classify_change(
+            title=hit.title,
+            summary=hit.summary or copy.summary,
+            source_type=hit.source_type,
+            entity_name=entity.name,
+            entity_kind=entity.kind,
+        )
+
         stmt = (
             pg_insert(EntityAlert)
             .values(
@@ -215,6 +229,8 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
                 is_urgent=is_urgent,
                 related_urls=hit.related_urls[:8],
                 sources_checked=sources_checked,
+                detector_type=detector.detector_type,
+                confidence=float(detector.confidence or 0),
             )
             .on_conflict_do_nothing(index_elements=["entity_id", "source_url"])
             .returning(EntityAlert.id)
@@ -223,6 +239,26 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
         if not inserted:
             continue
         created += 1
+        try:
+            from briefly_api.services.signals.persist import persist_market_signal
+
+            await persist_market_signal(
+                session,
+                user_id=entity.user_id,
+                entity_id=entity.id,
+                title=hit.title,
+                source_url=hit.url,
+                source_name=hit.source_name,
+                published_at=hit.published_at,
+                detector=detector,
+                what_changed=copy.what_changed,
+                why_it_matters=copy.why_it_matters,
+                action=copy.action,
+                operating_context=operating_ctx,
+                alert_id=inserted,
+            )
+        except Exception:
+            log.debug("Watch monitor: market signal persist failed", exc_info=True)
         if is_urgent and urgent_copy is None:
             urgent_copy = (hit.title, copy.summary)
 

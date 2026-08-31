@@ -145,6 +145,14 @@ export default function SettingsPage() {
   const [role, setRole] = useState("");
   const [goal, setGoal] = useState("");
   const [insight, setInsight] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [product, setProduct] = useState("");
+  const [customers, setCustomers] = useState("");
+  const [competitors, setCompetitors] = useState<string[]>([]);
+  const [techStack, setTechStack] = useState<string[]>([]);
+  const [strategicGoals, setStrategicGoals] = useState("");
+  const [risks, setRisks] = useState("");
+  const [questions, setQuestions] = useState<string[]>(["", "", ""]);
   const [topics, setTopics] = useState<string[]>([]);
   const [neverShow, setNeverShow] = useState<string[]>([]);
   const [deliveryTime, setDeliveryTime] = useState("07:00");
@@ -155,6 +163,8 @@ export default function SettingsPage() {
   // Per-section save state
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [contextSaving, setContextSaving] = useState(false);
+  const [contextSaved, setContextSaved] = useState(false);
   const [interestsSaving, setInterestsSaving] = useState(false);
   const [interestsSaved, setInterestsSaved] = useState(false);
   const [filtersSaving, setFiltersSaving] = useState(false);
@@ -195,6 +205,17 @@ export default function SettingsPage() {
           setDeliveryTime(p.digest_time ?? "07:00");
           setBriefStyle(p.brief_style ?? "analyst");
           setBriefLanguage(p.brief_language ?? "en");
+          const ctx = p.operating_context;
+          if (ctx) {
+            setCompanyName(ctx.company_name ?? "");
+            setProduct(ctx.product ?? "");
+            setCustomers(ctx.target_customers ?? "");
+            setCompetitors(ctx.competitors ?? []);
+            setTechStack(ctx.tech_stack ?? []);
+            setStrategicGoals(ctx.strategic_goals ?? "");
+            setRisks(ctx.risks ?? "");
+            setQuestions((ctx.strategic_questions ?? []).concat(["", "", ""]).slice(0, 5));
+          }
         }
         if (intel) {
           const fromReading = [
@@ -225,6 +246,25 @@ export default function SettingsPage() {
       });
       flashSaved(setProfileSaved);
     } finally { setProfileSaving(false); }
+  }
+
+  async function saveContext() {
+    setContextSaving(true);
+    try {
+      await api.updateOnboardingProfile({
+        operating_context: {
+          company_name: companyName.trim(),
+          product: product.trim(),
+          target_customers: customers.trim(),
+          competitors,
+          tech_stack: techStack,
+          strategic_goals: strategicGoals.trim(),
+          risks: risks.trim(),
+          strategic_questions: questions.map((q) => q.trim()).filter(Boolean),
+        },
+      });
+      flashSaved(setContextSaved);
+    } finally { setContextSaving(false); }
   }
 
   async function saveInterests() {
@@ -460,6 +500,102 @@ export default function SettingsPage() {
                   placeholder='e.g. "The Andreessen essay on software eating the world made me rethink infrastructure"'
                   rows={2}
                 />
+              </div>
+            </Section>
+
+            <Section
+              title="Company context"
+              description="Briefly uses this to judge which external changes could affect your company — not generic news interests."
+              onSave={saveContext}
+              saving={contextSaving}
+              saved={contextSaved}
+            >
+              <div className="settings-field">
+                <label className="settings-field-label">Company</label>
+                <input
+                  type="text"
+                  className="onboard-input"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="e.g. Northwind"
+                />
+              </div>
+              <div className="settings-field">
+                <label className="settings-field-label">Product</label>
+                <input
+                  type="text"
+                  className="onboard-input"
+                  value={product}
+                  onChange={(e) => setProduct(e.target.value)}
+                  placeholder="e.g. An AI ops copilot for Series A teams"
+                />
+              </div>
+              <div className="settings-field">
+                <label className="settings-field-label">Target customers</label>
+                <input
+                  type="text"
+                  className="onboard-input"
+                  value={customers}
+                  onChange={(e) => setCustomers(e.target.value)}
+                  placeholder="e.g. Founders at 5–50 person AI companies"
+                />
+              </div>
+              <div className="settings-field">
+                <label className="settings-field-label">Competitors and substitutes</label>
+                <TagEditor
+                  tags={competitors}
+                  onChange={setCompetitors}
+                  placeholder="e.g. Anthropic, OpenAI"
+                  suggestions={["OpenAI", "Anthropic", "Google DeepMind"]}
+                />
+              </div>
+              <div className="settings-field">
+                <label className="settings-field-label">Technology / model stack</label>
+                <TagEditor
+                  tags={techStack}
+                  onChange={setTechStack}
+                  placeholder="e.g. Claude, GPT-4o"
+                  suggestions={["Claude", "GPT-4o", "Gemini"]}
+                />
+              </div>
+              <div className="settings-field">
+                <label className="settings-field-label">Goals this quarter</label>
+                <textarea
+                  className="onboard-input onboard-textarea"
+                  rows={2}
+                  value={strategicGoals}
+                  onChange={(e) => setStrategicGoals(e.target.value)}
+                  placeholder="e.g. Ship a paid pilot; decide on model providers"
+                />
+              </div>
+              <div className="settings-field">
+                <label className="settings-field-label">Risks</label>
+                <textarea
+                  className="onboard-input onboard-textarea"
+                  rows={2}
+                  value={risks}
+                  onChange={(e) => setRisks(e.target.value)}
+                  placeholder="e.g. A competitor undercutting API pricing"
+                />
+              </div>
+              <div className="settings-field">
+                <label className="settings-field-label">Active strategic questions</label>
+                <p className="settings-field-hint">Three to five. Incoming signals are scored against these.</p>
+                {questions.map((q, i) => (
+                  <input
+                    key={i}
+                    type="text"
+                    className="onboard-input"
+                    style={{ marginTop: i === 0 ? 8 : 6 }}
+                    value={q}
+                    onChange={(e) => {
+                      const next = [...questions];
+                      next[i] = e.target.value;
+                      setQuestions(next);
+                    }}
+                    placeholder={i === 0 ? "e.g. Should we change model providers this quarter?" : `Question ${i + 1}`}
+                  />
+                ))}
               </div>
             </Section>
 

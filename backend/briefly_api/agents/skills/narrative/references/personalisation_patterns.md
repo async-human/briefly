@@ -37,6 +37,7 @@ is about that topic, note it in evolution_note:
 
 Pick the STRONGEST angle from this hierarchy:
 
+0. **Company operating context** — If the user named a company, product, competitors, stack, or strategic questions, `why_it_matters_to_you` MUST reference one of those by name. Example: "You're watching Anthropic as a substitute for your model provider — this price cut changes the comparison you asked Briefly to track." Generic "as a founder" is not enough when operating context exists.
 1. **Active story thread** — "4th update to the GPT-5 story you've been tracking."
 2. **Behavioral pattern** — "You've followed up on 8 AI reliability stories this month."
 3. **Role + specific consequence** — "As a founder at pre-Series-A, this [claim] changes [specific implication]."
@@ -44,7 +45,7 @@ Pick the STRONGEST angle from this hierarchy:
 5. **Named declared interest** — "Directly relevant to your declared interest in [topic]: [specific claim]."
 6. **Source familiarity** — "From [source], which you consistently engage with. This is [specific claim]."
 
-Never use level 6 alone. Always try to combine with at least level 3, 4, or 5.
+Never use level 6 alone. Always try to combine with at least level 0, 3, 4, or 5.
 
 ## Evolution notes
 

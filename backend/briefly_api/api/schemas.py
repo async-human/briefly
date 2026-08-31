@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class UserOut(BaseModel):
@@ -67,6 +67,17 @@ class CancelSubscriptionOut(BaseModel):
     message: str
 
 
+class OperatingContext(BaseModel):
+    company_name: str = ""
+    product: str = ""
+    target_customers: str = ""
+    competitors: list[str] = Field(default_factory=list)
+    tech_stack: list[str] = Field(default_factory=list)
+    strategic_goals: str = ""
+    risks: str = ""
+    strategic_questions: list[str] = Field(default_factory=list)
+
+
 class ProfileOut(BaseModel):
     role: str | None = None
     goal: str | None = None
@@ -78,8 +89,14 @@ class ProfileOut(BaseModel):
     onboarding_completed: bool = False
     brief_style: str = "analyst"
     brief_language: str = "en"
+    operating_context: OperatingContext = Field(default_factory=OperatingContext)
 
     model_config = {"from_attributes": True}
+
+    @field_validator("operating_context", mode="before")
+    @classmethod
+    def _operating_context(cls, value):
+        return value or {}
 
 
 class ProfileUpdate(BaseModel):
@@ -93,6 +110,7 @@ class ProfileUpdate(BaseModel):
     recent_insight: str | None = None        # a piece of content that changed their thinking
     brief_style: Literal["analyst", "scan", "plain"] | None = None
     brief_language: Literal["en", "hi"] | None = None
+    operating_context: dict | None = None    # structured company / founder context
 
 
 class NeverShowIn(BaseModel):
@@ -201,6 +219,8 @@ class DigestItemOut(BaseModel):
     was_disliked: bool = False
     score_breakdown: dict = Field(default_factory=dict)
     why_this_summary: str | None = None
+    detector_type: str | None = None
+    evidence: list[dict] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
@@ -396,8 +416,8 @@ class BulkSourceOut(BaseModel):
 
 
 class FeedbackIn(BaseModel):
-    signal_type: str  # "liked" | "disliked" | "clicked" | "saved" | "skipped" | "followed_up" | "opened"
-    digest_item_id: str
+    signal_type: str  # opened | clicked | saved | skipped | tracked | asked | dismissed | acted | decision_changed | ...
+    digest_item_id: str | None = None
     digest_id: str | None = None
     meta: dict = Field(default_factory=dict)  # extra context per signal (e.g. read_time_seconds)
 

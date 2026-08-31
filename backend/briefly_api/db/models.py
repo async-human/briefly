@@ -60,14 +60,18 @@ class DigestStatus(str, enum.Enum):
     failed     = "failed"
 
 class SignalType(str, enum.Enum):
-    opened         = "opened"
-    clicked        = "clicked"
-    skipped        = "skipped"
-    saved          = "saved"
-    disliked       = "disliked"
-    followed_up    = "followed_up"
-    source_added   = "source_added"
-    source_removed = "source_removed"
+    opened            = "opened"
+    clicked           = "clicked"
+    skipped           = "skipped"
+    saved             = "saved"
+    disliked          = "disliked"
+    followed_up       = "followed_up"
+    source_added      = "source_added"
+    source_removed    = "source_removed"
+    tracked           = "tracked"
+    dismissed         = "dismissed"
+    acted             = "acted"
+    decision_changed  = "decision_changed"
 
 
 # ── Users ─────────────────────────────────────────────────────────────────────
@@ -189,6 +193,11 @@ class UserProfile(Base):
     brief_style: Mapped[str] = mapped_column(String(32), default="analyst")
     brief_language: Mapped[str] = mapped_column(String(8), default="en")
     profile_meta: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+    # Structured company operating context — Sprint 1 moat asset.
+    # Shape: company_name, product, target_customers, competitors[], tech_stack[],
+    # strategic_goals, risks, strategic_questions[].
+    operating_context: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -508,7 +517,11 @@ class BehavioralSignal(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    signal_type: Mapped[SignalType] = mapped_column(Enum(SignalType), nullable=False)
+    # Stored as varchar so new decision-loop labels do not require ALTER TYPE.
+    signal_type: Mapped[SignalType] = mapped_column(
+        Enum(SignalType, native_enum=False, length=50, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
     digest_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("digests.id", ondelete="SET NULL"))
     digest_item_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("digest_items.id", ondelete="SET NULL"))
     source_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("sources.id", ondelete="SET NULL"))
@@ -851,6 +864,11 @@ class WatchedEntity(Base):
     aliases: Mapped[list[str]] = mapped_column(JSONB, default=list)
     priority: Mapped[int] = mapped_column(Integer, default=1)  # 1=normal, 2=high
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # How this entity relates to the user's company (Sprint 1/2 tracked universe).
+    relationship_to_user: Mapped[str] = mapped_column(String(40), default="watch")
+    # competitor | substitute | customer | stack | own | other | watch
+    watch_reason: Mapped[str | None] = mapped_column(Text)
+    monitoring_rules: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -910,6 +928,123 @@ class EntityAlert(Base):
     is_urgent: Mapped[bool] = mapped_column(Boolean, default=False)
     related_urls: Mapped[list[str]] = mapped_column(JSONB, default=list)
     sources_checked: Mapped[int] = mapped_column(Integer, default=0)
+    detector_type: Mapped[str | None] = mapped_column(String(40))
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class MarketSignal(Base):
+    """A normalized material change — the Sprint 2 `signals` object.
+
+    Distinct from BehavioralSignal (user interaction). One row per detected
+    development for a user/entity, with typed detector and confidence.
+    """
+
+    __tablename__ = "signals"
+    __table_args__ = (
+        Index("ix_signals_user_detected", "user_id", "detected_at"),
+        Index("ix_signals_entity", "entity_id"),
+        UniqueConstraint("user_id", "entity_id", "source_url", name="uq_signal_source"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    entity_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("watched_entities.id", ondelete="SET NULL"), nullable=True
+    )
+    detector_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    # pricing_positioning | model_api | product_release | other
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    what_changed: Mapped[str] = mapped_column(Text, default="")
+    previous_state: Mapped[str] = mapped_column(Text, default="")
+    new_state: Mapped[str] = mapped_column(Text, default="")
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[str] = mapped_column(String(20), default="candidate")
+    # candidate | verified | discarded
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    content_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    digest_item_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    alert_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class SignalEvidence(Base):
+    """Source-level provenance for a market signal."""
+
+    __tablename__ = "signal_evidence"
+    __table_args__ = (
+        Index("ix_signal_evidence_signal", "signal_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    signal_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("signals.id", ondelete="CASCADE"), index=True
+    )
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    source_name: Mapped[str] = mapped_column(String(200), default="")
+    extracted_claim: Mapped[str] = mapped_column(Text, default="")
+    supporting_passage: Mapped[str] = mapped_column(Text, default="")
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_contradictory: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class SignalImpact(Base):
+    """Company-specific consequence of a market signal."""
+
+    __tablename__ = "signal_impacts"
+    __table_args__ = (
+        Index("ix_signal_impacts_signal", "signal_id"),
+        Index("ix_signal_impacts_user", "user_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    signal_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("signals.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    why_it_matters: Mapped[str] = mapped_column(Text, default="")
+    who_affected: Mapped[str] = mapped_column(Text, default="")
+    recommended_action: Mapped[str] = mapped_column(Text, default="")
+    strategic_questions_hit: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class SignalFeedback(Base):
+    """Founder labels on whether a signal was decision-worthy."""
+
+    __tablename__ = "signal_feedback"
+    __table_args__ = (
+        Index("ix_signal_feedback_signal", "signal_id"),
+        Index("ix_signal_feedback_user", "user_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    signal_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("signals.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    label: Mapped[str] = mapped_column(String(40), nullable=False)
+    # useful | irrelevant | duplicate | incorrect | acted_on
+    note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

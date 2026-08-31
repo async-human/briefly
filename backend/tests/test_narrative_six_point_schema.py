@@ -77,3 +77,17 @@ def test_fallback_who_and_action_use_profile():
     profile = {"role": "Engineer", "goal": "ship an agent product"}
     assert _fallback_who(item, profile) == "Engineers tracking this story"
     assert "ship an agent product" in _fallback_action(item, profile)
+
+
+def test_fallback_uses_operating_context():
+    item = _item()
+    profile = {
+        "role": "Founder",
+        "operating_context": {
+            "company_name": "Northwind",
+            "target_customers": "AI ops teams",
+            "strategic_questions": ["Should we change model providers?"],
+        },
+    }
+    assert "Northwind" in _fallback_who(item, profile)
+    assert "model providers" in _fallback_action(item, profile)

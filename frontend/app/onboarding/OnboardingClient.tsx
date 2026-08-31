@@ -72,8 +72,8 @@ const ROLE_META: Record<(typeof ROLES)[number], { sub: string; icon: ReactNode }
 };
 
 const STEPS = [
-  { n: 1, label: "About you" },
-  { n: 2, label: "Topics" },
+  { n: 1, label: "Company" },
+  { n: 2, label: "Watch" },
   { n: 3, label: "Sources" },
   { n: 4, label: "Briefing" },
 ];
@@ -107,6 +107,7 @@ function TagInput({
   tags,
   onChange,
   suggestions = [],
+  preserveCase = false,
 }: {
   label: string;
   hint?: string;
@@ -114,12 +115,16 @@ function TagInput({
   tags: string[];
   onChange: (tags: string[]) => void;
   suggestions?: string[];
+  preserveCase?: boolean;
 }) {
   const [inputValue, setInputValue] = useState("");
 
   function add(raw: string) {
-    const tag = raw.trim().toLowerCase().replace(/,+$/, "");
-    if (tag && !tags.includes(tag) && tags.length < 12) onChange([...tags, tag]);
+    const tag = preserveCase
+      ? raw.trim().replace(/,+$/, "")
+      : raw.trim().toLowerCase().replace(/,+$/, "");
+    const key = tag.toLowerCase();
+    if (tag && !tags.some((t) => t.toLowerCase() === key) && tags.length < 12) onChange([...tags, tag]);
     setInputValue("");
   }
 
@@ -135,7 +140,7 @@ function TagInput({
     if (e.key === "Backspace" && !inputValue && tags.length > 0) remove(tags[tags.length - 1]);
   }
 
-  const unused = suggestions.filter((s) => !tags.includes(s)).slice(0, 6);
+  const unused = suggestions.filter((s) => !tags.some((t) => t.toLowerCase() === s.toLowerCase())).slice(0, 6);
 
   return (
     <div className="onboard-field">
@@ -174,6 +179,50 @@ function TagInput({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function QuestionList({
+  label,
+  hint,
+  questions,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  questions: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const slots = [...questions, "", "", "", "", ""].slice(0, 5);
+
+  function setAt(index: number, value: string) {
+    const next = slots.map((q, i) => (i === index ? value : q));
+    onChange(next.map((q) => q.trim()).filter(Boolean).slice(0, 5));
+  }
+
+  return (
+    <div className="onboard-field">
+      <span className="onboard-field-label">{label}</span>
+      {hint && <p className="onboard-field-hint">{hint}</p>}
+      <div className="onboard-question-list">
+        {slots.map((q, i) => (
+          <input
+            key={i}
+            type="text"
+            className="onboard-input"
+            value={questions[i] ?? ""}
+            onChange={(e) => {
+              const copy = [...questions];
+              copy[i] = e.target.value;
+              while (copy.length < i + 1) copy.push("");
+              onChange(copy);
+            }}
+            onBlur={() => setAt(i, questions[i] ?? "")}
+            placeholder={i === 0 ? "e.g. Should we change model providers this quarter?" : `Question ${i + 1}`}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -238,8 +287,16 @@ export default function OnboardingPage() {
   const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState("Founder");
   const [goal, setGoal] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [product, setProduct] = useState("");
+  const [customers, setCustomers] = useState("");
+  const [competitors, setCompetitors] = useState<string[]>([]);
+  const [techStack, setTechStack] = useState<string[]>([]);
+  const [strategicGoals, setStrategicGoals] = useState("");
+  const [risks, setRisks] = useState("");
+  const [questions, setQuestions] = useState<string[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
   const [digestTime, setDigestTime] = useState("07:00");
   const [loading, setLoading] = useState(true);
@@ -290,6 +347,17 @@ export default function OnboardingPage() {
           if (meData.profile.interests?.length)
             setTopics(meData.profile.interests.map((i) => i.topic).filter(Boolean));
           if (meData.profile.digest_time) setDigestTime(meData.profile.digest_time);
+          const ctx = meData.profile.operating_context;
+          if (ctx) {
+            if (ctx.company_name) setCompanyName(ctx.company_name);
+            if (ctx.product) setProduct(ctx.product);
+            if (ctx.target_customers) setCustomers(ctx.target_customers);
+            if (ctx.competitors?.length) setCompetitors(ctx.competitors);
+            if (ctx.tech_stack?.length) setTechStack(ctx.tech_stack);
+            if (ctx.strategic_goals) setStrategicGoals(ctx.strategic_goals);
+            if (ctx.risks) setRisks(ctx.risks);
+            if (ctx.strategic_questions?.length) setQuestions(ctx.strategic_questions);
+          }
         }
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load onboarding"))
@@ -452,6 +520,12 @@ export default function OnboardingPage() {
       await api.updateOnboardingProfile({
         role: role || undefined,
         goal: goal.trim() || undefined,
+        operating_context: {
+          company_name: companyName.trim(),
+          product: product.trim(),
+          target_customers: customers.trim(),
+          strategic_goals: strategicGoals.trim(),
+        },
       });
       goToStep(2);
     } catch (err) {
@@ -465,8 +539,23 @@ export default function OnboardingPage() {
     setSaving(true);
     setError("");
     try {
+      const inferred = [...topics];
+      for (const name of [...competitors, ...techStack]) {
+        const t = name.trim().toLowerCase();
+        if (t && !inferred.includes(t) && inferred.length < 12) inferred.push(t);
+      }
       await api.updateOnboardingProfile({
-        interests: topics.length ? topics : undefined,
+        interests: inferred.length ? inferred : undefined,
+        operating_context: {
+          company_name: companyName.trim(),
+          product: product.trim(),
+          target_customers: customers.trim(),
+          competitors,
+          tech_stack: techStack,
+          strategic_goals: strategicGoals.trim(),
+          risks: risks.trim(),
+          strategic_questions: questions.map((q) => q.trim()).filter(Boolean),
+        },
       });
       goToStep(3);
     } catch (err) {
@@ -683,12 +772,14 @@ export default function OnboardingPage() {
             )}
           </div>
 
-          {/* Step 1 — About you */}
+          {/* Step 1 — Company */}
           {step === 1 && (
             <section className="onboard-panel">
               <header className="onboard-panel-head">
-                <h1 className="onboard-title">Let&apos;s get to know each other, {firstName}.</h1>
-                <p className="onboard-desc">Pick what fits best — this shapes how Briefly prioritizes your digest.</p>
+                <h1 className="onboard-title">What are you building, {firstName}?</h1>
+                <p className="onboard-desc">
+                  Briefly watches the market around your company — competitors, models, and the questions you cannot afford to miss.
+                </p>
                 <p className="onboard-editable-note">
                   You can change these anytime in <Link href="/settings">Settings</Link>.
                 </p>
@@ -722,11 +813,44 @@ export default function OnboardingPage() {
                 </div>
 
                 <label className="onboard-field">
-                  <span className="onboard-field-label">What&apos;s your main focus right now?</span>
+                  <span className="onboard-field-label">Company</span>
                   <input
                     type="text"
                     className="onboard-input"
-                    placeholder="e.g. Building an AI product and staying ahead of the space"
+                    placeholder="e.g. Northwind"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                  />
+                </label>
+
+                <label className="onboard-field">
+                  <span className="onboard-field-label">Product</span>
+                  <input
+                    type="text"
+                    className="onboard-input"
+                    placeholder="e.g. An AI ops copilot for Series A teams"
+                    value={product}
+                    onChange={(e) => setProduct(e.target.value)}
+                  />
+                </label>
+
+                <label className="onboard-field">
+                  <span className="onboard-field-label">Who do you sell to?</span>
+                  <input
+                    type="text"
+                    className="onboard-input"
+                    placeholder="e.g. Founders and product leads at 5–50 person AI companies"
+                    value={customers}
+                    onChange={(e) => setCustomers(e.target.value)}
+                  />
+                </label>
+
+                <label className="onboard-field">
+                  <span className="onboard-field-label">What&apos;s the main thing you&apos;re trying to get right?</span>
+                  <input
+                    type="text"
+                    className="onboard-input"
+                    placeholder="e.g. Stay ahead of model pricing and competitor packaging"
                     value={goal}
                     onChange={(e) => setGoal(e.target.value)}
                   />
@@ -750,27 +874,78 @@ export default function OnboardingPage() {
             </section>
           )}
 
-          {/* Step 2 — Topics */}
+          {/* Step 2 — What to watch */}
           {step === 2 && (
             <section className="onboard-panel">
               <header className="onboard-panel-head">
-                <h1 className="onboard-title">What should always be on your radar?</h1>
+                <h1 className="onboard-title">What should Briefly watch?</h1>
                 <p className="onboard-desc">
-                  Pick one or two you care about most — Briefly scores every story against these.
+                  Competitors, your stack, and the questions that would change a decision. Briefly uses these to judge what is material.
                 </p>
                 <p className="onboard-editable-note">
                   You can change these anytime in <Link href="/settings">Settings</Link>.
                 </p>
               </header>
 
+              <div className="onboard-fields">
               <TagInput
-                label="Topics"
-                hint="Press Enter or tap a suggestion to add."
-                placeholder="e.g. AI agents, startup funding, product design"
+                label="Competitors and substitutes"
+                hint="Companies whose pricing, launches, or positioning you cannot miss."
+                placeholder="e.g. Anthropic, OpenAI, Linear"
+                tags={competitors}
+                onChange={setCompetitors}
+                preserveCase
+                suggestions={["OpenAI", "Anthropic", "Google DeepMind", "Mistral"]}
+              />
+
+              <TagInput
+                label="Technology / model stack"
+                hint="Models, APIs, and tools whose price or deprecation would hit you."
+                placeholder="e.g. Claude, GPT-4o, Postgres"
+                tags={techStack}
+                onChange={setTechStack}
+                preserveCase
+                suggestions={["Claude", "GPT-4o", "Gemini", "Postgres", "Vercel"]}
+              />
+
+              <QuestionList
+                label="Active strategic questions"
+                hint="Three to five. Briefly will connect incoming changes to these."
+                questions={questions}
+                onChange={setQuestions}
+              />
+
+              <label className="onboard-field">
+                <span className="onboard-field-label">Goals this quarter</span>
+                <textarea
+                  className="onboard-input onboard-textarea"
+                  rows={2}
+                  placeholder="e.g. Ship a paid pilot; decide whether to switch model providers"
+                  value={strategicGoals}
+                  onChange={(e) => setStrategicGoals(e.target.value)}
+                />
+              </label>
+
+              <label className="onboard-field">
+                <span className="onboard-field-label">Risks you&apos;re watching</span>
+                <textarea
+                  className="onboard-input onboard-textarea"
+                  rows={2}
+                  placeholder="e.g. A competitor undercutting our API pricing"
+                  value={risks}
+                  onChange={(e) => setRisks(e.target.value)}
+                />
+              </label>
+
+              <TagInput
+                label="Other topics"
+                hint="Optional extras beyond competitors and stack."
+                placeholder="e.g. AI agents, startup funding"
                 tags={topics}
                 onChange={setTopics}
                 suggestions={TOPIC_SUGGESTIONS[role] ?? DEFAULT_TOPICS}
               />
+              </div>
 
               <div className="onboard-actions" style={{ marginTop: 32 }}>
                 <button type="button" className="btn-primary onboard-cta" onClick={handleSaveTopics} disabled={saving}>

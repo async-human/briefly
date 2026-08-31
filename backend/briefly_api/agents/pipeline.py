@@ -445,6 +445,8 @@ async def _load_watching_alerts(session, ctx: PipelineContext) -> PipelineContex
                 "is_urgent": alert.is_urgent,
                 "related_urls": list(alert.related_urls or []),
                 "sources_checked": alert.sources_checked,
+                "detector_type": getattr(alert, "detector_type", None),
+                "confidence": float(getattr(alert, "confidence", 0) or 0),
             }
             for alert, ent in rows
         ]

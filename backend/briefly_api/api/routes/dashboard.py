@@ -1396,14 +1396,24 @@ async def get_weekly_report(
 # ── Item feedback ─────────────────────────────────────────────────────────────
 
 _SIGNAL_MAP: dict[str, SignalType] = {
-    "liked":        SignalType.saved,
-    "disliked":     SignalType.disliked,
-    "clicked":      SignalType.clicked,
-    "saved":        SignalType.saved,
-    "remembered":   SignalType.saved,
-    "skipped":      SignalType.skipped,
-    "followed_up":  SignalType.followed_up,
-    "opened":       SignalType.opened,
+    "liked":               SignalType.saved,
+    "disliked":            SignalType.disliked,
+    "clicked":             SignalType.clicked,
+    "saved":               SignalType.saved,
+    "remembered":          SignalType.saved,
+    "skipped":             SignalType.skipped,
+    "followed_up":         SignalType.followed_up,
+    "asked":               SignalType.followed_up,
+    "ask":                 SignalType.followed_up,
+    "opened":              SignalType.opened,
+    "tracked":             SignalType.tracked,
+    "track":               SignalType.tracked,
+    "dismissed":           SignalType.dismissed,
+    "dismiss":             SignalType.dismissed,
+    "acted":               SignalType.acted,
+    "act":                 SignalType.acted,
+    "decision_changed":    SignalType.decision_changed,
+    "changed_my_decision": SignalType.decision_changed,
 }
 
 
@@ -1413,23 +1423,38 @@ async def record_feedback(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> FeedbackOut:
-    signal_type = _SIGNAL_MAP.get(body.signal_type)
+    signal_type = _SIGNAL_MAP.get((body.signal_type or "").strip().lower())
     if not signal_type:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown signal_type '{body.signal_type}'. Use: liked, disliked, clicked, saved, remembered.",
+            detail=(
+                "Unknown signal_type. Use: opened, clicked, saved, skipped, tracked, "
+                "asked, dismissed, acted, decision_changed, liked, disliked, remembered."
+            ),
         )
 
-    # opened signal uses digest_item_id to carry digest_id (special case from frontend)
-    if body.signal_type == "opened":
+    meta = dict(body.meta or {})
+
+    # Digest-level or item-less events (open session, track from settings, ask).
+    if (body.signal_type or "").strip().lower() == "opened" or not body.digest_item_id:
         db.add(BehavioralSignal(
             user_id=user.id,
-            signal_type=SignalType.opened,
+            signal_type=signal_type,
             digest_id=body.digest_id,
-            meta=body.meta or {},
+            meta=meta,
         ))
+        if signal_type == SignalType.decision_changed and user.profile:
+            note = str(meta.get("note") or meta.get("decision") or "").strip()
+            if note:
+                user.profile.changed_mind_about = note[:2000]
         await db.commit()
-        return FeedbackOut(learned_message=None)
+        from briefly_api.services.feedback_learned import build_learned_message
+
+        return FeedbackOut(
+            learned_message=build_learned_message(
+                body.signal_type, source_name=None, headline=str(meta.get("entity") or ""),
+            )
+        )
 
     item_result = await db.execute(
         select(DigestItem).where(
@@ -1442,30 +1467,44 @@ async def record_feedback(
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Digest item not found.")
 
+    raw_type = (body.signal_type or "").strip().lower()
+
     # Update the item flags
-    if body.signal_type in ("liked", "saved", "remembered"):
+    if raw_type in ("liked", "saved", "remembered"):
         item.was_saved = True
-    elif body.signal_type == "disliked":
+    elif raw_type == "disliked":
         item.was_disliked = True
-    elif body.signal_type == "clicked":
+    elif raw_type == "clicked":
         item.was_clicked = True
-    elif body.signal_type == "followed_up":
+    elif raw_type in ("followed_up", "asked", "ask"):
         item.had_follow_up = True
         item.follow_up_depth = (item.follow_up_depth or 0) + 1
+    elif raw_type in ("acted", "act"):
+        item.was_saved = True
+        item.had_follow_up = True
 
-    if body.signal_type == "remembered":
+    if raw_type == "remembered":
         await _upsert_saved_memory(db, user.id, item)
 
-    # Store signal record
+    if signal_type == SignalType.decision_changed and user.profile:
+        note = str(meta.get("note") or meta.get("decision") or item.headline or "").strip()
+        if note:
+            user.profile.changed_mind_about = note[:2000]
+
+    merged_meta = {
+        "source_name": item.source_name,
+        "source_url": item.source_url,
+        **meta,
+    }
+
     db.add(BehavioralSignal(
         user_id=user.id,
         signal_type=signal_type,
         digest_id=body.digest_id,
         digest_item_id=body.digest_item_id,
-        meta={"source_name": item.source_name, "source_url": item.source_url},
+        meta=merged_meta,
     ))
 
-    # Update source weight in user profile for immediate effect on next briefing
     source_id: str | None = None
     if item.content_id:
         from briefly_api.db.models import RawContent
@@ -1476,24 +1515,21 @@ async def record_feedback(
 
     if item.source_name and user.profile:
         await _bump_source_weight(
-            user, item.source_name, body.signal_type, db, source_id=source_id,
+            user, item.source_name, raw_type, db, source_id=source_id,
         )
 
-    if body.signal_type in ("liked", "saved", "remembered", "disliked", "skipped") and user.profile:
+    if raw_type in ("liked", "saved", "remembered", "disliked", "skipped", "acted", "act") and user.profile:
         from briefly_api.services.learned_adjustments import queue_adjustment
 
         queue_adjustment(
             user.profile,
-            signal_type="saved" if body.signal_type == "remembered" else body.signal_type,
+            signal_type="saved" if raw_type in ("remembered", "acted", "act") else raw_type,
             source_name=item.source_name,
             headline=item.headline,
         )
 
     await db.commit()
 
-    # ── Real-time signal processing (SignalMonitorAgent) ──────────────────────
-    # Runs immediately after commit to update topic clusters + fingerprint.
-    # Errors are swallowed — this must never break the feedback route.
     try:
         from briefly_api.workers.signal_processor import handle_signal
         asyncio.create_task(
@@ -1508,9 +1544,7 @@ async def record_feedback(
     except Exception:
         pass
 
-    # Click-to-discover: suggest RSS feeds via pending discovery on next scan —
-    # no silent auto-add (user confirms sources before briefing).
-    if body.signal_type == "clicked" and item.source_url:
+    if raw_type == "clicked" and item.source_url:
         asyncio.create_task(
             _queue_click_discovery(user.id, item.source_url)
         )
@@ -1518,7 +1552,7 @@ async def record_feedback(
     from briefly_api.services.feedback_learned import build_learned_message
 
     learned = build_learned_message(
-        body.signal_type,
+        raw_type,
         source_name=item.source_name,
         headline=item.headline,
     )

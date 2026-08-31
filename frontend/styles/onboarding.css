@@ -544,6 +544,18 @@
   padding: 13px 16px;
 }
 
+.onboard-shell .onboard-textarea {
+  min-height: 72px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.onboard-question-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 /* Schedule step */
 .onboard-schedule-card {
   padding: 20px;

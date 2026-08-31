@@ -127,7 +127,9 @@ function DislikeIcon() {
 }
 
 function ReadingCard({
-  item, mode, isSaved, isDisliked, isTracked, isRemembered, onSave, onDislike, onLike, onTrack, onRemember, index, showMemoryCallout,
+  item, mode, isSaved, isDisliked, isTracked, isRemembered, decided, acted, dismissed,
+  onSave, onDislike, onLike, onTrack, onRemember, onArticleClick, onAsk, onDecisionChanged, onAct, onDismiss,
+  index, showMemoryCallout,
 }: {
   item: DigestItem;
   mode: Mode;
@@ -135,11 +137,19 @@ function ReadingCard({
   isDisliked: boolean;
   isTracked: boolean;
   isRemembered: boolean;
+  decided: boolean;
+  acted: boolean;
+  dismissed: boolean;
   onSave: () => void;
   onDislike: () => void;
   onLike: () => void;
   onTrack: () => void;
   onRemember: () => void;
+  onArticleClick: () => void;
+  onAsk: () => void;
+  onDecisionChanged: () => void;
+  onAct: () => void;
+  onDismiss: () => void;
   index: number;
   showMemoryCallout: boolean;
 }) {
@@ -326,6 +336,33 @@ function ReadingCard({
           </div>
         )}
 
+        <div className="read-decision-row" role="group" aria-label="Decision feedback">
+          <button
+            type="button"
+            className={`read-decision-btn${decided ? " is-on" : ""}`}
+            onClick={onDecisionChanged}
+            disabled={decided}
+          >
+            {decided ? "Decision noted" : "This changed a decision"}
+          </button>
+          <button
+            type="button"
+            className={`read-decision-btn${acted ? " is-on" : ""}`}
+            onClick={onAct}
+            disabled={acted}
+          >
+            {acted ? "Action logged" : "I'll act on this"}
+          </button>
+          <button
+            type="button"
+            className={`read-decision-btn read-decision-btn--quiet${dismissed ? " is-on" : ""}`}
+            onClick={onDismiss}
+            disabled={dismissed}
+          >
+            {dismissed ? "Dismissed" : "Not decision-worthy"}
+          </button>
+        </div>
+
         {/* Confidence signal — how Briefly knows this is relevant */}
         {item.confidence_signal && (
           <p className="read-confidence-signal">◈ {item.confidence_signal}</p>
@@ -365,6 +402,7 @@ function ReadingCard({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.35, delay: 0.28, ease: EASE }}
+              onClick={onArticleClick}
             >
               Read full article
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -382,6 +420,7 @@ function ReadingCard({
               <Link
                 href={askAboutContent(item.content_id, item.id, item.headline)}
                 className="read-ask-link read-ask-link-why"
+                onClick={onAsk}
               >
                 Ask about this
               </Link>
@@ -709,6 +748,9 @@ export default function ReadingPage() {
   const [disliked, setDisliked]   = useState<Set<string>>(new Set());
   const [tracked, setTracked]     = useState<Set<string>>(new Set());
   const [remembered, setRemembered] = useState<Set<string>>(new Set());
+  const [decided, setDecided]     = useState<Set<string>>(new Set());
+  const [acted, setActed]         = useState<Set<string>>(new Set());
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [isComplete, setIsComplete] = useState(false);
   const [elapsed, setElapsed]     = useState(0);
   // Track which item index gets the memory callout (first item with memory_reference or memory_connections)
@@ -881,6 +923,60 @@ export default function ReadingPage() {
       });
   }, [currentIndex, items, digest, remembered, addToSaved, showLearned]);
 
+  const clickCurrent = useCallback(() => {
+    if (!digest) return;
+    const item = items[currentIndex];
+    if (!item) return;
+    api.recordFeedback({ signal_type: "clicked", digest_item_id: item.id, digest_id: digest.id }).catch(() => {});
+  }, [currentIndex, items, digest]);
+
+  const askCurrent = useCallback(() => {
+    if (!digest) return;
+    const item = items[currentIndex];
+    if (!item) return;
+    api.recordFeedback({ signal_type: "asked", digest_item_id: item.id, digest_id: digest.id }).catch(() => {});
+  }, [currentIndex, items, digest]);
+
+  const markDecision = useCallback(() => {
+    if (!digest) return;
+    const item = items[currentIndex];
+    if (!item || decided.has(item.id)) return;
+    setDecided((prev) => new Set(Array.from(prev).concat(item.id)));
+    api.recordFeedback({
+      signal_type: "decision_changed",
+      digest_item_id: item.id,
+      digest_id: digest.id,
+      meta: { headline: item.headline },
+    })
+      .then((r) => showLearned(r.learned_message))
+      .catch(() => {});
+  }, [currentIndex, items, digest, decided, showLearned]);
+
+  const markActed = useCallback(() => {
+    if (!digest) return;
+    const item = items[currentIndex];
+    if (!item || acted.has(item.id)) return;
+    setActed((prev) => new Set(Array.from(prev).concat(item.id)));
+    api.recordFeedback({
+      signal_type: "acted",
+      digest_item_id: item.id,
+      digest_id: digest.id,
+      meta: { action: item.suggested_action || item.headline },
+    })
+      .then((r) => showLearned(r.learned_message))
+      .catch(() => {});
+  }, [currentIndex, items, digest, acted, showLearned]);
+
+  const markDismissed = useCallback(() => {
+    if (!digest) return;
+    const item = items[currentIndex];
+    if (!item || dismissed.has(item.id)) return;
+    setDismissed((prev) => new Set(Array.from(prev).concat(item.id)));
+    api.recordFeedback({ signal_type: "dismissed", digest_item_id: item.id, digest_id: digest.id })
+      .then((r) => showLearned(r.learned_message))
+      .catch(() => {});
+  }, [currentIndex, items, digest, dismissed, showLearned]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handle = (e: KeyboardEvent) => {
@@ -1032,11 +1128,19 @@ export default function ReadingPage() {
               isDisliked={disliked.has(item.id)}
               isTracked={tracked.has(guessTrackName(item).toLowerCase())}
               isRemembered={remembered.has(item.id)}
+              decided={decided.has(item.id)}
+              acted={acted.has(item.id)}
+              dismissed={dismissed.has(item.id)}
               onSave={toggleSave}
               onDislike={toggleDislike}
               onLike={toggleLike}
               onTrack={trackCurrent}
               onRemember={rememberCurrent}
+              onArticleClick={clickCurrent}
+              onAsk={askCurrent}
+              onDecisionChanged={markDecision}
+              onAct={markActed}
+              onDismiss={markDismissed}
               index={currentIndex}
               showMemoryCallout={currentIndex === memoryCalloutIndex}
             />

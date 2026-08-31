@@ -51,11 +51,15 @@ _EMBEDDING_REFRESH_DAYS = 7
 _CLUSTER_DECAY_RATE = 0.05
 # Weight delta per signal type
 _SIGNAL_WEIGHT = {
-    SignalType.clicked:     +0.08,
-    SignalType.followed_up: +0.12,
-    SignalType.saved:       +0.10,
-    SignalType.skipped:     -0.05,
-    SignalType.disliked:    -0.10,
+    SignalType.clicked:           +0.08,
+    SignalType.followed_up:       +0.12,
+    SignalType.saved:             +0.10,
+    SignalType.acted:             +0.14,
+    SignalType.decision_changed:  +0.16,
+    SignalType.tracked:           +0.08,
+    SignalType.skipped:           -0.05,
+    SignalType.dismissed:         -0.04,
+    SignalType.disliked:          -0.10,
 }
 
 

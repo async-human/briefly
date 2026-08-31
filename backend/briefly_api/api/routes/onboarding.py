@@ -67,6 +67,11 @@ from briefly_api.db.engine import SessionLocal, get_db
 from briefly_api.db.models import Source, User, UserProfile
 from briefly_api.embeddings.adapter import get_embedding_adapter
 from briefly_api.services.gmail import count_newsletters
+from briefly_api.services.operating_context import (
+    merge_operating_context,
+    normalize_operating_context,
+    seed_tracked_entities_from_context,
+)
 from briefly_api.services.privacy_gmail import append_gmail_access_log, disconnect_gmail_privacy
 
 log = logging.getLogger(__name__)
@@ -153,6 +158,18 @@ async def update_onboarding_profile(
         profile.brief_style = body.brief_style
     if body.brief_language is not None:
         profile.brief_language = body.brief_language
+    if body.operating_context is not None:
+        from sqlalchemy.orm.attributes import flag_modified
+
+        profile.operating_context = merge_operating_context(
+            profile.operating_context, body.operating_context
+        )
+        flag_modified(profile, "operating_context")
+        ctx = normalize_operating_context(profile.operating_context)
+        # Keep goal in sync when the founder names the company/product and has no goal yet.
+        if not (profile.goal or "").strip() and (ctx["company_name"] or ctx["product"]):
+            bits = [p for p in (ctx["company_name"], ctx["product"]) if p]
+            profile.goal = " — ".join(bits)
     await db.commit()
     return await _build_onboarding_status(user, db)
 
@@ -188,6 +205,12 @@ async def complete_onboarding(
     if not user.profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
     user.profile.onboarding_completed = True
+    try:
+        await seed_tracked_entities_from_context(
+            db, user.id, user.profile.operating_context
+        )
+    except Exception:
+        log.exception("Failed to seed tracked entities for user %s", user.id)
     await db.commit()
 
     # Seed the Personal Relevance Vector in the background — don't block the response.
@@ -196,6 +219,7 @@ async def complete_onboarding(
         "goal": user.profile.goal,
         "interests": user.profile.interests or [],
         "topic_clusters": user.profile.topic_clusters or [],
+        "operating_context": dict(user.profile.operating_context or {}),
     }
     asyncio.create_task(_seed_profile_embedding(user.id, profile_snapshot, settings))
 

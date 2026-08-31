@@ -318,6 +318,50 @@
   color: var(--text-secondary, inherit);
 }
 
+.read-shell-v2 .read-decision-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.875rem;
+}
+
+.read-shell-v2 .read-decision-btn {
+  appearance: none;
+  border: 1px solid var(--border, oklch(80% 0.02 70));
+  background: transparent;
+  color: var(--text-secondary, inherit);
+  font: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.read-shell-v2 .read-decision-btn:hover:not(:disabled) {
+  border-color: var(--border-strong, oklch(60% 0.03 70));
+  color: var(--text, inherit);
+}
+
+.read-shell-v2 .read-decision-btn:focus-visible {
+  outline: 2px solid var(--text, currentColor);
+  outline-offset: 2px;
+}
+
+.read-shell-v2 .read-decision-btn.is-on {
+  border-color: transparent;
+  background: oklch(48% 0.12 278 / 0.12);
+  color: var(--text, inherit);
+}
+
+.read-shell-v2 .read-decision-btn--quiet {
+  opacity: 0.8;
+}
+
+.read-shell-v2 .read-decision-btn:disabled {
+  cursor: default;
+}
+
 .read-shell-v2 .read-confidence-signal {
   font-size: 0.6875rem;
   margin-top: 0.25rem;

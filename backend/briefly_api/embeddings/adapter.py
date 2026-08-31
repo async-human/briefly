@@ -74,6 +74,15 @@ class EmbeddingAdapter:
             parts.append(f"role: {profile_data['role']}")
         if profile_data.get("goal"):
             parts.append(f"goal: {profile_data['goal']}")
+        ctx_block = ""
+        try:
+            from briefly_api.services.operating_context import format_operating_context
+
+            ctx_block = format_operating_context(profile_data.get("operating_context"))
+        except Exception:
+            ctx_block = ""
+        if ctx_block:
+            parts.append(ctx_block)
         interests = profile_data.get("interests", [])
         if interests:
             topics = " ".join(i.get("topic", "") for i in interests if i.get("topic"))

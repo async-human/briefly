@@ -21,8 +21,16 @@ def build_learned_message(signal_type: str, *, source_name: str | None, headline
     if signal_type == "skipped":
         return "Noted — similar stories will rank lower."
 
-    if signal_type == "clicked":
-        return None
+    if signal_type in ("followed_up", "asked", "ask"):
+        return "Noted — I'll use this question to sharpen tomorrow's brief."
+    if signal_type in ("tracked", "track"):
+        return "Tracking that. I'll surface material changes, not every mention."
+    if signal_type in ("acted", "act"):
+        return "Logged as an action. I'll look for follow-up evidence."
+    if signal_type in ("decision_changed", "changed_my_decision"):
+        return "Recorded. I'll treat this as a decision that new evidence can reopen."
+    if signal_type in ("dismissed", "dismiss"):
+        return "Dismissed — similar signals will rank lower."
 
     return None
 

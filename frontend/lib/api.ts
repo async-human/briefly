@@ -261,6 +261,17 @@ export type OrbSessionResult = {
   thread_id: string | null;
 };
 
+export type OperatingContext = {
+  company_name: string;
+  product: string;
+  target_customers: string;
+  competitors: string[];
+  tech_stack: string[];
+  strategic_goals: string;
+  risks: string;
+  strategic_questions: string[];
+};
+
 export type Profile = {
   role: string | null;
   goal: string | null;
@@ -271,6 +282,7 @@ export type Profile = {
   recent_insight: string | null;
   brief_style?: BriefStyle;
   brief_language?: BriefLanguage;
+  operating_context?: OperatingContext;
 };
 
 export type MeResponse = {
@@ -1104,6 +1116,7 @@ export const api = {
     recent_insight?: string;
     brief_style?: BriefStyle;
     brief_language?: BriefLanguage;
+    operating_context?: Partial<OperatingContext>;
   }) =>
     request<OnboardingStatus>("/api/v1/onboarding/profile", {
       method: "PATCH",
@@ -1215,7 +1228,7 @@ export const api = {
   // Item feedback
   recordFeedback: (body: {
     signal_type: string;
-    digest_item_id: string;
+    digest_item_id?: string;
     digest_id?: string;
     meta?: Record<string, unknown>;
   }) =>
@@ -1570,6 +1583,8 @@ export type WatchedAlert = {
   is_urgent: boolean;
   related_urls: string[];
   sources_checked: number;
+  detector_type?: string | null;
+  confidence?: number;
   created_at: string | null;
 };
 
