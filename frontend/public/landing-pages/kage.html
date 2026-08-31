@@ -566,8 +566,6 @@ body[data-layout-gallery="b"] .card:first-child .card-list{
      that whole time measured against the bar. */
   .nav.menu-open{ transform:none; transition:none; }
   .nav-burger{ margin-left:auto; }
-  .nav-cta{ margin-left:auto; }
-  .nav-burger{ margin-left:12px; }
   .nav-burger.active i:nth-child(1){ top:7px; width:26px; transform:rotate(45deg); }
   .nav-burger.active i:nth-child(2){ top:7px; width:26px; transform:rotate(-45deg); }
   html.nav-open,html.nav-open body{ overflow:hidden; }
@@ -995,7 +993,6 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
     <a class="nav-link" href="#lessons" data-cursor><span>Method</span><span class="alt">Fields</span></a>
     <a class="nav-link" href="#eternity" data-cursor><span>Access</span><span class="alt">Join</span></a>
   </nav>
-  <a class="nav-cta" href="/login" target="_top" data-cursor>Sign in</a>
   <button class="nav-burger" aria-label="Menu" data-cursor><i></i><i></i></button>
 </header>
 
@@ -2794,6 +2791,7 @@ function buildTemple() {
     r.position.set(s * 10.6, F + 3.4, TEMPLE_Z + 1.4); r.castShadow = true; g.add(r);
   });
 
+  g.visible = false;
   scene.add(g); WORLD.temple = g;
 
   /* the glow the hall pushes out over its own steps */
@@ -2801,6 +2799,7 @@ function buildTemple() {
     new THREE.MeshBasicMaterial({ map: tx(texGlow('rgba(255,150,66,.80)', 'rgba(240,96,26,.24)')),
       transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: .30 }));
   spill.position.set(0, F + 3.0, TEMPLE_Z + 5.6); spill.renderOrder = 2;
+  spill.visible = false;
   scene.add(spill); WORLD.hallHalo = spill;
 
   /* the band of mist that separates the hall from the trees behind it — the
@@ -4008,10 +4007,14 @@ function buildLights() {
      nothing else — a range that reaches the roof turns the whole building into
      a paper lantern and the silhouette disappears. */
   const hallL = new THREE.PointLight(0xff8a26, 2.3, 15, 2);
-  hallL.position.set(0, PODIUM + 1.2, TEMPLE_Z + 8.6); scene.add(hallL); WORLD.hallLight = hallL;
+  hallL.position.set(0, PODIUM + 1.2, TEMPLE_Z + 8.6);
+  hallL.visible = false;
+  scene.add(hallL); WORLD.hallLight = hallL;
   [-1, 1].forEach(s => {
     const w = new THREE.PointLight(0xff8420, 2.2, 11, 2);
-    w.position.set(s * 11.4, PODIUM + 1.2, TEMPLE_Z + 5.6); scene.add(w);
+    w.position.set(s * 11.4, PODIUM + 1.2, TEMPLE_Z + 5.6);
+    w.visible = false;
+    scene.add(w);
   });
 
   /* the moon throws almost nothing, but a trace of red high on the right
@@ -4498,6 +4501,21 @@ function wireNav() {
     e.preventDefault();
     scrollTo({ top: a.getAttribute('href') === '#top' ? 0 : t.offsetTop - 40, behavior: REDUCE ? 'auto' : 'smooth' });
   }));
+  /* The page lives in a sandboxed iframe. target=_top is blocked unless the
+     parent allows top navigation, so app routes post out and the host assigns. */
+  document.addEventListener('click', e => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target.closest('a[href]');
+    if (!a) return;
+    const href = a.getAttribute('href') || '';
+    if (href.charAt(0) !== '/') return;
+    e.preventDefault();
+    try {
+      window.top.location.assign(href);
+    } catch (err) {
+      window.parent.postMessage({ type: 'briefly:navigate', href }, window.location.origin);
+    }
+  });
 }
 
 function wireFocus() {
