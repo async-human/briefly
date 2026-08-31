@@ -26,7 +26,11 @@ export function MorningPulse({
   connectionLabel,
   generating,
 }: MorningPulseProps) {
-  const lit = nodes.filter((n) => n.active);
+  const overnight = countPhrase(
+    changeCount,
+    "1 change today",
+    `${changeCount} changes today`,
+  );
 
   return (
     <header className="pulse">
@@ -34,38 +38,34 @@ export function MorningPulse({
       <h2 className="pulse-hello">{greeting}.</h2>
       <p className="pulse-line">{line}</p>
 
-      <ul className="pulse-counts" aria-label="Today at a glance">
-        <li>
-          <span className="pulse-count-value">{changeCount}</span>
-          <span className="pulse-count-label">
-            {countPhrase(changeCount, "important change", "important changes")}
-          </span>
+      <ul className="pulse-pills" aria-label="Today at a glance">
+        <li className={changeCount > 0 ? "is-on" : undefined}>
+          {changeCount} important
         </li>
         <li>
-          <span className="pulse-count-value">{decisionCount}</span>
-          <span className="pulse-count-label">
-            {countPhrase(decisionCount, "decision affected", "decisions affected")}
-          </span>
+          {decisionCount === 1 ? "1 decision affected" : `${decisionCount} decisions affected`}
         </li>
-        <li>
-          <span className="pulse-count-value">{urgentCount}</span>
-          <span className="pulse-count-label">
-            {countPhrase(urgentCount, "urgent action", "urgent actions")}
-          </span>
+        <li className={urgentCount > 0 ? "is-urgent" : undefined}>
+          {urgentCount > 0
+            ? countPhrase(urgentCount, "1 urgent", `${urgentCount} urgent`)
+            : "Nothing urgent"}
         </li>
       </ul>
 
-      <PulseConstellation
-        nodes={nodes}
-        connectionLabel={connectionLabel}
-        generating={Boolean(generating)}
-      />
-
-      {lit.length > 0 ? (
-        <p className="pulse-lit">
-          Lit today: {lit.map((n) => n.name).join(", ")}
+      <article className="pulse-world">
+        <header className="pulse-world-head">
+          <h3 className="pulse-world-title">Your world</h3>
+          <p className="pulse-world-meta">{changeCount > 0 ? overnight : "Quiet so far"}</p>
+        </header>
+        <PulseConstellation
+          nodes={nodes}
+          connectionLabel={connectionLabel}
+          generating={Boolean(generating)}
+        />
+        <p className="pulse-world-note">
+          Only changed or decision-relevant areas are emphasized.
         </p>
-      ) : null}
+      </article>
     </header>
   );
 }
@@ -85,15 +85,15 @@ function PulseConstellation({
     return () => window.clearTimeout(t);
   }, []);
 
-  const cx = 160;
-  const cy = 92;
-  const radius = 64;
+  const cx = 180;
+  const cy = 108;
+  const radius = 78;
   const positions = nodes.map((node, i) => {
     const angle = (-Math.PI / 2) + (i * (2 * Math.PI)) / Math.max(nodes.length, 1);
     return {
       ...node,
       x: cx + Math.cos(angle) * radius,
-      y: cy + Math.sin(angle) * 50,
+      y: cy + Math.sin(angle) * 58,
     };
   });
   const active = positions.find((n) => n.active);
@@ -102,7 +102,7 @@ function PulseConstellation({
   return (
     <svg
       className={`pulse-map${ready ? " is-ready" : ""}${generating ? " is-thinking" : ""}`}
-      viewBox="0 0 320 188"
+      viewBox="0 0 360 220"
       role="img"
       aria-label={
         litCount > 0
@@ -126,16 +126,15 @@ function PulseConstellation({
           <line x1={active.x} y1={active.y} x2={cx} y2={cy} />
         </g>
       ) : null}
-      <circle className="pulse-core" cx={cx} cy={cy} r="22" />
-      <text className="pulse-core-label" x={cx} y={cy - 3} textAnchor="middle">
-        <tspan x={cx} dy="0">Your</tspan>
-        <tspan x={cx} dy="11">world</tspan>
+      <circle className="pulse-core" cx={cx} cy={cy} r="28" />
+      <text className="pulse-core-label" x={cx} y={cy + 4} textAnchor="middle">
+        Briefly
       </text>
       {positions.map((n) => (
         <g key={n.id} className={n.active ? "pulse-node is-on" : "pulse-node"}>
-          <circle cx={n.x} cy={n.y} r={n.active ? 7 : 4} />
-          <text x={n.x} y={n.y + (n.y < cy ? -14 : 20)} textAnchor="middle">
-            {shortLabel(n.name, 16)}
+          <circle cx={n.x} cy={n.y} r={n.active ? 16 : 9} />
+          <text x={n.x} y={n.y + (n.y < cy ? -22 : 28)} textAnchor="middle">
+            {shortLabel(n.name, 14)}
           </text>
         </g>
       ))}
@@ -143,7 +142,7 @@ function PulseConstellation({
         <text
           className="pulse-link-label"
           x={(active.x + cx) / 2}
-          y={(active.y + cy) / 2 - 8}
+          y={(active.y + cy) / 2 - 10}
           textAnchor="middle"
         >
           {connectionLabel}

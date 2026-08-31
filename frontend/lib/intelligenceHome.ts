@@ -4,16 +4,24 @@ import { detectorLabel } from "@/lib/detectors";
 
 export type IntelKind = "change" | "pattern" | "decision";
 
+export type GlanceMetric = {
+  value: string;
+  hint: string;
+  direction?: "down" | "up";
+};
+
 export type IntelligenceObject = {
   id: string;
   kind: IntelKind;
   label: string;
   title: string;
   why: string;
+  impact?: string;
   connected?: string;
   confidence?: number | null;
   digestId?: string | null;
   itemId?: string | null;
+  signalId?: string | null;
   askHref?: string;
   readHref?: string;
   sourceUrl?: string | null;
@@ -23,6 +31,7 @@ export type IntelligenceObject = {
   corroborating?: number;
   urgent?: boolean;
   action?: string | null;
+  metric?: GlanceMetric | null;
 };
 
 export type PulseNode = {
@@ -43,7 +52,10 @@ export type MorningPulseModel = {
 };
 
 const MAX_CARDS = 3;
-const MAX_NODES = 5;
+const MAX_NODES = 6;
+
+const DOWN_RE = /\b(cut|lower|drop|declin|reduc|fell|fall|cheaper|discount|slash|down)\b/i;
+const UP_RE = /\b(rais|increas|hike|surge|higher|climbed)\b/i;
 
 export function shortLabel(text: string | null | undefined, max = 16): string {
   const t = (text || "").trim();
@@ -55,12 +67,75 @@ export function countPhrase(n: number, singular: string, plural: string): string
   return n === 1 ? singular : plural;
 }
 
+/** Pull a real percentage out of evidence text. Returns null if none is present. */
+export function extractPercentDelta(
+  ...texts: Array<string | null | undefined>
+): GlanceMetric | null {
+  const blob = texts.filter(Boolean).join(" ");
+  const m = blob.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (!m) return null;
+  const pct = Number(m[1]);
+  if (!Number.isFinite(pct) || pct <= 0 || pct > 1000) return null;
+  const down = DOWN_RE.test(blob);
+  const up = UP_RE.test(blob);
+  let hint = "change";
+  if (/pric/i.test(blob)) hint = "pricing";
+  else if (/\bapi\b/i.test(blob)) hint = "API";
+  return {
+    value: `${Math.round(pct)}%`,
+    hint,
+    direction: down && !up ? "down" : up && !down ? "up" : undefined,
+  };
+}
+
 function confidenceOf(item: DigestItem | WatchedAlert): number | null {
   if ("signal_confidence" in item && typeof item.signal_confidence === "number" && item.signal_confidence > 0) {
     return item.signal_confidence;
   }
   if ("confidence" in item && typeof item.confidence === "number" && item.confidence > 0) {
     return item.confidence;
+  }
+  return null;
+}
+
+function impactLine(kind: IntelKind, connected?: string): string | undefined {
+  if (!connected) return undefined;
+  const name = connected.trim();
+  if (name.length < 2 || name.length > 48) return undefined;
+  if (kind === "decision") return `Conflicts with ${name}.`;
+  if (kind === "pattern") return `Unusually relevant to ${name}.`;
+  return `Touches your ${name}.`;
+}
+
+function metricFor(args: {
+  kind: IntelKind;
+  title: string;
+  why: string;
+  previousState?: string | null;
+  newState?: string | null;
+  corroborating?: number;
+  confidence?: number | null;
+  detector?: string | null;
+}): GlanceMetric | null {
+  if (args.kind === "change") {
+    const fromText = extractPercentDelta(
+      args.previousState,
+      args.newState,
+      args.title,
+      args.why,
+    );
+    if (fromText) {
+      if (args.detector === "pricing_positioning") fromText.hint = "pricing";
+      if (args.detector === "model_api" && fromText.hint === "change") fromText.hint = "API";
+      return fromText;
+    }
+    return null;
+  }
+  if (args.kind === "pattern" && args.corroborating && args.corroborating > 1) {
+    return { value: String(args.corroborating), hint: "sources" };
+  }
+  if (args.kind === "decision" && args.confidence != null) {
+    return { value: `${Math.round(args.confidence * 100)}%`, hint: "confidence" };
   }
   return null;
 }
@@ -80,16 +155,21 @@ function fromAlert(alert: WatchedAlert, digest: Digest | null): IntelligenceObje
   const why = (alert.why_it_matters || alert.what_changed || "").trim();
   const match = itemMatchingAlert(digest, alert);
   const digestId = digest?.id ?? null;
+  const connected = alert.entity_name;
+  const confidence = confidenceOf(alert);
+  const corroborating = alert.related_urls?.length || undefined;
   return {
     id: `alert:${alert.id}`,
     kind,
-    label: kind === "change" ? "Important change" : "Emerging",
+    label: kind === "change" ? "Important change" : "Emerging pattern",
     title: alert.title,
     why: why || `Update on ${alert.entity_name}.`,
-    connected: alert.entity_name,
-    confidence: confidenceOf(alert),
+    impact: impactLine(kind, connected),
+    connected,
+    confidence,
     digestId,
     itemId: match?.id,
+    signalId: alert.signal_id || null,
     askHref: match?.content_id
       ? askAboutContent(match.content_id, match.id, match.headline)
       : askUrl({ title: alert.title }),
@@ -102,9 +182,19 @@ function fromAlert(alert: WatchedAlert, digest: Digest | null): IntelligenceObje
     sourceName: alert.source_name || alert.entity_name,
     previousState: alert.previous_state || null,
     newState: alert.new_state || null,
-    corroborating: alert.related_urls?.length || undefined,
+    corroborating,
     urgent: Boolean(alert.is_urgent),
     action: alert.action && !/^none/i.test(alert.action) ? alert.action : null,
+    metric: metricFor({
+      kind,
+      title: alert.title,
+      why,
+      previousState: alert.previous_state,
+      newState: alert.new_state,
+      corroborating,
+      confidence,
+      detector: alert.detector_type,
+    }),
   };
 }
 
@@ -119,16 +209,23 @@ function fromItem(item: DigestItem, digestId: string): IntelligenceObject {
     item.memory_connections?.[0]?.description ||
     detector ||
     undefined;
+  const confidence = confidenceOf(item);
+  const corroborating = item.duplicate_count > 1 ? item.duplicate_count : item.evidence?.length;
+  const title = kind === "decision" && item.evolution_note
+    ? item.headline
+    : item.headline;
   return {
     id: `item:${item.id}`,
     kind,
-    label: kind === "decision" ? "Reconsider?" : kind === "pattern" ? "Emerging" : "Important change",
-    title: item.headline,
+    label: kind === "decision" ? "Reconsider?" : kind === "pattern" ? "Emerging pattern" : "Important change",
+    title,
     why: why || item.headline,
+    impact: impactLine(kind, connected),
     connected,
-    confidence: confidenceOf(item),
+    confidence,
     digestId,
     itemId: item.id,
+    signalId: item.signal_id || null,
     askHref: item.content_id
       ? askAboutContent(item.content_id, item.id, item.headline)
       : askUrl({ title: item.headline }),
@@ -137,8 +234,18 @@ function fromItem(item: DigestItem, digestId: string): IntelligenceObject {
     sourceName: item.source_name,
     previousState: item.previous_state || null,
     newState: item.new_state || null,
-    corroborating: item.duplicate_count > 1 ? item.duplicate_count : item.evidence?.length,
+    corroborating,
     action: item.suggested_action || null,
+    metric: metricFor({
+      kind,
+      title: item.headline,
+      why,
+      previousState: item.previous_state,
+      newState: item.new_state,
+      corroborating,
+      confidence,
+      detector: item.detector_type,
+    }),
   };
 }
 
@@ -175,6 +282,21 @@ function pickCards(
   return picked;
 }
 
+function isEntityLit(
+  ent: WatchedEntity,
+  unread: WatchedAlert[],
+  cards: IntelligenceObject[],
+): boolean {
+  if (unread.some((a) => a.entity_id === ent.id || a.entity_name === ent.name)) return true;
+  const n = ent.name.trim().toLowerCase();
+  if (n.length < 3) return false;
+  return cards.some(
+    (c) =>
+      c.title.toLowerCase().includes(n) ||
+      (c.connected || "").toLowerCase().includes(n),
+  );
+}
+
 export function buildMorningPulse(input: {
   digest: Digest | null;
   alerts: WatchedAlert[];
@@ -189,13 +311,10 @@ export function buildMorningPulse(input: {
     cards.filter((c) => c.kind === "decision").length;
   const urgentCount = unread.filter((a) => a.is_urgent).length;
 
-  const activeNames = new Set(
-    unread.map((a) => a.entity_name).filter(Boolean),
-  );
   const nodes: PulseNode[] = input.entities.slice(0, MAX_NODES).map((ent) => ({
     id: ent.id,
     name: ent.name,
-    active: activeNames.has(ent.name) || unread.some((a) => a.entity_id === ent.id),
+    active: isEntityLit(ent, unread, cards),
   }));
 
   let line = "Nothing needs you yet.";

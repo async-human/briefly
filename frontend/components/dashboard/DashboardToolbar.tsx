@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { AppPageHeader } from "./AppPageHeader";
 
 type DashboardToolbarProps = {
@@ -16,25 +15,13 @@ type DashboardToolbarProps = {
 };
 
 export function DashboardToolbar({
-  itemCount,
-  savedMinutes,
   sourceCount,
-  digestId,
   generating,
   onRefresh,
 }: DashboardToolbarProps) {
-  const hasBrief = Boolean(digestId && !generating && (itemCount ?? 0) > 0);
   const hasRefresh = Boolean(onRefresh && sourceCount > 0);
 
-  const stats = !generating
-    ? [
-        ...(savedMinutes != null && savedMinutes > 0
-          ? [{ value: `~${savedMinutes}m`, label: "reading distilled" }]
-          : []),
-      ]
-    : [];
-
-  if (!hasBrief && !hasRefresh && stats.length === 0 && !generating) {
+  if (!hasRefresh && !generating) {
     return <h1 className="sr-only">Dashboard</h1>;
   }
 
@@ -51,26 +38,18 @@ export function DashboardToolbar({
         ) : undefined
       }
       actions={
-        <>
-          {hasBrief && digestId && (
-            <Link href={`/dashboard/read/${digestId}`} className="dash-btn dash-btn-primary">
-              Open briefing
-            </Link>
-          )}
-          {hasRefresh && (
-            <button
-              type="button"
-              className={`dash-btn dash-btn-secondary${generating ? " dash-btn-loading" : ""}`}
-              onClick={onRefresh}
-              disabled={generating}
-            >
-              {generating && <span className="dash-btn-spinner" aria-hidden />}
-              {generating ? "Refreshing…" : "Refresh"}
-            </button>
-          )}
-        </>
+        hasRefresh ? (
+          <button
+            type="button"
+            className={`dash-btn dash-btn-secondary${generating ? " dash-btn-loading" : ""}`}
+            onClick={onRefresh}
+            disabled={generating}
+          >
+            {generating && <span className="dash-btn-spinner" aria-hidden />}
+            {generating ? "Refreshing…" : "Refresh"}
+          </button>
+        ) : undefined
       }
-      stats={stats}
     />
   );
 }

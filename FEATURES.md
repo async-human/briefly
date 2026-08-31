@@ -149,7 +149,8 @@ Do not start these because the last file compiled.
 
 | Date | Commit | What shipped |
 |---|---|---|
-| 2026-08-31 | (this) | Morning Pulse + Intelligence Cards on the dashboard; `SURFACE.md` (3–5 things, three questions, three layers). No new routes or widgets |
+| 2026-08-31 | (this) | Glance hierarchy: pill counts, framed Your World, denser cards, briefing recedes |
+| 2026-08-31 | `cce23c0` | Morning Pulse + Intelligence Cards on the dashboard; `SURFACE.md` |
 | 2026-08-31 | `77d9f01` | Full Feedly analysis in `FEEDLY_DIRECTION.md`; `FEATURES.md` is the implementation log |
 | 2026-08-31 | `a98f566` | First `FEATURES.md` + condensed Feedly note |
 | 2026-08-31 | `500998f` | `MOAT_ROADMAP.md` at repo root |

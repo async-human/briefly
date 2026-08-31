@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, type Digest, type WatchedAlert, type WatchedEntity } from "@/lib/api";
 import { getTimeGreeting } from "@/lib/greeting";
 import { buildMorningPulse } from "@/lib/intelligenceHome";
@@ -13,6 +12,7 @@ type IntelligenceHomeProps = {
   name: string;
   dateLabel: string;
   generating: boolean;
+  children?: ReactNode;
 };
 
 export function IntelligenceHome({
@@ -20,12 +20,15 @@ export function IntelligenceHome({
   name,
   dateLabel,
   generating,
+  children,
 }: IntelligenceHomeProps) {
   const [alerts, setAlerts] = useState<WatchedAlert[]>([]);
   const [entities, setEntities] = useState<WatchedEntity[]>([]);
   const [greeting] = useState(() => getTimeGreeting().label);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState(false);
+  const [restOpen, setRestOpen] = useState(true);
+  const userToggledRest = useRef(false);
 
   const refresh = useCallback(() => {
     Promise.all([
@@ -63,28 +66,33 @@ export function IntelligenceHome({
 
   const model = buildMorningPulse({ digest, alerts, entities, generating });
   const scanState = scanning ? "loading" : scanError ? "error" : undefined;
+  const briefCount = digest?.items?.length ?? 0;
+
+  useEffect(() => {
+    if (userToggledRest.current) return;
+    if (generating) {
+      setRestOpen(true);
+      return;
+    }
+    setRestOpen(model.cards.length === 0);
+  }, [generating, model.cards.length]);
 
   return (
-    <section className="intel-home" aria-label="Today at a glance">
-      <MorningPulse
-        greeting={`${greeting}, ${name}`}
-        dateLabel={dateLabel}
-        line={model.line}
-        changeCount={model.changeCount}
-        decisionCount={model.decisionCount}
-        urgentCount={model.urgentCount}
-        nodes={model.nodes}
-        connectionLabel={model.connectionLabel}
-        generating={generating}
-      />
+    <div className="intel-home">
+      <section aria-label="Today at a glance">
+        <MorningPulse
+          greeting={`${greeting}, ${name}`}
+          dateLabel={dateLabel}
+          line={model.line}
+          changeCount={model.changeCount}
+          decisionCount={model.decisionCount}
+          urgentCount={model.urgentCount}
+          nodes={model.nodes}
+          connectionLabel={model.connectionLabel}
+          generating={generating}
+        />
 
-      {model.cards.length > 0 ? (
-        <div className="intel-stack">
-          <p className="intel-stack-label">
-            {model.cards.length === 1
-              ? "1 thing deserves your attention"
-              : `${model.cards.length} things deserve your attention`}
-          </p>
+        {model.cards.length > 0 ? (
           <ul className="intel-stack-list">
             {model.cards.map((obj) => (
               <li key={obj.id}>
@@ -92,43 +100,56 @@ export function IntelligenceHome({
               </li>
             ))}
           </ul>
-        </div>
-      ) : (
-        !generating && (
-          <p className="intel-quiet">
-            When something material moves in your world, it will land here — not as a feed of stories.
-          </p>
-        )
-      )}
-
-      {model.action ? (
-        <p className="intel-do">
-          <span className="intel-do-kicker">Do this</span>
-          <Link href={model.action.href} className="intel-do-link">
-            {model.action.label}
-          </Link>
-        </p>
-      ) : null}
-
-      {entities.length > 0 ? (
-        <div className="intel-scan-wrap">
-          <button
-            type="button"
-            className="dash-btn dash-btn-secondary intel-scan"
-            onClick={() => void scanWatching()}
-            disabled={scanning}
-            data-state={scanState}
-            aria-busy={scanning}
-          >
-            {scanning ? "Checking sources…" : "Check watching sources"}
-          </button>
-          {scanError ? (
-            <p className="intel-scan-error" role="alert">
-              Couldn’t check sources. Try again.
+        ) : (
+          !generating && (
+            <p className="intel-quiet">
+              When something material moves in your world, it will land here — not as a feed of stories.
             </p>
-          ) : null}
-        </div>
+          )
+        )}
+
+        {entities.length > 0 ? (
+          <div className="intel-scan-wrap">
+            <button
+              type="button"
+              className="intel-scan"
+              onClick={() => void scanWatching()}
+              disabled={scanning}
+              data-state={scanState}
+              aria-busy={scanning}
+            >
+              {scanning ? "Checking sources…" : "Check watching sources"}
+            </button>
+            {scanError ? (
+              <p className="intel-scan-error" role="alert">
+                Couldn’t check sources. Try again.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+
+      {children ? (
+        <details
+          className="intel-rest"
+          open={restOpen}
+          onToggle={(event) => {
+            if (!event.isTrusted) return;
+            userToggledRest.current = true;
+            setRestOpen((event.target as HTMLDetailsElement).open);
+          }}
+        >
+          <summary className="intel-rest-summary">
+            <span className="intel-rest-title">The rest of today</span>
+            {briefCount > 0 ? (
+              <span className="intel-rest-count">
+                {briefCount} in the briefing
+              </span>
+            ) : null}
+          </summary>
+          <div className="intel-rest-body">{children}</div>
+        </details>
       ) : null}
-    </section>
+    </div>
   );
 }

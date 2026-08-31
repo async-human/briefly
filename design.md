@@ -15,13 +15,13 @@ Art Deco editorial — ivory paper, deep teal ink, restrained gold geometry. A c
 - **v5** — Art Deco Grand Salon: symmetric masthead, framed hero brief, jewel-toned memory chamber, asymmetric action composition, expanded footer
 - **v6** — Dashboard priority pass: open greeting, urgent-signal restraint, briefing-first canvas, quiet utilities, optional intelligence depth
 - **v7** — Workbench uses the canvas: wide briefing + sticky rail, story cards, collapsible device groups
-- **v8** — Morning Pulse + Intelligence Cards: the home canvas answers three questions (what changed, why it matters, what to do). Glance → expand in place → investigate. One card grammar. Motion means change.
+- **v9** — Glance hierarchy pass: pill counts, framed Your World constellation, denser Intelligence Cards, briefing recedes behind “the rest of today.”
 
 ## App macrostructure
 
 **Workbench** — sidebar navigation + primary canvas + secondary sources rail. Function carries the page; no hero enrichment.
 
-The canvas opens on a **glance layer**: Morning Pulse (greeting, three counts, constellation of tracked names) and at most three Intelligence Cards. The briefing, calendar, and insights remain Layer 3 — “the rest of today.”
+The canvas opens on a **glance layer**: greeting, pill counts, a framed Your World constellation, and at most three Intelligence Cards. The briefing, calendar, and insights recede behind **The rest of today**.
 
 On wide viewports the lower canvas is a two-column workbench: today’s briefing fills the main column; meetings and optional intelligence sit in a sticky rail. Story cards are the interaction surface. Setup prompts never displace the daily brief.
 

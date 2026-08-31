@@ -39,9 +39,9 @@ Same footprint. Different visual grammar.
 Signature of the home screen. Not “we scanned N articles.”
 
 > Good morning. Your world moved a little today.  
-> 3 important changes · 1 decision affected · 0 urgent.
+> 3 important · 1 decision affected · Nothing urgent
 
-A quiet constellation of tracked entities: most nodes faint, today’s changes softly lit, one connection drawn if we know it.
+A framed **Your world** constellation: most nodes faint, today’s changes softly lit, one connection drawn if we know it.
 
 ## Motion
 
@@ -57,4 +57,4 @@ A price drop, a momentum sparkline, a belief-confidence shift, or a May → June
 
 ## What stays off the home screen
 
-Calendar, connections, source discovery, the full briefing list, insights, listening, and email drafts remain available. They are not the first thing the eye hits. The briefing is Layer 3: “the rest of today,” after the pulse.
+Calendar, connections, source discovery, the full briefing list, insights, listening, and email drafts remain available behind **The rest of today**. They are not the first thing the eye hits.

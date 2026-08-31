@@ -325,13 +325,11 @@ function DashboardContent() {
         name={greeting}
         dateLabel={today}
         generating={generating}
-      />
-
+      >
       <div className="dash-feed-workbench">
         <div className="dash-feed-main">
           <div className="dash-primary-zone">
             <div className="dash-primary-head">
-              <h2 className="dash-primary-label">The rest of today</h2>
               {digest && (digest.items?.length ?? 0) > 0 && (
                 <button
                   type="button"
@@ -404,6 +402,7 @@ function DashboardContent() {
           />
         </aside>
       </div>
+      </IntelligenceHome>
 
       <ConnectionsDrawer
         open={connectionsOpen}

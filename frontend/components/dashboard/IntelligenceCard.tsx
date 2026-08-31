@@ -2,7 +2,8 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
-import type { IntelligenceObject } from "@/lib/intelligenceHome";
+import { api } from "@/lib/api";
+import { shortLabel, type IntelligenceObject } from "@/lib/intelligenceHome";
 
 type IntelligenceCardProps = {
   object: IntelligenceObject;
@@ -10,13 +11,27 @@ type IntelligenceCardProps = {
 
 export function IntelligenceCard({ object }: IntelligenceCardProps) {
   const [open, setOpen] = useState(false);
+  const [gone, setGone] = useState(false);
+  const [rating, setRating] = useState(false);
   const panelId = useId();
   const conf = object.confidence != null ? Math.round(object.confidence * 100) : null;
   const kindClass =
     object.kind === "decision" ? "glance-card--decision"
       : object.kind === "pattern" ? "glance-card--pattern"
         : "glance-card--change";
-  const sources = object.corroborating && object.corroborating > 1 ? object.corroborating : null;
+
+  if (gone) return null;
+
+  async function markNoise() {
+    if (!object.signalId || rating) return;
+    setRating(true);
+    try {
+      await api.rateSignal(object.signalId, "irrelevant", object.title);
+      setGone(true);
+    } catch {
+      setRating(false);
+    }
+  }
 
   return (
     <article
@@ -30,47 +45,46 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
         aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="glance-card-kicker">{object.label}</span>
-        <h3 className="glance-card-title">{object.title}</h3>
-        {!open ? (
-          <p className="glance-card-glance">{truncate(object.why, 110)}</p>
-        ) : null}
-        {object.previousState && object.newState ? (
-          <StateShift from={object.previousState} to={object.newState} />
-        ) : null}
-        {!open && sources ? <SourceMarks count={sources} /> : null}
+        <div className="glance-card-copy">
+          <span className="glance-card-kicker">{object.label}</span>
+          <h3 className="glance-card-title">{object.title}</h3>
+          {object.impact ? (
+            <p className="glance-card-impact">{object.impact}</p>
+          ) : !open ? (
+            <p className="glance-card-glance">{truncate(object.why, 90)}</p>
+          ) : null}
+        </div>
+        <Metric object={object} />
       </button>
 
       <div id={panelId} className="glance-card-layer" hidden={!open}>
+        <span className="glance-card-kicker">Why it matters</span>
         <p className="glance-card-why">{object.why}</p>
-        {object.connected ? (
-          <p className="glance-card-meta">
-            Connected to {object.connected}
-            {conf != null ? ` · ${conf}% confidence` : ""}
-            {sources ? ` · ${sources} sources` : ""}
-          </p>
-        ) : (
-          (conf != null || sources) && (
-            <p className="glance-card-meta">
-              {conf != null ? `${conf}% confidence` : null}
-              {conf != null && sources ? " · " : null}
-              {sources ? `${sources} sources` : null}
-            </p>
-          )
-        )}
-        {open && sources ? <SourceMarks count={sources} /> : null}
+        {conf != null ? (
+          <p className="glance-conf">{conf}% confidence</p>
+        ) : null}
         <div className="glance-card-actions">
-          {object.readHref ? (
-            <Link href={object.readHref} className="glance-card-btn">
-              Understand
-            </Link>
-          ) : null}
           {object.askHref ? (
-            <Link href={object.askHref} className="glance-card-btn glance-card-btn-quiet">
-              Why does this matter?
+            <Link href={object.askHref} className="glance-card-btn">
+              Ask Briefly
             </Link>
           ) : null}
-          {object.sourceUrl ? (
+          {object.readHref ? (
+            <Link href={object.readHref} className="glance-card-btn glance-card-btn-quiet">
+              Review
+            </Link>
+          ) : null}
+          {object.signalId ? (
+            <button
+              type="button"
+              className="glance-card-btn glance-card-btn-quiet"
+              onClick={() => void markNoise()}
+              disabled={rating}
+              data-state={rating ? "loading" : undefined}
+            >
+              {rating ? "Saving…" : "Not important"}
+            </button>
+          ) : object.sourceUrl ? (
             <a
               href={object.sourceUrl}
               className="glance-card-btn glance-card-btn-quiet"
@@ -86,36 +100,31 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
   );
 }
 
-function StateShift({ from, to }: { from: string; to: string }) {
-  return (
-    <div className="glance-shift" aria-label={`Was ${from}, now ${to}`}>
-      <div className="glance-shift-col">
-        <span className="glance-shift-k">Was</span>
-        <span className="glance-shift-v">{from}</span>
+function Metric({ object }: { object: IntelligenceObject }) {
+  if (object.metric) {
+    const arrow =
+      object.metric.direction === "down" ? "↓ "
+        : object.metric.direction === "up" ? "↑ "
+          : "";
+    return (
+      <div className="glance-card-metric">
+        <span className="glance-card-metric-value">
+          {arrow}{object.metric.value}
+        </span>
+        <span className="glance-card-metric-hint">{object.metric.hint}</span>
       </div>
-      <span className="glance-shift-arrow" aria-hidden>
-        →
-      </span>
-      <div className="glance-shift-col">
-        <span className="glance-shift-k">Now</span>
-        <span className="glance-shift-v">{to}</span>
+    );
+  }
+  if (object.previousState && object.newState) {
+    return (
+      <div className="glance-card-metric glance-card-metric--shift">
+        <span className="glance-card-metric-was">{shortLabel(object.previousState, 18)}</span>
+        <span className="glance-card-metric-arrow" aria-hidden>→</span>
+        <span className="glance-card-metric-now">{shortLabel(object.newState, 18)}</span>
       </div>
-    </div>
-  );
-}
-
-function SourceMarks({ count }: { count: number }) {
-  const n = Math.min(count, 8);
-  return (
-    <p className="glance-sources">
-      <span className="glance-sources-dots" aria-hidden>
-        {Array.from({ length: n }, (_, i) => (
-          <i key={i} />
-        ))}
-      </span>
-      {count} {count === 1 ? "source" : "sources"}
-    </p>
-  );
+    );
+  }
+  return null;
 }
 
 function truncate(text: string, n: number): string {
