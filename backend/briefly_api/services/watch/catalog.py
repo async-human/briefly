@@ -14,6 +14,7 @@ COMPANY_CATALOG: dict[str, dict] = {
         "pages": {
             "pricing": "https://openai.com/api/pricing/",
         },
+        "site": "https://openai.com",
     },
     "anthropic": {
         "name": "Anthropic",
@@ -24,6 +25,7 @@ COMPANY_CATALOG: dict[str, dict] = {
             "docs": "https://platform.claude.com/docs/en/about-claude/models/overview",
             "changelog": "https://platform.claude.com/docs/en/release-notes/overview",
         },
+        "site": "https://www.anthropic.com",
     },
     "google deepmind": {
         "name": "Google DeepMind",

@@ -2,8 +2,8 @@
 briefly_api/api/routes/watched.py
 
 Watched entities — companies / topics / people the user wants real-time alerts
-on ("tell me whenever Anthropic ships"). Matched by the watch monitor against
-official blogs, Google News, GitHub, and the user's own pool.
+on ("tell me whenever Anthropic ships"). Official pages are resolved, then
+hashed; Google News, GitHub, and the user's pool remain the backstop.
 
   GET    /watched-entities              list (with unread counts)
   POST   /watched-entities              add (idempotent by name)
@@ -24,7 +24,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.auth.deps import get_current_user
 from briefly_api.db.engine import get_db
-from briefly_api.db.models import BehavioralSignal, EntityAlert, MarketSignal, SignalType, User, WatchedEntity
+from briefly_api.db.models import (
+    BehavioralSignal,
+    EntityAlert,
+    EntitySource,
+    MarketSignal,
+    SignalType,
+    User,
+    WatchedEntity,
+)
 from briefly_api.services.watch.catalog import generate_aliases, match_terms_for, topic_terms
 
 router = APIRouter(tags=["watched"])
@@ -42,6 +50,19 @@ class EntityStateOut(BaseModel):
     observed_at: datetime | None = None
 
 
+class WatchPageOut(BaseModel):
+    source_type: str
+    url: str
+    status: str
+    last_error: str | None = None
+
+
+class WatchCoverageOut(BaseModel):
+    status: str = "news_only"
+    pages: list[WatchPageOut] = []
+    note: str = ""
+
+
 class WatchedEntityOut(BaseModel):
     id: str
     name: str
@@ -54,6 +75,7 @@ class WatchedEntityOut(BaseModel):
     unread_count: int = 0
     relationship_to_user: str = "watch"
     last_states: list[EntityStateOut] = []
+    coverage: WatchCoverageOut | None = None
 
 
 class WatchedEntityIn(BaseModel):
@@ -62,6 +84,11 @@ class WatchedEntityIn(BaseModel):
     keywords: list[str] = []
     relationship_to_user: str = "watch"
     watch_reason: str | None = None
+    page_url: str | None = None
+
+
+class WatchPageIn(BaseModel):
+    url: str
 
 
 class EntityAlertOut(BaseModel):
@@ -105,7 +132,15 @@ def _serialize_entity(
     r: WatchedEntity,
     unread: int = 0,
     last_states: list | None = None,
+    coverage: dict | None = None,
 ) -> WatchedEntityOut:
+    cov = None
+    if coverage:
+        cov = WatchCoverageOut(
+            status=str(coverage.get("status") or "news_only"),
+            pages=[WatchPageOut.model_validate(p) for p in coverage.get("pages") or []],
+            note=str(coverage.get("note") or ""),
+        )
     return WatchedEntityOut(
         id=r.id,
         name=r.name,
@@ -118,6 +153,7 @@ def _serialize_entity(
         unread_count=unread,
         relationship_to_user=getattr(r, "relationship_to_user", None) or "watch",
         last_states=[EntityStateOut.model_validate(s) for s in (last_states or [])],
+        coverage=cov,
     )
 
 
@@ -263,6 +299,36 @@ async def _thread_snaps_for_bundles(db: AsyncSession, user_id: str, bundles: dic
         return {}
 
 
+async def _coverage_map(db: AsyncSession, rows: list[WatchedEntity]) -> dict[str, dict]:
+    if not rows:
+        return {}
+    from briefly_api.services.watch.resolve import coverage_from_sources
+
+    sources = (
+        await db.execute(
+            select(EntitySource).where(EntitySource.entity_id.in_([r.id for r in rows]))
+        )
+    ).scalars().all()
+    by: dict[str, list[EntitySource]] = {}
+    for src in sources:
+        by.setdefault(src.entity_id, []).append(src)
+    out: dict[str, dict] = {}
+    for row in rows:
+        if row.kind in {"topic", "person"}:
+            cov = {
+                "status": "skipped",
+                "pages": [],
+                "note": "Topics and people stay on news and RSS.",
+            }
+        else:
+            cov = coverage_from_sources(by.get(row.id) or [])
+            disc = dict((row.monitoring_rules or {}).get("page_discovery") or {})
+            if cov["status"] == "news_only" and disc.get("note"):
+                cov["note"] = str(disc["note"])
+        out[row.id] = cov
+    return out
+
+
 async def _unread_map(db: AsyncSession, user_id: str) -> dict[str, int]:
     rows = (
         await db.execute(
@@ -294,7 +360,16 @@ async def list_watched(
         snaps = await latest_by_entities(db, user.id, [r.id for r in rows])
     except Exception:
         snaps = {}
-    return [_serialize_entity(r, unread.get(r.id, 0), snaps.get(r.id) or []) for r in rows]
+    coverage = await _coverage_map(db, list(rows))
+    return [
+        _serialize_entity(
+            r,
+            unread.get(r.id, 0),
+            snaps.get(r.id) or [],
+            coverage.get(r.id),
+        )
+        for r in rows
+    ]
 
 
 @router.post("/watched-entities", response_model=WatchedEntityOut, status_code=status.HTTP_201_CREATED)
@@ -336,6 +411,12 @@ async def add_watched(
 
     from briefly_api.services.watch.sources import seed_sources
     await seed_sources(db, ent)
+    page_url = (body.page_url or "").strip()
+    if page_url:
+        from briefly_api.services.watch.resolve import classify_page_url, pin_official_page
+
+        kind_page = classify_page_url(page_url) or "changelog"
+        await pin_official_page(db, ent, kind_page, page_url)
 
     db.add(
         BehavioralSignal(
@@ -356,7 +437,8 @@ async def add_watched(
     except Exception:
         pass
 
-    return _serialize_entity(ent, 0)
+    cov = await _coverage_map(db, [ent])
+    return _serialize_entity(ent, 0, coverage=cov.get(ent.id))
 
 
 @router.delete("/watched-entities/{entity_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
@@ -373,6 +455,45 @@ async def remove_watched(
     )
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/watched-entities/{entity_id}/pages", response_model=WatchedEntityOut)
+async def pin_watched_page(
+    entity_id: str,
+    body: WatchPageIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> WatchedEntityOut:
+    url = (body.url or "").strip()
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="Pin an https URL for the official page.")
+    ent = (
+        await db.execute(
+            select(WatchedEntity).where(
+                WatchedEntity.id == entity_id,
+                WatchedEntity.user_id == user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not ent:
+        raise HTTPException(status_code=404, detail="Watched entity not found.")
+    from briefly_api.services.watch.resolve import classify_page_url, pin_official_page
+
+    kind_page = classify_page_url(url) or "changelog"
+    await pin_official_page(db, ent, kind_page, url)
+    await db.commit()
+    await db.refresh(ent)
+    try:
+        from briefly_api.services.background_jobs import enqueue_background_job
+        await enqueue_background_job(
+            "watch_scan",
+            {"user_id": user.id, "entity_id": ent.id, "force": True},
+        )
+    except Exception:
+        pass
+    unread = await _unread_map(db, user.id)
+    cov = await _coverage_map(db, [ent])
+    return _serialize_entity(ent, unread.get(ent.id, 0), coverage=cov.get(ent.id))
 
 
 @router.get("/watched-alerts", response_model=list[EntityAlertOut])

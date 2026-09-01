@@ -1570,10 +1570,15 @@ export const api = {
 
   // Watched entities (companies / topics / people to alert on)
   listWatchedEntities: () => request<WatchedEntity[]>("/api/v1/watched-entities"),
-  addWatchedEntity: (body: { name: string; kind?: string; keywords?: string[] }) =>
+  addWatchedEntity: (body: { name: string; kind?: string; keywords?: string[]; page_url?: string }) =>
     request<WatchedEntity>("/api/v1/watched-entities", {
       method: "POST",
       body: JSON.stringify(body),
+    }),
+  pinWatchedPage: (id: string, url: string) =>
+    request<WatchedEntity>(`/api/v1/watched-entities/${id}/pages`, {
+      method: "POST",
+      body: JSON.stringify({ url }),
     }),
   removeWatchedEntity: (id: string) =>
     request<void>(`/api/v1/watched-entities/${id}`, { method: "DELETE" }),
@@ -1652,6 +1657,16 @@ export type WatchedEntity = {
     effective_at?: string | null;
     observed_at?: string | null;
   }[];
+  coverage?: {
+    status: "official" | "partial" | "news_only" | "skipped" | string;
+    pages: {
+      source_type: string;
+      url: string;
+      status: string;
+      last_error?: string | null;
+    }[];
+    note: string;
+  } | null;
 };
 
 export type WatchedAlert = {

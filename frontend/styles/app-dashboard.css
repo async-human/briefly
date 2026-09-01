@@ -11199,6 +11199,36 @@ a.saved-capture-title:hover {
   overflow-wrap: anywhere;
 }
 
+.watched-pin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.watched-pin .watched-input {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.watched-pin-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--app-brand);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.watched-pin-link:hover,
+.watched-pin-link:focus-visible {
+  color: var(--app-ink);
+}
+
 .watched-empty {
   margin: 0;
   font-size: 0.82rem;

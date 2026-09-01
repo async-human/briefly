@@ -116,3 +116,71 @@ def test_docs_source_type_forces_model_api_detector():
         entity_kind="company",
     )
     assert result.detector_type == DETECTOR_MODEL_API
+
+
+def test_classify_page_url_prefers_pricing_over_docs_path():
+    from briefly_api.services.watch.resolve import classify_page_url
+
+    assert classify_page_url("https://openai.com/api/pricing/") == "pricing"
+    assert classify_page_url("https://linear.app/changelog") == "changelog"
+    assert classify_page_url("https://docs.stripe.com/changelog") == "changelog"
+    assert classify_page_url("https://platform.claude.com/docs") == "docs"
+    assert classify_page_url("https://example.com/about") is None
+
+
+def test_homepage_candidates_for_unknown_company():
+    from briefly_api.services.watch.resolve import homepage_candidates
+
+    urls = homepage_candidates("Cummins")
+    joined = " ".join(urls).lower()
+    assert "cummins.com" in joined
+    assert catalog_pages("Cummins") == []
+
+
+def test_nav_labels_select_official_pages_without_crawling():
+    from briefly_api.services.watch.resolve import extract_labeled_links, well_known_candidates
+
+    html = """
+    <nav>
+      <a href="/pricing">Pricing</a>
+      <a href="https://docs.acme.com/">Docs</a>
+      <a href="/blog/why-we-raised">Ignore me</a>
+      <a href="/changelog">Changelog</a>
+    </nav>
+    """
+    links = dict(extract_labeled_links("https://acme.com/", html, "Acme"))
+    assert links["pricing"] == "https://acme.com/pricing"
+    assert links["docs"].startswith("https://docs.acme.com")
+    assert links["changelog"] == "https://acme.com/changelog"
+    probes = well_known_candidates("https://acme.com/", {"pricing"})
+    assert any(url.endswith("/pricing") for _, url in probes)
+
+
+def test_sitemap_picks_official_paths_only():
+    from briefly_api.services.watch.resolve import pages_from_sitemap
+
+    xml = """
+    <urlset>
+      <loc>https://acme.com/blog/hello-world</loc>
+      <loc>https://acme.com/pricing</loc>
+      <loc>https://other.com/pricing</loc>
+      <loc>https://acme.com/docs/api</loc>
+    </urlset>
+    """
+    found = dict(pages_from_sitemap(xml, "https://acme.com/", "Acme"))
+    assert found["pricing"] == "https://acme.com/pricing"
+    assert found["docs"] == "https://acme.com/docs/api"
+    assert "https://other.com/pricing" not in found.values()
+
+
+def test_coverage_news_only_when_no_pages():
+    from types import SimpleNamespace
+
+    from briefly_api.services.watch.resolve import coverage_from_sources
+
+    cov = coverage_from_sources([
+        SimpleNamespace(source_type="news", url="https://news.google.com/x", last_error=None, content_hash=None),
+    ])
+    assert cov["status"] == "news_only"
+    assert "Pin a URL" in cov["note"] or "pin" in cov["note"].lower()
+

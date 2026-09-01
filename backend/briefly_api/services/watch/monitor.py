@@ -27,6 +27,7 @@ from briefly_api.services.watch.relevance import (
     score_hit,
 )
 from briefly_api.services.watch.sources import fetch_entity_hits, maybe_discover_blog, seed_sources
+from briefly_api.services.watch.resolve import maybe_discover_pages
 from briefly_api.services.watch.summarize import write_alert_copy
 
 log = logging.getLogger(__name__)
@@ -142,6 +143,10 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
         await maybe_discover_blog(session, entity)
     except Exception:
         log.debug("Watch discover skipped for %s", entity.name, exc_info=True)
+    try:
+        await maybe_discover_pages(session, entity, force=force)
+    except Exception:
+        log.debug("Watch page resolve skipped for %s", entity.name, exc_info=True)
 
     page_hits, pages_checked = await check_entity_pages(
         session,

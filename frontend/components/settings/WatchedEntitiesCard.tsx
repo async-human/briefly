@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { api, type WatchedEntity } from "@/lib/api";
 
 const KINDS = [
@@ -20,6 +20,9 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
   const [entities, setEntities] = useState<WatchedEntity[]>([]);
   const [name, setName] = useState("");
   const [kind, setKind] = useState("company");
+  const [pageUrl, setPageUrl] = useState("");
+  const [pinFor, setPinFor] = useState<string | null>(null);
+  const [pinUrl, setPinUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
@@ -39,11 +42,16 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
     setBusy(true);
     setError("");
     try {
-      const created = await api.addWatchedEntity({ name: trimmed, kind });
+      const created = await api.addWatchedEntity({
+        name: trimmed,
+        kind,
+        page_url: pageUrl.trim() || undefined,
+      });
       setEntities((prev) =>
         prev.some((x) => x.id === created.id) ? prev : [created, ...prev],
       );
       setName("");
+      setPageUrl("");
       if (!created.last_checked) {
         sessionStorage.setItem(
           "briefly:monitoring-setup-warning",
@@ -90,6 +98,24 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
     }
   }
 
+  async function pinPage(id: string) {
+    const url = pinUrl.trim();
+    if (!url || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const updated = await api.pinWatchedPage(id, url);
+      setEntities((prev) => prev.map((ent) => (ent.id === id ? updated : ent)));
+      setPinFor(null);
+      setPinUrl("");
+      setNote("Official page pinned. Check now to store a baseline.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not pin that page.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove(id: string) {
     setEntities((prev) => prev.filter((x) => x.id !== id));
     await api.removeWatchedEntity(id).catch(() => undefined);
@@ -118,6 +144,16 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. OpenAI, Anthropic, a topic to watch…"
         />
+        {!compact && (kind === "company" || kind === "product") ? (
+          <input
+            className="watched-input"
+            type="url"
+            value={pageUrl}
+            onChange={(e) => setPageUrl(e.target.value)}
+            placeholder="Official pricing/docs URL (optional)"
+            aria-label="Official page URL"
+          />
+        ) : null}
         <button type="submit" className="dash-btn dash-btn-primary" disabled={busy || !name.trim()}>
           Watch
         </button>
@@ -153,18 +189,79 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
             </li>
           ))}
         </ul>
-        {entities.some((ent) => (ent.last_states?.length ?? 0) > 0) ? (
+        {entities.some((ent) => ent.coverage || (ent.last_states?.length ?? 0) > 0) ? (
           <ul className="watched-known">
             {entities.flatMap((ent) => {
+              const rows: ReactElement[] = [];
+              const cov = ent.coverage;
+              if (cov) {
+                const watching = (cov.pages || [])
+                  .filter((p) => p.status === "watching" || p.status === "pending")
+                  .map((p) => p.source_type);
+                const label =
+                  cov.status === "official"
+                    ? `official ${watching.join(" · ") || "pages"}`
+                    : cov.status === "partial"
+                      ? `official ${watching.join(" · ") || "page"} · news for the rest`
+                      : cov.status === "skipped"
+                        ? "news and RSS"
+                        : "news only";
+                const canPin =
+                  (ent.kind === "company" || ent.kind === "product") &&
+                  cov.status !== "official" &&
+                  cov.status !== "skipped";
+                rows.push(
+                  <li key={`${ent.id}-cov`}>
+                    <span className="watched-known-name">{ent.name}</span>
+                    <span className="watched-known-label">{label}</span>
+                    {canPin ? (
+                      pinFor === ent.id ? (
+                        <form
+                          className="watched-pin"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            void pinPage(ent.id);
+                          }}
+                        >
+                          <input
+                            className="watched-input"
+                            type="url"
+                            value={pinUrl}
+                            onChange={(e) => setPinUrl(e.target.value)}
+                            placeholder="https://…/pricing"
+                            aria-label={`Official page for ${ent.name}`}
+                          />
+                          <button type="submit" className="dash-btn dash-btn-secondary" disabled={busy || !pinUrl.trim()}>
+                            Pin
+                          </button>
+                        </form>
+                      ) : (
+                        <button
+                          type="button"
+                          className="watched-pin-link"
+                          onClick={() => {
+                            setPinFor(ent.id);
+                            setPinUrl("");
+                          }}
+                        >
+                          Pin a page we missed
+                        </button>
+                      )
+                    ) : null}
+                  </li>,
+                );
+              }
               const latest = ent.last_states?.[0];
-              if (!latest?.state) return [];
-              return [
-                <li key={`${ent.id}-known`}>
-                  <span className="watched-known-name">{ent.name}</span>
-                  <span className="watched-known-label">{latest.label}</span>
-                  <span className="watched-known-state">{shortKnown(latest.state)}</span>
-                </li>,
-              ];
+              if (latest?.state) {
+                rows.push(
+                  <li key={`${ent.id}-known`}>
+                    <span className="watched-known-name">{ent.name}</span>
+                    <span className="watched-known-label">{latest.label}</span>
+                    <span className="watched-known-state">{shortKnown(latest.state)}</span>
+                  </li>,
+                );
+              }
+              return rows;
             })}
           </ul>
         ) : null}
@@ -173,7 +270,7 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
         <p className="watched-empty">
           {compact
             ? "Track a company from a brief, or add one here."
-            : "Nothing watched yet. Add a company or topic and Briefly will alert you when it ships something — even from sources you don't follow."}
+            : "Nothing watched yet. Add a company and Briefly resolves its official pricing, docs, and changelog pages when it can find them. News still runs if a page cannot be confirmed."}
         </p>
       )}
 

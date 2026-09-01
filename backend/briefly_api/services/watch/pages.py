@@ -1,9 +1,7 @@
 """Pinned official-page change detection for watched companies.
 
-Not a crawler and not an LLM browsing agent. Each catalog company may pin at
-most three public URLs (pricing, docs, changelog). First successful fetch is a
-baseline with no alert. We hash canonical extract, not raw HTML. A fetch
-failure is not treated as "no change." Unknown companies stay on RSS + news.
+Not a site crawler. Pages come from the catalog, homepage/nav resolution,
+or a URL the user pins. First successful fetch is a baseline with no alert.
 """
 from __future__ import annotations
 
