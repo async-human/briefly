@@ -12,6 +12,8 @@ export type GlanceMetric = {
 
 export type IntelligenceObject = {
   id: string;
+  entityId?: string | null;
+  entityName?: string | null;
   kind: IntelKind;
   label: string;
   title: string;
@@ -40,6 +42,15 @@ export type PulseNode = {
   id: string;
   name: string;
   active: boolean;
+  signalCount: number;
+  urgentCount: number;
+  changeCount: number;
+  decisionCount: number;
+  latestSignal: string | null;
+  cardIds: string[];
+  reviewHref: string | null;
+  askHref: string;
+  networkHref: string;
 };
 
 export type MorningPulseModel = {
@@ -235,6 +246,8 @@ function fromAlert(alert: WatchedAlert, digest: Digest | null): IntelligenceObje
   const corroborating = alert.related_urls?.length || undefined;
   return {
     id: `alert:${alert.id}`,
+    entityId: alert.entity_id,
+    entityName: alert.entity_name,
     kind,
     label: kind === "decision" ? "Reconsider?" : kind === "change" ? "Important change" : "Emerging pattern",
     title: alert.title,
@@ -405,14 +418,28 @@ function isEntityLit(
   unread: WatchedAlert[],
   cards: IntelligenceObject[],
 ): boolean {
-  if (unread.some((a) => a.entity_id === ent.id || a.entity_name === ent.name)) return true;
+  if (unread.some((a) => alertMatchesEntity(a, ent))) return true;
+  return cards.some((card) => cardMatchesEntity(card, ent));
+}
+
+function alertMatchesEntity(alert: WatchedAlert, ent: WatchedEntity): boolean {
+  return alert.entity_id === ent.id
+    || alert.entity_name.trim().toLowerCase() === ent.name.trim().toLowerCase();
+}
+
+function cardMatchesEntity(card: IntelligenceObject, ent: WatchedEntity): boolean {
+  if (card.entityId) return card.entityId === ent.id;
+  if (card.entityName?.trim().toLowerCase() === ent.name.trim().toLowerCase()) return true;
   const n = ent.name.trim().toLowerCase();
   if (n.length < 3) return false;
-  return cards.some(
-    (c) =>
-      c.title.toLowerCase().includes(n) ||
-      (c.connected || "").toLowerCase().includes(n),
-  );
+  return card.title.toLowerCase().includes(n)
+    || (card.connected || "").toLowerCase().includes(n);
+}
+
+function alertTimestamp(alert: WatchedAlert): number {
+  const value = alert.created_at || alert.published_at;
+  const timestamp = value ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 export function buildMorningPulse(input: {
@@ -449,16 +476,46 @@ export function buildMorningPulse(input: {
   const urgentCount = unread.filter((a) => a.is_urgent).length;
 
   const rankedEntities = [...input.entities].sort((a, b) => {
-    const score = (ent: WatchedEntity) => unread.filter(
-      (alert) => alert.entity_id === ent.id && (alert.is_material_change || isDecisionTouch(alert)),
-    ).length;
+    const score = (ent: WatchedEntity) => unread.reduce((total, alert) => {
+      if (!alertMatchesEntity(alert, ent)) return total;
+      return total
+        + 1
+        + (alert.is_urgent ? 4 : 0)
+        + (alert.is_material_change ? 2 : 0)
+        + (isDecisionTouch(alert) ? 3 : 0);
+    }, 0);
     return score(b) - score(a);
   });
-  const nodes: PulseNode[] = rankedEntities.slice(0, MAX_NODES).map((ent) => ({
-    id: ent.id,
-    name: ent.name,
-    active: isEntityLit(ent, unread, cards),
-  }));
+  const nodes: PulseNode[] = rankedEntities.slice(0, MAX_NODES).map((ent) => {
+    const entityAlerts = unread
+      .filter((alert) => alertMatchesEntity(alert, ent))
+      .sort((a, b) => alertTimestamp(b) - alertTimestamp(a));
+    const relatedCards = cards.filter((card) => cardMatchesEntity(card, ent));
+    const latestAlert = entityAlerts[0];
+    const latestCard = relatedCards[0];
+
+    return {
+      id: ent.id,
+      name: ent.name,
+      active: isEntityLit(ent, unread, cards),
+      signalCount: entityAlerts.length,
+      urgentCount: entityAlerts.filter((alert) => alert.is_urgent).length,
+      changeCount: entityAlerts.filter(
+        (alert) => alert.is_material_change && !isDecisionTouch(alert),
+      ).length,
+      decisionCount: entityAlerts.filter((alert) => isDecisionTouch(alert)).length,
+      latestSignal: latestAlert
+        ? (latestAlert.why_it_matters
+          || latestAlert.what_changed
+          || latestAlert.summary
+          || latestAlert.title).trim()
+        : latestCard?.why || null,
+      cardIds: relatedCards.map((card) => card.id),
+      reviewHref: relatedCards.find((card) => card.readHref)?.readHref || null,
+      askHref: latestCard?.askHref || askUrl({ title: ent.name }),
+      networkHref: `/graph?node=${encodeURIComponent(ent.id)}`,
+    };
+  });
 
   let line = "Nothing needs you yet.";
   if (input.generating) line = "Briefly is reading your world.";

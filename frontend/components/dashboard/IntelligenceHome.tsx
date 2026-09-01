@@ -30,6 +30,7 @@ export function IntelligenceHome({
   const [loadError, setLoadError] = useState(false);
   const [setupWarning, setSetupWarning] = useState("");
   const [restOpen, setRestOpen] = useState(true);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const userToggledRest = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -76,8 +77,18 @@ export function IntelligenceHome({
   }
 
   const model = buildMorningPulse({ digest, alerts, entities, generating });
+  const selectedNode = model.nodes.find((node) => node.id === selectedEntityId) || null;
+  const visibleCards = selectedNode
+    ? model.cards.filter((card) => selectedNode.cardIds.includes(card.id))
+    : model.cards;
   const scanState = scanning ? "loading" : scanError ? "error" : undefined;
   const briefCount = digest?.items?.length ?? 0;
+
+  useEffect(() => {
+    if (selectedEntityId && !model.nodes.some((node) => node.id === selectedEntityId)) {
+      setSelectedEntityId(null);
+    }
+  }, [model.nodes, selectedEntityId]);
 
   useEffect(() => {
     if (userToggledRest.current) return;
@@ -101,16 +112,30 @@ export function IntelligenceHome({
           nodes={model.nodes}
           connectionLabel={model.connectionLabel}
           generating={generating}
+          selectedNodeId={selectedEntityId}
+          onSelectNode={(nodeId) => {
+            setSelectedEntityId((current) => current === nodeId ? null : nodeId);
+          }}
+          onClearSelection={() => setSelectedEntityId(null)}
         />
 
-        {model.cards.length > 0 ? (
-          <ul className="intel-stack-list">
-            {model.cards.map((obj) => (
+        {visibleCards.length > 0 ? (
+          <ul
+            id="dashboard-intelligence-list"
+            className="intel-stack-list"
+            aria-label={selectedNode ? `Intelligence connected to ${selectedNode.name}` : undefined}
+          >
+            {visibleCards.map((obj) => (
               <li key={obj.id}>
                 <IntelligenceCard object={obj} />
               </li>
             ))}
           </ul>
+        ) : selectedNode ? (
+          <p className="intel-quiet" role="status">
+            No featured intelligence card is attached to {selectedNode.name} today. Its latest
+            monitoring signal is summarized above.
+          </p>
         ) : (
           !generating && !loadError && (
             <p className="intel-quiet">

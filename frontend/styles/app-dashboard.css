@@ -12083,8 +12083,8 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 }
 
 /* Hallmark · component: morning-pulse-world · genre: editorial · theme: design.md Art Deco (locked)
- * redesign: connection ledger — central axis, plain entity labels, every relationship visible
- * states: default · loading · active-signal · quiet
+ * redesign: interactive connection ledger — every relationship visible, evidence on selection
+ * states: default · hover · focus · active · disabled · loading · error · success
  * contrast: pass (40–41) · honest: pass (46) · chrome: pass (47) · tokens: pass (48)
  * responsive: pass (49) · mobile: pass (34, 49, 50–57) · icons: pass (30)
  * Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5
@@ -12218,6 +12218,11 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   color: var(--app-muted);
 }
 
+.pulse-field-wrap {
+  width: 100%;
+  min-width: 0;
+}
+
 .pulse-field {
   position: relative;
   width: 100%;
@@ -12307,12 +12312,31 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   background: var(--app-brand);
 }
 
+.pulse-field-edge.is-selected {
+  height: 2px;
+  background: var(--app-ink);
+}
+
 .pulse-field-entity {
+  appearance: none;
   display: flex;
+  width: 100%;
+  min-height: 3rem;
   min-width: 0;
+  margin: 0;
+  border: 0;
+  border-radius: var(--app-radius-sm);
+  background: transparent;
   flex-direction: column;
+  justify-content: center;
   gap: 0.125rem;
-  color: var(--app-muted);
+  font: inherit;
+  color: var(--app-ink-secondary);
+  cursor: pointer;
+  transition:
+    color var(--app-dur) var(--app-ease),
+    opacity var(--app-dur) var(--app-ease),
+    transform var(--app-dur) var(--app-ease);
 }
 
 .pulse-field-entity.is-left {
@@ -12331,7 +12355,38 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   color: var(--app-ink);
 }
 
+.pulse-field-entity.is-selected .pulse-field-entity-name {
+  text-decoration: underline;
+  text-decoration-color: var(--app-brand);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.125rem;
+}
+
+.pulse-field-entity:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 2px;
+}
+
+.pulse-field-entity:active {
+  transform: translateY(1px);
+}
+
+.pulse-field-entity:disabled,
+.pulse-field-entity[data-state="loading"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pulse-field-entity[data-state="error"] {
+  color: var(--app-danger-fg);
+}
+
+.pulse-field-entity[data-state="success"] .pulse-field-entity-state {
+  color: var(--app-ink-secondary);
+}
+
 .pulse-field-entity-name {
+  width: 100%;
   font-family: var(--font-sans), system-ui, sans-serif;
   font-size: 0.875rem;
   font-weight: 600;
@@ -12339,23 +12394,172 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   letter-spacing: -0.01em;
   line-height: 1.2;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pulse-field-entity-state {
+  width: 100%;
   font-family: var(--font-sans), system-ui, sans-serif;
   font-size: 0.6875rem;
   line-height: 1.2;
-  color: var(--app-muted);
+  color: var(--app-ink-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pulse-field-entity.is-on .pulse-field-entity-state {
   color: var(--app-chip-brand-fg);
 }
 
+.pulse-selection {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.5rem;
+  align-items: end;
+  padding: 1rem 0 0.75rem;
+  border-block-end: 1px solid var(--app-border);
+}
+
+.pulse-selection-copy {
+  display: flex;
+  min-width: 0;
+  max-width: 46rem;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pulse-selection-name,
+.pulse-selection-summary,
+.pulse-selection-reason {
+  margin: 0;
+}
+
+.pulse-selection-name {
+  font-family: var(--font-art-deco), var(--font-serif), Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-style: normal;
+  line-height: 1.2;
+  color: var(--app-ink);
+  overflow-wrap: anywhere;
+}
+
+.pulse-selection-summary {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  color: var(--app-chip-brand-fg);
+}
+
+.pulse-selection-reason {
+  max-width: 68ch;
+  padding-block-start: 0.25rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--app-ink-secondary);
+}
+
+.pulse-selection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.pulse-selection-action {
+  appearance: none;
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.75rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--app-ink-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--app-dur) var(--app-ease),
+    background-color var(--app-dur) var(--app-ease),
+    opacity var(--app-dur) var(--app-ease),
+    transform var(--app-dur) var(--app-ease);
+}
+
+.pulse-selection-action.is-primary {
+  border-color: var(--app-accent);
+  background: var(--app-accent);
+  color: var(--app-on-accent);
+}
+
+.pulse-selection-action:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 2px;
+}
+
+.pulse-selection-action:active {
+  transform: translateY(1px);
+}
+
+.pulse-selection-action:disabled,
+.pulse-selection-action[aria-disabled="true"],
+.pulse-selection-action[data-state="loading"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pulse-selection-action[data-state="error"] {
+  border-color: var(--app-danger-border);
+  color: var(--app-danger-fg);
+}
+
+.pulse-selection-action[data-state="success"] {
+  border-color: var(--app-success-fg);
+  color: var(--app-success-fg);
+}
+
+@media (hover: hover) {
+  .pulse-field-entity:not(:disabled):hover {
+    color: var(--app-ink);
+  }
+
+  .pulse-field-entity:not(:disabled):hover .pulse-field-entity-state {
+    color: var(--app-ink-secondary);
+  }
+
+  .pulse-selection-action:not(:disabled):hover {
+    background: var(--app-surface-muted);
+    color: var(--app-ink);
+  }
+
+  .pulse-selection-action.is-primary:hover {
+    background: var(--app-ink);
+    border-color: var(--app-ink);
+    color: var(--app-on-accent);
+  }
+}
+
 @media (max-width: 40rem) {
   .pulse-world {
     padding: 1rem;
+  }
+
+  .pulse-selection {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .pulse-selection-actions {
+    justify-content: flex-start;
   }
 }
 
@@ -12415,6 +12619,7 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   .pulse-field-entity.is-left,
   .pulse-field-entity.is-right {
     position: relative;
+    width: 100%;
     align-items: flex-start;
     padding-inline: 0;
     text-align: left;
@@ -12431,6 +12636,20 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 
   .pulse-field-entity.is-on::before {
     border-color: var(--app-brand);
+  }
+
+  .pulse-field-entity.is-selected::before {
+    border-color: var(--app-ink);
+    border-block-start-width: 2px;
+  }
+
+  .pulse-selection-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pulse-selection-action {
+    width: 100%;
   }
 }
 
@@ -12885,6 +13104,8 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 
   .glance-card-hit,
   .glance-card-btn,
+  .pulse-field-entity,
+  .pulse-selection-action,
   .intel-scan,
   .intel-rest-summary {
     transition: none;
@@ -12894,6 +13115,8 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   .glance-card-hit.is-active,
   .glance-card-btn:active,
   .glance-card-btn.is-active,
+  .pulse-field-entity:active,
+  .pulse-selection-action:active,
   .intel-scan:active,
   .intel-scan.is-active,
   .intel-rest-summary:active,
