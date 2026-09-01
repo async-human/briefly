@@ -12083,7 +12083,7 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 }
 
 /* Hallmark · component: morning-pulse-world · genre: editorial · theme: design.md Art Deco (locked)
- * redesign: intelligence field — nested orbits, anchored entity capsules, one meaningful connection
+ * redesign: connection ledger — central axis, plain entity labels, every relationship visible
  * states: default · loading · active-signal · quiet
  * contrast: pass (40–41) · honest: pass (46) · chrome: pass (47) · tokens: pass (48)
  * responsive: pass (49) · mobile: pass (34, 49, 50–57) · icons: pass (30)
@@ -12221,40 +12221,18 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 .pulse-field {
   position: relative;
   width: 100%;
-  height: clamp(15rem, 23vw, 18rem);
-  margin: 0.7rem 0 0.55rem;
+  height: clamp(12rem, 18vw, 14rem);
+  margin: 0.75rem 0 0.5rem;
   overflow: hidden;
   border-block: 1px solid var(--app-border);
 }
 
-.pulse-field-map {
+.pulse-field-axis {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.pulse-field-orbit {
-  fill: none;
-  stroke: var(--app-border-strong);
-  stroke-width: 1;
-  stroke-dasharray: 3 9;
-  vector-effect: non-scaling-stroke;
-}
-
-.pulse-field-orbit-inner {
-  stroke-opacity: 0.72;
-  stroke-dasharray: 2 12;
-}
-
-.pulse-field-connection {
-  fill: none;
-  stroke: var(--app-brand);
-  stroke-width: 1.35;
-  stroke-linecap: round;
-  stroke-opacity: 0.72;
-  vector-effect: non-scaling-stroke;
+  inset-block: 1rem;
+  inset-inline-start: 50%;
+  z-index: 1;
+  border-inline-start: 1px solid var(--app-border-strong);
 }
 
 .pulse-field-core {
@@ -12264,56 +12242,30 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   z-index: 2;
   transform: translate(-50%, -50%);
   display: flex;
-  width: 8.5rem;
-  min-height: 8.5rem;
-  padding: 1rem;
+  width: 8rem;
+  padding: 0.75rem 0.5rem;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.2rem;
-  border: 1px solid var(--app-border-strong);
-  border-radius: 50%;
+  gap: 0.25rem;
+  border-block: 1px solid var(--app-border-strong);
   background: var(--app-surface);
   color: var(--app-ink);
   text-align: center;
 }
 
-.pulse-field-core::before,
-.pulse-field-core::after {
-  content: "";
-  position: absolute;
-  inset: 0.48rem;
-  border: 1px solid var(--app-border);
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.pulse-field-core::after {
-  inset: -0.45rem;
-  border-style: dashed;
-  border-color: var(--app-border-strong);
-}
-
-.pulse-field-core-mark {
-  width: 0.48rem;
-  height: 0.48rem;
-  margin-bottom: 0.25rem;
-  transform: rotate(45deg);
-  background: var(--app-brand);
-}
-
 .pulse-field-core-name {
   font-family: var(--font-art-deco), var(--font-serif), Georgia, serif;
-  font-size: clamp(1.35rem, 2.4vw, 1.7rem);
+  font-size: clamp(1.2rem, 2vw, 1.5rem);
   font-weight: 600;
   font-style: normal;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.025em;
   line-height: 1.1;
   white-space: nowrap;
 }
 
 .pulse-field-core-state {
-  max-width: 6.5rem;
+  max-width: 7rem;
   font-family: var(--font-sans), system-ui, sans-serif;
   font-size: 0.625rem;
   font-weight: 500;
@@ -12321,85 +12273,101 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   color: var(--app-muted);
 }
 
-.pulse-field.is-thinking .pulse-field-core-mark {
+.pulse-field.is-thinking .pulse-field-core-state {
   animation: pulse-think 2.8s var(--app-ease) infinite;
 }
 
-.pulse-field-entity {
+.pulse-field-rows {
   position: absolute;
-  z-index: 3;
-  transform: translate(-50%, -50%);
+  inset: 1rem 0;
+  z-index: 1;
   display: flex;
-  min-width: 8rem;
-  max-width: 12rem;
-  padding: 0.58rem 0.7rem;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.pulse-field-row {
+  display: grid;
+  min-height: 4rem;
+  grid-template-columns:
+    minmax(7rem, 0.8fr)
+    minmax(2rem, 1fr)
+    1px
+    minmax(2rem, 1fr)
+    minmax(7rem, 0.8fr);
   align-items: center;
-  gap: 0.55rem;
-  border: 1px solid var(--app-border-strong);
-  border-radius: var(--app-radius-sm);
-  background: var(--app-surface);
-  color: var(--app-ink-secondary);
 }
 
-.pulse-field-entity.is-on {
-  border-color: color-mix(in srgb, var(--app-brand) 54%, var(--app-border-strong));
-  color: var(--app-ink);
+.pulse-field-edge {
+  height: 1px;
+  background: var(--app-border-strong);
 }
 
-.pulse-field-entity-dot {
-  width: 0.42rem;
-  height: 0.42rem;
-  flex: 0 0 auto;
-  border: 1px solid var(--app-border-strong);
-  border-radius: 50%;
-  background: var(--app-surface-muted);
-}
-
-.pulse-field-entity.is-on .pulse-field-entity-dot {
-  border-color: var(--app-brand);
+.pulse-field-edge.is-on {
   background: var(--app-brand);
 }
 
-.pulse-field-entity-copy {
+.pulse-field-entity {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 0.08rem;
+  gap: 0.125rem;
+  color: var(--app-muted);
+}
+
+.pulse-field-entity.is-left {
+  align-items: flex-end;
+  padding-inline-end: 0.75rem;
+  text-align: right;
+}
+
+.pulse-field-entity.is-right {
+  align-items: flex-start;
+  padding-inline-start: 0.75rem;
+  text-align: left;
+}
+
+.pulse-field-entity.is-on {
+  color: var(--app-ink);
 }
 
 .pulse-field-entity-name {
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   font-weight: 600;
   font-style: normal;
   letter-spacing: -0.01em;
   line-height: 1.2;
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
 .pulse-field-entity-state {
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.2;
   color: var(--app-muted);
+}
+
+.pulse-field-entity.is-on .pulse-field-entity-state {
+  color: var(--app-chip-brand-fg);
 }
 
 @media (max-width: 40rem) {
   .pulse-world {
     padding: 1rem;
   }
+}
 
+@media (max-width: 32rem) {
   .pulse-field {
-    display: grid;
     height: auto;
     min-height: 0;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
-    padding: 0.65rem;
+    padding-block: 0.75rem;
     overflow: visible;
   }
 
-  .pulse-field-map {
+  .pulse-field-axis {
     display: none;
   }
 
@@ -12407,45 +12375,62 @@ body[data-app-theme="dark"] .upgrade-modal-error {
     position: relative;
     left: auto;
     top: auto;
-    grid-column: 1 / -1;
-    width: auto;
-    min-height: 4.5rem;
-    padding: 0.75rem 1rem;
+    width: 100%;
+    padding: 0 0 0.75rem;
+    align-items: flex-start;
     transform: none;
-    border-radius: var(--app-radius-sm);
+    border-block-start: 0;
+    text-align: left;
   }
 
-  .pulse-field-core::before,
-  .pulse-field-core::after {
+  .pulse-field-rows {
+    position: relative;
+    inset: auto;
+    display: block;
+    padding: 0.25rem 0 0.25rem 1.25rem;
+  }
+
+  .pulse-field-rows::before {
+    content: "";
+    position: absolute;
+    inset-block: 0.75rem;
+    inset-inline-start: 0.25rem;
+    border-inline-start: 1px solid var(--app-border-strong);
+  }
+
+  .pulse-field-row {
+    display: flex;
+    min-height: 0;
+    padding-block: 0.75rem;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .pulse-field-edge,
+  .pulse-field-axis-gap,
+  .pulse-field-entity.is-empty {
     display: none;
   }
 
-  .pulse-field-core-mark {
-    margin-bottom: 0.1rem;
-  }
-
-  .pulse-field-entity {
+  .pulse-field-entity.is-left,
+  .pulse-field-entity.is-right {
     position: relative;
-    left: auto !important;
-    top: auto !important;
-    width: auto;
-    min-width: 0;
-    max-width: none;
-    transform: none;
+    align-items: flex-start;
+    padding-inline: 0;
+    text-align: left;
   }
 
-  .pulse-field-entity-name {
-    font-size: 0.75rem;
+  .pulse-field-entity:not(.is-empty)::before {
+    content: "";
+    position: absolute;
+    top: 0.5rem;
+    inset-inline-start: -1rem;
+    width: 0.75rem;
+    border-block-start: 1px solid var(--app-border-strong);
   }
-}
 
-@media (max-width: 22rem) {
-  .pulse-field {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .pulse-field-core {
-    grid-column: 1;
+  .pulse-field-entity.is-on::before {
+    border-color: var(--app-brand);
   }
 }
 
@@ -12894,7 +12879,7 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulse-field.is-thinking .pulse-field-core-mark {
+  .pulse-field.is-thinking .pulse-field-core-state {
     animation: none;
   }
 
