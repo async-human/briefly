@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-09-01",
+    "scope": "app-component",
+    "target": "frontend dashboard Your world graph",
+    "verb": "redesign",
+    "macrostructure": "Workbench · compact intelligence field",
+    "theme": "custom Art Deco app system (design.md, locked)",
+    "theme_axes": "light / classical-serif / warm-gold",
+    "enrichment": "none",
+    "motion": "active-connection · reading-mark",
+    "brief": "Replaced the oversized all-spokes graph with nested orbits, anchored entity capsules, one meaningful active connection, honest status copy, and a responsive list fallback."
+  },
+  {
     "date": "2026-08-31",
     "scope": "app-page",
     "target": "frontend dashboard glance",

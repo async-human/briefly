@@ -1,6 +1,7 @@
 "use client";
 
-import { countPhrase, type PulseNode } from "@/lib/intelligenceHome";
+import type { CSSProperties } from "react";
+import { countPhrase, shortLabel, type PulseNode } from "@/lib/intelligenceHome";
 
 type MorningPulseProps = {
   greeting: string;
@@ -14,15 +15,23 @@ type MorningPulseProps = {
   generating?: boolean;
 };
 
-/** Composed seats around the core — not a regular orbit, so 4 names don't become a plus. */
+/** Balanced seats around the monitoring core. Mobile CSS turns these into a list. */
 const SEATS: Array<{ x: number; y: number }> = [
-  { x: 18, y: 18 },
-  { x: 82, y: 20 },
-  { x: 14, y: 78 },
-  { x: 86, y: 76 },
-  { x: 8, y: 48 },
-  { x: 92, y: 50 },
+  { x: 22, y: 25 },
+  { x: 78, y: 25 },
+  { x: 18, y: 72 },
+  { x: 82, y: 72 },
+  { x: 50, y: 12 },
+  { x: 50, y: 86 },
 ];
+
+function connectionPath(x: number, y: number): string {
+  const targetX = x * 10;
+  const targetY = y * 3.2;
+  const controlX = 500 + (targetX - 500) * 0.52;
+  const controlY = 160 + (targetY - 160) * 0.32;
+  return `M 500 160 Q ${controlX.toFixed(1)} ${controlY.toFixed(1)} ${targetX.toFixed(1)} ${targetY.toFixed(1)}`;
+}
 
 export function MorningPulse({
   greeting,
@@ -32,6 +41,7 @@ export function MorningPulse({
   decisionCount,
   urgentCount,
   nodes,
+  connectionLabel,
   generating,
 }: MorningPulseProps) {
   const overnight = countPhrase(
@@ -39,6 +49,13 @@ export function MorningPulse({
     "1 change today",
     `${changeCount} changes today`,
   );
+  const worldStatus = changeCount > 0
+    ? overnight
+    : urgentCount > 0
+      ? countPhrase(urgentCount, "1 urgent signal", `${urgentCount} urgent signals`)
+      : decisionCount > 0
+        ? countPhrase(decisionCount, "1 decision in focus", `${decisionCount} decisions in focus`)
+        : "Quiet so far";
 
   return (
     <header className="pulse">
@@ -63,9 +80,13 @@ export function MorningPulse({
       <article className="pulse-world">
         <header className="pulse-world-head">
           <h3 className="pulse-world-title">Your world</h3>
-          <p className="pulse-world-meta">{changeCount > 0 ? overnight : "Quiet so far"}</p>
+          <p className="pulse-world-meta">{worldStatus}</p>
         </header>
-        <PulsePlate nodes={nodes} generating={Boolean(generating)} />
+        <PulseField
+          nodes={nodes}
+          connectionLabel={connectionLabel}
+          generating={Boolean(generating)}
+        />
         <p className="pulse-world-note">
           Only changed or decision-relevant areas are emphasized.
         </p>
@@ -74,11 +95,13 @@ export function MorningPulse({
   );
 }
 
-function PulsePlate({
+function PulseField({
   nodes,
+  connectionLabel,
   generating,
 }: {
   nodes: PulseNode[];
+  connectionLabel: string | null;
   generating: boolean;
 }) {
   const litCount = nodes.filter((n) => n.active).length;
@@ -86,38 +109,53 @@ function PulsePlate({
     ...node,
     ...SEATS[i],
   }));
+  const focusNode = placed.find((node) => node.active);
 
   return (
     <div
-      className={`pulse-plate${generating ? " is-thinking" : ""}`}
+      className={`pulse-field${generating ? " is-thinking" : ""}`}
       role="img"
       aria-label={
         litCount > 0
-          ? `Your world, with ${litCount} tracked ${litCount === 1 ? "name" : "names"} emphasized`
-          : "Your tracked world"
+          ? `Your world. ${litCount} of ${placed.length} tracked ${placed.length === 1 ? "entity is" : "entities are"} in focus.`
+          : `Your world. Monitoring ${placed.length} tracked ${placed.length === 1 ? "entity" : "entities"}.`
       }
     >
-      <svg className="pulse-plate-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-        {placed.map((n) => (
-          <line
-            key={n.id}
-            className={n.active ? "is-on" : undefined}
-            x1="50"
-            y1="50"
-            x2={n.x}
-            y2={n.y}
+      <svg className="pulse-field-map" viewBox="0 0 1000 320" preserveAspectRatio="none" aria-hidden>
+        <ellipse className="pulse-field-orbit pulse-field-orbit-outer" cx="500" cy="160" rx="390" ry="118" />
+        <ellipse className="pulse-field-orbit pulse-field-orbit-inner" cx="500" cy="160" rx="250" ry="72" />
+        {focusNode ? (
+          <path
+            className="pulse-field-connection"
+            d={connectionPath(focusNode.x, focusNode.y)}
           />
-        ))}
+        ) : null}
       </svg>
-      <span className="pulse-plate-core">Briefly</span>
-      {placed.map((n) => (
-        <span
-          key={n.id}
-          className={`pulse-plate-name${n.active ? " is-on" : ""}`}
-          style={{ left: `${n.x}%`, top: `${n.y}%` }}
-        >
-          {n.name}
+
+      <div className="pulse-field-core">
+        <span className="pulse-field-core-mark" aria-hidden />
+        <span className="pulse-field-core-name">Briefly</span>
+        <span className="pulse-field-core-state">
+          {generating
+            ? "Reading your world"
+            : connectionLabel
+              ? `Connected to ${shortLabel(connectionLabel, 24)}`
+              : "Monitoring quietly"}
         </span>
+      </div>
+
+      {placed.map((n) => (
+        <div
+          key={n.id}
+          className={`pulse-field-entity${n.active ? " is-on" : ""}`}
+          style={{ left: `${n.x}%`, top: `${n.y}%` } as CSSProperties}
+        >
+          <span className="pulse-field-entity-dot" aria-hidden />
+          <span className="pulse-field-entity-copy">
+            <span className="pulse-field-entity-name">{shortLabel(n.name, 22)}</span>
+            <span className="pulse-field-entity-state">{n.active ? "In focus" : "Watching"}</span>
+          </span>
+        </div>
       ))}
     </div>
   );

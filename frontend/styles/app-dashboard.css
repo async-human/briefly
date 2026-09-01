@@ -12083,9 +12083,10 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 }
 
 /* Hallmark · component: morning-pulse-world · genre: editorial · theme: design.md Art Deco (locked)
- * redesign: type plate — HTML names, straight hairlines, no orbit/dots
- * states: default · hover · focus · active · disabled · loading · error · success
- * contrast: pass
+ * redesign: intelligence field — nested orbits, anchored entity capsules, one meaningful connection
+ * states: default · loading · active-signal · quiet
+ * contrast: pass (40–41) · honest: pass (46) · chrome: pass (47) · tokens: pass (48)
+ * responsive: pass (49) · mobile: pass (34, 49, 50–57) · icons: pass (30)
  * Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5
  */
 
@@ -12217,98 +12218,234 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   color: var(--app-muted);
 }
 
-.pulse-plate {
+.pulse-field {
   position: relative;
   width: 100%;
-  min-height: 14rem;
-  aspect-ratio: 2.35 / 1;
-  max-height: 20rem;
+  height: clamp(15rem, 23vw, 18rem);
+  margin: 0.7rem 0 0.55rem;
+  overflow: hidden;
+  border-block: 1px solid var(--app-border);
 }
 
-.pulse-plate-lines {
+.pulse-field-map {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  overflow: visible;
 }
 
-.pulse-plate-lines line {
-  stroke: var(--app-ink);
-  stroke-opacity: 0.12;
+.pulse-field-orbit {
+  fill: none;
+  stroke: var(--app-border-strong);
   stroke-width: 1;
+  stroke-dasharray: 3 9;
   vector-effect: non-scaling-stroke;
 }
 
-.pulse-plate-lines line.is-on {
-  stroke: var(--app-brand);
-  stroke-opacity: 0.55;
+.pulse-field-orbit-inner {
+  stroke-opacity: 0.72;
+  stroke-dasharray: 2 12;
 }
 
-.pulse-plate-core {
+.pulse-field-connection {
+  fill: none;
+  stroke: var(--app-brand);
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-opacity: 0.72;
+  vector-effect: non-scaling-stroke;
+}
+
+.pulse-field-core {
   position: absolute;
   left: 50%;
   top: 50%;
-  z-index: 1;
+  z-index: 2;
   transform: translate(-50%, -50%);
-  padding: 0.15rem 0.55rem;
+  display: flex;
+  width: 8.5rem;
+  min-height: 8.5rem;
+  padding: 1rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: 50%;
   background: var(--app-surface);
-  font-family: var(--font-art-deco), var(--font-serif), Georgia, serif;
-  font-size: clamp(1.15rem, 2.4vw, 1.5rem);
-  font-weight: 600;
-  font-style: normal;
-  letter-spacing: 0.04em;
-  line-height: 1.1;
   color: var(--app-ink);
-  white-space: nowrap;
-}
-
-.pulse-plate.is-thinking .pulse-plate-core {
-  animation: pulse-think 2.8s var(--app-ease) infinite;
-}
-
-.pulse-plate-name {
-  position: absolute;
-  z-index: 1;
-  transform: translate(-50%, -50%);
-  max-width: 11rem;
-  padding: 0.12rem 0.4rem;
-  background: var(--app-surface);
-  font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  font-style: normal;
-  letter-spacing: 0.04em;
-  line-height: 1.3;
-  color: var(--app-ink-secondary);
   text-align: center;
-  overflow-wrap: anywhere;
 }
 
-.pulse-plate-name.is-on {
-  color: var(--app-ink);
-}
-
-.pulse-plate-name.is-on::after {
+.pulse-field-core::before,
+.pulse-field-core::after {
   content: "";
-  display: block;
-  width: 0.85rem;
-  height: 1px;
-  margin: 0.28rem auto 0;
+  position: absolute;
+  inset: 0.48rem;
+  border: 1px solid var(--app-border);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.pulse-field-core::after {
+  inset: -0.45rem;
+  border-style: dashed;
+  border-color: var(--app-border-strong);
+}
+
+.pulse-field-core-mark {
+  width: 0.48rem;
+  height: 0.48rem;
+  margin-bottom: 0.25rem;
+  transform: rotate(45deg);
   background: var(--app-brand);
 }
 
+.pulse-field-core-name {
+  font-family: var(--font-art-deco), var(--font-serif), Georgia, serif;
+  font-size: clamp(1.35rem, 2.4vw, 1.7rem);
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.pulse-field-core-state {
+  max-width: 6.5rem;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.625rem;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--app-muted);
+}
+
+.pulse-field.is-thinking .pulse-field-core-mark {
+  animation: pulse-think 2.8s var(--app-ease) infinite;
+}
+
+.pulse-field-entity {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  display: flex;
+  min-width: 8rem;
+  max-width: 12rem;
+  padding: 0.58rem 0.7rem;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid var(--app-border-strong);
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface);
+  color: var(--app-ink-secondary);
+}
+
+.pulse-field-entity.is-on {
+  border-color: color-mix(in srgb, var(--app-brand) 54%, var(--app-border-strong));
+  color: var(--app-ink);
+}
+
+.pulse-field-entity-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--app-border-strong);
+  border-radius: 50%;
+  background: var(--app-surface-muted);
+}
+
+.pulse-field-entity.is-on .pulse-field-entity-dot {
+  border-color: var(--app-brand);
+  background: var(--app-brand);
+}
+
+.pulse-field-entity-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.08rem;
+}
+
+.pulse-field-entity-name {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.pulse-field-entity-state {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.625rem;
+  line-height: 1.2;
+  color: var(--app-muted);
+}
+
 @media (max-width: 40rem) {
-  .pulse-plate {
-    aspect-ratio: 1.35 / 1;
-    min-height: 16rem;
-    max-height: none;
+  .pulse-world {
+    padding: 1rem;
   }
 
-  .pulse-plate-name {
+  .pulse-field {
+    display: grid;
+    height: auto;
+    min-height: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding: 0.65rem;
+    overflow: visible;
+  }
+
+  .pulse-field-map {
+    display: none;
+  }
+
+  .pulse-field-core {
+    position: relative;
+    left: auto;
+    top: auto;
+    grid-column: 1 / -1;
+    width: auto;
+    min-height: 4.5rem;
+    padding: 0.75rem 1rem;
+    transform: none;
+    border-radius: var(--app-radius-sm);
+  }
+
+  .pulse-field-core::before,
+  .pulse-field-core::after {
+    display: none;
+  }
+
+  .pulse-field-core-mark {
+    margin-bottom: 0.1rem;
+  }
+
+  .pulse-field-entity {
+    position: relative;
+    left: auto !important;
+    top: auto !important;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    transform: none;
+  }
+
+  .pulse-field-entity-name {
     font-size: 0.75rem;
-    max-width: 7.5rem;
+  }
+}
+
+@media (max-width: 22rem) {
+  .pulse-field {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pulse-field-core {
+    grid-column: 1;
   }
 }
 
@@ -12757,7 +12894,7 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulse-plate.is-thinking .pulse-plate-core {
+  .pulse-field.is-thinking .pulse-field-core-mark {
     animation: none;
   }
 
