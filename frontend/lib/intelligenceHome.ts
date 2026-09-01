@@ -55,6 +55,7 @@ export type MorningPulseModel = {
 
 const MAX_CARDS = 3;
 const MAX_NODES = 6;
+const NEGATIVE_SIGNAL_LABELS = new Set(["irrelevant", "duplicate", "incorrect"]);
 
 const DOWN_RE = /\b(cut|lower|drop|declin|reduc|fell|fall|cheaper|discount|slash|down)\b/i;
 const UP_RE = /\b(rais|increas|hike|surge|higher|climbed)\b/i;
@@ -137,12 +138,7 @@ function metricFor(args: {
       }
       return null;
     }
-    const fromText = extractPercentDelta(
-      args.previousState,
-      args.newState,
-      args.title,
-      args.why,
-    );
+    const fromText = extractPercentDelta(args.newState);
     if (fromText) {
       if (args.detector === "pricing_positioning") fromText.hint = "pricing";
       if (args.detector === "model_api" && fromText.hint === "change") fromText.hint = "API";
@@ -226,7 +222,11 @@ function itemMatchingAlert(digest: Digest | null, alert: WatchedAlert): DigestIt
 function fromAlert(alert: WatchedAlert, digest: Digest | null): IntelligenceObject {
   const thread = threadOf(alert);
   const isDecision = isDecisionTouch(alert);
-  const kind: IntelKind = isDecision ? "decision" : alert.detector_type ? "change" : "pattern";
+  const kind: IntelKind = isDecision
+    ? "decision"
+    : alert.is_material_change
+      ? "change"
+      : "pattern";
   const why = (alert.why_it_matters || alert.what_changed || "").trim();
   const match = itemMatchingAlert(digest, alert);
   const digestId = digest?.id ?? null;
@@ -280,7 +280,13 @@ function fromItem(item: DigestItem, digestId: string): IntelligenceObject {
   const thread = threadOf(item);
   const isDecision = isDecisionTouch(item) || Boolean(item.contradiction_flag || item.evolution_note);
   const isPattern = !isDecision && (item.duplicate_count || 0) > 1;
-  const kind: IntelKind = isDecision ? "decision" : isPattern ? "pattern" : "change";
+  const kind: IntelKind = isDecision
+    ? "decision"
+    : isPattern
+      ? "pattern"
+      : item.is_material_change
+        ? "change"
+        : "pattern";
   const detector = detectorLabel(item.detector_type);
   const why = (item.why_it_matters || item.summary || "").trim();
   const connected =
@@ -333,26 +339,44 @@ function pickCards(
   alerts: WatchedAlert[],
   digest: Digest | null,
 ): IntelligenceObject[] {
-  const unread = alerts.filter((a) => !a.is_read);
-  const fromWatch = unread.slice(0, 3).map((a) => fromAlert(a, digest));
+  const unread = alerts.filter(
+    (a) => !a.is_read && !NEGATIVE_SIGNAL_LABELS.has(a.signal_label || ""),
+  );
+  const fromWatch = unread
+    .map((a) => fromAlert(a, digest))
+    .filter((card) => card.kind === "decision" || card.kind === "change" || (card.corroborating || 0) > 1)
+    .sort((a, b) => cardPriority(b) - cardPriority(a));
   const items = digest?.items ?? [];
+  const visibleItems = items.filter(
+    (item) => !NEGATIVE_SIGNAL_LABELS.has(item.signal_label || ""),
+  );
   const digestId = digest?.id;
   const threadDecisions = digestId
-    ? items.filter((i) => isDecisionTouch(i)).map((i) => fromItem(i, digestId))
+    ? visibleItems.filter((i) => isDecisionTouch(i)).map((i) => fromItem(i, digestId))
     : [];
   const decisions = digestId
-    ? items.filter((i) => i.contradiction_flag || i.evolution_note).map((i) => fromItem(i, digestId))
+    ? visibleItems.filter((i) => i.contradiction_flag || i.evolution_note).map((i) => fromItem(i, digestId))
     : [];
   const patterned = digestId
-    ? items.filter((i) => (i.duplicate_count || 0) > 1).map((i) => fromItem(i, digestId))
+    ? visibleItems.filter((i) => (i.duplicate_count || 0) > 1).map((i) => fromItem(i, digestId))
     : [];
-  const rest = digestId ? items.map((i) => fromItem(i, digestId)) : [];
+  const rest = digestId
+    ? visibleItems
+        .filter(
+          (i) => isDecisionTouch(i)
+            || Boolean(i.contradiction_flag || i.evolution_note)
+            || Boolean(i.is_material_change)
+            || (i.duplicate_count || 0) > 1,
+        )
+        .map((i) => fromItem(i, digestId))
+        .sort((a, b) => cardPriority(b) - cardPriority(a))
+    : [];
 
   const picked: IntelligenceObject[] = [];
   const seen = new Set<string>();
   const take = (obj: IntelligenceObject | undefined) => {
     if (!obj || picked.length >= MAX_CARDS) return;
-    const key = obj.title.toLowerCase();
+    const key = obj.signalId ? `signal:${obj.signalId}` : `title:${obj.title.toLowerCase()}`;
     if (seen.has(key)) return;
     seen.add(key);
     picked.push(obj);
@@ -360,9 +384,20 @@ function pickCards(
 
   take(fromWatch.find((c) => c.kind === "change") || fromWatch[0]);
   take(threadDecisions[0] || decisions[0]);
-  take(patterned.find((c) => !seen.has(c.title.toLowerCase())) || fromWatch.find((c) => c.kind !== "change"));
+  take(patterned.find((c) => !seen.has(c.signalId ? `signal:${c.signalId}` : `title:${c.title.toLowerCase()}`)) || fromWatch.find((c) => c.kind !== "change"));
   for (const obj of [...fromWatch, ...rest]) take(obj);
   return picked;
+}
+
+function cardPriority(card: IntelligenceObject): number {
+  return (card.kind === "decision" ? 100 : card.kind === "change" ? 60 : 30)
+    + (card.urgent ? 30 : 0)
+    + Math.round((card.confidence || 0) * 10)
+    + Math.min(card.corroborating || 0, 5);
+}
+
+function uniqueCount<T>(rows: T[], keyOf: (row: T) => string): number {
+  return new Set(rows.map(keyOf).filter(Boolean)).size;
 }
 
 function isEntityLit(
@@ -387,17 +422,39 @@ export function buildMorningPulse(input: {
   generating: boolean;
 }): MorningPulseModel {
   const cards = pickCards(input.alerts, input.digest);
-  const unread = input.alerts.filter((a) => !a.is_read);
-  const changeCount = unread.length || cards.filter((c) => c.kind === "change").length;
-  const decisionCount =
-    (input.digest?.items ?? []).filter(
-      (i) => isDecisionTouch(i) || i.contradiction_flag || i.evolution_note,
-    ).length
-    || unread.filter((a) => isDecisionTouch(a)).length
-    || cards.filter((c) => c.kind === "decision").length;
+  const unread = input.alerts.filter(
+    (a) => !a.is_read && !NEGATIVE_SIGNAL_LABELS.has(a.signal_label || ""),
+  );
+  const materialAlerts = unread.filter((a) => a.is_material_change && !isDecisionTouch(a));
+  const materialItems = (input.digest?.items ?? []).filter(
+    (i) => i.is_material_change
+      && !isDecisionTouch(i)
+      && !NEGATIVE_SIGNAL_LABELS.has(i.signal_label || ""),
+  );
+  const changeCount = uniqueCount(
+    [...materialAlerts, ...materialItems],
+    (row) => row.signal_id || `title:${("title" in row ? row.title : row.headline).toLowerCase()}`,
+  );
+  const decisionRows = [
+    ...(input.digest?.items ?? []).filter(
+      (i) => !NEGATIVE_SIGNAL_LABELS.has(i.signal_label || "")
+        && (isDecisionTouch(i) || i.contradiction_flag || i.evolution_note),
+    ),
+    ...unread.filter((a) => isDecisionTouch(a)),
+  ];
+  const decisionCount = uniqueCount(
+    decisionRows,
+    (row) => row.decision_thread_id || row.signal_id || `decision:${"title" in row ? row.title : row.headline}`,
+  ) || uniqueCount(cards.filter((card) => card.kind === "decision"), (card) => card.id);
   const urgentCount = unread.filter((a) => a.is_urgent).length;
 
-  const nodes: PulseNode[] = input.entities.slice(0, MAX_NODES).map((ent) => ({
+  const rankedEntities = [...input.entities].sort((a, b) => {
+    const score = (ent: WatchedEntity) => unread.filter(
+      (alert) => alert.entity_id === ent.id && (alert.is_material_change || isDecisionTouch(alert)),
+    ).length;
+    return score(b) - score(a);
+  });
+  const nodes: PulseNode[] = rankedEntities.slice(0, MAX_NODES).map((ent) => ({
     id: ent.id,
     name: ent.name,
     active: isEntityLit(ent, unread, cards),

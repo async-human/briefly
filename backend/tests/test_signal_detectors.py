@@ -7,6 +7,7 @@ from briefly_api.services.signals.detectors import (
     DETECTOR_PRODUCT,
     classify_change,
 )
+from briefly_api.services.signals.persist import is_material_signal
 
 
 def test_pricing_change():
@@ -52,3 +53,18 @@ def test_unrelated_is_other():
     )
     assert result.detector_type == "other"
     assert result.confidence < 0.4
+
+
+def test_materiality_requires_confident_and_company_relevant_change():
+    base = {
+        "detector_type": DETECTOR_PRICING,
+        "detector_confidence": 0.8,
+        "relevance_score": 0.9,
+        "is_urgent": False,
+        "why_it_matters": "This changes our model economics.",
+    }
+    assert is_material_signal(**base)
+    assert not is_material_signal(**{**base, "relevance_score": 0.4})
+    assert not is_material_signal(**{**base, "detector_confidence": 0.4})
+    assert not is_material_signal(**{**base, "why_it_matters": ""})
+    assert is_material_signal(**{**base, "relevance_score": 0.4, "is_urgent": True})

@@ -6,7 +6,12 @@ instead of generic topic matching.
 """
 from __future__ import annotations
 
+import re
+import logging
+from dataclasses import dataclass
 from typing import Any
+
+log = logging.getLogger(__name__)
 
 CONTEXT_KEYS = (
     "company_name",
@@ -178,6 +183,34 @@ def distinctive_tokens(text: str) -> list[str]:
     return tokens
 
 
+_MATCH_NOISE = {
+    "change", "changed", "changes", "changing", "quarter", "today", "currently",
+    "consider", "decision", "decide",
+}
+
+
+def question_match_score(question: str, text: str) -> float:
+    """Conservative lexical relevance score for routing evidence to a question.
+
+    A generic single word must never attach evidence to a strategic decision.
+    Short one-concept questions can still match on one unusually specific term.
+    """
+    query = [token for token in distinctive_tokens(question) if token not in _MATCH_NOISE]
+    if not query:
+        return 0.0
+    haystack = set(re.findall(r"[a-z0-9][a-z0-9+#.-]*", (text or "").lower()))
+    matched = {token for token in query if token in haystack}
+    if len(query) == 1:
+        return 1.0 if len(query[0]) >= 8 and query[0] in matched else 0.0
+    if len(matched) < 2:
+        return 0.0
+    return len(matched) / len(set(query))
+
+
+def question_matches_text(question: str, text: str) -> bool:
+    return question_match_score(question, text) >= 0.4
+
+
 def questions_hit_by_text(ctx: dict[str, Any] | None, text: str) -> list[str]:
     """Return strategic questions whose distinctive words appear in text."""
     data = normalize_operating_context(ctx or {})
@@ -186,17 +219,22 @@ def questions_hit_by_text(ctx: dict[str, Any] | None, text: str) -> list[str]:
         return []
     hits: list[str] = []
     for question in data["strategic_questions"]:
-        tokens = distinctive_tokens(question)
-        if tokens and any(token in blob for token in tokens):
+        if question_matches_text(question, blob):
             hits.append(question)
     return hits
+
+
+@dataclass(frozen=True)
+class TrackedEntitySeedResult:
+    created: int
+    source_failures: tuple[str, ...] = ()
 
 
 async def seed_tracked_entities_from_context(
     session,
     user_id: str,
     ctx: dict[str, Any] | None,
-) -> int:
+) -> TrackedEntitySeedResult:
     """Create watched entities from competitors and stack names. Idempotent."""
     from sqlalchemy import select
 
@@ -216,6 +254,7 @@ async def seed_tracked_entities_from_context(
     ).scalars().all()
     have = {e.name.lower() for e in existing}
     created = 0
+    source_failures: list[str] = []
     for name, kind, relationship in specs:
         if name.lower() in have:
             continue
@@ -240,9 +279,14 @@ async def seed_tracked_entities_from_context(
         session.add(ent)
         await session.flush()
         try:
-            await seed_sources(session, ent)
+            async with session.begin_nested():
+                sources = await seed_sources(session, ent)
+            if not sources:
+                source_failures.append(name)
+                log.warning("No monitoring source found while seeding entity %s", name)
         except Exception:
-            pass
+            source_failures.append(name)
+            log.exception("Failed to seed monitoring sources for entity %s", name)
         have.add(name.lower())
         created += 1
-    return created
+    return TrackedEntitySeedResult(created=created, source_failures=tuple(source_failures))

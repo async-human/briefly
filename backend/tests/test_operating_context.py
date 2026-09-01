@@ -54,6 +54,7 @@ def test_questions_hit_by_distinctive_tokens():
     hits = questions_hit_by_text(ctx, "Anthropic cut API prices for their model providers")
     assert hits
     assert not questions_hit_by_text(ctx, "City council debates parking")
+    assert not questions_hit_by_text(ctx, "Our pricing changed this quarter")
     assert distinctive_tokens("Should we change model providers this quarter?") == [
         "change", "model", "providers", "quarter",
     ]

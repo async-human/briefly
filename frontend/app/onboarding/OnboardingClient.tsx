@@ -612,7 +612,13 @@ export default function OnboardingPage() {
         digest_time: digestTime,
         digest_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
-      await api.completeOnboarding();
+      const completed = await api.completeOnboarding();
+      if (completed.monitoring_warnings.length > 0) {
+        sessionStorage.setItem(
+          "briefly:monitoring-setup-warning",
+          completed.monitoring_warnings.join(" "),
+        );
+      }
       sessionStorage.removeItem(STEP_KEY);
       router.replace("/dashboard");
     } catch (err) {

@@ -27,21 +27,32 @@ export function IntelligenceHome({
   const [greeting] = useState(() => getTimeGreeting().label);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [setupWarning, setSetupWarning] = useState("");
   const [restOpen, setRestOpen] = useState(true);
   const userToggledRest = useRef(false);
 
-  const refresh = useCallback(() => {
-    Promise.all([
-      api.listWatchedAlerts(true).catch(() => [] as WatchedAlert[]),
-      api.listWatchedEntities().catch(() => [] as WatchedEntity[]),
-    ]).then(([nextAlerts, nextEntities]) => {
+  const refresh = useCallback(async () => {
+    try {
+      const [nextAlerts, nextEntities] = await Promise.all([
+        api.listWatchedAlerts(true),
+        api.listWatchedEntities(),
+      ]);
       setAlerts(nextAlerts);
       setEntities(nextEntities);
-    });
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
+    }
   }, []);
 
   useEffect(() => {
     void refresh();
+    const warning = sessionStorage.getItem("briefly:monitoring-setup-warning") || "";
+    if (warning) {
+      setSetupWarning(warning);
+      sessionStorage.removeItem("briefly:monitoring-setup-warning");
+    }
   }, [refresh]);
 
   async function scanWatching() {
@@ -83,7 +94,7 @@ export function IntelligenceHome({
         <MorningPulse
           greeting={`${greeting}, ${name}`}
           dateLabel={dateLabel}
-          line={model.line}
+          line={loadError ? "Monitoring data is temporarily unavailable." : model.line}
           changeCount={model.changeCount}
           decisionCount={model.decisionCount}
           urgentCount={model.urgentCount}
@@ -101,12 +112,21 @@ export function IntelligenceHome({
             ))}
           </ul>
         ) : (
-          !generating && (
+          !generating && !loadError && (
             <p className="intel-quiet">
               When something material moves in your world, it will land here — not as a feed of stories.
             </p>
           )
         )}
+
+        {loadError ? (
+          <p className="intel-scan-error" role="alert">
+            Briefly couldn’t load your monitoring data. This is not an all-clear.
+          </p>
+        ) : null}
+        {setupWarning ? (
+          <p className="intel-scan-error" role="status">{setupWarning}</p>
+        ) : null}
 
         {entities.length > 0 ? (
           <div className="intel-scan-wrap">

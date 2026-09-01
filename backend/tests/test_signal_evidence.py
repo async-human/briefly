@@ -62,12 +62,17 @@ def test_bundle_from_signal_separates_corroboration():
         confidence=0.82,
         previous_state="Claude API list price unchanged",
         new_state="API prices cut 40%",
+        is_material_change=True,
+        is_state_change=True,
+        event_fingerprint="event-1",
         pieces=pieces,
         label="useful",
     )
     assert bundle["signal_id"] == "sig-1"
     assert bundle["corroborating_count"] == 1
     assert bundle["previous_state"]
+    assert bundle["is_material_change"] is True
+    assert bundle["is_state_change"] is True
     assert bundle["label"] == "useful"
     assert len(bundle["contradictory"]) == 1
 

@@ -17,7 +17,7 @@ from briefly_api.db.engine import engine
 
 log = logging.getLogger(__name__)
 
-_HEAD = "018"
+_HEAD = "019"
 # Last revision whose objects are already created by Base.metadata.create_all()
 _STAMP_IF_LEGACY = "003"
 
@@ -75,6 +75,10 @@ async def _head_schema_ready() -> bool:
         and await _table_exists("signals")
         and await _table_exists("decision_threads")
         and await _table_exists("entity_snapshots")
+        and await _column_exists("entity_alerts", "event_fingerprint")
+        and await _column_exists("signals", "event_fingerprint")
+        and await _column_exists("signals", "is_material_change")
+        and await _column_exists("entity_snapshots", "state_value")
     )
 
 
@@ -120,11 +124,16 @@ async def ensure_migrations() -> None:
             log.info("Alembic already at head (%s)", _HEAD)
             return
         log.warning(
-            "Alembic is stamped %s but six-point columns are missing — applying them",
+            "Alembic is stamped %s but required schema objects are missing — checking legacy columns",
             _HEAD,
         )
         await _apply_014_columns()
-        return
+        if await _head_schema_ready():
+            return
+        raise RuntimeError(
+            f"Database is stamped {_HEAD} but required schema objects are missing; "
+            "refusing to start with a partial intelligence schema."
+        )
 
     if revision:
         log.info("Alembic at revision %s — upgrading to head", revision)
@@ -163,10 +172,10 @@ async def ensure_migrations() -> None:
             return
         log.error(
             "Alembic upgrade failed (exit %s) and head schema is still incomplete. "
-            "init_db() will try ADD COLUMN IF NOT EXISTS on boot.",
+            "Refusing to start with a partial intelligence schema.",
             rc,
         )
-        return
+        raise SystemExit(1)
 
     if _run_alembic("stamp", _HEAD) != 0:
         raise SystemExit(1)

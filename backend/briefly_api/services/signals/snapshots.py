@@ -7,13 +7,25 @@ and does not invent a state change.
 """
 from __future__ import annotations
 
+import hashlib
 import re
+from datetime import datetime
 from typing import Any
 
 from briefly_api.services.operating_context import distinctive_tokens
 from briefly_api.services.signals.detectors import DETECTOR_TYPES
 
 _PCT = re.compile(r"(\d+(?:\.\d+)?)\s*%")
+_MONEY = re.compile(
+    r"(?:(?P<currency>USD|EUR|GBP|INR)\s*)?(?P<symbol>[$€£₹])?\s*"
+    r"(?P<amount>\d+(?:\.\d+)?)\s*(?P<scale>[kKmMbB])?"
+)
+_VERSION = re.compile(
+    r"\b(?:gpt|claude|gemini|llama|mistral)[-\s]?[a-z]*[-\s]?(?:\d+(?:\.\d+)?|opus|sonnet|haiku)\b",
+    re.I,
+)
+_DOWN = re.compile(r"\b(cut|cuts|lower|lowered|drop|dropped|reduce|reduced|cheaper|discount)\b", re.I)
+_UP = re.compile(r"\b(raise|raises|raised|increase|increased|hike|hiked|higher)\b", re.I)
 _ASPECT_LABEL = {
     "pricing_positioning": "pricing",
     "model_api": "API",
@@ -34,6 +46,36 @@ def _percent(text: str) -> str | None:
     return m.group(1) if m else None
 
 
+def extract_state_fields(text: str) -> dict[str, str | None]:
+    """Extract conservative machine-comparable state without inventing a value."""
+    normalized = normalize_state(text)
+    pct = _percent(normalized)
+    if pct is not None:
+        direction = "down" if _DOWN.search(normalized) else "up" if _UP.search(normalized) else ""
+        return {"value": pct, "unit": "percent", "direction": direction or None}
+    version = _VERSION.search(normalized)
+    if version:
+        value = re.sub(r"\s+", "-", version.group(0).lower())
+        return {"value": value, "unit": "version", "direction": None}
+    for match in _MONEY.finditer(normalized):
+        if not (match.group("currency") or match.group("symbol")):
+            continue
+        value = f"{match.group('amount')}{(match.group('scale') or '').lower()}"
+        unit = (match.group("currency") or match.group("symbol") or "money").lower()
+        direction = "down" if _DOWN.search(normalized) else "up" if _UP.search(normalized) else ""
+        return {"value": value, "unit": unit, "direction": direction or None}
+    return {"value": None, "unit": None, "direction": None}
+
+
+def event_fingerprint(aspect: str, state_text: str, source_url: str = "") -> str:
+    """Stable idempotency key that permits a reused page URL to report a new state."""
+    state = normalize_state(state_text).lower()
+    # Entity identity is part of the database uniqueness key. Excluding the URL
+    # lets the same normalized event converge when two sources race to insert it.
+    raw = f"{aspect}|{state}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 def same_observation(left: str, right: str) -> bool:
     """True when two claims describe the same observed state, not a new change."""
     a = normalize_state(left).lower()
@@ -42,6 +84,13 @@ def same_observation(left: str, right: str) -> bool:
         return False
     if a == b:
         return True
+    fa, fb = extract_state_fields(a), extract_state_fields(b)
+    if fa["direction"] and fb["direction"] and fa["direction"] != fb["direction"]:
+        return False
+    if fa["unit"] and fa["unit"] == fb["unit"] and fa["value"] == fb["value"]:
+        ta, tb = set(distinctive_tokens(a)), set(distinctive_tokens(b))
+        if ta & tb:
+            return True
     pa, pb = _percent(a), _percent(b)
     if pa and pb and pa != pb:
         return False
@@ -51,9 +100,7 @@ def same_observation(left: str, right: str) -> bool:
     if not ta or not tb:
         return False
     shared = ta & tb
-    if len(shared) >= 3:
-        return True
-    return len(shared) / len(ta | tb) >= 0.5
+    return len(shared) / len(ta | tb) >= 0.65
 
 
 async def current_state(
@@ -79,7 +126,7 @@ async def current_state(
                 EntitySnapshot.entity_id == entity_id,
                 EntitySnapshot.aspect == aspect,
             )
-            .order_by(EntitySnapshot.observed_at.desc())
+            .order_by(EntitySnapshot.observed_at.desc(), EntitySnapshot.created_at.desc())
             .limit(1)
         )
     ).scalar_one_or_none()
@@ -126,25 +173,38 @@ async def record_snapshot(
     state_text: str,
     source_url: str = "",
     signal_id: str | None = None,
+    effective_at: datetime | None = None,
+    fingerprint: str | None = None,
 ) -> str | None:
     text = normalize_state(state_text)[:500]
     if not text or aspect not in DETECTOR_TYPES:
         return None
     import uuid
-
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
     from briefly_api.db.models import EntitySnapshot
 
-    snap = EntitySnapshot(
-        id=str(uuid.uuid4()),
-        user_id=user_id,
-        entity_id=entity_id,
-        aspect=aspect,
-        state_text=text,
-        source_url=(source_url or "")[:2000],
-        signal_id=signal_id,
+    fields = extract_state_fields(text)
+    event_id = fingerprint or event_fingerprint(aspect, text, source_url)
+    snapshot_id = str(uuid.uuid4())
+    stmt = (
+        pg_insert(EntitySnapshot)
+        .values(
+            id=snapshot_id,
+            user_id=user_id,
+            entity_id=entity_id,
+            aspect=aspect,
+            state_text=text,
+            state_value=fields["value"],
+            state_unit=fields["unit"],
+            effective_at=effective_at,
+            event_fingerprint=event_id,
+            source_url=(source_url or "")[:2000],
+            signal_id=signal_id,
+        )
+        .on_conflict_do_nothing()
+        .returning(EntitySnapshot.id)
     )
-    session.add(snap)
-    return snap.id
+    return (await session.execute(stmt)).scalar_one_or_none()
 
 
 async def resolve_states(
@@ -211,6 +271,9 @@ async def latest_by_entities(
                 "aspect": row.aspect,
                 "label": aspect_label(row.aspect),
                 "state": row.state_text,
+                "value": row.state_value,
+                "unit": row.state_unit,
+                "effective_at": row.effective_at,
                 "observed_at": row.observed_at,
             }
         )

@@ -172,7 +172,8 @@ async def update_onboarding_profile(
             bits = [p for p in (ctx["company_name"], ctx["product"]) if p]
             profile.goal = " — ".join(bits)
         try:
-            await seed_decision_threads_from_context(db, user.id, profile.operating_context)
+            async with db.begin_nested():
+                await seed_decision_threads_from_context(db, user.id, profile.operating_context)
         except Exception:
             log.exception("Failed to seed decision threads for user %s", user.id)
     await db.commit()
@@ -210,16 +211,25 @@ async def complete_onboarding(
     if not user.profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found.")
     user.profile.onboarding_completed = True
+    monitoring_warnings: list[str] = []
     try:
-        await seed_tracked_entities_from_context(
-            db, user.id, user.profile.operating_context
-        )
+        async with db.begin_nested():
+            seeded = await seed_tracked_entities_from_context(
+                db, user.id, user.profile.operating_context
+            )
+        if seeded.source_failures:
+            monitoring_warnings.append(
+                "Monitoring sources still need attention for: "
+                + ", ".join(seeded.source_failures)
+            )
     except Exception:
         log.exception("Failed to seed tracked entities for user %s", user.id)
+        monitoring_warnings.append("Briefly could not finish setting up monitored entities.")
     try:
-        await seed_decision_threads_from_context(
-            db, user.id, user.profile.operating_context
-        )
+        async with db.begin_nested():
+            await seed_decision_threads_from_context(
+                db, user.id, user.profile.operating_context
+            )
     except Exception:
         log.exception("Failed to seed decision threads for user %s", user.id)
     await db.commit()
@@ -234,7 +244,11 @@ async def complete_onboarding(
     }
     asyncio.create_task(_seed_profile_embedding(user.id, profile_snapshot, settings))
 
-    return OnboardingCompleteOut(onboarding_completed=True)
+    return OnboardingCompleteOut(
+        onboarding_completed=True,
+        monitoring_setup="partial" if monitoring_warnings else "ready",
+        monitoring_warnings=monitoring_warnings,
+    )
 
 
 async def _seed_profile_embedding(

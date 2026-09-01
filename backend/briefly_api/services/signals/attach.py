@@ -115,26 +115,29 @@ async def link_signals_to_digest(session, user_id: str, digest_id: str) -> int:
         if isinstance(breakdown.get("watch_alert_id"), str):
             alert_id = breakdown["watch_alert_id"]
         try:
-            signal_id = await persist_market_signal(
-                session,
-                user_id=user_id,
-                entity_id=entity.id,
-                title=item.headline or "",
-                source_url=item.source_url or "",
-                source_name=item.source_name or "",
-                published_at=None,
-                detector=detector,
-                what_changed=item.summary or item.headline or "",
-                why_it_matters=item.why_it_matters or "",
-                action=item.suggested_action or "",
-                operating_context=profile or None,
-                alert_id=alert_id,
-                related_urls=[
-                    str(extra.get("url"))
-                    for extra in (item.all_sources or [])
-                    if isinstance(extra, dict) and extra.get("url")
-                ],
-            )
+            async with session.begin_nested():
+                signal_id = await persist_market_signal(
+                    session,
+                    user_id=user_id,
+                    entity_id=entity.id,
+                    title=item.headline or "",
+                    source_url=item.source_url or "",
+                    source_name=item.source_name or "",
+                    published_at=None,
+                    detector=detector,
+                    what_changed=item.summary or item.headline or "",
+                    why_it_matters=item.why_it_matters or "",
+                    action=item.suggested_action or "",
+                    operating_context=profile or None,
+                    alert_id=alert_id,
+                    related_urls=[
+                        str(extra.get("url"))
+                        for extra in (item.all_sources or [])
+                        if isinstance(extra, dict) and extra.get("url")
+                    ],
+                    relevance_score=float(item.relevance_score or 0),
+                    is_urgent=False,
+                )
         except Exception:
             log.debug("link_signals_to_digest: persist failed", exc_info=True)
             continue
@@ -168,10 +171,12 @@ async def evidence_for_items(session, user_id: str, items: list[DigestItem]) -> 
     if urls:
         from sqlalchemy import or_
 
+        evidence_ids = select(SignalEvidence.signal_id).where(SignalEvidence.source_url.in_(urls))
         stmt = stmt.where(
             or_(
                 MarketSignal.digest_item_id.in_(item_ids),
                 MarketSignal.source_url.in_(urls),
+                MarketSignal.id.in_(evidence_ids),
             )
         )
     else:
@@ -217,6 +222,10 @@ async def evidence_for_items(session, user_id: str, items: list[DigestItem]) -> 
                 is_contradictory=bool(row.is_contradictory),
             )
         )
+        if row.source_url:
+            signal = next((s for s in signals if s.id == row.signal_id), None)
+            if signal:
+                by_url[url_key(row.source_url)] = signal
 
     out: dict[str, dict[str, Any]] = {}
     for item in items:
@@ -245,6 +254,9 @@ async def evidence_for_items(session, user_id: str, items: list[DigestItem]) -> 
                 confidence=signal.confidence,
                 previous_state=signal.previous_state,
                 new_state=signal.new_state or item.headline,
+                is_material_change=signal.is_material_change,
+                is_state_change=signal.is_state_change,
+                event_fingerprint=signal.event_fingerprint,
                 pieces=pieces,
                 label=labels.get(signal.id),
             )

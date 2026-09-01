@@ -18,11 +18,17 @@ def test_title_from_question_strips_lead_and_time_words():
     assert title_from_question("Model economics") == "Model economics"
 
 
-def test_stance_contradicts_on_state_change_or_flag():
-    assert stance_for_signal(previous_state="held", new_state="cut 40%") == "contradicting"
-    assert stance_for_signal(is_contradictory=True) == "contradicting"
-    assert stance_for_signal(previous_state="", new_state="cut 40%") == "supporting"
-    assert stance_for_signal(previous_state="cut 40%", new_state="cut 40%") == "supporting"
+def test_stance_stays_related_until_belief_comparison_is_verified():
+    assert stance_for_signal(current_belief="Stay on Claude") == "related"
+    assert stance_for_signal(current_belief="") == "related"
+    assert stance_for_signal(
+        current_belief="Stay on Claude",
+        explicit_stance="contradicting",
+    ) == "contradicting"
+    assert stance_for_signal(
+        current_belief="Stay on Claude",
+        explicit_stance="supporting",
+    ) == "supporting"
 
 
 def test_confidence_is_none_until_evidence_exists():
@@ -37,6 +43,8 @@ def test_thread_matches_distinctive_tokens():
     q = "Should we change model providers this quarter?"
     assert distinctive_tokens(q) == ["change", "model", "providers", "quarter"]
     assert thread_matches_text(q, "Anthropic cut API prices for their model providers")
+    assert not thread_matches_text(q, "Our pricing changed this quarter")
+    assert not thread_matches_text(q, "A new image model launched")
     assert not thread_matches_text(q, "City council debates parking")
     assert not thread_matches_text(q, "")
 

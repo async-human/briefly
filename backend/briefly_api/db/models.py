@@ -905,7 +905,14 @@ class EntityAlert(Base):
     __table_args__ = (
         Index("ix_entity_alerts_user_unread", "user_id", "is_read"),
         Index("ix_entity_alerts_entity", "entity_id"),
-        UniqueConstraint("entity_id", "source_url", name="uq_entity_alert_source"),
+        Index("ix_entity_alerts_source_url", "source_url"),
+        Index(
+            "uq_entity_alert_event",
+            "entity_id",
+            "event_fingerprint",
+            unique=True,
+            postgresql_where=text("event_fingerprint IS NOT NULL"),
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
@@ -921,6 +928,7 @@ class EntityAlert(Base):
     why_it_matters: Mapped[str] = mapped_column(Text, default="")
     action: Mapped[str] = mapped_column(Text, default="")
     source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    event_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_name: Mapped[str] = mapped_column(String(200), default="")
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     relevance_score: Mapped[float] = mapped_column(Float, default=0.0)
@@ -946,7 +954,15 @@ class MarketSignal(Base):
     __table_args__ = (
         Index("ix_signals_user_detected", "user_id", "detected_at"),
         Index("ix_signals_entity", "entity_id"),
-        UniqueConstraint("user_id", "entity_id", "source_url", name="uq_signal_source"),
+        Index("ix_signals_source_url", "source_url"),
+        Index(
+            "uq_signal_event",
+            "user_id",
+            "entity_id",
+            "event_fingerprint",
+            unique=True,
+            postgresql_where=text("event_fingerprint IS NOT NULL"),
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
@@ -966,6 +982,9 @@ class MarketSignal(Base):
     status: Mapped[str] = mapped_column(String(20), default="candidate")
     # candidate | verified | discarded
     source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    event_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    is_material_change: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_state_change: Mapped[bool] = mapped_column(Boolean, default=False)
     content_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     digest_item_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     alert_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
@@ -988,6 +1007,21 @@ class EntitySnapshot(Base):
     __table_args__ = (
         Index("ix_entity_snapshots_latest", "user_id", "entity_id", "aspect", "observed_at"),
         Index("ix_entity_snapshots_entity", "entity_id"),
+        Index(
+            "uq_entity_snapshot_event",
+            "user_id",
+            "entity_id",
+            "aspect",
+            "event_fingerprint",
+            unique=True,
+            postgresql_where=text("event_fingerprint IS NOT NULL"),
+        ),
+        Index(
+            "uq_entity_snapshot_signal",
+            "signal_id",
+            unique=True,
+            postgresql_where=text("signal_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
@@ -1000,6 +1034,10 @@ class EntitySnapshot(Base):
     aspect: Mapped[str] = mapped_column(String(40), nullable=False)
     # pricing_positioning | model_api | product_release
     state_text: Mapped[str] = mapped_column(Text, nullable=False)
+    state_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    state_unit: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    effective_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    event_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_url: Mapped[str] = mapped_column(Text, default="")
     signal_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("signals.id", ondelete="SET NULL"), nullable=True

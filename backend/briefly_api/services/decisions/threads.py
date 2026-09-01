@@ -10,7 +10,7 @@ import re
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from briefly_api.services.operating_context import distinctive_tokens, normalize_operating_context
+from briefly_api.services.operating_context import normalize_operating_context, question_matches_text
 
 if TYPE_CHECKING:
     from briefly_api.db.models import DecisionThread
@@ -35,26 +35,23 @@ def title_from_question(question: str) -> str:
 
 
 def thread_matches_text(question: str, blob: str) -> bool:
-    hay = (blob or "").lower()
-    if not hay:
-        return False
-    tokens = distinctive_tokens(question)
-    return bool(tokens) and any(token in hay for token in tokens)
+    return question_matches_text(question, blob)
 
 
 def stance_for_signal(
     *,
-    previous_state: str = "",
-    new_state: str = "",
-    is_contradictory: bool = False,
+    current_belief: str = "",
+    explicit_stance: str | None = None,
 ) -> str:
-    if is_contradictory:
-        return "contradicting"
-    prev = (previous_state or "").strip()
-    nxt = (new_state or "").strip()
-    if prev and nxt and prev.lower() != nxt.lower():
-        return "contradicting"
-    return "supporting"
+    """Return a directional stance only when another component verified it.
+
+    A market state changing is not, by itself, evidence against a founder's
+    belief. Until a grounded comparison exists, the honest stance is related.
+    """
+    if not (current_belief or "").strip():
+        return "related"
+    cleaned = (explicit_stance or "").strip().lower()
+    return cleaned if cleaned in {"supporting", "contradicting"} else "related"
 
 
 def confidence_from_counts(supporting: int, contradicting: int) -> float | None:
@@ -150,6 +147,7 @@ async def link_signal_to_threads(
     previous_state: str = "",
     new_state: str = "",
     is_contradictory: bool = False,
+    explicit_stance: str | None = None,
 ) -> list[str]:
     """Attach a signal to matching open threads and refresh confidence."""
     from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -167,15 +165,14 @@ async def link_signal_to_threads(
     ).scalars().all()
     if not threads:
         return []
-    stance = stance_for_signal(
-        previous_state=previous_state,
-        new_state=new_state,
-        is_contradictory=is_contradictory,
-    )
     linked: list[str] = []
     for thread in threads:
         if not thread_matches_text(thread.question, blob):
             continue
+        stance = stance_for_signal(
+            current_belief=thread.current_belief or "",
+            explicit_stance=("contradicting" if is_contradictory else explicit_stance),
+        )
         stmt = (
             pg_insert(ThreadSignal)
             .values(
@@ -191,12 +188,13 @@ async def link_signal_to_threads(
         if not inserted:
             continue
         linked.append(thread.id)
-        await _refresh_thread_confidence(
-            session,
-            thread,
-            signal_id=signal_id,
-            note=f"{stance} evidence linked",
-        )
+        if stance in {"supporting", "contradicting"}:
+            await _refresh_thread_confidence(
+                session,
+                thread,
+                signal_id=signal_id,
+                note=f"{stance} evidence linked",
+            )
     return linked
 
 

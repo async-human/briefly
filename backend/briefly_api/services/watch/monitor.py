@@ -210,6 +210,13 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
             entity_name=entity.name,
             entity_kind=entity.kind,
         )
+        from briefly_api.services.signals.snapshots import event_fingerprint
+
+        alert_fingerprint = event_fingerprint(
+            detector.detector_type,
+            detector.new_state or detector.extracted_claim or hit.title,
+            hit.url,
+        )
 
         stmt = (
             pg_insert(EntityAlert)
@@ -223,6 +230,7 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
                 why_it_matters=copy.why_it_matters[:500],
                 action=copy.action[:300],
                 source_url=hit.url,
+                event_fingerprint=alert_fingerprint,
                 source_name=hit.source_name[:200],
                 published_at=hit.published_at,
                 relevance_score=score,
@@ -232,7 +240,7 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
                 detector_type=detector.detector_type,
                 confidence=float(detector.confidence or 0),
             )
-            .on_conflict_do_nothing(index_elements=["entity_id", "source_url"])
+            .on_conflict_do_nothing()
             .returning(EntityAlert.id)
         )
         inserted = (await session.execute(stmt)).scalar_one_or_none()
@@ -242,22 +250,25 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
         try:
             from briefly_api.services.signals.persist import persist_market_signal
 
-            await persist_market_signal(
-                session,
-                user_id=entity.user_id,
-                entity_id=entity.id,
-                title=hit.title,
-                source_url=hit.url,
-                source_name=hit.source_name,
-                published_at=hit.published_at,
-                detector=detector,
-                what_changed=copy.what_changed,
-                why_it_matters=copy.why_it_matters,
-                action=copy.action,
-                operating_context=operating_ctx,
-                alert_id=inserted,
-                related_urls=list(hit.related_urls or []),
-            )
+            async with session.begin_nested():
+                await persist_market_signal(
+                    session,
+                    user_id=entity.user_id,
+                    entity_id=entity.id,
+                    title=hit.title,
+                    source_url=hit.url,
+                    source_name=hit.source_name,
+                    published_at=hit.published_at,
+                    detector=detector,
+                    what_changed=copy.what_changed,
+                    why_it_matters=copy.why_it_matters,
+                    action=copy.action,
+                    operating_context=operating_ctx,
+                    alert_id=inserted,
+                    related_urls=list(hit.related_urls or []),
+                    relevance_score=score,
+                    is_urgent=is_urgent,
+                )
         except Exception:
             log.debug("Watch monitor: market signal persist failed", exc_info=True)
         if is_urgent and urgent_copy is None:

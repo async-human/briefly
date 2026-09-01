@@ -36,6 +36,9 @@ class EntityStateOut(BaseModel):
     aspect: str
     label: str
     state: str
+    value: str | None = None
+    unit: str | None = None
+    effective_at: datetime | None = None
     observed_at: datetime | None = None
 
 
@@ -81,6 +84,8 @@ class EntityAlertOut(BaseModel):
     signal_id: str | None = None
     previous_state: str = ""
     new_state: str = ""
+    is_material_change: bool = False
+    is_state_change: bool = False
     signal_label: str | None = None
     evidence: list[dict] = Field(default_factory=list)
     decision_thread_id: str | None = None
@@ -117,6 +122,8 @@ def _serialize_alert(
     signal_id: str | None = None,
     previous_state: str = "",
     new_state: str = "",
+    is_material_change: bool = False,
+    is_state_change: bool = False,
     signal_label: str | None = None,
     evidence: list[dict] | None = None,
     thread: dict | None = None,
@@ -147,6 +154,8 @@ def _serialize_alert(
         signal_id=signal_id,
         previous_state=previous_state,
         new_state=new_state,
+        is_material_change=is_material_change,
+        is_state_change=is_state_change,
         signal_label=signal_label,
         evidence=list(evidence or []),
         created_at=row.created_at,
@@ -160,16 +169,23 @@ async def _alert_signal_map(db: AsyncSession, user_id: str, alerts: list[EntityA
     alert_ids = [a.id for a in alerts]
     urls = [a.source_url for a in alerts if a.source_url]
     from sqlalchemy import or_
+    from briefly_api.db.models import SignalEvidence, SignalFeedback
 
     stmt = select(MarketSignal).where(MarketSignal.user_id == user_id)
     if urls:
-        stmt = stmt.where(or_(MarketSignal.alert_id.in_(alert_ids), MarketSignal.source_url.in_(urls)))
+        evidence_ids = select(SignalEvidence.signal_id).where(SignalEvidence.source_url.in_(urls))
+        stmt = stmt.where(
+            or_(
+                MarketSignal.alert_id.in_(alert_ids),
+                MarketSignal.source_url.in_(urls),
+                MarketSignal.id.in_(evidence_ids),
+            )
+        )
     else:
         stmt = stmt.where(MarketSignal.alert_id.in_(alert_ids))
     signals = (await db.execute(stmt)).scalars().all()
     if not signals:
         return {}
-    from briefly_api.db.models import SignalEvidence, SignalFeedback
     from briefly_api.services.signals.evidence import bundle_from_signal, evidence_piece
 
     signal_ids = [s.id for s in signals]
@@ -208,6 +224,9 @@ async def _alert_signal_map(db: AsyncSession, user_id: str, alerts: list[EntityA
             confidence=signal.confidence,
             previous_state=signal.previous_state,
             new_state=signal.new_state,
+            is_material_change=signal.is_material_change,
+            is_state_change=signal.is_state_change,
+            event_fingerprint=signal.event_fingerprint,
             pieces=pieces_by.get(signal.id) or [],
             label=labels.get(signal.id),
         )
@@ -215,6 +234,9 @@ async def _alert_signal_map(db: AsyncSession, user_id: str, alerts: list[EntityA
             by_alert[signal.alert_id] = bundle
         if signal.source_url:
             by_url[signal.source_url] = bundle
+        for piece in pieces_by.get(signal.id) or []:
+            if piece.get("source_url"):
+                by_url[str(piece["source_url"])] = bundle
     out: dict[str, dict] = {}
     for alert in alerts:
         bundle = by_alert.get(alert.id) or by_url.get(alert.source_url)
@@ -378,6 +400,8 @@ async def list_alerts(
                 signal_id=sid,
                 previous_state=bundle.get("previous_state") or "",
                 new_state=bundle.get("new_state") or "",
+                is_material_change=bool(bundle.get("is_material_change")),
+                is_state_change=bool(bundle.get("is_state_change")),
                 signal_label=bundle.get("label"),
                 evidence=list(bundle.get("pieces") or []),
                 thread=snaps.get(str(sid)) if sid else None,
@@ -426,6 +450,8 @@ async def scan_watched(
                 signal_id=sid,
                 previous_state=bundle.get("previous_state") or "",
                 new_state=bundle.get("new_state") or "",
+                is_material_change=bool(bundle.get("is_material_change")),
+                is_state_change=bool(bundle.get("is_state_change")),
                 signal_label=bundle.get("label"),
                 evidence=list(bundle.get("pieces") or []),
                 thread=snaps.get(str(sid)) if sid else None,

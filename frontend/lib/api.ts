@@ -387,6 +387,8 @@ export type DigestItem = {
   signal_confidence?: number | null;
   previous_state?: string | null;
   new_state?: string | null;
+  is_material_change?: boolean;
+  is_state_change?: boolean;
   signal_label?: string | null;
   evidence?: EvidencePiece[];
   decision_thread_id?: string | null;
@@ -1151,7 +1153,11 @@ export const api = {
       body: JSON.stringify({ topic }),
     }),
   completeOnboarding: () =>
-    request<{ onboarding_completed: boolean }>("/api/v1/onboarding/complete", {
+    request<{
+      onboarding_completed: boolean;
+      monitoring_setup: "ready" | "partial";
+      monitoring_warnings: string[];
+    }>("/api/v1/onboarding/complete", {
       method: "POST",
     }),
   startGmailConnect: (redirectPath = "/onboarding") =>
@@ -1616,7 +1622,15 @@ export type WatchedEntity = {
   keywords: string[];
   aliases?: string[];
   unread_count?: number;
-  last_states?: { aspect: string; label: string; state: string; observed_at?: string | null }[];
+  last_states?: {
+    aspect: string;
+    label: string;
+    state: string;
+    value?: string | null;
+    unit?: string | null;
+    effective_at?: string | null;
+    observed_at?: string | null;
+  }[];
 };
 
 export type WatchedAlert = {
@@ -1642,6 +1656,8 @@ export type WatchedAlert = {
   signal_id?: string | null;
   previous_state?: string;
   new_state?: string;
+  is_material_change?: boolean;
+  is_state_change?: boolean;
   signal_label?: string | null;
   evidence?: EvidencePiece[];
   created_at: string | null;

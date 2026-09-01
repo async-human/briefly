@@ -135,6 +135,8 @@ class OnboardingStatusOut(BaseModel):
 
 class OnboardingCompleteOut(BaseModel):
     onboarding_completed: bool
+    monitoring_setup: str = "ready"
+    monitoring_warnings: list[str] = Field(default_factory=list)
 
 
 class GmailConnectOut(BaseModel):
@@ -224,6 +226,8 @@ class DigestItemOut(BaseModel):
     signal_confidence: float | None = None
     previous_state: str | None = None
     new_state: str | None = None
+    is_material_change: bool = False
+    is_state_change: bool = False
     signal_label: str | None = None
     evidence: list[dict] = Field(default_factory=list)
     decision_thread_id: str | None = None
@@ -681,4 +685,3 @@ class OrbTurnJsonIn(BaseModel):
     content_id: str | None = None
     content_type: str = "audio/webm"
     filename: str = "turn.webm"
-

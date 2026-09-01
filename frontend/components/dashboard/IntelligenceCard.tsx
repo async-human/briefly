@@ -13,6 +13,8 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
   const [open, setOpen] = useState(false);
   const [gone, setGone] = useState(false);
   const [rating, setRating] = useState(false);
+  const [ratingError, setRatingError] = useState(false);
+  const [showReasons, setShowReasons] = useState(false);
   const panelId = useId();
   const conf = object.confidence != null ? Math.round(object.confidence * 100) : null;
   const beliefMoved =
@@ -27,14 +29,16 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
 
   if (gone) return null;
 
-  async function markNoise() {
+  async function markNoise(label: "irrelevant" | "duplicate" | "incorrect", note: string) {
     if (!object.signalId || rating) return;
     setRating(true);
+    setRatingError(false);
     try {
-      await api.rateSignal(object.signalId, "irrelevant", object.title);
+      await api.rateSignal(object.signalId, label, note);
       setGone(true);
     } catch {
       setRating(false);
+      setRatingError(true);
     }
   }
 
@@ -95,13 +99,14 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
             <button
               type="button"
               className="glance-card-btn glance-card-btn-quiet"
-              onClick={() => void markNoise()}
+              onClick={() => setShowReasons((value) => !value)}
               disabled={rating}
               data-state={rating ? "loading" : undefined}
             >
               {rating ? "Saving…" : "Not important"}
             </button>
-          ) : object.sourceUrl ? (
+          ) : null}
+          {object.sourceUrl ? (
             <a
               href={object.sourceUrl}
               className="glance-card-btn glance-card-btn-quiet"
@@ -112,6 +117,17 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
             </a>
           ) : null}
         </div>
+        {showReasons && object.signalId ? (
+          <div className="glance-card-actions" aria-label="Why this was not important">
+            <button disabled={rating} className="glance-card-btn glance-card-btn-quiet" type="button" onClick={() => void markNoise("irrelevant", "already_knew")}>Already knew</button>
+            <button disabled={rating} className="glance-card-btn glance-card-btn-quiet" type="button" onClick={() => void markNoise("irrelevant", "does_not_affect_me")}>Doesn’t affect me</button>
+            <button disabled={rating} className="glance-card-btn glance-card-btn-quiet" type="button" onClick={() => void markNoise("duplicate", "duplicate_development")}>Duplicate</button>
+            <button disabled={rating} className="glance-card-btn glance-card-btn-quiet" type="button" onClick={() => void markNoise("incorrect", "incorrect_signal")}>Incorrect</button>
+          </div>
+        ) : null}
+        {ratingError ? (
+          <p className="intel-scan-error" role="alert">Couldn’t save that rating. Try again.</p>
+        ) : null}
       </div>
     </article>
   );
