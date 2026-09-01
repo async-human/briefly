@@ -12083,10 +12083,10 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 }
 
 /* Hallmark · component: morning-pulse-world · genre: editorial · theme: design.md Art Deco (locked)
- * redesign: salon constellation (curved spokes · gold ticks · watching column)
+ * redesign: engraved plate — hairline ellipse, open nodes, type as the mark
  * states: default · hover · focus · active · disabled · loading · error · success
  * contrast: pass
- * Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4
+ * Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5
  */
 
 .intel-home {
@@ -12178,35 +12178,12 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   width: 100%;
   max-width: none;
   margin: 1.15rem 0 0;
-  padding: 1.05rem 1.2rem 1rem;
+  padding: 1.1rem 1.25rem 1.05rem;
   border: 1px solid var(--app-border-strong);
   border-radius: var(--app-radius);
-  background:
-    radial-gradient(ellipse 70% 80% at 38% 46%, color-mix(in oklch, var(--app-brand) 8%, transparent), transparent 62%),
-    var(--app-surface);
+  background: var(--app-surface);
   box-shadow: var(--app-shadow-surface);
   min-width: 0;
-}
-
-.app-shell[data-theme="dark"] .pulse-world {
-  background:
-    radial-gradient(ellipse 70% 80% at 38% 46%, color-mix(in oklch, var(--app-brand) 16%, transparent), transparent 62%),
-    var(--app-surface);
-}
-
-.pulse-world-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.75rem 1.5rem;
-  align-items: stretch;
-  min-width: 0;
-}
-
-@container (min-width: 40rem) {
-  .pulse-world-body {
-    grid-template-columns: minmax(0, 1fr) minmax(12.5rem, 17rem);
-    align-items: center;
-  }
 }
 
 .pulse-world-head {
@@ -12214,7 +12191,7 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   align-items: baseline;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.15rem;
 }
 
 .pulse-world-title {
@@ -12234,7 +12211,7 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 }
 
 .pulse-world-note {
-  margin: 0.55rem 0 0;
+  margin: 0.15rem 0 0;
   font-size: 0.75rem;
   line-height: 1.4;
   color: var(--app-muted);
@@ -12252,47 +12229,30 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 .pulse-orbit {
   fill: none;
   stroke: var(--app-border-strong);
-  vector-effect: non-scaling-stroke;
-}
-
-.pulse-orbit-outer {
-  stroke-dasharray: 1.6 5.5;
-  stroke-width: 1;
-}
-
-.pulse-orbit-inner {
   stroke-width: 0.75;
-  opacity: 0.7;
-}
-
-.pulse-tick {
-  fill: var(--app-brand);
-}
-
-.pulse-tick-core {
-  fill: var(--app-brand);
+  vector-effect: non-scaling-stroke;
 }
 
 .pulse-spoke {
   fill: none;
-  stroke: color-mix(in oklch, var(--app-ink) 14%, var(--app-border-strong));
-  stroke-width: 1.15;
+  stroke: color-mix(in oklch, var(--app-ink) 18%, transparent);
+  stroke-width: 0.8;
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
 
 .pulse-spoke.is-on {
-  stroke: color-mix(in oklch, var(--app-brand) 62%, var(--app-border-strong));
-  stroke-width: 1.45;
+  stroke: color-mix(in oklch, var(--app-brand) 42%, var(--app-ink));
+  stroke-width: 0.9;
 }
 
 .pulse-link-path {
   fill: none;
   stroke: var(--app-brand);
-  stroke-width: 1.7;
+  stroke-width: 1;
   stroke-linecap: round;
-  stroke-dasharray: 140;
-  stroke-dashoffset: 140;
+  stroke-dasharray: 180;
+  stroke-dashoffset: 180;
   vector-effect: non-scaling-stroke;
 }
 
@@ -12302,153 +12262,53 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 
 .pulse-core-ring {
   fill: none;
-  stroke: color-mix(in oklch, var(--app-brand) 45%, var(--app-border-strong));
-  stroke-width: 1;
+  stroke: var(--app-ink);
+  stroke-width: 0.85;
+  opacity: 0.28;
   vector-effect: non-scaling-stroke;
-}
-
-.pulse-core {
-  stroke: var(--app-brand);
-  stroke-width: 1.35;
-  vector-effect: non-scaling-stroke;
-}
-
-.pulse-core-in {
-  stop-color: color-mix(in oklch, var(--app-brand) 22%, var(--app-surface));
-}
-
-.pulse-core-out {
-  stop-color: color-mix(in oklch, var(--app-brand) 10%, var(--app-surface));
-}
-
-.pulse-halo-in {
-  stop-color: var(--app-brand);
-  stop-opacity: 0.3;
-}
-
-.pulse-halo-out {
-  stop-color: var(--app-brand);
-  stop-opacity: 0;
 }
 
 .pulse-core-label {
   font-family: var(--font-art-deco), var(--font-serif), Georgia, serif;
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 600;
   font-style: normal;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
   fill: var(--app-ink);
 }
 
-.pulse-node-disc {
-  fill: var(--app-surface);
-  stroke: var(--app-ink-secondary);
-  stroke-width: 1.2;
-  vector-effect: non-scaling-stroke;
+.pulse-node-dot {
+  fill: var(--app-ink);
+  opacity: 0.38;
 }
 
-.pulse-node-glint {
-  fill: color-mix(in oklch, var(--app-surface) 70%, white);
-  pointer-events: none;
+.pulse-node-ring {
+  fill: none;
+  stroke: var(--app-brand);
+  stroke-width: 0.85;
+  opacity: 0.55;
+  vector-effect: non-scaling-stroke;
 }
 
 .pulse-node text {
   font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
+  letter-spacing: 0.03em;
   fill: var(--app-ink-secondary);
 }
 
-.pulse-node.is-on .pulse-node-disc {
+.pulse-node.is-on .pulse-node-dot {
   fill: var(--app-brand);
-  stroke: var(--app-brand);
-}
-
-.pulse-node.is-on .pulse-node-glint {
-  fill: color-mix(in oklch, var(--app-surface) 55%, white);
+  opacity: 1;
 }
 
 .pulse-node.is-on text {
   fill: var(--app-ink);
-  font-weight: 650;
 }
 
-.pulse-link-label {
-  font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 9px;
-  font-weight: 500;
-  fill: var(--app-ink-secondary);
-}
-
-.pulse-map.is-thinking .pulse-core {
+.pulse-map.is-thinking .pulse-core-ring {
   animation: pulse-think 2.8s var(--app-ease) infinite;
-}
-
-.pulse-world-legend {
-  list-style: none;
-  margin: 0;
-  padding: 0.15rem 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  min-width: 0;
-  border-top: 1px solid var(--app-border);
-}
-
-@container (min-width: 40rem) {
-  .pulse-world-legend {
-    border-top: none;
-    border-left: 1px solid var(--app-border-strong);
-    padding: 0.35rem 0 0.35rem 1.15rem;
-    min-height: 11rem;
-    justify-content: center;
-  }
-}
-
-.pulse-world-legend li {
-  display: grid;
-  grid-template-columns: 0.55rem minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.55rem;
-  min-height: 1.75rem;
-}
-
-.pulse-world-legend-empty {
-  display: block;
-  font-size: 0.8125rem;
-  color: var(--app-muted);
-}
-
-.pulse-world-pip {
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 1px;
-  background: var(--app-border-strong);
-  transform: rotate(45deg);
-}
-
-.pulse-world-legend li.is-on .pulse-world-pip {
-  background: var(--app-brand);
-}
-
-.pulse-world-legend-name {
-  font-size: 0.8125rem;
-  font-weight: 550;
-  color: var(--app-ink);
-  overflow-wrap: anywhere;
-  min-width: 0;
-}
-
-.pulse-world-legend-state {
-  font-size: 0.6875rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: var(--app-muted);
-  white-space: nowrap;
-}
-
-.pulse-world-legend li.is-on .pulse-world-legend-state {
-  color: var(--app-brand);
 }
 
 @keyframes pulse-draw {
@@ -12456,7 +12316,7 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 }
 
 @keyframes pulse-think {
-  50% { opacity: 0.55; }
+  50% { opacity: 0.12; }
 }
 
 .intel-stack-list {
@@ -12901,7 +12761,7 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 
 @media (prefers-reduced-motion: reduce) {
   .pulse-map.is-ready .pulse-link-path,
-  .pulse-map.is-thinking .pulse-core {
+  .pulse-map.is-thinking .pulse-core-ring {
     animation: none;
   }
 
