@@ -1621,6 +1621,9 @@ export type WatchedEntity = {
   kind: string;
   keywords: string[];
   aliases?: string[];
+  is_active?: boolean;
+  last_checked?: string | null;
+  last_alerted_at?: string | null;
   unread_count?: number;
   last_states?: {
     aspect: string;

@@ -44,6 +44,12 @@ export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) 
         prev.some((x) => x.id === created.id) ? prev : [created, ...prev],
       );
       setName("");
+      if (!created.last_checked) {
+        sessionStorage.setItem(
+          "briefly:monitoring-setup-warning",
+          `${created.name} was added. Run Check now on Today to activate monitoring.`,
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not add.");
     } finally {

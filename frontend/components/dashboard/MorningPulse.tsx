@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { countPhrase, shortLabel, type PulseNode } from "@/lib/intelligenceHome";
 
@@ -10,9 +11,16 @@ type MorningPulseProps = {
   changeCount: number;
   decisionCount: number;
   urgentCount: number;
+  watchCount: number;
+  pendingCheckCount: number;
+  lastCheckedAt: string | null;
   nodes: PulseNode[];
   connectionLabel: string | null;
   generating?: boolean;
+  scanning: boolean;
+  scanError: boolean;
+  scanResult: { entities: number; newAlerts: number } | null;
+  onScan: () => void;
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
   onClearSelection: () => void;
@@ -27,13 +35,28 @@ export function MorningPulse({
   changeCount,
   decisionCount,
   urgentCount,
+  watchCount,
+  pendingCheckCount,
+  lastCheckedAt,
   nodes,
   connectionLabel,
   generating,
+  scanning,
+  scanError,
+  scanResult,
+  onScan,
   selectedNodeId,
   onSelectNode,
   onClearSelection,
 }: MorningPulseProps) {
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const overnight = countPhrase(
     changeCount,
     "1 change today",
@@ -69,13 +92,47 @@ export function MorningPulse({
 
       <article className="pulse-world">
         <header className="pulse-world-head">
-          <h3 className="pulse-world-title">Your world</h3>
-          <p className="pulse-world-meta">{worldStatus}</p>
+          <div className="pulse-world-heading">
+            <h3 className="pulse-world-title">Your world</h3>
+            <p
+              className={`pulse-world-monitor${scanning ? " is-scanning" : ""}${scanError ? " is-error" : ""}`}
+              role={scanError ? "alert" : "status"}
+            >
+              <span className="pulse-monitor-dot" aria-hidden />
+              {monitoringOverview({
+                watchCount,
+                pendingCheckCount,
+                lastCheckedAt,
+                scanning,
+                scanError,
+                scanResult,
+                now,
+              })}
+            </p>
+          </div>
+          <div className="pulse-world-tools">
+            <p className="pulse-world-meta">{worldStatus}</p>
+            {watchCount > 0 ? (
+              <button
+                type="button"
+                className="pulse-world-check"
+                onClick={onScan}
+                disabled={scanning}
+                aria-busy={scanning}
+                data-state={scanning ? "loading" : scanError ? "error" : scanResult ? "success" : undefined}
+              >
+                {scanning ? "Checking…" : scanError ? "Retry check" : "Check now"}
+              </button>
+            ) : null}
+          </div>
         </header>
         <PulseField
           nodes={nodes}
           connectionLabel={connectionLabel}
           generating={Boolean(generating)}
+          scanning={scanning}
+          now={now}
+          onScan={onScan}
           selectedNodeId={selectedNodeId}
           onSelectNode={onSelectNode}
           onClearSelection={onClearSelection}
@@ -93,6 +150,9 @@ function PulseField({
   nodes,
   connectionLabel,
   generating,
+  scanning,
+  now,
+  onScan,
   selectedNodeId,
   onSelectNode,
   onClearSelection,
@@ -100,6 +160,9 @@ function PulseField({
   nodes: PulseNode[];
   connectionLabel: string | null;
   generating: boolean;
+  scanning: boolean;
+  now: number | null;
+  onScan: () => void;
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
   onClearSelection: () => void;
@@ -114,10 +177,12 @@ function PulseField({
       right: visibleNodes[index * 2 + 1] ?? null,
     }),
   );
-  const coreState = selectedNode
-    ? entityStatus(selectedNode, true)
-    : generating
-    ? "Reading your world"
+  const coreState = scanning
+    ? "Checking source network"
+    : selectedNode
+      ? signalStatus(selectedNode, true)
+      : generating
+      ? "Reading your world"
     : connectionLabel
       ? `Context: ${shortLabel(connectionLabel, 24)}`
       : litCount > 0
@@ -125,17 +190,17 @@ function PulseField({
         : "Monitoring quietly";
   const accessibleSummary = visibleNodes.length > 0
     ? visibleNodes
-        .map((node) => `${node.name}, ${node.active ? "in focus" : "watching"}`)
+        .map((node) => `${node.name}, ${monitoringLabel(node, scanning, now)}`)
         .join("; ")
     : "No tracked entities yet";
 
   return (
     <div className="pulse-field-wrap">
       <div
-        className={`pulse-field${generating ? " is-thinking" : ""}${selectedNode ? " has-selection" : ""}`}
+        className={`pulse-field${generating ? " is-thinking" : ""}${scanning ? " is-scanning" : ""}${selectedNode ? " has-selection" : ""}`}
         role="group"
         aria-label={`Your world connections. ${accessibleSummary}. Select an entity to inspect its signals.`}
-        aria-busy={generating}
+        aria-busy={generating || scanning}
       >
         <span className="pulse-field-axis" aria-hidden />
 
@@ -154,7 +219,9 @@ function PulseField({
                   node={left}
                   side="left"
                   selected={left.id === selectedNodeId}
-                  disabled={generating}
+                  disabled={generating || scanning}
+                  scanning={scanning}
+                  now={now}
                   onSelect={onSelectNode}
                 />
               ) : <span className="pulse-field-entity is-empty" />}
@@ -172,7 +239,9 @@ function PulseField({
                   node={right}
                   side="right"
                   selected={right.id === selectedNodeId}
-                  disabled={generating}
+                  disabled={generating || scanning}
+                  scanning={scanning}
+                  now={now}
                   onSelect={onSelectNode}
                 />
               ) : <span className="pulse-field-entity is-empty" />}
@@ -185,9 +254,14 @@ function PulseField({
         <section className="pulse-selection" aria-label={`${selectedNode.name} monitoring details`}>
           <div className="pulse-selection-copy" aria-live="polite">
             <p className="pulse-selection-name">{selectedNode.name}</p>
-            <p className="pulse-selection-summary">{entityStatus(selectedNode, true)}</p>
+            <p className="pulse-selection-monitor">
+              <span className="pulse-monitor-dot" aria-hidden />
+              {monitoringLabel(selectedNode, scanning, now)}
+              {selectedNode.lastCheckedAt ? ` · ${checkStatus(selectedNode.lastCheckedAt, now)}` : ""}
+            </p>
+            <p className="pulse-selection-summary">{signalStatus(selectedNode, true)}</p>
             <p className="pulse-selection-reason">
-              {selectedNode.latestSignal || "No unread signal is attached to this entity right now."}
+              {selectedNode.latestSignal || quietReason(selectedNode)}
             </p>
           </div>
           <div className="pulse-selection-actions">
@@ -195,6 +269,17 @@ function PulseField({
               <Link className="pulse-selection-action is-primary" href={selectedNode.reviewHref}>
                 Review signal
               </Link>
+            ) : !selectedNode.lastCheckedAt ? (
+              <button
+                type="button"
+                className="pulse-selection-action is-primary"
+                onClick={onScan}
+                disabled={scanning}
+                aria-busy={scanning}
+                data-state={scanning ? "loading" : undefined}
+              >
+                {scanning ? "Checking…" : "Check sources"}
+              </button>
             ) : (
               <Link className="pulse-selection-action is-primary" href={selectedNode.askHref}>
                 Ask Briefly
@@ -218,31 +303,91 @@ function PulseEntity({
   side,
   selected,
   disabled,
+  scanning,
+  now,
   onSelect,
 }: {
   node: PulseNode;
   side: "left" | "right";
   selected: boolean;
   disabled: boolean;
+  scanning: boolean;
+  now: number | null;
   onSelect: (nodeId: string) => void;
 }) {
+  const monitor = entityMonitorPresentation(node, scanning, now);
+
   return (
     <button
       type="button"
-      className={`pulse-field-entity is-${side}${node.active ? " is-on" : ""}${selected ? " is-selected" : ""}`}
+      className={`pulse-field-entity is-${side} is-${monitor.tone}${node.active ? " is-on" : ""}${selected ? " is-selected" : ""}`}
       onClick={() => onSelect(node.id)}
       disabled={disabled}
       aria-pressed={selected}
-      aria-label={`${node.name}, ${entityStatus(node, true)}`}
+      aria-label={`${node.name}, ${monitor.badge}${monitor.detail ? `, ${monitor.detail}` : ""}`}
       data-state={disabled ? "loading" : selected ? "success" : undefined}
     >
       <span className="pulse-field-entity-name">{shortLabel(node.name, 26)}</span>
-      <span className="pulse-field-entity-state">{entityStatus(node)}</span>
+      <span className="pulse-field-entity-badge">
+        <span className="pulse-monitor-dot" aria-hidden />
+        {monitor.badge}
+      </span>
+      {monitor.detail ? (
+        <span className="pulse-field-entity-activity">{monitor.detail}</span>
+      ) : null}
     </button>
   );
 }
 
-function entityStatus(node: PulseNode, detailed = false): string {
+type MonitorTone = "pending" | "live" | "hot" | "paused" | "scanning";
+
+function entityMonitorPresentation(
+  node: PulseNode,
+  scanning: boolean,
+  now: number | null,
+): { tone: MonitorTone; badge: string; detail: string | null } {
+  if (scanning) {
+    return { tone: "scanning", badge: "Scanning sources", detail: null };
+  }
+  if (!node.monitoringActive) {
+    return { tone: "paused", badge: "Paused", detail: "Monitoring is off" };
+  }
+  if (!node.lastCheckedAt) {
+    return {
+      tone: "pending",
+      badge: "Needs first scan",
+      detail: "Run Check now to activate",
+    };
+  }
+  if (node.urgentCount > 0) {
+    return {
+      tone: "hot",
+      badge: countPhrase(node.urgentCount, "1 urgent", `${node.urgentCount} urgent`),
+      detail: signalStatus(node),
+    };
+  }
+  if (node.signalCount > 0 || node.changeCount > 0 || node.decisionCount > 0) {
+    return {
+      tone: "hot",
+      badge: signalStatus(node),
+      detail: checkStatus(node.lastCheckedAt, now),
+    };
+  }
+  if (node.cardIds.length > 0) {
+    return {
+      tone: "hot",
+      badge: "In today’s brief",
+      detail: checkStatus(node.lastCheckedAt, now),
+    };
+  }
+  return {
+    tone: "live",
+    badge: "Live",
+    detail: checkStatus(node.lastCheckedAt, now),
+  };
+}
+
+function signalStatus(node: PulseNode, detailed = false): string {
   const signals = countPhrase(node.signalCount, "1 signal", `${node.signalCount} signals`);
   const details = [
     node.urgentCount > 0
@@ -260,5 +405,72 @@ function entityStatus(node: PulseNode, detailed = false): string {
   if (details.length > 0) return details.join(" · ");
   if (node.signalCount > 0) return signals;
   if (node.cardIds.length > 0) return "Connected to today’s brief";
-  return "Watching";
+  return "No unread signals";
+}
+
+function monitoringLabel(node: PulseNode, scanning: boolean, now: number | null): string {
+  return entityMonitorPresentation(node, scanning, now).badge;
+}
+
+function checkStatus(lastCheckedAt: string | null, now: number | null): string {
+  if (!lastCheckedAt) return "First check pending";
+  if (now == null) return "Source check recorded";
+  const checkedAt = Date.parse(lastCheckedAt);
+  if (!Number.isFinite(checkedAt)) return "Source check recorded";
+  const elapsedMinutes = Math.max(0, Math.floor((now - checkedAt) / 60_000));
+  if (elapsedMinutes < 1) return "Checked just now";
+  if (elapsedMinutes < 60) return `Checked ${elapsedMinutes} min ago`;
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) return `Checked ${elapsedHours} hr ago`;
+  const elapsedDays = Math.floor(elapsedHours / 24);
+  return `Checked ${elapsedDays} d ago`;
+}
+
+function quietReason(node: PulseNode): string {
+  if (!node.monitoringActive) return "Monitoring is paused for this entity.";
+  if (!node.lastCheckedAt) {
+    return "The first source check has not completed yet. Run a check to establish its monitoring state.";
+  }
+  return "No unread signal met the alert threshold on the latest source check.";
+}
+
+function monitoringOverview({
+  watchCount,
+  pendingCheckCount,
+  lastCheckedAt,
+  scanning,
+  scanError,
+  scanResult,
+  now,
+}: {
+  watchCount: number;
+  pendingCheckCount: number;
+  lastCheckedAt: string | null;
+  scanning: boolean;
+  scanError: boolean;
+  scanResult: { entities: number; newAlerts: number } | null;
+  now: number | null;
+}): string {
+  if (scanError) return "Source check failed · retry available";
+  if (scanning) {
+    return countPhrase(watchCount, "Checking 1 active watch…", `Checking ${watchCount} active watches…`);
+  }
+  if (scanResult) {
+    const watches = countPhrase(scanResult.entities, "1 watch checked", `${scanResult.entities} watches checked`);
+    const alerts = scanResult.newAlerts === 0
+      ? "no new alerts"
+      : countPhrase(scanResult.newAlerts, "1 new alert", `${scanResult.newAlerts} new alerts`);
+    return `${watches} · ${alerts}`;
+  }
+  if (watchCount === 0) return "No active watches";
+  const watches = countPhrase(watchCount, "1 active watch", `${watchCount} active watches`);
+  if (pendingCheckCount > 0) {
+    const pending = countPhrase(
+      pendingCheckCount,
+      "1 needs first scan",
+      `${pendingCheckCount} need first scan`,
+    );
+    return `${watches} · ${pending}`;
+  }
+  return `${watches} · ${checkStatus(lastCheckedAt, now)}`;
 }

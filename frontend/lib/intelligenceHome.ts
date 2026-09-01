@@ -42,6 +42,8 @@ export type PulseNode = {
   id: string;
   name: string;
   active: boolean;
+  monitoringActive: boolean;
+  lastCheckedAt: string | null;
   signalCount: number;
   urgentCount: number;
   changeCount: number;
@@ -58,6 +60,9 @@ export type MorningPulseModel = {
   changeCount: number;
   decisionCount: number;
   urgentCount: number;
+  watchCount: number;
+  pendingCheckCount: number;
+  lastCheckedAt: string | null;
   nodes: PulseNode[];
   connectionLabel: string | null;
   cards: IntelligenceObject[];
@@ -475,7 +480,8 @@ export function buildMorningPulse(input: {
   ) || uniqueCount(cards.filter((card) => card.kind === "decision"), (card) => card.id);
   const urgentCount = unread.filter((a) => a.is_urgent).length;
 
-  const rankedEntities = [...input.entities].sort((a, b) => {
+  const monitoringEntities = input.entities.filter((entity) => entity.is_active !== false);
+  const rankedEntities = [...monitoringEntities].sort((a, b) => {
     const score = (ent: WatchedEntity) => unread.reduce((total, alert) => {
       if (!alertMatchesEntity(alert, ent)) return total;
       return total
@@ -498,6 +504,8 @@ export function buildMorningPulse(input: {
       id: ent.id,
       name: ent.name,
       active: isEntityLit(ent, unread, cards),
+      monitoringActive: ent.is_active !== false,
+      lastCheckedAt: ent.last_checked || null,
       signalCount: entityAlerts.length,
       urgentCount: entityAlerts.filter((alert) => alert.is_urgent).length,
       changeCount: entityAlerts.filter(
@@ -527,12 +535,21 @@ export function buildMorningPulse(input: {
     || (input.digest?.id ? `/dashboard/read/${input.digest.id}` : null);
 
   const connected = cards[0]?.connected ?? null;
+  const lastCheckedAt = monitoringEntities.reduce<string | null>((latest, entity) => {
+    if (!entity.last_checked) return latest;
+    if (!latest) return entity.last_checked;
+    return Date.parse(entity.last_checked) > Date.parse(latest) ? entity.last_checked : latest;
+  }, null);
+  const pendingCheckCount = monitoringEntities.filter((entity) => !entity.last_checked).length;
 
   return {
     line,
     changeCount,
     decisionCount,
     urgentCount,
+    watchCount: monitoringEntities.length,
+    pendingCheckCount,
+    lastCheckedAt,
     nodes,
     connectionLabel: connected ? shortLabel(connected, 22) : null,
     cards,

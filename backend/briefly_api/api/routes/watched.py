@@ -48,6 +48,9 @@ class WatchedEntityOut(BaseModel):
     kind: str
     keywords: list[str]
     aliases: list[str] = []
+    is_active: bool = True
+    last_checked: datetime | None = None
+    last_alerted_at: datetime | None = None
     unread_count: int = 0
     relationship_to_user: str = "watch"
     last_states: list[EntityStateOut] = []
@@ -109,6 +112,9 @@ def _serialize_entity(
         kind=r.kind,
         keywords=list(r.keywords or []),
         aliases=list(r.aliases or []),
+        is_active=bool(r.is_active),
+        last_checked=r.last_checked,
+        last_alerted_at=r.last_alerted_at,
         unread_count=unread,
         relationship_to_user=getattr(r, "relationship_to_user", None) or "watch",
         last_states=[EntityStateOut.model_validate(s) for s in (last_states or [])],
