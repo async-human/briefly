@@ -10,7 +10,7 @@ The dashboard answers only:
 
 Everything else is progressive disclosure. If the user still has to scan twenty cards to find the three that matter, Briefly has not solved overload — it has summarized it.
 
-Full destination: [`FEEDLY_DIRECTION.md`](FEEDLY_DIRECTION.md). Implementation log: [`FEATURES.md`](FEATURES.md).
+Full destination and phases: [`ROADMAP.md`](ROADMAP.md). Implementation log: [`FEATURES.md`](FEATURES.md).
 
 ---
 

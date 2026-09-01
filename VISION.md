@@ -1,8 +1,8 @@
 # Briefly — Vision & North Star
 
 *The durable answer to "what is Briefly?" Read alongside [PRODUCT.md](PRODUCT.md)
-(scope discipline) and the project memory. When a new idea shows up, test it
-against this file first.*
+(scope discipline) and [ROADMAP.md](ROADMAP.md) (phases and gates). When a new idea
+shows up, test it against this file first.*
 
 ---
 

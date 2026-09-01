@@ -3,6 +3,9 @@
 *Single source of truth for what Briefly **is**, what's **in** it, and what we're
 deliberately **not** building. Read this before proposing or building any feature.*
 
+**Phases, gates, and sequencing:** [`ROADMAP.md`](ROADMAP.md)  
+**What has shipped:** [`FEATURES.md`](FEATURES.md)
+
 ---
 
 ## The spine (one sentence)

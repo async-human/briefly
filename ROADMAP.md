@@ -1,253 +1,305 @@
-# Briefly Product Roadmap
+# Briefly — Product Roadmap
 
-**North star:** An agent-centric second brain that automates personal knowledge curation with minimal ongoing friction — passive ingestion + active brain dumps → a living **Personal Relevance Vector** → a noise-free morning intelligence report mapped to the user's stack, projects, and cognitive context.
+**Single source of truth** for what Briefly is, where it is going, and what ships next.
 
-**Current baseline (June 2026):** ~75–80% of the V1 daily-brief core is built. ~58–65% of the full autonomous second-brain vision. This doc sequences the gap into three shippable phases.
+**Companion docs (different jobs — not roadmaps):**
 
----
+| Doc | Purpose |
+|-----|---------|
+| [`PRODUCT.md`](PRODUCT.md) | Scope discipline, feature map, stop rule |
+| [`VISION.md`](VISION.md) | Identity evolution (read → remember → act) |
+| [`FEATURES.md`](FEATURES.md) | Living log of what has shipped |
+| [`SURFACE.md`](SURFACE.md) | Dashboard glance-layer UX rules |
+| [`design.md`](design.md) | Visual design system |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Stack and agent pipeline ADR |
 
-## Phase overview
-
-| Phase | Theme | User promise | Timeline (suggested) |
-|-------|--------|--------------|----------------------|
-| **V1** | *Trust the brief* | "Every morning I get a sharp, personalized brief from what I follow — and I can dump thoughts that shape tomorrow." | **Now → 4 weeks** |
-| **V1.5** | *Passive second brain* | "Briefly builds and refreshes my knowledge base while I sleep — I barely manage sources." | **Weeks 5–12** |
-| **V2** | *Active cognitive partner* | "Briefly connects dots I missed, answers questions over everything I've seen, and creates artifacts." | **Months 4–9** |
-
----
-
-## V1 — Trust the brief *(ship & stabilize)*
-
-**Goal:** Make the morning brief reliable, transparent, and differentiated enough that power users return daily. No new major surfaces — harden what exists.
-
-### Already built (protect & polish)
-
-| Capability | Status | Key code |
-|------------|--------|----------|
-| 14-agent pipeline (fetch → relevance → dual-pool plan → write → deliver) | ✅ Wired | `backend/briefly_api/agents/pipeline.py` |
-| Dual-pool sections: **What's new** + **Highly relevant to you** | ✅ Wired | `agents/planner.py`, `services/digest_sections.py` |
-| Personal Relevance Vector (pgvector + EMA from brain dumps & signals) | ✅ Wired | `agents/relevance.py`, `services/brain_dump.py`, `agents/learning.py` |
-| Brain Dump text + voice (STT → structure → profile update → brief inject) | ✅ Wired | `api/routes/capture.py`, `BrainDumpOverlay.tsx` |
-| Source connectors (RSS, YouTube, Reddit, URL, Gmail, Readwise, email forward) | ✅ Wired | `services/connectors/` |
-| Scheduled + on-demand generation (same pipeline) | ✅ Wired | `workers/scheduler.py`, `services/briefing.py` |
-| Skipped-items transparency (reading mode) | ✅ Wired | `digest.meta.skipped`, read UI |
-| Gmail metadata discovery + nightly footprint RSS auto-add | ✅ Partial | `gmail_discovery.py`, `footprint_scanner.py` |
-
-### V1 must-ship (gaps to close)
-
-#### 1. Reliability & empty states
-- [x] **Pipeline never saves 0-item digests** when planner selected items (writer fallbacks + persist guard).
-- [x] **Harden profile/topic_cluster parsing** across all agents (`profile_utils.py`, learning, interest_discovery, writer).
-- [ ] **Integration tests** for `run_for_user`: mock sources → non-empty digest with sections.
-- [x] **Frontend:** clear "Regenerate briefing" when digest is empty but sources exist.
-
-#### 2. Brief quality bar
-- [x] **"Why this matters to you"** always references profile — validator + rewrite in `briefing_writer.py`.
-- [ ] **Never-show & topic filters** respected end-to-end (relevance agent ✅; verify settings UI → DB → pipeline).
-- [ ] **RSS catalog audit** — all suggested sources validate; dead feeds removed (`scripts/audit_catalog_feeds.py` in CI).
-
-#### 3. Voice capture production-grade
-- [ ] Audio-first periodic Whisper during recording (preview endpoint ✅).
-- [ ] Confirm ffmpeg on Railway for WebM → WAV.
-- [ ] Fallback path when final STT fails but preview transcript exists.
-
-#### 4. Zero-friction basics (V1 scope only)
-- [x] Auto-regenerate brief on source add/remove (✅ dashboard).
-- [x] **Stale landing roadmap** — updated `Roadmap.tsx` (V1 + V1.5 shipped items).
-- [x] Onboarding: warm-start ingestion on complete; first brief on dashboard load.
-
-#### 5. Ops & economics (minimum)
-- [x] Env checklist in deploy docs: `.env.example` deploy section.
-- [x] Log pipeline stage timings + item counts per run (observability).
-- [ ] Target: **&lt; $0.50/user/day** at V1 scale (real-time APIs only; batch deferred to V1.5).
-
-### V1 success metrics
-- ≥ **60% D7 retention** for users who complete first brief.
-- ≥ **90%** of generate runs produce ≥ 5 items when ≥ 2 fetchable sources exist.
-- ≥ **20%** of active users submit ≥ 1 brain dump / week.
-- Median time-to-first-brief **&lt; 3 min** after onboarding.
-
-### V1 explicit non-goals
-- Paywall breaking, overnight full-text batch, audio briefs, Ask Briefly chat, serendity engine, camera capture.
+**Last updated:** 2026-09-01
 
 ---
 
-## V1.5 — Passive second brain *(ingest while you sleep)*
+## 1. What Briefly is
 
-**Goal:** Shift from "briefing app that fetches at 7am" to "system that continuously ingests, embeds, and scores — morning run is mostly *select + write*."
+### One-liner
 
-### Architecture shift
+> **Briefly is decision intelligence for AI founders:** it monitors the sources and entities you care about, remembers how evidence and assumptions evolved, and turns material changes into cited briefs and reviewable next steps — with zero PKM upkeep.
+
+### Spine (every feature must connect here)
+
+> Briefly reads everything you follow, remembers it, and hands you one personal briefing you can talk to.
+
+Three layers, in roadmap order:
+
+1. **Read** — ingest only what the user chose; morning brief + proactive alerts
+2. **Remember** — compounding memory: threads, snapshots, decision history, Ask Briefly
+3. **Act** — grounded drafts and actions with human approval (earned, not yet broad)
+
+### Beachhead
+
+**AI/software founders and solo builders** (5–50 person companies) who:
+
+- Subscribe to too much and carry backlog guilt
+- Abandoned Notion/Obsidian because upkeep became their job
+- Pay for time-savers; falling behind has direct business cost
+
+Broader personas (investors, PMs, engineers) use the same engine later — **one persona deep first.**
+
+### Who it is not for
+
+Casual consumers and anyone wanting a general assistant. Briefly wins on **your sources + your history**, not the open web.
+
+---
+
+## 2. Canonical decisions (resolves old doc conflicts)
+
+These replace contradictory guidance spread across retired roadmap files.
+
+| Topic | **Canonical decision** | Retired / wrong direction |
+|-------|------------------------|---------------------------|
+| Primary identity | Decision intelligence + cited brief | Generic “second brain” / PKM app |
+| Core pain | **Maintenance tax** (no tagging, filing, revisiting) | “Too much information” alone |
+| Product loop | Observe → detect change → connect history → assess impact → recommend action → approve → learn | Article feed → summarize |
+| Phase gates | Commercial + retention proof before next phase | Ship features because code is done |
+| Graph UI | **Parked** — surface history as sentences in brief/Ask | Knowledge graph as hero surface |
+| Ask Briefly | **Shipped** — corpus-first chat (`/ask`, orb) | “V2 non-goal” (obsolete) |
+| Free tier | **Shipped** — free tier exists for activation | “No free beyond trial” (aspirational only) |
+| Pilot pricing | Test **$49–99/mo** with concierge pilots | Must match $9 founding on site today |
+| Voice / WhatsApp / desktop | Phase 3+ ambient layer | Priority now |
+| Feedly-style AI Feeds | **Do not build** query-builder feeds | Copy Feedly’s filter console |
+| Detectors | **Three first** (pricing, API/model, product/changelog) | Add fourth before precision holds |
+| New top-level surfaces | **Frozen** until Today + Memory cohere | New pages per feature |
+
+---
+
+## 3. North star and moat
+
+### North star metric
+
+> **Weekly paid accounts that take at least one evidence-backed action from Briefly — or confirm a Briefly signal changed or prioritized a decision.**
+
+Supporting: useful-signal rate, citation coverage, D30/D60 retention, active decision threads, time to first decision-worthy signal.
+
+### The moat (four compounding assets)
+
+1. **Context** — company, competitors, stack, strategic questions
+2. **Temporal intelligence** — versioned changes, threads, invalidated assumptions
+3. **Decision outcomes** — what was accepted, edited, acted on, result
+4. **Workflow embed** — shared watches, team memory (later)
+
+**Moat maturity today:** ~Level 1–2 (personalized brief + pieces of temporal memory). Not commercially proven until retention and willingness to pay validate accumulated context.
+
+### Four defensible wedges (pick depth, not breadth)
+
+1. **Compound context** — automatic graph/memory; switching cost grows weekly
+2. **Write-back** — track entity, save thread, draft memo (approval-gated)
+3. **Curation / packs** — high-signal founder universe, not “connect RSS”
+4. **Ambient delivery** — 08:00 brief, proactive alerts (voice/messaging later)
+
+---
+
+## 4. Product loop and objects
+
+### User-facing promise
+
+> Know what changed, why it matters **to you**, what it changes about what you believed, and what you should do next.
+
+### Pipeline (articles are evidence, not the product)
 
 ```
-TODAY (V1)                          TARGET (V1.5)
-─────────────                         ───────────────
-User's digest_time ──► fetch+score   Overnight worker ──► RawContent + embeddings
-         │                                      │
-         └──► write brief (all in one)  Morning worker ──► plan + write from DB pool
+Company context → Tracked universe → Signal detection → Event clustering
+→ Change detection → Verification → Company impact
+→ Decision thread + brief → Recommended action → Feedback → Relevance DNA
 ```
 
-### 1. Decouple ingestion from generation
+### Core objects
 
-| Work item | Detail | Status |
-|-----------|--------|--------|
-| **Ingestion worker** | `services/content_ingestion.py` — fetch → upsert `RawContent` → embed → score. | ✅ |
-| **Job queue** | Redis lock via `workers/job_queue.py` (optional; no-op without Redis). | ✅ |
-| **Generation worker** | Pool-first `agents/collector.py` + `services/content_pool.py`. | ✅ |
-| **Idempotency** | Content keyed by `content_hash`; skip re-embed if unchanged. | ✅ |
+| Object | Purpose |
+|--------|---------|
+| `tracked_entities` / watches | Monitoring universe |
+| `entity_snapshots` | Versioned observed state |
+| `signals` + `signal_evidence` | Material change + provenance |
+| `signal_impacts` + `signal_feedback` | Personal impact + quality labels |
+| `decision_threads` | Persistent question, belief, evidence |
+| `digest` / brief items | Daily decision-oriented delivery |
+| Ask threads | Corpus-first Q&A with citations |
 
-### 2. True passive footprint
+### Brief format (six fields)
 
-| Work item | Detail |
-|-----------|--------|
-| **Expand footprint scanner** | Beyond RSS auto-add: track sender frequency, auto-create `email` sources for top newsletters without UI confirm (opt-out in settings). |
-| **Gmail incremental sync** | Store `historyId` / last sync; nightly pull **new** messages only → `RawContent` (not at brief time). |
-| **Click-to-discover v2** | Lower threshold; surface "Briefly found a feed for X — added automatically" toast. |
-| **Interest-driven auto-sources** | `interest_discovery.py` → auto-add when `auto_expand_sources` enabled. | ✅ |
+What changed · Why it matters · Who/what it affects · Past context · Suggested action · Evidence trail
 
-### 3. Full-text strategy (honest, not magic)
+### Dashboard surface rule
 
-Paywall automation is expensive and legally gray. V1.5 picks **lanes**:
+Home answers only: **What changed? Why care? Anything to do?** — 3–5 things at glance (Morning Pulse + ≤3 Intelligence Cards). See [`SURFACE.md`](SURFACE.md).
 
-| Lane | Approach |
-|------|----------|
-| **A. RSS / public web** | Existing `url_scraper` + trafilatura at ingest time. |
-| **B. Email & newsletters** | Full body already in Gmail connector — ingest overnight. |
-| **C. User-owned access** | Readwise, forwarded email, YouTube transcripts. |
-| **D. Publisher RSS only** | No paywall bypass; summarize abstract + link. |
+### vs Feedly (borrow machinery, not philosophy)
 
-- [ ] **Ingest-time scrape** — move URL expansion from pipeline fetch to ingestion worker.
-- [x] **Quality gate** — drop items with &lt; 200 chars clean text unless title+URL suffice (`content_ingestion.py`).
-- [ ] **Explicit UX copy** — "Briefly reads what you have access to; it doesn't break paywalls."
-
-### 4. Batch APIs & cost (from `gemini_prod_strategy.md`)
-
-- [ ] Route **embed batch**, **dedup clustering**, and **brief writer** through provider Batch APIs (11pm–5am user TZ).
-- [ ] Morning job consumes batch results → target **$0.15–0.30/user/day**.
-- [ ] Feature flag: real-time path for "Generate now" button; batch path for scheduled.
-
-### 5. Visible intelligence (deepen trust)
-
-- [x] Dashboard: **"What Briefly ingested last night"** — `IngestionPanel.tsx` + `GET /ingestion/summary`.
-- [x] **Activity feed** on profile — ingestion events in `activity_feed`.
-- [ ] Email preheader: skipped-note from writer (`skipped_note` already partially wired).
-
-### 6. Friction removals
-
-- [ ] **Sources optional at onboarding** — Gmail connect alone can seed first brief via footprint.
-- [x] **Silent first brief** — auto-generate after onboarding (dashboard load + warm-start ingest).
-- [x] **Digest time = delivery only** — ingestion at `ingest_time` (~03:00 local) via scheduler.
-
-### V1.5 success metrics
-- ≥ **70%** of brief items come from content ingested **before** morning generate (not live fetch).
-- ≥ **30%** of users on **auto-source expansion** (opt-in) with &lt; 5% opt-out rate.
-- Ingestion worker p95 **&lt; 10 min** per user per night.
-- Unit cost **≤ $0.30/user/day** at 1k DAU.
+- **Borrow:** signal typing, dedup, entity extraction, evidence bundles
+- **Do not copy:** feed builders, filter consoles, global trend dashboards, article-count metrics, chat-with-selection as core, enterprise collab complexity
+- **Briefly goes further:** state transitions + personal/company impact + decision threads + approved actions
 
 ---
 
-## V2 — Active cognitive partner *(connect, ask, create)*
+## 5. Phased roadmap
 
-**Goal:** Briefly stops being "the best morning email" and becomes **the place you think with your accumulated context** — proactive synthesis, conversational retrieval, multimodal capture.
+Timelines are planning ranges. **A phase starts only when the previous gate is met** — not when the last ticket closed.
 
-Aligned with `gemini_prod_strategy.md` sections 1–4 (V3/V4 features pulled forward where feasible).
+### Phase 0 — Paid validation *(weeks 0–4)*
 
-### 1. Serendipity & dot-connecting engine
+**Promise:** Every morning, the few external changes that could affect my company — connected to my context, with what deserves action.
 
-| Work item | Detail |
-|-----------|--------|
-| **Weekly graph agent** | New `agents/serendipity.py` — embed all `RawContent` from last 90 days; find cross-domain pairs (old save ↔ new email/brain dump). |
-| **Notification / brief section** | "Connections Briefly noticed" — 1–3 synthesized bridges per week. |
-| **Memory upgrade** | Replace keyword `memory.py` threads with embedding-cluster story arcs. |
+**Work:** Founder positioning, structured operating context onboarding, concierge pilots, charge from day one, instrument decision events.
 
-### 2. Ask Briefly (RAG over personal corpus)
+**Gate:** 10 paying pilots · 5 active 4+ weeks · 3 “would be seriously disappointed” · 30% WAU with ≥1 decision-worthy signal/week.
 
-| Work item | Detail |
-|-----------|--------|
-| **Chat API** | `POST /api/v1/ask` — retrieve top-k from `ContentEmbedding` + recent digests + brain dumps. |
-| **Citations required** | Every answer links to source URL / dump / email. |
-| **"Where did I see that?"** | Semantic recovery across all ingested types. |
-| **UI** | Dashboard side panel or `/ask` — chief-of-staff tone. |
-
-### 3. Intent-based deep research agents
-
-| Work item | Detail |
-|-----------|--------|
-| **Mission queue** | User prompt → planner decomposes → sub-agents (search corpus, fetch new Reddit/RSS, synthesize). |
-| **Artifact output** | Markdown report, outline, or flashcards — stored + optional brief inject. |
-| **Async UX** | "Briefly is researching…" → notify when done (email or push). |
-
-### 4. Multimodal capture expansion
-
-| Work item | Detail |
-|-----------|--------|
-| **Lock-screen / widget voice** | PWA or native wrapper for one-tap brain dump (extend existing overlay). |
-| **Camera → brain** | Photo upload → OCR (Vision API) → structure → graph node (extends brain dump pipeline). |
-| **Auto cross-reference** | New dump tagged against last 48h ingested items (LLM + embedding nearest neighbors). |
-
-### 5. Dynamic audio brief (optional premium)
-
-| Work item | Detail |
-|-----------|--------|
-| **Two-host podcast script** | Writer agent variant — dialogue filtered through user goals. |
-| **TTS** | ElevenLabs / OpenAI TTS; 5-min cap. |
-| **Delivery** | Link in email + in-app player. |
-
-### 6. Platform & agent ops (V2 hardening)
-
-| Work item | Detail |
-|-----------|--------|
-| **Agent config** | Skip/disable agents via env; per-user feature flags. |
-| **Separate worker pools** | Ingestion, generation, research, weekly serendipity. |
-| **Evaluation harness** | Golden profiles + source fixtures; score relevance@k, section balance, writer quality. |
-
-### V2 success metrics
-- ≥ **40%** WAU use Ask Briefly ≥ 1×/week.
-- ≥ **25%** open weekly serendipity digest.
-- NPS **≥ 50** among 90-day retained users.
-- Research missions complete with citation coverage **≥ 95%**.
+**If gate fails:** change niche, universe, or brief format — not more features.
 
 ---
 
-## Cross-phase technical debt (address incrementally)
+### Phase 1 — Trustworthy signal engine *(weeks 5–10)* **← current focus**
 
-| Item | V1 | V1.5 | V2 |
-|------|----|----|-----|
-| `source_weights` in `topic_clusters` hack | Fix schema | ✅ | — |
-| Monolithic FastAPI process | Accept | Split workers | Full queue |
-| Redis unused | — | ✅ Required | Scale |
-| No agent tests | Smoke tests | Ingestion tests | Eval harness |
-| Landing page vs product drift | Fix copy | — | — |
+**Promise:** Briefly notices changes I cannot afford to miss and shows why they matter.
 
----
+**Deliverables:**
 
-## Mapping vision pillars → phases
+- Tracked universe with live monitoring status (pending / live / hot)
+- Change detectors: pricing, API/model, product/changelog (no fourth until precision holds)
+- Evidence bundles: previous vs new state, confidence, corroboration
+- Six-part decision brief + evaluation harness (`signals/eval`)
+- Engineering hardening: worker/web split, scheduler reliability, rate limits, cost ledger
 
-| Vision pillar | V1 | V1.5 | V2 |
-|---------------|----|----|-----|
-| Multi-agent architecture | Sequential pipeline stable | Queued agent stages | Distributed agents + missions |
-| Passive digital footprint | Gmail discover + footprint scan | Overnight Gmail + auto-sources | Full passive index |
-| Paywall / full-text | On-demand scrape | Ingest-time scrape (honest lanes) | + user-provided sources only |
-| Overnight processing | Footprint only | Ingest + batch LLM | + weekly serendipity graph |
-| Brain Dump | Text + voice ✅ | + widget, auto cross-ref | + camera OCR |
-| Personal Relevance Vector | EMA + relevance agent ✅ | Nightly re-score all pool | Graph-aware vector |
-| Morning tailored brief | Dual-pool + writer ✅ | Pre-ingested pool | + audio + connections |
-| Zero friction | Manual sources OK | Auto sources, silent brief | Ask + research, invisible ops |
+**Gate:** ≥75% precision top-5 signals · <15% false-positive on alerts · ≥95% evidence coverage · ≥40% D30 paid retention.
+
+**Status (see [`FEATURES.md`](FEATURES.md)):** Partial — three detectors, snapshots, threads v0, Ask Briefly, glance dashboard shipped; missions, full impact model, ranking loop not done.
 
 ---
 
-## Suggested next 2 sprints (V1 close-out)
+### Phase 2 — Temporal decision memory *(months 3–5)*
 
-**Sprint A (stability)**
-1. Pipeline persist guard (no empty digests).
-2. RSS catalog CI audit + fix broken feeds.
-3. Profile/cluster defensive parsing audit.
-4. Update landing `Roadmap.tsx`.
+**Promise:** Briefly remembers what we believed, what changed, and what to reconsider.
 
-**Sprint B (trust + delight)**
-1. "Profile updated" / "Ingested last night" transparency panel.
-2. Writer validator for `why_it_matters` personalization.
-3. Onboarding shorten → auto-first-brief.
-4. Basic pipeline integration test.
+**Deliverables:** Decision Threads v1 (confidence from verified evidence), assumption invalidation inline in brief, hybrid retrieval for Ask, outcome feedback labels.
+
+**Gate:** ≥50% D60 retention · 40% WAU get useful historical connection/week · 25% WAU use Decision Threads · 95% citation correctness in decision Ask.
+
+---
+
+### Phase 3 — Closed-loop actions *(months 5–8)*
+
+**Promise:** When something important changes, Briefly prepares the work to respond.
+
+**Actions (approval-gated):** team memo, battlecard update, cost-impact comparison, investigation task, stakeholder email draft, watch/thread updates.
+
+**Architecture:** Propose → evidence → preview → edit → approve → execute → audit → outcome.
+
+**Gate:** 25% paid WAU execute/export an action · 70% drafts accepted with light edits · zero unauthorized external actions.
+
+---
+
+### Phase 4 — Team intelligence *(months 8–12)*
+
+**Promise:** One shared memory of what changed, what we decided, and why.
+
+Shared watches, threads, decision log, Slack delivery, pre-meeting context.
+
+**Gate:** 20 paying teams or $25k MRR · 70% 90-day team retention · team ARPA ≥$250/mo.
+
+---
+
+### Phase 5 — Distribution & packs *(months 12–18)*
+
+Self-serve competitor onboarding, founder intelligence pack, shareable cited cards, referral loops.
+
+**Gate:** $50k MRR · one channel ≥30% new paid · 70% self-serve activation · CAC payback <6 months.
+
+---
+
+### Phase 6 — Category leadership *(months 18–36)*
+
+Improve precision/latency/actions before new personas. Enterprise controls only on demand. Target **~$100k MRR** via higher ARPA (founder Pro + teams), not 2,000 users at $49.
+
+---
+
+## 6. Next 90 days (concrete sequence)
+
+| Sprint | Deliverable | Exit evidence |
+|--------|-------------|---------------|
+| 1 | Scope freeze + operating context + instrumentation | 5 pilots configured |
+| 2 | Signals model + 3 detectors | Reviewable signal records |
+| 3 | Evidence-backed six-part brief | Founder-rated top signals |
+| 4 | Ranking / eval loop | Top-5 precision → 75% |
+| 5 | Decision Threads v1 | ≥1 thread per active pilot |
+| 6 | First action card (memo or task) | ≥5 approved exports |
+
+**Do not start:** fourth detector, mission builder, `/companies` page, team workspaces, Feedly-style feeds, graph expansion, camera capture, desktop app.
+
+---
+
+## 7. Engineering track (platform maturity)
+
+Parallel to commercial phases — harden the machine that delivers the brief.
+
+### V1 — Trust the brief *(now → 4 weeks)*
+
+- Pipeline never saves empty digests when sources exist
+- Personalization validator on “why this matters to you”
+- Voice capture production-grade (Whisper preview, ffmpeg on deploy)
+- Integration tests for `run_for_user`
+- Target: **< $0.50/user/day** at V1 scale
+
+### V1.5 — Passive ingestion *(weeks 5–12)*
+
+- Decouple overnight ingest from morning write (mostly shipped)
+- Ingest-time scrape for public URLs; honest paywall copy
+- Batch APIs for embed/dedup/writer → **$0.15–0.30/user/day**
+- “What Briefly ingested last night” transparency (partial)
+
+### V2 — Cognitive partner *(months 4–9, after Phase 2 gate)*
+
+- Weekly serendipity / dot-connecting agent
+- Deep research missions → markdown artifact
+- Audio brief as personal podcast feed (not play-button-only)
+- pgvector queries in Postgres (not in-memory KNN at scale)
+- Separate worker pools + eval harness
+
+---
+
+## 8. Ask Briefly (chat)
+
+**Status:** Phase A–B shipped.
+
+- **Global Ask** — `/ask` + orb, one thread, corpus-first citations
+- **Contextual follow-up** — from read view, saved, graph (partial)
+- **Later:** proactive chat, async research missions
+
+Chat closes the loop: **Ingest → Brief → Read → Ask → Learn → better Brief.**
+
+Do not rebuild: `FollowUpThread`, `ContentEmbedding`, enrichment cache, graph deep links — extend them.
+
+---
+
+## 9. Anti-roadmap (do not build)
+
+| Temptation | Why avoid |
+|------------|-----------|
+| Own voice/telephony infra | Use providers; moat is curation + memory |
+| 50+ source integrations in V1 | Depth on 10 high-signal sources |
+| Mobile app year 1 | Email + web + extension enough |
+| Knowledge graph as primary UI | Demo-ware; sentences in brief win |
+| Enterprise before $50k MRR | Solo founder; sales kills focus |
+| Multi-language year 1 | English-first until PMF |
+| Autonomous send/post/purchase | Human approval always until trust proven |
+| New top-level nav pages | Deepen Today + Memory first ([`PRODUCT.md`](PRODUCT.md) stop rule) |
+
+---
+
+## 10. Pricing (current vs experiment)
+
+| | Today (product) | Pilot experiment |
+|--|-----------------|------------------|
+| Free | 3 sources, limited brief | — |
+| Pro | $9/mo founding | Test $49–99/mo with concierge |
+| Team | Not shipped | $149–499/mo after Phase 4 gate |
+
+Raise price when decision value and retention prove it — not when feature count grows.
 
 ---
 
@@ -255,6 +307,6 @@ Aligned with `gemini_prod_strategy.md` sections 1–4 (V3/V4 features pulled for
 
 | Date | Change |
 |------|--------|
-| 2026-06-01 | Initial V1 → V1.5 → V2 roadmap from codebase audit + product vision |
-
-*Companion docs: `gemini_prod_strategy.md` (feature imagination), `briefly_prd_v2.docx` (requirements).*
+| 2026-09-01 | **Consolidated** `MOAT_ROADMAP.md`, `PRODUCT_ROADMAP_V2.md`, `PRODUCT_ROADMAP_COMPLEMENT.md`, `FEEDLY_DIRECTION.md`, `CHAT_ROADMAP.md`, engineering `ROADMAP.md`, and retired `gemini_prod_strategy.md` into this file |
+| 2026-08-31 | Moat roadmap and Feedly direction added at root |
+| 2026-06-01 | Original V1 / V1.5 / V2 engineering roadmap |

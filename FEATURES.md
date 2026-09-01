@@ -1,6 +1,6 @@
 # Briefly — implemented features
 
-Living log of what is **in the product**, mapped to the destination in [`FEEDLY_DIRECTION.md`](FEEDLY_DIRECTION.md), the gates in [`MOAT_ROADMAP.md`](MOAT_ROADMAP.md), and the home-screen rule in [`SURFACE.md`](SURFACE.md).
+Living log of what is **in the product**, mapped to [`ROADMAP.md`](ROADMAP.md), the gates in that doc, and the home-screen rule in [`SURFACE.md`](SURFACE.md).
 
 Update this file whenever a capability ships, is reshaped, or is deliberately parked. A rising feature count is not progress unless it moves a signal, a decision, or a retained user.
 
@@ -150,6 +150,7 @@ Do not start these because the last file compiled.
 
 | Date | Commit | What shipped |
 |---|---|---|
+| 2026-09-01 | (this) | Consolidated product docs into `ROADMAP.md`; retired MOAT/FEEDLY/PRODUCT_ROADMAP* files |
 | 2026-09-01 | (this) | Truth layer: conservative Decision Threads, event-aware dedup, structured snapshots, material Pulse counts, visible partial failures, feedback reasons |
 | 2026-08-31 | (this) | Entity snapshots v0: last-known state per watched entity + detector; previous→new on glance from real history |
 | 2026-08-31 | `1cbd662` | Decision Threads v0: persistent question/belief, signal linking, Laplace confidence, glance “Reconsider?” from real movement |
