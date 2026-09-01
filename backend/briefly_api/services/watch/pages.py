@@ -157,6 +157,10 @@ def evaluate_extract(
 
 
 def extract_visible_text(html: str, url: str) -> str:
+    from briefly_api.services.watch.scrape import extract_embedded_text, is_challenge_html
+
+    if is_challenge_html(html or ""):
+        return ""
     text = trafilatura.extract(
         html,
         url=url,
@@ -171,7 +175,10 @@ def extract_visible_text(html: str, url: str) -> str:
     soup = BeautifulSoup(html or "", "html.parser")
     for tag in soup(["script", "style", "noscript", "svg"]):
         tag.decompose()
-    return soup.get_text("\n")
+    fallback = soup.get_text("\n")
+    if not is_thin(canonicalize_extract(fallback)):
+        return fallback
+    return extract_embedded_text(html or "")
 
 
 def _robots_origin(url: str) -> str:
@@ -254,6 +261,21 @@ def _hit_for_change(entity: WatchedEntity, src: EntitySource, decision: ExtractD
     )
 
 
+def _prefer_live_sources(sources: list[EntitySource]) -> list[EntitySource]:
+    """One URL per kind. Prefer a stored extract over a blocked duplicate."""
+    def rank(src: EntitySource) -> tuple[int, int, int]:
+        failing = 1 if (src.last_error or "").strip() else 0
+        hashed = 0 if src.content_hash else 1
+        return (failing, hashed, int(src.consecutive_failures or 0))
+
+    best: dict[str, EntitySource] = {}
+    for src in sources:
+        cur = best.get(src.source_type)
+        if cur is None or rank(src) < rank(cur):
+            best[src.source_type] = src
+    return [best[kind] for kind in ("pricing", "docs", "changelog") if kind in best]
+
+
 async def check_entity_pages(
     session,
     entity: WatchedEntity,
@@ -272,6 +294,7 @@ async def check_entity_pages(
     ).scalars().all()
     if not sources:
         return [], 0
+    sources = _prefer_live_sources(sources)
 
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(minutes=max(5, min_interval_minutes))

@@ -171,7 +171,7 @@ export function coverageLine(coverage?: WatchedEntity["coverage"] | null): strin
   if (coverage.status === "partial") {
     return watching.length
       ? `Official ${watching.join(" · ")} · news for the rest`
-      : "Some official pages pending";
+      : coverage.note || "Some official pages pending";
   }
   if (coverage.status === "skipped") return "News and RSS";
   return coverage.note || "News only — no official pricing, docs, or changelog page confirmed";

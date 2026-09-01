@@ -3,9 +3,10 @@
 We do not crawl the site. For each watched company we try, in order:
 
 1. Catalog pins (known companies)
-2. Labels on the company homepage (Pricing, Docs, Changelog)
-3. sitemap.xml paths that clearly match those surfaces
-4. Same-host well-known paths, only after a homepage actually loaded,
+2. Marketing homepage plus sibling developer/docs/platform hosts
+3. Labels on those pages (Pricing, Docs, Changelog)
+4. sitemap.xml (and one level of sitemap index)
+5. Same-host well-known paths, only after a page actually loaded,
    and only if the URL returns readable content
 
 A candidate is pinned only after that confirmation. A 404 is not a source.
@@ -15,7 +16,6 @@ the official surface is watched.
 from __future__ import annotations
 
 import logging
-import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin, urlparse
@@ -25,7 +25,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from briefly_api.db.models import EntitySource, WatchedEntity
 from briefly_api.services.url_scraper import UrlFetchError, fetch_html
-from briefly_api.services.watch.catalog import catalog_match, normalize_name
+from briefly_api.services.watch.catalog import catalog_match, catalog_pages, normalize_name
 from briefly_api.services.watch.pages import (
     PAGE_SOURCE_TYPES,
     canonicalize_extract,
@@ -35,69 +35,35 @@ from briefly_api.services.watch.pages import (
     robots_status,
 )
 from briefly_api.services.watch.relevance import canonicalize_url
+from briefly_api.services.watch.scrape import (
+    classify_page_url,
+    extract_labeled_links,
+    host_of as _host,
+    is_challenge_html,
+    is_sitemap_index,
+    pages_from_sitemap,
+    sibling_origins,
+    sitemap_locs,
+    well_known_candidates,
+)
 
 log = logging.getLogger(__name__)
 
 _DISCOVERY_TTL = timedelta(hours=24)
-_MAX_CONFIRMS = 6
-_SITEMAP_LOCS = 80
+_MAX_CONFIRMS = 10
+_SITEMAP_CHILDREN = 3
 
-_PRICING = re.compile(
-    r"\b(pricing|plans?|price list|packaging|api pricing)\b", re.I
-)
-_CHANGELOG = re.compile(
-    r"\b(changelog|release notes|what'?s new|releases|release notes)\b", re.I
-)
-_DOCS = re.compile(
-    r"\b(docs?|documentation|api reference|developers?|developer hub)\b", re.I
-)
-_PATH_PRICING = re.compile(r"/(?:api/)?pricing(?:/|$)|/plans(?:/|$)", re.I)
-_PATH_CHANGELOG = re.compile(
-    r"/(?:changelog|releases|release-notes|whats-new|what's-new)(?:/|$)", re.I
-)
-_PATH_DOCS = re.compile(r"/(?:docs?|documentation|developers?|api)(?:/|$)", re.I)
-
-_PROBES = {
-    "pricing": ("/pricing", "/plans"),
-    "changelog": ("/changelog", "/releases"),
-    "docs": ("/docs", "/developers"),
-}
-
-_RELATED_PREFIX = ("docs.", "platform.", "developers.", "developer.", "api.")
-
-
-def classify_page_url(url: str, anchor: str = "") -> str | None:
-    """Map a URL (and optional link text) to pricing | docs | changelog."""
-    parsed = urlparse(url or "")
-    path = parsed.path or "/"
-    host = (parsed.netloc or "").lower()
-    blob = f"{anchor} {path} {host}"
-    if _PRICING.search(blob) or _PATH_PRICING.search(path):
-        return "pricing"
-    if _CHANGELOG.search(blob) or _PATH_CHANGELOG.search(path):
-        return "changelog"
-    if _DOCS.search(blob) or _PATH_DOCS.search(path):
-        return "docs"
-    if any(host.startswith(p) for p in _RELATED_PREFIX):
-        return "docs"
-    return None
-
-
-def _host(url: str) -> str:
-    return (urlparse(url or "").netloc or "").lower().removeprefix("www.")
-
-
-def _related_host(page_url: str, link_url: str, entity_name: str) -> bool:
-    page_host = _host(page_url)
-    link_host = _host(link_url)
-    if not page_host or not link_host:
-        return False
-    if page_host == link_host:
-        return True
-    if link_host.endswith("." + page_host) or page_host.endswith("." + link_host):
-        return True
-    slug = normalize_name(entity_name).replace(" ", "")
-    return bool(slug) and len(slug) >= 4 and slug in link_host.replace("-", "")
+# Re-export for existing tests and pin API.
+__all__ = [
+    "classify_page_url",
+    "coverage_from_sources",
+    "extract_labeled_links",
+    "homepage_candidates",
+    "maybe_discover_pages",
+    "pages_from_sitemap",
+    "pin_official_page",
+    "well_known_candidates",
+]
 
 
 def homepage_candidates(name: str, *, source_hosts: list[str] | None = None) -> list[str]:
@@ -117,9 +83,15 @@ def homepage_candidates(name: str, *, source_hosts: list[str] | None = None) -> 
         site = str(catalog.get("site") or "").strip()
         if site:
             add(site)
+            for sibling in sibling_origins(site):
+                add(sibling)
         blog = str(catalog.get("blog") or "").strip()
         if blog:
             parsed = urlparse(blog)
+            if parsed.netloc:
+                add(f"{parsed.scheme or 'https'}://{parsed.netloc}")
+        for _kind, page in catalog_pages(name):
+            parsed = urlparse(page)
             if parsed.netloc:
                 add(f"{parsed.scheme or 'https'}://{parsed.netloc}")
     slug = normalize_name(name).replace(" ", "")
@@ -128,67 +100,17 @@ def homepage_candidates(name: str, *, source_hosts: list[str] | None = None) -> 
         add(f"https://{slug}.com")
         add(f"https://{slug}.ai")
         add(f"https://www.{slug}.ai")
+        for sibling in sibling_origins(f"{slug}.com"):
+            add(sibling)
+        for sibling in sibling_origins(f"{slug}.ai"):
+            add(sibling)
     for host in source_hosts or []:
         host = (host or "").removeprefix("www.")
         if host and "." in host and "google.com" not in host and "github.com" not in host:
             add(f"https://{host}")
-    return out[:6]
-
-
-def extract_labeled_links(page_url: str, html: str, entity_name: str) -> list[tuple[str, str]]:
-    """Official-surface links declared on the homepage. At most one URL per kind."""
-    found: dict[str, str] = {}
-    for match in re.finditer(
-        r"<a\b[^>]*\bhref=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>",
-        html or "",
-        re.I | re.S,
-    ):
-        href = match.group(1).strip()
-        if not href or href.startswith(("#", "mailto:", "javascript:", "tel:")):
-            continue
-        text = re.sub(r"<[^>]+>", " ", match.group(2))
-        text = " ".join(text.split())
-        absolute = urljoin(page_url, href).split("#", 1)[0]
-        if not _related_host(page_url, absolute, entity_name):
-            continue
-        kind = classify_page_url(absolute, text)
-        if not kind or kind in found:
-            continue
-        found[kind] = canonicalize_url(absolute) or absolute
-        if len(found) >= 3:
-            break
-    return [(kind, found[kind]) for kind in ("pricing", "docs", "changelog") if kind in found]
-
-
-def pages_from_sitemap(xml: str, origin: str, entity_name: str) -> list[tuple[str, str]]:
-    found: dict[str, str] = {}
-    locs = re.findall(r"<loc>\s*([^<\s]+)\s*</loc>", xml or "", re.I)
-    for loc in locs[:_SITEMAP_LOCS]:
-        url = loc.strip()
-        if not _related_host(origin, url, entity_name):
-            continue
-        kind = classify_page_url(url)
-        if not kind or kind in found:
-            continue
-        found[kind] = canonicalize_url(url) or url
-        if len(found) >= 3:
-            break
-    return [(kind, found[kind]) for kind in ("pricing", "docs", "changelog") if kind in found]
-
-
-def well_known_candidates(homepage: str, missing: set[str]) -> list[tuple[str, str]]:
-    """Same-host path guesses. Callers must confirm before pinning."""
-    parsed = urlparse(homepage)
-    origin = f"{parsed.scheme or 'https'}://{parsed.netloc}"
-    out: list[tuple[str, str]] = []
-    for kind in ("pricing", "docs", "changelog"):
-        if kind not in missing:
-            continue
-        for path in _PROBES[kind]:
-            key = canonicalize_url(urljoin(origin.rstrip("/") + "/", path.lstrip("/")))
-            if key:
-                out.append((kind, key))
-    return out
+            for sibling in sibling_origins(host):
+                add(sibling)
+    return out[:12]
 
 
 def coverage_from_sources(sources: list[EntitySource]) -> dict:
@@ -216,18 +138,26 @@ def coverage_from_sources(sources: list[EntitySource]) -> dict:
             }
         )
     kinds = {p["source_type"] for p in pages}
-    watching = {p["source_type"] for p in pages if p["status"] in {"watching", "pending"}}
-    if len(watching) >= 3:
+    live = {p["source_type"] for p in pages if p["status"] in {"watching", "pending"}}
+    found = {p["source_type"] for p in pages if p["status"] in {"watching", "pending", "failing", "blocked"}}
+    if len(live) >= 3:
         status = "official"
         note = "Watching official pricing, docs, and changelog pages."
-    elif watching:
+    elif live:
         missing = [k for k in ("pricing", "docs", "changelog") if k not in kinds]
         status = "partial"
-        watched = ", ".join(sorted(watching))
+        watched = ", ".join(sorted(live))
         note = (
             f"Watching official {watched}. "
             + (f"Not yet watching {', '.join(missing)}. " if missing else "")
             + "News and RSS still run."
+        )
+    elif found:
+        status = "partial"
+        blocked = ", ".join(sorted(found))
+        note = (
+            f"Found official {blocked}, but the page was blocked or unreadable this cycle. "
+            "News and RSS still run."
         )
     else:
         status = "news_only"
@@ -285,10 +215,54 @@ async def _confirm_readable(url: str) -> bool:
         return False
     try:
         _final, html = await fetch_html(url)
+        if is_challenge_html(html):
+            return False
         text = extract_visible_text(html, url)
     except (UrlFetchError, Exception):
         return False
     return not is_thin(canonicalize_extract(text))
+
+
+async def _open_homepage(guesses: list[str]) -> tuple[str, str]:
+    for guess in guesses:
+        if robots_status(guess) != "allow":
+            continue
+        try:
+            final_url, html = await fetch_html(guess)
+        except Exception:
+            continue
+        if is_challenge_html(html):
+            continue
+        homepage = canonicalize_url(final_url) or guess
+        return homepage, html
+    return "", ""
+
+
+async def _sitemap_pages(homepage: str, entity_name: str, missing: set[str], seen_urls: set[str]) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+    sitemap_url = urljoin(homepage.rstrip("/") + "/", "sitemap.xml")
+    try:
+        if robots_status(sitemap_url) != "allow":
+            return out
+        _final, xml = await fetch_html(sitemap_url)
+    except Exception:
+        return out
+    xmls = [xml]
+    if is_sitemap_index(xml):
+        for child in sitemap_locs(xml, limit=_SITEMAP_CHILDREN):
+            try:
+                if robots_status(child) != "allow":
+                    continue
+                _f, child_xml = await fetch_html(child)
+                xmls.append(child_xml)
+            except Exception:
+                continue
+    for blob in xmls:
+        for kind, url in pages_from_sitemap(blob, homepage, entity_name):
+            if kind in missing and url not in seen_urls:
+                out.append((kind, url))
+                seen_urls.add(url)
+    return out
 
 
 async def maybe_discover_pages(session, entity: WatchedEntity, *, force: bool = False) -> None:
@@ -302,7 +276,7 @@ async def maybe_discover_pages(session, entity: WatchedEntity, *, force: bool = 
             select(EntitySource).where(EntitySource.entity_id == entity.id)
         )
     ).scalars().all()
-    have = {s.source_type for s in existing if s.source_type in PAGE_SOURCE_TYPES}
+    have = {s.source_type for s in existing if s.source_type in PAGE_SOURCE_TYPES and not (s.last_error or "").strip()}
     rules = dict(entity.monitoring_rules or {})
     previous = dict(rules.get("page_discovery") or {})
     attempted = previous.get("attempted_at")
@@ -311,8 +285,12 @@ async def maybe_discover_pages(session, entity: WatchedEntity, *, force: bool = 
             ts = datetime.fromisoformat(str(attempted).replace("Z", "+00:00"))
             if ts.tzinfo is None:
                 ts = ts.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) - ts < _DISCOVERY_TTL:
+            if datetime.now(timezone.utc) - ts < _DISCOVERY_TTL and len(have) >= 3:
                 return
+            if datetime.now(timezone.utc) - ts < _DISCOVERY_TTL and not force:
+                # Retry sooner when coverage is still news-only / partial.
+                if have:
+                    return
         except ValueError:
             pass
 
@@ -322,56 +300,40 @@ async def maybe_discover_pages(session, entity: WatchedEntity, *, force: bool = 
         return
 
     hosts = [_host(s.url) for s in existing]
-    candidates = homepage_candidates(entity.name, source_hosts=hosts)
-    homepage = ""
-    html = ""
-    for guess in candidates:
-        if robots_status(guess) != "allow":
-            continue
-        try:
-            final_url, html = await fetch_html(guess)
-        except Exception:
-            continue
-        if is_thin(canonicalize_extract(extract_visible_text(html, guess))):
-            # Homepage shells are often JS; still use the URL as origin for probes.
-            homepage = canonicalize_url(final_url) or guess
-            break
-        homepage = canonicalize_url(final_url) or guess
-        break
-
-    if not homepage:
-        _set_discovery(
-            entity,
-            status="news_only",
-            note="Could not open a company homepage. News and RSS still run.",
-        )
-        return
+    homepage, html = await _open_homepage(homepage_candidates(entity.name, source_hosts=hosts))
 
     wanted: list[tuple[str, str]] = []
     seen_urls: set[str] = {canonicalize_url(s.url) for s in existing}
-    for kind, url in extract_labeled_links(homepage, html, entity.name):
-        if kind in missing and url not in seen_urls:
-            wanted.append((kind, url))
-            seen_urls.add(url)
 
-    if missing - {k for k, _ in wanted}:
-        try:
-            sitemap_url = urljoin(homepage.rstrip("/") + "/", "sitemap.xml")
-            if robots_status(sitemap_url) == "allow":
-                _final, sitemap_xml = await fetch_html(sitemap_url)
-                for kind, url in pages_from_sitemap(sitemap_xml, homepage, entity.name):
-                    if kind in missing and url not in seen_urls:
-                        wanted.append((kind, url))
-                        seen_urls.add(url)
-        except Exception:
-            pass
+    for kind, url in catalog_pages(entity.name):
+        key = canonicalize_url(url) or url
+        if kind in missing and key not in seen_urls:
+            wanted.append((kind, key))
+            seen_urls.add(key)
 
-    still_missing = missing - {k for k, _ in wanted}
-    wanted.extend(
-        (kind, url)
-        for kind, url in well_known_candidates(homepage, still_missing)
-        if url not in seen_urls
-    )
+    if homepage and html:
+        for kind, url in extract_labeled_links(homepage, html, entity.name):
+            if kind in missing and url not in seen_urls:
+                wanted.append((kind, url))
+                seen_urls.add(url)
+        still = missing - {k for k, _ in wanted}
+        if still:
+            for kind, url in await _sitemap_pages(homepage, entity.name, still, seen_urls):
+                wanted.append((kind, url))
+        still = missing - {k for k, _ in wanted}
+        wanted.extend(
+            (kind, url)
+            for kind, url in well_known_candidates(homepage, still)
+            if url not in seen_urls
+        )
+
+    if not wanted and not homepage:
+        _set_discovery(
+            entity,
+            status="news_only",
+            note="Could not open a company homepage or developer site. News and RSS still run.",
+        )
+        return
 
     confirms = 0
     pinned = 0
@@ -404,7 +366,7 @@ async def maybe_discover_pages(session, entity: WatchedEntity, *, force: bool = 
     else:
         status = "news_only"
         note = (
-            "Homepage opened, but no pricing, docs, or changelog page confirmed. "
+            "Opened a company site, but no pricing, docs, or changelog page confirmed. "
             "News and RSS still run."
         )
     _set_discovery(entity, status=status, note=note, homepage=homepage)

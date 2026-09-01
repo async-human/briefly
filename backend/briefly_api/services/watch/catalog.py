@@ -12,7 +12,9 @@ COMPANY_CATALOG: dict[str, dict] = {
         "blog": "https://openai.com/news/rss.xml",
         "github": "openai",
         "pages": {
-            "pricing": "https://openai.com/api/pricing/",
+            "pricing": "https://developers.openai.com/api/docs/pricing",
+            "docs": "https://developers.openai.com/api/docs",
+            "changelog": "https://developers.openai.com/api/docs/changelog",
         },
         "site": "https://openai.com",
     },
@@ -91,6 +93,10 @@ COMPANY_CATALOG: dict[str, dict] = {
         "name": "NVIDIA",
         "aliases": ["Nvidia", "NVDA"],
         "blog": "https://blogs.nvidia.com/feed/",
+        "pages": {
+            "docs": "https://docs.nvidia.com/",
+        },
+        "site": "https://www.nvidia.com",
     },
     "microsoft": {
         "name": "Microsoft",
@@ -145,6 +151,11 @@ COMPANY_CATALOG: dict[str, dict] = {
     "sarvam": {
         "name": "Sarvam",
         "aliases": ["Sarvam AI", "sarvam.ai"],
+        "pages": {
+            "pricing": "https://www.sarvam.ai/api-pricing",
+            "docs": "https://docs.sarvam.ai/sarvam-api-docs",
+        },
+        "site": "https://www.sarvam.ai",
     },
     "cummins": {
         "name": "Cummins",
@@ -189,6 +200,7 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
 
 HIGH_AUTHORITY_DOMAINS = frozenset({
     "openai.com",
+    "developers.openai.com",
     "anthropic.com",
     "claude.com",
     "platform.claude.com",
@@ -208,6 +220,8 @@ HIGH_AUTHORITY_DOMAINS = frozenset({
     "ft.com",
     "github.com",
     "nvidia.com",
+    "docs.nvidia.com",
+    "docs.sarvam.ai",
     "microsoft.com",
     "stripe.com",
     "vercel.com",

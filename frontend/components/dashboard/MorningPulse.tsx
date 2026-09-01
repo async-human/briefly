@@ -418,7 +418,10 @@ function knownStateEmpty(node: PulseNode): string {
     return "No official pricing, docs, or changelog page confirmed yet. Pin a URL in Settings if we missed it.";
   }
   if (node.coverageStatus === "official" || node.coverageStatus === "partial") {
-    return "The first confirmed official page is stored as a baseline, not an alert. Last-known copy appears once Check now stores an extract.";
+    return (
+      node.coverageLine
+      || "The first confirmed official page is stored as a baseline, not an alert. Last-known copy appears once Check now stores an extract."
+    );
   }
   return "No last-known pricing, API, or product state yet.";
 }

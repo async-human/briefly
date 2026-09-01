@@ -15,10 +15,16 @@ from briefly_api.services.watch.pages import (
 
 def test_catalog_pins_openai_pricing_and_skips_unknown():
     openai = dict(catalog_pages("OpenAI"))
-    assert openai["pricing"] == "https://openai.com/api/pricing/"
+    assert openai["pricing"] == "https://developers.openai.com/api/docs/pricing"
+    assert openai["docs"].startswith("https://developers.openai.com/")
+    assert openai["changelog"].startswith("https://developers.openai.com/")
     assert len(openai) <= 3
     assert catalog_pages("Totally Unknown Co") == []
     assert catalog_pages("Cummins") == []
+    sarvam = dict(catalog_pages("Sarvam"))
+    assert "api-pricing" in sarvam["pricing"]
+    nvidia = dict(catalog_pages("nvidia"))
+    assert nvidia["docs"].startswith("https://docs.nvidia.com")
 
 
 def test_catalog_anthropic_has_official_pages():
@@ -122,9 +128,15 @@ def test_classify_page_url_prefers_pricing_over_docs_path():
     from briefly_api.services.watch.resolve import classify_page_url
 
     assert classify_page_url("https://openai.com/api/pricing/") == "pricing"
+    assert classify_page_url("https://developers.openai.com/api/docs/pricing") == "pricing"
+    assert classify_page_url("https://www.sarvam.ai/api-pricing") == "pricing"
     assert classify_page_url("https://linear.app/changelog") == "changelog"
     assert classify_page_url("https://docs.stripe.com/changelog") == "changelog"
     assert classify_page_url("https://platform.claude.com/docs") == "docs"
+    assert classify_page_url("https://docs.nvidia.com/") == "docs"
+    assert classify_page_url("https://developers.openai.com/llms.txt") is None
+    assert classify_page_url("https://www.sarvam.ai/products/doc-agents") is None
+    assert classify_page_url("https://platform.openai.com/login") is None
     assert classify_page_url("https://example.com/about") is None
 
 
@@ -137,16 +149,28 @@ def test_homepage_candidates_for_unknown_company():
     assert catalog_pages("Cummins") == []
 
 
+def test_homepage_candidates_include_developer_siblings():
+    from briefly_api.services.watch.resolve import homepage_candidates
+    from briefly_api.services.watch.scrape import sibling_origins
+
+    urls = " ".join(homepage_candidates("OpenAI")).lower()
+    assert "developers.openai.com" in urls
+    siblings = " ".join(sibling_origins("https://openai.com"))
+    assert "developers.openai.com" in siblings
+    assert "platform.openai.com" in siblings
+
+
 def test_nav_labels_select_official_pages_without_crawling():
     from briefly_api.services.watch.resolve import extract_labeled_links, well_known_candidates
 
     html = """
     <nav>
-      <a href="/pricing">Pricing</a>
+      <a href="/pricing"><span>Pricing</span></a>
       <a href="https://docs.acme.com/">Docs</a>
       <a href="/blog/why-we-raised">Ignore me</a>
       <a href="/changelog">Changelog</a>
     </nav>
+    <script type="application/json">{"next":"https://acme.com/api-pricing"}</script>
     """
     links = dict(extract_labeled_links("https://acme.com/", html, "Acme"))
     assert links["pricing"] == "https://acme.com/pricing"
@@ -154,6 +178,7 @@ def test_nav_labels_select_official_pages_without_crawling():
     assert links["changelog"] == "https://acme.com/changelog"
     probes = well_known_candidates("https://acme.com/", {"pricing"})
     assert any(url.endswith("/pricing") for _, url in probes)
+    assert any("api-pricing" in url for _, url in probes)
 
 
 def test_sitemap_picks_official_paths_only():
@@ -209,4 +234,41 @@ def test_coverage_includes_last_known_excerpt():
     assert cov["status"] in {"partial", "official"}
     assert cov["pages"][0]["excerpt"]
     assert "$2.50" in cov["pages"][0]["excerpt"]
+
+
+def test_coverage_failing_page_is_not_news_only():
+    from types import SimpleNamespace
+
+    from briefly_api.services.watch.resolve import coverage_from_sources
+
+    cov = coverage_from_sources([
+        SimpleNamespace(
+            source_type="pricing",
+            url="https://openai.com/api/pricing/",
+            last_error="openai.com blocks automated access (403)",
+            content_hash=None,
+            last_extract=None,
+        ),
+    ])
+    assert cov["status"] == "partial"
+    assert cov["pages"][0]["status"] == "failing"
+    assert "unreadable" in cov["note"].lower() or "blocked" in cov["note"].lower()
+
+
+def test_embedded_json_prices_and_challenge_html():
+    from briefly_api.services.watch.pages import extract_visible_text
+    from briefly_api.services.watch.scrape import extract_embedded_text, is_challenge_html, is_sitemap_index
+
+    html = """
+    <html><body><div>Loading</div>
+    <script type="application/ld+json">{"offers":[{"price":"2.50","priceCurrency":"USD"}]}</script>
+    </body></html>
+    """
+    text = extract_embedded_text(html)
+    assert "2.50" in text
+    assert "$" in text or "USD" in text
+    visible = extract_visible_text(html, "https://example.com/pricing")
+    assert "2.50" in visible
+    assert is_challenge_html("<html><title>Just a moment...</title><body>cf-browser-verification</body></html>")
+    assert is_sitemap_index("<sitemapindex><sitemap><loc>https://acme.com/s.xml</loc></sitemap></sitemapindex>")
 
