@@ -111,13 +111,14 @@ function PulseConstellation({
     const len = Math.hypot(dx, dy) || 1;
     const side = Math.abs(dx) > Math.abs(dy);
     const labelPad = side ? 36 : 26;
+    const anchor: "start" | "middle" | "end" = dx < -12 ? "end" : dx > 12 ? "start" : "middle";
     return {
       ...node,
       x,
       y,
       lx: x + (dx / len) * labelPad,
       ly: y + (dy / len) * labelPad + (dy >= 0 ? 5 : -2),
-      anchor: dx < -12 ? "end" : dx > 12 ? "start" : "middle",
+      anchor,
       bend: (i % 2 === 0 ? 10 : -8),
     };
   });
