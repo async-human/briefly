@@ -26,11 +26,6 @@ from briefly_api.services.watch.relevance import WatchHit, canonicalize_url
 log = logging.getLogger(__name__)
 
 PAGE_SOURCE_TYPES = frozenset({"pricing", "docs", "changelog"})
-PAGE_ASPECT = {
-    "pricing": "pricing_positioning",
-    "docs": "model_api",
-    "changelog": "product_release",
-}
 PAGE_LABEL = {
     "pricing": "pricing page",
     "docs": "docs page",

@@ -77,7 +77,6 @@ def classify_change(
     entity_kind: str = "",
     previous_state: str = "",
 ) -> DetectorResult:
-    blob = f"{title} {summary}".lower()
     forced = _PAGE_FORCE.get(source_type)
     if forced:
         confidence = 0.9
@@ -94,6 +93,7 @@ def classify_change(
             supporting_passage=_passage(summary, title),
         )
 
+    blob = f"{title} {summary}".lower()
     pricing = _hits(blob, _PRICING)
     model = _hits(blob, _MODEL_API)
     product = _hits(blob, _PRODUCT)
