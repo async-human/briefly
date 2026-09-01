@@ -12083,7 +12083,7 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 }
 
 /* Hallmark · component: morning-pulse-world · genre: editorial · theme: design.md Art Deco (locked)
- * redesign: engraved plate — hairline ellipse, open nodes, type as the mark
+ * redesign: type plate — HTML names, straight hairlines, no orbit/dots
  * states: default · hover · focus · active · disabled · loading · error · success
  * contrast: pass
  * Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V5
@@ -12217,106 +12217,103 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   color: var(--app-muted);
 }
 
-.pulse-map {
-  display: block;
+.pulse-plate {
+  position: relative;
   width: 100%;
-  max-width: 100%;
-  height: auto;
+  min-height: 14rem;
+  aspect-ratio: 2.35 / 1;
+  max-height: 20rem;
+}
+
+.pulse-plate-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
   overflow: visible;
-  color: var(--app-ink);
 }
 
-.pulse-orbit {
-  fill: none;
-  stroke: var(--app-border-strong);
-  stroke-width: 0.75;
-  vector-effect: non-scaling-stroke;
-}
-
-.pulse-spoke {
-  fill: none;
-  stroke: color-mix(in oklch, var(--app-ink) 18%, transparent);
-  stroke-width: 0.8;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
-}
-
-.pulse-spoke.is-on {
-  stroke: color-mix(in oklch, var(--app-brand) 42%, var(--app-ink));
-  stroke-width: 0.9;
-}
-
-.pulse-link-path {
-  fill: none;
-  stroke: var(--app-brand);
-  stroke-width: 1;
-  stroke-linecap: round;
-  stroke-dasharray: 180;
-  stroke-dashoffset: 180;
-  vector-effect: non-scaling-stroke;
-}
-
-.pulse-map.is-ready .pulse-link-path {
-  animation: pulse-draw var(--app-dur-slow) var(--app-ease-out) forwards;
-}
-
-.pulse-core-ring {
-  fill: none;
+.pulse-plate-lines line {
   stroke: var(--app-ink);
-  stroke-width: 0.85;
-  opacity: 0.28;
+  stroke-opacity: 0.12;
+  stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
-.pulse-core-label {
+.pulse-plate-lines line.is-on {
+  stroke: var(--app-brand);
+  stroke-opacity: 0.55;
+}
+
+.pulse-plate-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  padding: 0.15rem 0.55rem;
+  background: var(--app-surface);
   font-family: var(--font-art-deco), var(--font-serif), Georgia, serif;
-  font-size: 17px;
+  font-size: clamp(1.15rem, 2.4vw, 1.5rem);
   font-weight: 600;
   font-style: normal;
-  letter-spacing: 0.02em;
-  fill: var(--app-ink);
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  color: var(--app-ink);
+  white-space: nowrap;
 }
 
-.pulse-node-dot {
-  fill: var(--app-ink);
-  opacity: 0.38;
-}
-
-.pulse-node-ring {
-  fill: none;
-  stroke: var(--app-brand);
-  stroke-width: 0.85;
-  opacity: 0.55;
-  vector-effect: non-scaling-stroke;
-}
-
-.pulse-node text {
-  font-family: var(--font-sans), system-ui, sans-serif;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.03em;
-  fill: var(--app-ink-secondary);
-}
-
-.pulse-node.is-on .pulse-node-dot {
-  fill: var(--app-brand);
-  opacity: 1;
-}
-
-.pulse-node.is-on text {
-  fill: var(--app-ink);
-}
-
-.pulse-map.is-thinking .pulse-core-ring {
+.pulse-plate.is-thinking .pulse-plate-core {
   animation: pulse-think 2.8s var(--app-ease) infinite;
 }
 
-@keyframes pulse-draw {
-  to { stroke-dashoffset: 0; }
+.pulse-plate-name {
+  position: absolute;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  max-width: 11rem;
+  padding: 0.12rem 0.4rem;
+  background: var(--app-surface);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  color: var(--app-ink-secondary);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.pulse-plate-name.is-on {
+  color: var(--app-ink);
+}
+
+.pulse-plate-name.is-on::after {
+  content: "";
+  display: block;
+  width: 0.85rem;
+  height: 1px;
+  margin: 0.28rem auto 0;
+  background: var(--app-brand);
+}
+
+@media (max-width: 40rem) {
+  .pulse-plate {
+    aspect-ratio: 1.35 / 1;
+    min-height: 16rem;
+    max-height: none;
+  }
+
+  .pulse-plate-name {
+    font-size: 0.75rem;
+    max-width: 7.5rem;
+  }
 }
 
 @keyframes pulse-think {
-  50% { opacity: 0.12; }
+  50% { opacity: 0.45; }
 }
 
 .intel-stack-list {
@@ -12760,13 +12757,8 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulse-map.is-ready .pulse-link-path,
-  .pulse-map.is-thinking .pulse-core-ring {
+  .pulse-plate.is-thinking .pulse-plate-core {
     animation: none;
-  }
-
-  .pulse-map.is-ready .pulse-link-path {
-    stroke-dashoffset: 0;
   }
 
   .glance-card-hit,
