@@ -161,6 +161,11 @@ async def probe_url(url: str) -> None:
     await asyncio.to_thread(_probe_url_sync, url)
 
 
+async def fetch_html(url: str) -> tuple[str, str]:
+    """Return (final_url, html). Raises UrlFetchError."""
+    return await asyncio.to_thread(_fetch_page_sync, url)
+
+
 async def scrape_url(url: str) -> list[NormalizedContent]:
     final_url, html = await asyncio.to_thread(_fetch_page_sync, url)
     article = await asyncio.to_thread(_extract_article_sync, final_url, html)

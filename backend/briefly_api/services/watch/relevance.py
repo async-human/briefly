@@ -32,6 +32,7 @@ class WatchHit:
     is_official: bool = False
     score: float = 0.0
     related_urls: list[str] = field(default_factory=list)
+    previous_state: str = ""
 
 
 def _tokens(text: str) -> set[str]:

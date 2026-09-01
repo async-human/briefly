@@ -877,7 +877,7 @@ class WatchedEntity(Base):
 
 
 class EntitySource(Base):
-    """Where to look for updates on a watched entity (blog RSS, news query, GitHub)."""
+    """Where to look for updates on a watched entity (blog RSS, news, GitHub, pinned pages)."""
 
     __tablename__ = "entity_sources"
     __table_args__ = (
@@ -892,6 +892,10 @@ class EntitySource(Base):
     source_type: Mapped[str] = mapped_column(String(40), default="news")
     url: Mapped[str] = mapped_column(Text, nullable=False)
     last_fetched: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    content_hash: Mapped[str | None] = mapped_column(String(64))
+    last_extract: Mapped[str | None] = mapped_column(Text)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

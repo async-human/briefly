@@ -61,6 +61,13 @@ def _passage(summary: str, title: str) -> str:
     return text[:400]
 
 
+_PAGE_FORCE = {
+    "pricing": DETECTOR_PRICING,
+    "docs": DETECTOR_MODEL_API,
+    "changelog": DETECTOR_PRODUCT,
+}
+
+
 def classify_change(
     *,
     title: str,
@@ -68,8 +75,25 @@ def classify_change(
     source_type: str = "",
     entity_name: str = "",
     entity_kind: str = "",
+    previous_state: str = "",
 ) -> DetectorResult:
     blob = f"{title} {summary}".lower()
+    forced = _PAGE_FORCE.get(source_type)
+    if forced:
+        confidence = 0.9
+        if entity_kind in ("company", "product") and entity_name:
+            confidence = 0.95
+        claim = (summary or title or "").strip().split("\n", 1)[0][:240] or (title or "").strip()[:240]
+        new_state = (summary or "").strip()[:240] or claim
+        return DetectorResult(
+            detector_type=forced,
+            confidence=confidence,
+            previous_state=(previous_state or "")[:240],
+            new_state=new_state,
+            extracted_claim=claim,
+            supporting_passage=_passage(summary, title),
+        )
+
     pricing = _hits(blob, _PRICING)
     model = _hits(blob, _MODEL_API)
     product = _hits(blob, _PRODUCT)
@@ -87,7 +111,7 @@ def classify_change(
         return DetectorResult(
             detector_type=DETECTOR_OTHER,
             confidence=0.25,
-            previous_state="",
+            previous_state=(previous_state or "")[:240],
             new_state=(title or "").strip()[:240],
             extracted_claim=(title or "").strip()[:240],
             supporting_passage=_passage(summary, title),
@@ -100,7 +124,7 @@ def classify_change(
     return DetectorResult(
         detector_type=best_type,
         confidence=round(confidence, 3),
-        previous_state="",
+        previous_state=(previous_state or "")[:240],
         new_state=claim,
         extracted_claim=claim,
         supporting_passage=_passage(summary, title),

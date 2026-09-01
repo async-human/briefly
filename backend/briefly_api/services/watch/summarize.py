@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 
 from briefly_api.llm.adapter import LLMAdapter, Message
+from briefly_api.services.watch.pages import PAGE_SOURCE_TYPES
 from briefly_api.services.watch.relevance import WatchHit
 
 log = logging.getLogger(__name__)
@@ -19,6 +20,13 @@ class AlertCopy:
     summary: str
 
 
+_PAGE_KIND = {
+    "pricing": "pricing page",
+    "docs": "docs page",
+    "changelog": "changelog",
+}
+
+
 def _fallback(entity_name: str, hit: WatchHit) -> AlertCopy:
     what = (hit.title or "").strip() or f"New update related to {entity_name}"
     why = (
@@ -30,6 +38,19 @@ def _fallback(entity_name: str, hit: WatchHit) -> AlertCopy:
     return AlertCopy(what, why, action, hit.is_official, summary)
 
 
+def _page_copy(entity_name: str, hit: WatchHit) -> AlertCopy:
+    kind = _PAGE_KIND.get(hit.source_type, "official page")
+    first = next((ln.strip() for ln in (hit.summary or "").splitlines() if ln.strip()), "")
+    what = first[:240] or f"{entity_name} {kind} changed"
+    why = (
+        f"You're watching {entity_name}. This came from their official {kind}, "
+        "not a news mention of it."
+    )
+    action = "Open the official page"
+    summary = f"What changed: {what}\nWhy it matters: {why}\nAction: {action}"
+    return AlertCopy(what, why, action, True, summary)
+
+
 async def write_alert_copy(
     entity_name: str,
     entity_kind: str,
@@ -37,6 +58,8 @@ async def write_alert_copy(
     *,
     user_id: str | None = None,
 ) -> AlertCopy:
+    if hit.source_type in PAGE_SOURCE_TYPES:
+        return _page_copy(entity_name, hit)
     snippet = (hit.summary or "")[:2400]
     try:
         llm = LLMAdapter()

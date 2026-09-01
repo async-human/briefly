@@ -11,17 +11,28 @@ COMPANY_CATALOG: dict[str, dict] = {
         "aliases": ["Open AI", "openai.com"],
         "blog": "https://openai.com/news/rss.xml",
         "github": "openai",
+        "pages": {
+            "pricing": "https://openai.com/api/pricing/",
+        },
     },
     "anthropic": {
         "name": "Anthropic",
         "aliases": ["AnthropicAI", "Claude"],
         "github": "anthropics",
+        "pages": {
+            "pricing": "https://claude.com/pricing",
+            "docs": "https://platform.claude.com/docs/en/about-claude/models/overview",
+            "changelog": "https://platform.claude.com/docs/en/release-notes/overview",
+        },
     },
     "google deepmind": {
         "name": "Google DeepMind",
         "aliases": ["DeepMind", "Google AI"],
         "blog": "https://deepmind.google/blog/rss.xml",
         "github": "google-deepmind",
+        "pages": {
+            "pricing": "https://ai.google.dev/gemini-api/docs/pricing",
+        },
     },
     "meta ai": {
         "name": "Meta AI",
@@ -33,26 +44,41 @@ COMPANY_CATALOG: dict[str, dict] = {
         "aliases": ["Mistral AI"],
         "blog": "https://mistral.ai/news/rss.xml",
         "github": "mistralai",
+        "pages": {
+            "pricing": "https://mistral.ai/pricing",
+        },
     },
     "cohere": {
         "name": "Cohere",
         "aliases": ["Cohere AI"],
         "github": "cohere-ai",
+        "pages": {
+            "pricing": "https://cohere.com/pricing",
+        },
     },
     "xai": {
         "name": "xAI",
         "aliases": ["xAI", "Grok"],
         "github": "xai-org",
+        "pages": {
+            "pricing": "https://x.ai/api",
+        },
     },
     "perplexity": {
         "name": "Perplexity",
         "aliases": ["Perplexity AI"],
+        "pages": {
+            "pricing": "https://docs.perplexity.ai/guides/pricing",
+        },
     },
     "hugging face": {
         "name": "Hugging Face",
         "aliases": ["HuggingFace", "HF"],
         "blog": "https://huggingface.co/blog/feed.xml",
         "github": "huggingface",
+        "pages": {
+            "pricing": "https://huggingface.co/pricing",
+        },
     },
     "stability ai": {
         "name": "Stability AI",
@@ -74,25 +100,45 @@ COMPANY_CATALOG: dict[str, dict] = {
         "name": "Stripe",
         "blog": "https://stripe.com/blog/feed.rss",
         "github": "stripe",
+        "pages": {
+            "pricing": "https://stripe.com/pricing",
+            "changelog": "https://docs.stripe.com/changelog",
+        },
     },
     "vercel": {
         "name": "Vercel",
         "blog": "https://vercel.com/atom",
         "github": "vercel",
+        "pages": {
+            "pricing": "https://vercel.com/pricing",
+            "changelog": "https://vercel.com/changelog",
+        },
     },
     "cursor": {
         "name": "Cursor",
         "aliases": ["Cursor.sh", "Anysphere"],
         "blog": "https://cursor.com/blog/rss.xml",
+        "pages": {
+            "pricing": "https://cursor.com/pricing",
+            "changelog": "https://cursor.com/changelog",
+        },
     },
     "linear": {
         "name": "Linear",
         "blog": "https://linear.app/blog/rss.xml",
         "github": "linear",
+        "pages": {
+            "pricing": "https://linear.app/pricing",
+            "changelog": "https://linear.app/changelog",
+        },
     },
     "notion": {
         "name": "Notion",
         "blog": "https://www.notion.com/blog/rss.xml",
+        "pages": {
+            "pricing": "https://www.notion.com/pricing",
+            "changelog": "https://www.notion.com/releases",
+        },
     },
     "sarvam": {
         "name": "Sarvam",
@@ -105,16 +151,25 @@ COMPANY_CATALOG: dict[str, dict] = {
     "groq": {
         "name": "Groq",
         "github": "groq",
+        "pages": {
+            "pricing": "https://groq.com/pricing",
+        },
     },
     "together ai": {
         "name": "Together AI",
         "aliases": ["TogetherAI"],
         "github": "togethercomputer",
+        "pages": {
+            "pricing": "https://www.together.ai/pricing",
+        },
     },
     "fireworks": {
         "name": "Fireworks",
         "aliases": ["Fireworks AI"],
         "github": "fw-ai",
+        "pages": {
+            "pricing": "https://fireworks.ai/pricing",
+        },
     },
     "openrouter": {
         "name": "OpenRouter",
@@ -133,8 +188,11 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
 HIGH_AUTHORITY_DOMAINS = frozenset({
     "openai.com",
     "anthropic.com",
+    "claude.com",
+    "platform.claude.com",
     "deepmind.google",
     "ai.google",
+    "ai.google.dev",
     "huggingface.co",
     "arxiv.org",
     "nature.com",
@@ -210,6 +268,23 @@ def catalog_match(name: str) -> dict | None:
         if len(key) >= 6 and (key == cname or key.startswith(cname) or cname.startswith(key)):
             return entry
     return None
+
+
+PAGE_KINDS = ("pricing", "docs", "changelog")
+
+
+def catalog_pages(name: str) -> list[tuple[str, str]]:
+    """Pinned official pages for a catalog company. Never guessed."""
+    entry = catalog_match(name)
+    if not entry:
+        return []
+    pages = entry.get("pages") or {}
+    out: list[tuple[str, str]] = []
+    for kind in PAGE_KINDS:
+        url = str(pages.get(kind) or "").strip()
+        if url:
+            out.append((kind, url))
+    return out[:3]
 
 
 def topic_terms(name: str, extra: list[str] | None = None) -> list[str]:

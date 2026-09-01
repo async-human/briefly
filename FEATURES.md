@@ -4,7 +4,7 @@ Living log of what is **in the product**, mapped to [`ROADMAP.md`](ROADMAP.md), 
 
 Update this file whenever a capability ships, is reshaped, or is deliberately parked. A rising feature count is not progress unless it moves a signal, a decision, or a retained user.
 
-**Last updated:** 2026-09-01 (Signal truth-layer hardening)
+**Last updated:** 2026-09-01 (Pinned official-page watch)
 
 ---
 
@@ -45,7 +45,7 @@ From the Feedly analysis. Status is against the *finished* version, not a first 
 
 | # | Capability | Finished version | Status | In repo today |
 |---|---|---|---|---|
-| 1 | **Signal ontology & change detection** | Typed state transition: entity, previous state, new state, confidence, evidence | `partial` | Three keyword detectors write `signals` + `signal_evidence`. `previous_state` comes from structured `entity_snapshots`; materiality requires detector confidence plus company relevance. Not a full website-diff / positioning crawl. |
+| 1 | **Signal ontology & change detection** | Typed state transition: entity, previous state, new state, confidence, evidence | `partial` | Three keyword detectors write `signals` + `signal_evidence`. `previous_state` comes from structured `entity_snapshots`; materiality requires detector confidence plus company relevance. Catalog companies also hash pinned official pricing/docs/changelog pages. Not a site-wide crawl. |
 | 2 | **Intelligence missions / tracked universe** | Briefly builds monitoring strategy from operating context. Universe evolves. | `partial` | Onboarding captures company / competitors / stack / questions and seeds `watched_entities`. User still adds watches by name. No auto-generated missions, no “track Tavily?” evolution. |
 | 3 | **Event clustering + delta** | One event, many sources; brief reports only what changed since last seen | `partial` | Signal fingerprints and conservative same-observation checks merge corroborating evidence while allowing reused changelog URLs to report a new state. No full semantic event object yet. |
 | 4 | **Company impact + evidence bundle** | Fact / inference / personal impact / recommendation, all cited | `partial` | Digest items expose source, claim, passage, corroboration, contradiction, detector, confidence. Read view and watching panel can rate Useful / Noise / Duplicate / Wrong. Layers are not yet labeled fact vs inference vs impact. |
@@ -84,7 +84,7 @@ Grouped by the decision loop, not by UI page.
 |---|---|---|
 | Source ingestion (RSS, YouTube, Reddit, URL, Gmail, Readwise, email forward) | `backend/briefly_api/services/connectors/`, overnight workers | Not an open-web crawler |
 | Nightly collect → score → plan → write → deliver | `agents/pipeline.py` | Still article-centric stages |
-| Watched entities + scored alerts | `watched_entities`, `entity_alerts`, dashboard watching panel | Keyword/semantic watch, not missions |
+| Watched entities + scored alerts | `watched_entities`, `entity_alerts`, dashboard watching panel | Keyword/semantic watch plus pinned official pages for catalog companies. Unknown names stay on Google News + RSS. Not missions |
 | Operating context (company, product, customers, competitors, stack, goals, risks, questions) | `user_profiles.operating_context`, onboarding + settings | Used in prompts/fallbacks; not yet a full impact model |
 | Onboarding seeds watches from competitors and stack | `operating_context.seed_tracked_entities_from_context` | No mission objects |
 
@@ -94,8 +94,9 @@ Grouped by the decision loop, not by UI page.
 |---|---|---|
 | First three founder detectors | `services/signals/detectors.py` | Rule/keyword classify; do not add a fourth until precision holds |
 | `signals`, `signal_evidence`, `signal_impacts`, `signal_feedback` | migration `016` | |
-| Entity snapshots (last-known pricing / API / product) | `entity_snapshots`, migrations `018`–`019` | Stores extracted value/unit/effective time plus evidence text. Event and signal uniqueness protect concurrent writes. No website crawl. |
-| Watch hits persist as market signals | `services/watch/monitor.py`, `services/signals/persist.py` | First sighting has empty previous_state; the next real change compares against the snapshot |
+| Entity snapshots (last-known pricing / API / product) | `entity_snapshots`, migrations `018`–`019` | Stores extracted value/unit/effective time plus evidence text. Event and signal uniqueness protect concurrent writes. Official page diffs write snapshots; login-walled and JS-empty pages do not. |
+| Pinned official page change-detection | `entity_sources` hash/extract (migration `021`), `services/watch/pages.py` | At most 3 catalog URLs per company (pricing / docs / changelog). First fetch is baseline, no alert. Hash of extract, not HTML. robots.txt respected. Fetch failure is not “no change.” No Playwright, no guessed `/pricing`, no site recursion |
+| Watch hits persist as market signals | `services/watch/monitor.py`, `services/signals/persist.py` | Official page hits run before RSS and skip the news relevance floor. First sighting has empty previous_state; the next real change compares against the snapshot |
 | Watching alerts pinned into **What’s new** when the URL is not already in the brief | `services/signals/attach.py` | Not a dedicated watching section |
 
 ### Connect history / assess impact
@@ -136,7 +137,8 @@ Grouped by the decision loop, not by UI page.
 Do not start these because the last file compiled.
 
 - Action cards (team memo / investigation task) beyond email drafts
-- Fourth detector (funding, hires, GitHub breaking changes, website diffs)
+- Fourth detector (funding, hires, GitHub breaking changes as their own type)
+- Site-wide crawls, guessed `/pricing` URLs, Playwright / JS rendering, LLM browsing agents
 - Intelligence mission builder or Feedly-style AND/OR/NOT feeds
 - `/companies` or entity-card page (cards belong in the brief and Ask)
 - Personal trend radar page
@@ -150,6 +152,7 @@ Do not start these because the last file compiled.
 
 | Date | Commit | What shipped |
 |---|---|---|
+| 2026-09-01 | (this) | Pinned official-page watch: hash+diff catalog pricing/docs/changelog URLs on the existing watch job |
 | 2026-09-01 | (this) | Consolidated product docs into `ROADMAP.md`; retired MOAT/FEEDLY/PRODUCT_ROADMAP* files |
 | 2026-09-01 | (this) | Truth layer: conservative Decision Threads, event-aware dedup, structured snapshots, material Pulse counts, visible partial failures, feedback reasons |
 | 2026-08-31 | (this) | Entity snapshots v0: last-known state per watched entity + detector; previous→new on glance from real history |

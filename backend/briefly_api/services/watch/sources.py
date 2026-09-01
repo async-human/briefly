@@ -14,10 +14,12 @@ from briefly_api.services.articles import FetchedArticle
 from briefly_api.services.rss import fetch_rss_articles
 from briefly_api.services.watch.catalog import (
     catalog_match,
+    catalog_pages,
     github_atom_url,
     google_news_url,
     normalize_name,
 )
+from briefly_api.services.watch.pages import PAGE_SOURCE_TYPES
 from briefly_api.services.watch.relevance import WatchHit, canonicalize_url
 
 log = logging.getLogger(__name__)
@@ -42,6 +44,7 @@ async def seed_sources(session, entity: WatchedEntity) -> list[EntitySource]:
         github = catalog.get("github")
         if github:
             wanted.append(("github", github_atom_url(github)))
+    wanted.extend(catalog_pages(entity.name))
     wanted.append(("news", google_news_url(entity.name)))
 
     existing = {
@@ -145,6 +148,8 @@ async def fetch_entity_hits(
     cutoff = now - timedelta(minutes=max(5, min_interval_minutes))
 
     for src in sources:
+        if src.source_type in PAGE_SOURCE_TYPES:
+            continue
         if not force and src.last_fetched:
             lf = src.last_fetched if src.last_fetched.tzinfo else src.last_fetched.replace(tzinfo=timezone.utc)
             if lf > cutoff:

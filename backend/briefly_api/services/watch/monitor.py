@@ -18,6 +18,7 @@ from briefly_api.db.models import (
     WatchedEntity,
 )
 from briefly_api.embeddings.adapter import get_embedding_adapter
+from briefly_api.services.watch.pages import PAGE_SOURCE_TYPES, check_entity_pages
 from briefly_api.services.watch.relevance import (
     WatchHit,
     canonicalize_url,
@@ -136,27 +137,41 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
     if not force and _should_skip(entity, now, s.watch_rss_min_interval_minutes):
         return 0
 
-    if await _unread_count(session, entity.id) >= s.watch_max_unread_per_entity:
-        entity.last_checked = now
-        log.info("Watch pause: %s has too many unread alerts", entity.name)
-        return 0
-
     await seed_sources(session, entity)
     try:
         await maybe_discover_blog(session, entity)
     except Exception:
         log.debug("Watch discover skipped for %s", entity.name, exc_info=True)
 
-    lookback = now - timedelta(days=7) if force else now - timedelta(hours=36)
-    external, sources_checked = await fetch_entity_hits(
+    page_hits, pages_checked = await check_entity_pages(
         session,
         entity,
         min_interval_minutes=s.watch_rss_min_interval_minutes,
-        since=lookback,
         force=force,
     )
-    pool = await _pool_hits(session, entity.user_id, entity, lookback)
-    combined = dedupe_hits(external + pool)
+
+    unread_capped = await _unread_count(session, entity.id) >= s.watch_max_unread_per_entity
+    lookback = now - timedelta(days=7) if force else now - timedelta(hours=36)
+    rss_hits: list[WatchHit] = []
+    pool: list[WatchHit] = []
+    rss_checked = 0
+    if unread_capped:
+        log.info("Watch pause RSS: %s has too many unread alerts", entity.name)
+        if not page_hits:
+            entity.last_checked = now
+            return 0
+    else:
+        rss_hits, rss_checked = await fetch_entity_hits(
+            session,
+            entity,
+            min_interval_minutes=s.watch_rss_min_interval_minutes,
+            since=lookback,
+            force=force,
+        )
+        pool = await _pool_hits(session, entity.user_id, entity, lookback)
+
+    sources_checked = pages_checked + rss_checked
+    combined = list(page_hits) + dedupe_hits(rss_hits + pool)
 
     click_rate = await _click_rate(session, entity.id)
     created = 0
@@ -169,34 +184,38 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
     for hit in combined:
         if created >= s.watch_max_alerts_per_entity_per_run:
             break
-        base = score_hit(
-            hit,
-            entity_name=entity.name,
-            kind=entity.kind,
-            keywords=list(entity.keywords or []),
-            aliases=list(entity.aliases or []),
-            semantic=None,
-            click_rate=click_rate,
-            now=now,
-        )
-        score = base
-        if base < s.watch_relevance_min_score:
-            if base < 0.45:
-                continue
-            semantic = await _semantic(hit, entity)
-            score = score_hit(
+        official_page = hit.source_type in PAGE_SOURCE_TYPES
+        if official_page:
+            score = max(float(hit.score or 0), 0.95)
+        else:
+            base = score_hit(
                 hit,
                 entity_name=entity.name,
                 kind=entity.kind,
                 keywords=list(entity.keywords or []),
                 aliases=list(entity.aliases or []),
-                semantic=semantic,
+                semantic=None,
                 click_rate=click_rate,
                 now=now,
             )
+            score = base
+            if base < s.watch_relevance_min_score:
+                if base < 0.45:
+                    continue
+                semantic = await _semantic(hit, entity)
+                score = score_hit(
+                    hit,
+                    entity_name=entity.name,
+                    kind=entity.kind,
+                    keywords=list(entity.keywords or []),
+                    aliases=list(entity.aliases or []),
+                    semantic=semantic,
+                    click_rate=click_rate,
+                    now=now,
+                )
+            if score < s.watch_relevance_min_score:
+                continue
         hit.score = score
-        if score < s.watch_relevance_min_score:
-            continue
 
         copy = await write_alert_copy(entity.name, entity.kind, hit, user_id=entity.user_id)
         is_urgent = copy.is_urgent or hit.is_official or score >= s.watch_urgent_score
@@ -209,6 +228,7 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
             source_type=hit.source_type,
             entity_name=entity.name,
             entity_kind=entity.kind,
+            previous_state=hit.previous_state,
         )
         from briefly_api.services.signals.snapshots import event_fingerprint
 

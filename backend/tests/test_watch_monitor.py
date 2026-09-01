@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from briefly_api.services.watch.catalog import (
     catalog_match,
+    catalog_pages,
     generate_aliases,
     google_news_url,
     match_terms_for,
@@ -26,6 +27,8 @@ def test_catalog_openai_and_unknown():
     assert catalog_match("Cummins")["name"] == "Cummins"
     assert catalog_match("Sarvam AI")["name"] == "Sarvam"
     assert catalog_match("Totally Unknown Co") is None
+    assert catalog_pages("OpenAI")
+    assert not catalog_pages("Cummins")
 
 
 def test_aliases_include_compact_and_domain():

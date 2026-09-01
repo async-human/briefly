@@ -168,6 +168,10 @@ async def init_db() -> None:
             "ALTER TABLE entity_alerts ADD COLUMN IF NOT EXISTS detector_type VARCHAR(40)",
             "ALTER TABLE entity_alerts ADD COLUMN IF NOT EXISTS confidence DOUBLE PRECISION DEFAULT 0",
             "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS operating_context JSONB DEFAULT '{}'::jsonb",
+            "ALTER TABLE entity_sources ADD COLUMN IF NOT EXISTS content_hash VARCHAR(64)",
+            "ALTER TABLE entity_sources ADD COLUMN IF NOT EXISTS last_extract TEXT",
+            "ALTER TABLE entity_sources ADD COLUMN IF NOT EXISTS last_error TEXT",
+            "ALTER TABLE entity_sources ADD COLUMN IF NOT EXISTS consecutive_failures INTEGER DEFAULT 0",
         ):
             try:
                 await conn.execute(text(stmt))
