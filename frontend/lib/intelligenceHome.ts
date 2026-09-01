@@ -36,6 +36,7 @@ export type IntelligenceObject = {
   metric?: GlanceMetric | null;
   belief?: string | null;
   previousConfidence?: number | null;
+  decisionThreadId?: string | null;
 };
 
 export type PulseNode = {
@@ -280,6 +281,7 @@ function fromAlert(alert: WatchedAlert, digest: Digest | null): IntelligenceObje
     action: alert.action && !/^none/i.test(alert.action) ? alert.action : null,
     belief: thread.belief,
     previousConfidence: thread.previous,
+    decisionThreadId: thread.id,
     metric: metricFor({
       kind,
       title: alert.title,
@@ -339,6 +341,7 @@ function fromItem(item: DigestItem, digestId: string): IntelligenceObject {
     action: item.suggested_action || null,
     belief: thread.belief,
     previousConfidence: thread.previous,
+    decisionThreadId: thread.id,
     metric: metricFor({
       kind,
       title: item.headline,

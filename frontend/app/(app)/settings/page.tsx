@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, type DecisionThread } from "@/lib/api";
 import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { AppThemeToggle } from "@/components/app/AppThemeToggle";
@@ -17,6 +17,7 @@ import { CaptureDevicesCard } from "@/components/settings/CaptureDevicesCard";
 import { PushNotificationsCard } from "@/components/settings/PushNotificationsCard";
 import { TelegramConnectCard } from "@/components/settings/TelegramConnectCard";
 import { WatchedEntitiesCard } from "@/components/settings/WatchedEntitiesCard";
+import { DecisionThreadTimeline } from "@/components/settings/DecisionThreadTimeline";
 import { ExtensionInstallCard } from "@/components/saved/ExtensionInstallCard";
 import { TopicsToTrackEditor } from "@/components/settings/TopicsToTrackEditor";
 
@@ -133,6 +134,8 @@ function Section({
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightThreadId = searchParams.get("thread");
   const [loading, setLoading] = useState(true);
   const showLoading = useMinLoadTime(loading);
   const [me, setMe] = useState<{
@@ -155,6 +158,7 @@ export default function SettingsPage() {
   const [questions, setQuestions] = useState<string[]>(["", "", ""]);
   const [threads, setThreads] = useState<DecisionThread[]>([]);
   const [beliefDrafts, setBeliefDrafts] = useState<Record<string, string>>({});
+  const [expandedTimelines, setExpandedTimelines] = useState<Record<string, boolean>>({});
   const [topics, setTopics] = useState<string[]>([]);
   const [neverShow, setNeverShow] = useState<string[]>([]);
   const [deliveryTime, setDeliveryTime] = useState("07:00");
@@ -242,6 +246,13 @@ export default function SettingsPage() {
     const timers = savedTimers.current;
     return () => timers.forEach(clearTimeout);
   }, [router]);
+
+  useEffect(() => {
+    if (!highlightThreadId || threads.length === 0) return;
+    setExpandedTimelines((prev) => ({ ...prev, [highlightThreadId]: true }));
+    const el = document.getElementById(highlightThreadId);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightThreadId, threads]);
 
   async function saveProfile() {
     setProfileSaving(true);
@@ -634,12 +645,16 @@ export default function SettingsPage() {
                   />
                 ))}
                 {threads.length > 0 ? (
-                  <div className="settings-threads">
+                  <div className="settings-threads" id="decision-threads">
                     <p className="settings-field-hint">
                       Briefly keeps a living belief for each question. Confidence only appears after evidence lands — never invented.
                     </p>
                     {threads.map((thread) => (
-                      <div key={thread.id} className="settings-thread">
+                      <div
+                        key={thread.id}
+                        className={`settings-thread${highlightThreadId === thread.id ? " is-highlight" : ""}`}
+                        id={thread.id}
+                      >
                         <div className="settings-thread-head">
                           <span className="settings-thread-title">{thread.title}</span>
                           {confidenceLabel(thread) ? (
@@ -659,6 +674,23 @@ export default function SettingsPage() {
                           }}
                           onBlur={() => void saveBelief(thread)}
                           placeholder="What you currently believe"
+                        />
+                        <button
+                          type="button"
+                          className="settings-thread-history-toggle"
+                          aria-expanded={Boolean(expandedTimelines[thread.id])}
+                          onClick={() =>
+                            setExpandedTimelines((prev) => ({
+                              ...prev,
+                              [thread.id]: !prev[thread.id],
+                            }))
+                          }
+                        >
+                          {expandedTimelines[thread.id] ? "Hide history" : "View decision history"}
+                        </button>
+                        <DecisionThreadTimeline
+                          threadId={thread.id}
+                          expanded={Boolean(expandedTimelines[thread.id])}
                         />
                       </div>
                     ))}

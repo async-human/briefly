@@ -1296,6 +1296,10 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+  getDecisionThreadTimeline: (id: string, days = 90) =>
+    request<DecisionTimelineEvent[]>(
+      `/api/v1/decision-threads/${encodeURIComponent(id)}/timeline?days=${days}`,
+    ),
   getCalendarUpcoming: () =>
     request<{
       connected: boolean;
@@ -1613,6 +1617,20 @@ export type DecisionThread = {
   source: string;
   stance?: string | null;
   updated_at?: string | null;
+};
+
+export type DecisionTimelineEvent = {
+  at: string;
+  type: "belief_edit" | "confidence_change" | "signal";
+  headline?: string | null;
+  belief?: string | null;
+  confidence?: number | null;
+  previous_confidence?: number | null;
+  stance?: string | null;
+  rationale?: string | null;
+  note?: string | null;
+  signal_id?: string | null;
+  evidence?: { url: string; passage?: string; source_name?: string }[];
 };
 
 export type WatchedEntity = {

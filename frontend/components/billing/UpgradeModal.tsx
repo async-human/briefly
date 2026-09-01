@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { api, type BillingStatus } from "@/lib/api";
-import { PRO_FEATURES, UPGRADE_COPY, type UpgradeReason } from "@/lib/plans";
+import { PRO_FEATURES, PRO_MONTHLY_LABEL, PRO_YEARLY_LABEL, UPGRADE_COPY, type UpgradeReason } from "@/lib/plans";
 
 type Props = {
   open: boolean;
@@ -138,7 +138,7 @@ export function UpgradeModal({ open, reason, billing, onClose, onUpgraded }: Pro
             disabled={busy !== null}
             onClick={() => void startCheckout("monthly")}
           >
-            {busy === "monthly" ? "Redirecting…" : "Continue — $9/month"}
+            {busy === "monthly" ? "Redirecting…" : `Continue — ${PRO_MONTHLY_LABEL}/month`}
           </button>
           <button
             type="button"
@@ -146,7 +146,7 @@ export function UpgradeModal({ open, reason, billing, onClose, onUpgraded }: Pro
             disabled={busy !== null}
             onClick={() => void startCheckout("yearly")}
           >
-            {busy === "yearly" ? "Redirecting…" : "$90/year · save 17%"}
+            {busy === "yearly" ? "Redirecting…" : `${PRO_YEARLY_LABEL}/year`}
           </button>
         </div>
 

@@ -3,29 +3,17 @@
 import { motion } from "framer-motion";
 import { Reveal } from "./Reveal";
 import { StaggerHeadline } from "./StaggerHeadline";
+import {
+  FREE_FEATURES,
+  PRO_FEATURES,
+  PRO_MONTHLY_PRICE,
+  PRO_YEARLY_PRICE,
+  PRO_PRICING_HEADLINE,
+  PRO_FOUNDING_NOTE,
+} from "@/lib/plans";
 
-const freeFeatures = [
-  { text: "3 source connections", included: true },
-  { text: "5 items per briefing", included: true },
-  { text: "Gmail, YouTube, Reddit, RSS", included: true },
-  { text: "7-day history", included: true },
-  { text: "Email delivery", included: true },
-  { text: "Manual capture", included: false },
-  { text: "Interest learning", included: false },
-  { text: "Ask Briefly", included: false },
-];
-
-const proFeatures = [
-  { text: "Unlimited source connections", included: true },
-  { text: "Full briefing, 8–14 items", included: true },
-  { text: "All source types + Readwise", included: true },
-  { text: "Unlimited history", included: true },
-  { text: "Interest learning — gets smarter daily", included: true },
-  { text: "Manual capture: links, notes, docs", included: true },
-  { text: "Ask Briefly — search your knowledge base", included: true },
-  { text: "Audio brief for your commute", included: true },
-  { text: "Priority support", included: true },
-];
+const freeFeatures = FREE_FEATURES;
+const proFeatures = PRO_FEATURES;
 
 function Check({ dim }: { dim?: boolean }) {
   return (
@@ -65,11 +53,11 @@ export function Pricing() {
               as="h2"
               trigger="inView"
               className="section-heading"
-              text={"Start free.\nUpgrade when it's indispensable."}
+              text={"Start free.\nUpgrade when a signal changes a decision."}
             />
             <p className="section-body">
-              Free is enough to feel the value. Pro is what it becomes when you
-              can&apos;t live without it.
+              Free shows the format. Pro is for founders who need cited change detection
+              and decision threads on their competitive universe.
             </p>
           </div>
         </Reveal>
@@ -112,21 +100,19 @@ export function Pricing() {
               <div className="pricing-pro-glow" aria-hidden />
               <div className="pricing-card-header">
                 <div className="pricing-pro-top">
-                  <p className="pricing-v2-name">Pro</p>
-                  <span className="pricing-pro-badge">Founding Price</span>
+                  <p className="pricing-v2-name">{PRO_PRICING_HEADLINE}</p>
+                  <span className="pricing-pro-badge">Pro</span>
                 </div>
                 <div className="pricing-v2-price-row">
-                  <span className="pricing-v2-amount">$9</span>
+                  <span className="pricing-v2-amount">${PRO_MONTHLY_PRICE}</span>
                   <div className="pricing-v2-period-stack">
                     <span className="pricing-v2-period">/ month</span>
-                    <span className="pricing-v2-annual">or $90/year · save 17%</span>
+                    <span className="pricing-v2-annual">or ${PRO_YEARLY_PRICE}/year</span>
                   </div>
                 </div>
-                <p className="pricing-founding-cap">
-                  First 200 founding members · price locked forever
-                </p>
+                <p className="pricing-founding-cap">{PRO_FOUNDING_NOTE}</p>
                 <p className="pricing-v2-tagline">
-                  V2, V3 &amp; V4 included as they ship
+                  Cited signals, decision threads, unlimited watches
                 </p>
               </div>
               <ul className="pricing-v2-features">
@@ -138,7 +124,7 @@ export function Pricing() {
                 ))}
               </ul>
               <a href="/upgrade" className="pricing-v2-btn pricing-v2-btn-pro">
-                Get Pro — $9/month
+                Get Founder Intelligence — ${PRO_MONTHLY_PRICE}/month
               </a>
             </motion.div>
           </div>

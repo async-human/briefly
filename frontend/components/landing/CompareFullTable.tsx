@@ -78,7 +78,7 @@ export const COMPARE_ROWS: CompareRow[] = [
   },
   {
     feature: "Price",
-    briefly: { kind: "text", value: "$9/mo founding" },
+    briefly: { kind: "text", value: "$79/mo Founder Intelligence" },
     readless: { kind: "text", value: "$4.90/mo" },
     meco: { kind: "text", value: "$3.99/mo" },
     readwise: { kind: "text", value: "$9.99/mo" },

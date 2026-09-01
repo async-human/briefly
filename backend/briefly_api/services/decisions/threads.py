@@ -38,6 +38,21 @@ def thread_matches_text(question: str, blob: str) -> bool:
     return question_matches_text(question, blob)
 
 
+def thread_matches_signal(thread: Any, blob: str) -> bool:
+    """Match a signal to threads by question, title, or stated belief."""
+    if thread_matches_text(thread.question, blob):
+        return True
+    title = (thread.title or "").strip()
+    if len(title) >= 4 and title.lower() in blob.lower():
+        return True
+    belief = (thread.current_belief or "").strip()
+    if len(belief) >= 12:
+        snippet = belief.lower()[: min(48, len(belief))]
+        if snippet in blob.lower():
+            return True
+    return False
+
+
 def stance_for_signal(
     *,
     current_belief: str = "",
@@ -167,7 +182,7 @@ async def link_signal_to_threads(
         return []
     linked: list[str] = []
     for thread in threads:
-        if not thread_matches_text(thread.question, blob):
+        if not thread_matches_signal(thread, blob):
             continue
         stance = stance_for_signal(
             current_belief=thread.current_belief or "",
@@ -188,12 +203,44 @@ async def link_signal_to_threads(
         if not inserted:
             continue
         linked.append(thread.id)
-        if stance in {"supporting", "contradicting"}:
+
+        final_stance = stance
+        assessment_note = f"{stance} evidence linked"
+        try:
+            from briefly_api.services.decisions.belief_assessor import (
+                assess_and_store,
+                directional_stance,
+            )
+
+            result = await assess_and_store(session, thread=thread, signal_id=signal_id)
+            if result:
+                verified = directional_stance(result)
+                if verified and verified != stance:
+                    from sqlalchemy import update as sql_update
+
+                    await session.execute(
+                        sql_update(ThreadSignal)
+                        .where(
+                            ThreadSignal.thread_id == thread.id,
+                            ThreadSignal.signal_id == signal_id,
+                        )
+                        .values(stance=verified)
+                    )
+                    final_stance = verified
+                    assessment_note = (result.rationale or assessment_note)[:400]
+        except Exception:
+            log.exception(
+                "Belief assessment failed for thread=%s signal=%s",
+                thread.id,
+                signal_id,
+            )
+
+        if final_stance in {"supporting", "contradicting"}:
             await _refresh_thread_confidence(
                 session,
                 thread,
                 signal_id=signal_id,
-                note=f"{stance} evidence linked",
+                note=assessment_note,
             )
     return linked
 

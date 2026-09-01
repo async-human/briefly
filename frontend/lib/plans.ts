@@ -4,6 +4,17 @@ export const FREE_SOURCE_LIMIT = 3;
 export const FREE_HISTORY_DAYS = 7;
 export const FREE_DIGEST_ITEMS = 5;
 
+/** Display pricing — configure matching Dodo product IDs in production. */
+export const PRO_MONTHLY_PRICE = 79;
+export const PRO_YEARLY_PRICE = 790;
+export const PRO_MONTHLY_LABEL = `$${PRO_MONTHLY_PRICE}`;
+export const PRO_YEARLY_LABEL = `$${PRO_YEARLY_PRICE}`;
+export const PRO_PRICING_HEADLINE = "Founder Intelligence";
+export const PRO_PRICING_TAGLINE =
+  "Unlimited watches, decision threads, cited signals, and Ask Briefly across your company's context.";
+export const PRO_FOUNDING_NOTE =
+  "Early founding members who joined at $9/mo keep their locked rate.";
+
 /** System placeholders — not user feeds; must not consume free source slots. */
 export const INTERNAL_SOURCE_TYPES = new Set(["brain_dump", "browser_capture"]);
 
@@ -58,13 +69,13 @@ export const FREE_FEATURES = [
 ];
 
 export const PRO_FEATURES = [
-  { text: "Unlimited source connections", included: true },
-  { text: "Full briefing, 8–14 items", included: true },
-  { text: "All source types + Readwise", included: true },
-  { text: "Unlimited history", included: true },
+  { text: "Unlimited watches & source connections", included: true },
+  { text: "Decision threads tied to your strategic questions", included: true },
+  { text: "Cited change detection (pricing, API, releases)", included: true },
+  { text: "Full briefings with evidence bundles", included: true },
+  { text: "Ask Briefly over your corpus & decisions", included: true },
   { text: "Brain dump — voice, text, links", included: true },
-  { text: "Ask Briefly — search your knowledge", included: true },
-  { text: "Interest learning", included: true },
+  { text: "Unlimited history", included: true },
   { text: "Audio brief for your commute", included: true },
 ];
 

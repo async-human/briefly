@@ -172,11 +172,15 @@ Timelines are planning ranges. **A phase starts only when the previous gate is m
 
 ---
 
-### Phase 2 — Temporal decision memory *(months 3–5)*
+### Phase 2 — Temporal decision memory *(months 3–5)* **← in progress**
 
 **Promise:** Briefly remembers what we believed, what changed, and what to reconsider.
 
 **Deliverables:** Decision Threads v1 (confidence from verified evidence), assumption invalidation inline in brief, hybrid retrieval for Ask, outcome feedback labels.
+
+**Shipped (v0.1):** `belief_assessments` table + BeliefAssessor (LLM, threshold-gated stances), `GET /decision-threads/{id}/timeline`, Settings decision history UI.
+
+**Still open:** Ask hybrid retrieval over timeline, outcome feedback table, eval harness for stance accuracy ≥85%.
 
 **Gate:** ≥50% D60 retention · 40% WAU get useful historical connection/week · 25% WAU use Decision Threads · 95% citation correctness in decision Ask.
 
@@ -293,11 +297,11 @@ Do not rebuild: `FollowUpThread`, `ContentEmbedding`, enrichment cache, graph de
 
 ## 10. Pricing (current vs experiment)
 
-| | Today (product) | Pilot experiment |
-|--|-----------------|------------------|
+| | Today (product UI) | Checkout note |
+|--|-----------------|---------------|
 | Free | 3 sources, limited brief | — |
-| Pro | $9/mo founding | Test $49–99/mo with concierge |
-| Team | Not shipped | $149–499/mo after Phase 4 gate |
+| Pro | **$79/mo** display (`lib/plans.ts`) | Create matching **$79/mo** Dodo product IDs; legacy $9 founding members keep rate via subscription |
+| Team | Not shipped | After Phase 4 gate |
 
 Raise price when decision value and retention prove it — not when feature count grows.
 

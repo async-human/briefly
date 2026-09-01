@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FREE_FEATURES, PRO_FEATURES } from "@/lib/plans";
+import { FREE_FEATURES, PRO_FEATURES, PRO_MONTHLY_PRICE, PRO_YEARLY_PRICE, PRO_PRICING_HEADLINE, PRO_FOUNDING_NOTE } from "@/lib/plans";
 
 type Props = {
   variant?: "settings" | "page";
@@ -43,13 +43,14 @@ export function PlanComparison({ variant = "settings", highlight = "pro" }: Prop
       >
         <div className="plan-comparison-head">
           <div className="plan-comparison-pro-top">
-            <p className="plan-comparison-name">Pro</p>
+            <p className="plan-comparison-name">{PRO_PRICING_HEADLINE}</p>
             <span className="plan-comparison-badge">Recommended</span>
           </div>
           <p className="plan-comparison-price">
-            $9 <span>/ month</span>
+            ${PRO_MONTHLY_PRICE} <span>/ month</span>
           </p>
-          <p className="plan-comparison-annual">or $90/year · save 17%</p>
+          <p className="plan-comparison-annual">or ${PRO_YEARLY_PRICE}/year</p>
+          <p className="plan-comparison-annual">{PRO_FOUNDING_NOTE}</p>
         </div>
         <ul className="plan-comparison-features">
           {PRO_FEATURES.map((f) => (

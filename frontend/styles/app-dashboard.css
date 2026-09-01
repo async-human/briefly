@@ -1806,6 +1806,14 @@
   border-top: 1px solid var(--app-border);
 }
 
+.app-shell .dash-surface-settings .settings-thread.is-highlight {
+  margin: 0 -0.65rem;
+  padding: 0.75rem 0.65rem;
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in oklch, var(--app-brand) 8%, transparent);
+  outline: 1px solid color-mix(in oklch, var(--app-brand) 22%, transparent);
+}
+
 .app-shell .dash-surface-settings .settings-thread-head {
   display: flex;
   justify-content: space-between;
@@ -1836,6 +1844,106 @@
   margin: 0.2rem 0 0.5rem;
   font-size: 0.8125rem;
   color: var(--app-muted);
+}
+
+.app-shell .dash-surface-settings .settings-thread-history-toggle {
+  margin-top: 0.45rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--app-brand);
+  font-size: 0.8125rem;
+  font-weight: 550;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.app-shell .dash-surface-settings .settings-thread-timeline-loading,
+.app-shell .dash-surface-settings .settings-thread-timeline-empty {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--app-muted);
+}
+
+.app-shell .dash-surface-settings .settings-thread-timeline {
+  margin: 0.65rem 0 0;
+  padding: 0 0 0 0.85rem;
+  border-left: 2px solid var(--app-border);
+  list-style: none;
+}
+
+.app-shell .dash-surface-settings .settings-timeline-item {
+  position: relative;
+  padding: 0 0 0.85rem 0.65rem;
+}
+
+.app-shell .dash-surface-settings .settings-timeline-item::before {
+  content: "";
+  position: absolute;
+  left: -1.15rem;
+  top: 0.35rem;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--app-border-strong);
+}
+
+.app-shell .dash-surface-settings .settings-timeline-item.is-signal::before {
+  background: var(--app-brand);
+}
+
+.app-shell .dash-surface-settings .settings-timeline-item.is-signal.is-contradicting::before {
+  background: #c2410c;
+}
+
+.app-shell .dash-surface-settings .settings-timeline-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  align-items: baseline;
+}
+
+.app-shell .dash-surface-settings .settings-timeline-date {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--app-muted);
+}
+
+.app-shell .dash-surface-settings .settings-timeline-kind {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--app-ink-secondary);
+}
+
+.app-shell .dash-surface-settings .settings-timeline-headline,
+.app-shell .dash-surface-settings .settings-timeline-belief,
+.app-shell .dash-surface-settings .settings-timeline-rationale,
+.app-shell .dash-surface-settings .settings-timeline-conf {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--app-ink);
+  line-height: 1.45;
+}
+
+.app-shell .dash-surface-settings .settings-timeline-rationale {
+  color: var(--app-ink-secondary);
+}
+
+.app-shell .dash-surface-settings .settings-timeline-conf {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  color: var(--app-brand);
+}
+
+.app-shell .dash-surface-settings .settings-timeline-evidence {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.75rem;
+  color: var(--app-muted);
+}
+
+.app-shell .dash-surface-settings .settings-timeline-evidence a {
+  color: var(--app-brand);
 }
 
 .app-shell .dash-surface-settings .onboard-input,

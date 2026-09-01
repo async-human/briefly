@@ -6,7 +6,7 @@ import { api, type BillingStatus } from "@/lib/api";
 import { PlanComparison, PlanUsageBar } from "@/components/billing/PlanComparison";
 import { CancelSubscriptionModal } from "@/components/billing/CancelSubscriptionModal";
 import { useUpgradeOptional } from "@/components/billing/UpgradeProvider";
-import { FREE_DIGEST_ITEMS, FREE_HISTORY_DAYS } from "@/lib/plans";
+import { FREE_DIGEST_ITEMS, FREE_HISTORY_DAYS, PRO_MONTHLY_LABEL, PRO_YEARLY_LABEL } from "@/lib/plans";
 import type { CancellationReason } from "@/lib/cancellationReasons";
 
 type Props = {
@@ -178,7 +178,7 @@ export function PlanBillingCard({ onUpgraded }: Props) {
               disabled={busy !== null}
               onClick={() => void startCheckout("monthly")}
             >
-              {busy === "monthly" ? "Redirecting to checkout…" : "Upgrade — $9/month"}
+              {busy === "monthly" ? "Redirecting to checkout…" : `Upgrade — ${PRO_MONTHLY_LABEL}/month`}
             </button>
             <button
               type="button"
@@ -186,7 +186,7 @@ export function PlanBillingCard({ onUpgraded }: Props) {
               disabled={busy !== null}
               onClick={() => void startCheckout("yearly")}
             >
-              {busy === "yearly" ? "Redirecting…" : "$90/year · save 17%"}
+              {busy === "yearly" ? "Redirecting…" : `${PRO_YEARLY_LABEL}/year`}
             </button>
             <Link href="/upgrade" className="settings-billing-link">
               Full plan comparison

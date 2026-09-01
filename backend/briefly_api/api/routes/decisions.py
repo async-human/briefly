@@ -3,22 +3,26 @@
 GET    /decision-threads
 POST   /decision-threads
 PATCH  /decision-threads/{id}
+GET    /decision-threads/{id}/timeline
 
 No new frontend page. Settings and the dashboard glance consume this.
 """
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from briefly_api.auth.deps import get_current_user
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import DecisionThread, User
+from briefly_api.services.decisions.timeline import get_thread_timeline
 from briefly_api.services.decisions.threads import (
     create_thread,
+    get_thread,
     list_threads,
     snapshot_dict,
     update_thread,
@@ -48,6 +52,26 @@ class DecisionThreadIn(BaseModel):
 class DecisionThreadPatch(BaseModel):
     belief: str | None = Field(default=None, max_length=800)
     status: str | None = Field(default=None, max_length=20)
+
+
+class TimelineEvidenceOut(BaseModel):
+    url: str
+    passage: str = ""
+    source_name: str = ""
+
+
+class TimelineEventOut(BaseModel):
+    at: datetime
+    type: Literal["belief_edit", "confidence_change", "signal"]
+    headline: str | None = None
+    belief: str | None = None
+    confidence: float | None = None
+    previous_confidence: float | None = None
+    stance: str | None = None
+    rationale: str | None = None
+    note: str | None = None
+    signal_id: str | None = None
+    evidence: list[TimelineEvidenceOut] = Field(default_factory=list)
 
 
 def _serialize(thread: DecisionThread) -> DecisionThreadOut:
@@ -117,3 +141,39 @@ async def patch_decision_thread(
     await db.commit()
     await db.refresh(thread)
     return _serialize(thread)
+
+
+@router.get("/decision-threads/{thread_id}/timeline", response_model=list[TimelineEventOut])
+async def get_decision_thread_timeline(
+    thread_id: str,
+    days: int = Query(default=90, ge=1, le=365),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[TimelineEventOut]:
+    thread = await get_thread(db, user.id, thread_id)
+    if not thread:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Decision thread not found.")
+    rows = await get_thread_timeline(db, user.id, thread_id, days=days)
+    return [
+        TimelineEventOut(
+            at=row["at"],
+            type=row["type"],
+            headline=row.get("headline"),
+            belief=row.get("belief"),
+            confidence=row.get("confidence"),
+            previous_confidence=row.get("previous_confidence"),
+            stance=row.get("stance"),
+            rationale=row.get("rationale"),
+            note=row.get("note"),
+            signal_id=row.get("signal_id"),
+            evidence=[
+                TimelineEvidenceOut(
+                    url=e.get("url") or "",
+                    passage=e.get("passage") or "",
+                    source_name=e.get("source_name") or "",
+                )
+                for e in (row.get("evidence") or [])
+            ],
+        )
+        for row in rows
+    ]

@@ -8,8 +8,14 @@ import { getToken } from "@/lib/auth";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PlanComparison } from "@/components/billing/PlanComparison";
 import { AnimatedPageSkeleton } from "@/components/loading/AnimatedPageSkeleton";
-import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
 import { PageContentTransition } from "@/components/loading/PageContentTransition";
+import { AppPageHeader } from "@/components/dashboard/AppPageHeader";
+import {
+  PRO_MONTHLY_LABEL,
+  PRO_YEARLY_LABEL,
+  PRO_PRICING_TAGLINE,
+  PRO_FOUNDING_NOTE,
+} from "@/lib/plans";
 
 export default function UpgradePage() {
   const router = useRouter();
@@ -82,8 +88,8 @@ export default function UpgradePage() {
       <div className="dash-page dash-page-upgrade">
         <AppPageHeader
           eyebrow="Billing"
-          title="Choose your plan"
-          subtitle="Start free, upgrade when Briefly becomes indispensable."
+          title="Founder Intelligence"
+          subtitle="Cited change detection, decision threads, and unlimited watches on what moves your company."
         />
 
         <PageContentTransition>
@@ -109,7 +115,7 @@ export default function UpgradePage() {
               <div className="upgrade-page-cta dash-surface">
                 <p className="upgrade-page-cta-title">Ready to upgrade?</p>
                 <p className="upgrade-page-cta-sub">
-                  First 200 founding members lock in $9/mo forever. Cancel anytime.
+                  {PRO_PRICING_TAGLINE} {PRO_FOUNDING_NOTE}
                 </p>
                 <div className="upgrade-page-actions">
                   <button
@@ -118,7 +124,7 @@ export default function UpgradePage() {
                     disabled={busy !== null}
                     onClick={() => void startCheckout("monthly")}
                   >
-                    {busy === "monthly" ? "Redirecting to checkout…" : "Get Pro — $9/month"}
+                    {busy === "monthly" ? "Redirecting to checkout…" : `Get Pro — ${PRO_MONTHLY_LABEL}/month`}
                   </button>
                   <button
                     type="button"
@@ -126,7 +132,7 @@ export default function UpgradePage() {
                     disabled={busy !== null}
                     onClick={() => void startCheckout("yearly")}
                   >
-                    {busy === "yearly" ? "Redirecting…" : "Get Pro — $90/year"}
+                    {busy === "yearly" ? "Redirecting…" : `Get Pro — ${PRO_YEARLY_LABEL}/year`}
                   </button>
                 </div>
                 <p className="upgrade-page-foot">

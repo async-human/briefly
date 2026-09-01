@@ -85,6 +85,14 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
           <p className="glance-conf">{conf}% confidence</p>
         ) : null}
         <div className="glance-card-actions">
+          {object.decisionThreadId ? (
+            <Link
+              href={`/settings?thread=${encodeURIComponent(object.decisionThreadId)}#decision-threads`}
+              className="glance-card-btn"
+            >
+              Review decision
+            </Link>
+          ) : null}
           {object.askHref ? (
             <Link href={object.askHref} className="glance-card-btn">
               Ask Briefly

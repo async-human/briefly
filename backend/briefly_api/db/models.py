@@ -1132,6 +1132,35 @@ class ThreadUpdate(Base):
     )
 
 
+class BeliefAssessment(Base):
+    """Verified comparison of a market signal against a decision thread belief."""
+
+    __tablename__ = "belief_assessments"
+    __table_args__ = (
+        Index("ix_belief_assessments_thread", "thread_id", "created_at"),
+        Index("ix_belief_assessments_signal", "signal_id"),
+        UniqueConstraint("thread_id", "signal_id", name="uq_belief_assessment_thread_signal"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    thread_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("decision_threads.id", ondelete="CASCADE"), index=True
+    )
+    signal_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("signals.id", ondelete="CASCADE"), index=True
+    )
+    stance: Mapped[str] = mapped_column(String(32), nullable=False)
+    # supporting | contradicting | unrelated | insufficient_evidence
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    assessor_confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    verifier: Mapped[str] = mapped_column(String(20), default="llm")
+    # llm | user | rule
+    evidence_urls: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class SignalEvidence(Base):
     """Source-level provenance for a market signal."""
 

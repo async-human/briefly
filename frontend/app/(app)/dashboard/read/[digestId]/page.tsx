@@ -23,6 +23,7 @@ import { useLearnedToast } from "@/components/dashboard/LearnedToast";
 import { copyMarkdownNote } from "@/lib/markdownNote";
 import { guessTrackName } from "@/lib/trackName";
 import { detectorLabel, SIGNAL_RATE_OPTIONS } from "@/lib/detectors";
+import { DecisionImpactPanel, hasDecisionImpact } from "@/components/dashboard/DecisionImpactPanel";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Mode = "quick" | "deep";
@@ -132,7 +133,7 @@ function EvidenceBlock({
   onRate,
 }: {
   item: DigestItem;
-  onRate?: (label: string) => void;
+  onRate?: (label: string, note?: string) => void;
 }) {
   const pieces = item.evidence || [];
   const primary = pieces.find((p) => !p.is_contradictory) || pieces[0];
@@ -193,10 +194,10 @@ function EvidenceBlock({
         <div className="read-signal-rate" role="group" aria-label="Rate this signal">
           {SIGNAL_RATE_OPTIONS.map((opt) => (
             <button
-              key={opt.value}
+              key={opt.label}
               type="button"
               className={`read-decision-btn${item.signal_label === opt.value ? " is-on" : ""}`}
-              onClick={() => onRate(opt.value)}
+              onClick={() => onRate(opt.value, opt.note)}
               disabled={item.signal_label === opt.value}
             >
               {opt.label}
@@ -209,8 +210,8 @@ function EvidenceBlock({
 }
 
 function ReadingCard({
-  item, mode, isSaved, isDisliked, isTracked, isRemembered, decided, acted, dismissed,
-  onSave, onDislike, onLike, onTrack, onRemember, onArticleClick, onAsk, onDecisionChanged, onAct, onDismiss, onRateSignal,
+  item, mode, isSaved, isDisliked, isTracked, isRemembered, decided, acted, dismissed, monitoringNoted,
+  onSave, onDislike, onLike, onTrack, onRemember, onArticleClick, onAsk, onDecisionChanged, onAct, onDismiss, onRateSignal, onKeepMonitoring,
   index, showMemoryCallout,
 }: {
   item: DigestItem;
@@ -222,6 +223,7 @@ function ReadingCard({
   decided: boolean;
   acted: boolean;
   dismissed: boolean;
+  monitoringNoted: boolean;
   onSave: () => void;
   onDislike: () => void;
   onLike: () => void;
@@ -232,7 +234,8 @@ function ReadingCard({
   onDecisionChanged: () => void;
   onAct: () => void;
   onDismiss: () => void;
-  onRateSignal: (label: string) => void;
+  onRateSignal: (label: string, note?: string) => void;
+  onKeepMonitoring: () => void;
   index: number;
   showMemoryCallout: boolean;
 }) {
@@ -245,6 +248,8 @@ function ReadingCard({
     ? `${item.duplicate_count} sources covered this — merged`
     : null;
   const hasDeepSummary = mode === "deep" && !!item.summary;
+  const isDecisionSignal = Boolean(item.signal_id || item.is_material_change || item.decision_thread_id);
+  const showWhatChanged = Boolean(item.summary && (hasDeepSummary || isDecisionSignal));
   const articleUrl = isReadableArticleUrl(item.source_url) ? item.source_url : null;
   const youtubeBadge = getYouTubeBadge(item);
 
@@ -379,7 +384,7 @@ function ReadingCard({
           {item.headline}
         </motion.h1>
 
-        {hasDeepSummary && (
+        {showWhatChanged && (
           <motion.p
             className="read-summary-v2"
             initial={{ opacity: 0, y: 8 }}
@@ -405,14 +410,20 @@ function ReadingCard({
         </div>
         <p className="read-why-v2-text">{item.why_it_matters}</p>
 
-        {item.who_it_affects && (
+        <DecisionImpactPanel
+          item={item}
+          onKeepMonitoring={item.signal_id ? onKeepMonitoring : undefined}
+          keepMonitoringDone={monitoringNoted}
+        />
+
+        {item.who_it_affects && !hasDecisionImpact(item) && (
           <div className="read-six-point">
             <span className="read-field-label">Who it affects</span>
             <p className="read-six-point-text">{item.who_it_affects}</p>
           </div>
         )}
 
-        {item.suggested_action && (
+        {item.suggested_action && !hasDecisionImpact(item) && (
           <div className="read-six-point">
             <span className="read-field-label">Do this</span>
             <p className="read-six-point-text">{item.suggested_action}</p>
@@ -836,6 +847,7 @@ export default function ReadingPage() {
   const [decided, setDecided]     = useState<Set<string>>(new Set());
   const [acted, setActed]         = useState<Set<string>>(new Set());
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [monitoringNoted, setMonitoringNoted] = useState<Set<string>>(new Set());
   const [isComplete, setIsComplete] = useState(false);
   const [elapsed, setElapsed]     = useState(0);
   // Track which item index gets the memory callout (first item with memory_reference or memory_connections)
@@ -1062,7 +1074,23 @@ export default function ReadingPage() {
       .catch(() => {});
   }, [currentIndex, items, digest, dismissed, showLearned]);
 
-  const rateCurrent = useCallback((label: string) => {
+  const markMonitoring = useCallback(() => {
+    if (!digest) return;
+    const item = items[currentIndex];
+    if (!item?.signal_id || monitoringNoted.has(item.id)) return;
+    setMonitoringNoted((prev) => new Set(Array.from(prev).concat(item.id)));
+    api.rateSignal(item.signal_id, "useful", "keep_monitoring")
+      .then((r) => showLearned(r.learned_message || undefined))
+      .catch(() => {
+        setMonitoringNoted((prev) => {
+          const next = new Set(prev);
+          next.delete(item.id);
+          return next;
+        });
+      });
+  }, [currentIndex, items, digest, monitoringNoted, showLearned]);
+
+  const rateCurrent = useCallback((label: string, note?: string) => {
     if (!digest) return;
     const item = items[currentIndex];
     if (!item?.signal_id || item.signal_label === label) return;
@@ -1075,7 +1103,7 @@ export default function ReadingPage() {
         ),
       };
     });
-    api.rateSignal(item.signal_id, label, item.headline)
+    api.rateSignal(item.signal_id, label, note || item.headline)
       .then((r) => showLearned(r.learned_message || undefined))
       .catch(() => {
         setDigest((prev) => {
@@ -1244,6 +1272,7 @@ export default function ReadingPage() {
               decided={decided.has(item.id)}
               acted={acted.has(item.id)}
               dismissed={dismissed.has(item.id)}
+              monitoringNoted={monitoringNoted.has(item.id)}
               onSave={toggleSave}
               onDislike={toggleDislike}
               onLike={toggleLike}
@@ -1254,6 +1283,7 @@ export default function ReadingPage() {
               onDecisionChanged={markDecision}
               onAct={markActed}
               onDismiss={markDismissed}
+              onKeepMonitoring={markMonitoring}
               onRateSignal={rateCurrent}
               index={currentIndex}
               showMemoryCallout={currentIndex === memoryCalloutIndex}

@@ -5,9 +5,9 @@ export function detectorLabel(kind: string | null | undefined): string | null {
   return null;
 }
 
-export const SIGNAL_RATE_OPTIONS: { label: string; value: string }[] = [
+export const SIGNAL_RATE_OPTIONS: { label: string; value: string; note?: string }[] = [
   { label: "Useful", value: "useful" },
-  { label: "Noise", value: "irrelevant" },
-  { label: "Duplicate", value: "duplicate" },
+  { label: "Already knew", value: "irrelevant", note: "already_knew" },
+  { label: "No impact", value: "irrelevant", note: "no_impact" },
   { label: "Wrong", value: "incorrect" },
 ];

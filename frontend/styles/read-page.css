@@ -362,6 +362,55 @@
   cursor: default;
 }
 
+.read-shell-v2 .read-decision-impact {
+  margin-top: 1rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid oklch(48% 0.08 278 / 0.22);
+  border-radius: 0.65rem;
+  background: oklch(48% 0.06 278 / 0.06);
+}
+
+.read-shell-v2 .read-decision-impact.is-reconsider {
+  border-color: oklch(62% 0.12 55 / 0.35);
+  background: oklch(62% 0.08 55 / 0.08);
+}
+
+.read-shell-v2 .read-decision-impact-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.read-shell-v2 .read-decision-impact-badge {
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: oklch(52% 0.12 55);
+}
+
+.read-shell-v2 .read-decision-impact-lead {
+  margin: 0 0 0.65rem;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--text, inherit);
+}
+
+.read-shell-v2 .read-decision-impact-conf {
+  margin: 0 0 0.65rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, inherit);
+}
+
+.read-shell-v2 .read-decision-impact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
 .read-shell-v2 .read-evidence {
   margin-top: 0.85rem;
   padding-top: 0.75rem;
