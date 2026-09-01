@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { countPhrase, shortLabel, type PulseNode } from "@/lib/intelligenceHome";
+import { countPhrase, knownStateLine, knownStateValue, shortLabel, type PulseNode } from "@/lib/intelligenceHome";
 
 type MorningPulseProps = {
   greeting: string;
@@ -138,8 +138,8 @@ export function MorningPulse({
           onClearSelection={onClearSelection}
         />
         <p className="pulse-world-note">
-          Select an entity to inspect its signal and filter the intelligence below. Every watched
-          relationship stays visible.
+          Select an entity to see last-known pricing, API, and product state. Cards below are
+          only for a material change, not the baseline.
         </p>
       </article>
     </header>
@@ -260,6 +260,23 @@ function PulseField({
               {selectedNode.lastCheckedAt ? ` · ${checkStatus(selectedNode.lastCheckedAt, now)}` : ""}
             </p>
             <p className="pulse-selection-summary">{signalStatus(selectedNode, true)}</p>
+            {selectedNode.coverageLine ? (
+              <p className="pulse-selection-coverage">{selectedNode.coverageLine}</p>
+            ) : null}
+            {selectedNode.knownStates.length > 0 ? (
+              <ul className="pulse-selection-known">
+                {selectedNode.knownStates.map((row) => (
+                  <li key={row.aspect}>
+                    <span className="pulse-selection-known-label">{row.label}</span>
+                    <span className="pulse-selection-known-state">{knownStateValue(row)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="pulse-selection-known-empty">
+                {knownStateEmpty(selectedNode)}
+              </p>
+            )}
             <p className="pulse-selection-reason">
               {selectedNode.latestSignal || quietReason(selectedNode)}
             </p>
@@ -285,9 +302,15 @@ function PulseField({
                 Ask Briefly
               </Link>
             )}
-            <Link className="pulse-selection-action" href={selectedNode.networkHref}>
-              Open in Network
-            </Link>
+            {selectedNode.coverageStatus === "news_only" ? (
+              <Link className="pulse-selection-action" href="/settings">
+                Pin a page
+              </Link>
+            ) : (
+              <Link className="pulse-selection-action" href={selectedNode.networkHref}>
+                Open in Network
+              </Link>
+            )}
             <button type="button" className="pulse-selection-action" onClick={onClearSelection}>
               Show all
             </button>
@@ -324,7 +347,7 @@ function PulseEntity({
       onClick={() => onSelect(node.id)}
       disabled={disabled}
       aria-pressed={selected}
-      aria-label={`${node.name}, ${monitor.badge}${monitor.detail ? `, ${monitor.detail}` : ""}`}
+      aria-label={`${node.name}, ${monitor.badge}${monitor.detail ? `, ${monitor.detail}` : ""}${node.knownStates[0] ? `, ${knownStateLine(node.knownStates[0])}` : ""}`}
       data-state={disabled ? "loading" : selected ? "success" : undefined}
     >
       <span className="pulse-field-entity-name">{shortLabel(node.name, 26)}</span>
@@ -334,6 +357,9 @@ function PulseEntity({
       </span>
       {monitor.detail ? (
         <span className="pulse-field-entity-activity">{monitor.detail}</span>
+      ) : null}
+      {node.knownStates[0] ? (
+        <span className="pulse-field-entity-known">{knownStateLine(node.knownStates[0])}</span>
       ) : null}
     </button>
   );
@@ -385,6 +411,16 @@ function entityMonitorPresentation(
     badge: "Live",
     detail: checkStatus(node.lastCheckedAt, now),
   };
+}
+
+function knownStateEmpty(node: PulseNode): string {
+  if (node.coverageStatus === "news_only" || node.coverageStatus === "skipped") {
+    return "No official pricing, docs, or changelog page confirmed yet. Pin a URL in Settings if we missed it.";
+  }
+  if (node.coverageStatus === "official" || node.coverageStatus === "partial") {
+    return "The first confirmed official page is stored as a baseline, not an alert. Last-known copy appears once Check now stores an extract.";
+  }
+  return "No last-known pricing, API, or product state yet.";
 }
 
 function signalStatus(node: PulseNode, detailed = false): string {

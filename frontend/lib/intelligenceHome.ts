@@ -39,6 +39,14 @@ export type IntelligenceObject = {
   decisionThreadId?: string | null;
 };
 
+export type PulseKnownState = {
+  aspect: string;
+  label: string;
+  state: string;
+  value?: string | null;
+  unit?: string | null;
+};
+
 export type PulseNode = {
   id: string;
   name: string;
@@ -50,6 +58,9 @@ export type PulseNode = {
   changeCount: number;
   decisionCount: number;
   latestSignal: string | null;
+  knownStates: PulseKnownState[];
+  coverageLine: string | null;
+  coverageStatus: string | null;
   cardIds: string[];
   reviewHref: string | null;
   askHref: string;
@@ -85,6 +96,85 @@ export function shortLabel(text: string | null | undefined, max = 16): string {
 
 export function countPhrase(n: number, singular: string, plural: string): string {
   return n === 1 ? singular : plural;
+}
+
+export function knownStateValue(row: {
+  state: string;
+  value?: string | null;
+  unit?: string | null;
+}): string {
+  const value = (row.value || "").trim();
+  const unit = (row.unit || "").trim().toLowerCase();
+  if (value) {
+    if (unit === "percent") return `${value}%`;
+    if (unit === "$" || unit === "usd") return `$${value}`;
+    if (unit) return `${value} ${unit}`;
+    return value;
+  }
+  return shortLabel((row.state || "").trim(), 96);
+}
+
+export function knownStateLine(row: {
+  label: string;
+  state: string;
+  value?: string | null;
+  unit?: string | null;
+}): string {
+  const label = (row.label || "").trim();
+  const value = knownStateValue(row);
+  if (!label) return value;
+  if (!value) return label;
+  return `${label}: ${value}`;
+}
+
+const PAGE_ASPECT: Record<string, { aspect: string; label: string }> = {
+  pricing: { aspect: "pricing_positioning", label: "pricing" },
+  docs: { aspect: "model_api", label: "API" },
+  changelog: { aspect: "product_release", label: "product" },
+};
+
+function knownStatesFor(ent: WatchedEntity): PulseKnownState[] {
+  const fromSnaps: PulseKnownState[] = (ent.last_states || [])
+    .filter((row) => (row.state || "").trim() || (row.value || "").trim())
+    .map((row) => ({
+      aspect: row.aspect,
+      label: row.label,
+      state: row.state,
+      value: row.value,
+      unit: row.unit,
+    }));
+  const seen = new Set(fromSnaps.map((row) => row.aspect));
+  const fromPages: PulseKnownState[] = [];
+  for (const page of ent.coverage?.pages || []) {
+    const mapped = PAGE_ASPECT[page.source_type];
+    const excerpt = (page.excerpt || "").trim();
+    if (!mapped || !excerpt || seen.has(mapped.aspect)) continue;
+    if (page.status !== "watching") continue;
+    seen.add(mapped.aspect);
+    fromPages.push({
+      aspect: mapped.aspect,
+      label: mapped.label,
+      state: excerpt,
+    });
+  }
+  return [...fromSnaps, ...fromPages].slice(0, 3);
+}
+
+export function coverageLine(coverage?: WatchedEntity["coverage"] | null): string | null {
+  if (!coverage) return null;
+  const watching = (coverage.pages || [])
+    .filter((page) => page.status === "watching" || page.status === "pending")
+    .map((page) => page.source_type);
+  if (coverage.status === "official") {
+    return watching.length ? `Official ${watching.join(" · ")}` : "Official pages confirmed";
+  }
+  if (coverage.status === "partial") {
+    return watching.length
+      ? `Official ${watching.join(" · ")} · news for the rest`
+      : "Some official pages pending";
+  }
+  if (coverage.status === "skipped") return "News and RSS";
+  return coverage.note || "News only — no official pricing, docs, or changelog page confirmed";
 }
 
 /** Pull a real percentage out of evidence text. Returns null if none is present. */
@@ -521,6 +611,9 @@ export function buildMorningPulse(input: {
           || latestAlert.summary
           || latestAlert.title).trim()
         : latestCard?.why || null,
+      knownStates: knownStatesFor(ent),
+      coverageLine: coverageLine(ent.coverage),
+      coverageStatus: ent.coverage?.status || null,
       cardIds: relatedCards.map((card) => card.id),
       reviewHref: relatedCards.find((card) => card.readHref)?.readHref || null,
       askHref: latestCard?.askHref || askUrl({ title: ent.name }),

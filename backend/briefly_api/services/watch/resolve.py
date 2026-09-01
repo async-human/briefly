@@ -31,6 +31,7 @@ from briefly_api.services.watch.pages import (
     canonicalize_extract,
     extract_visible_text,
     is_thin,
+    known_excerpt,
     robots_status,
 )
 from briefly_api.services.watch.relevance import canonicalize_url
@@ -204,12 +205,14 @@ def coverage_from_sources(sources: list[EntitySource]) -> dict:
             status = "watching"
         else:
             status = "pending"
+        excerpt = known_excerpt(getattr(src, "last_extract", None) or "") or None
         pages.append(
             {
                 "source_type": src.source_type,
                 "url": src.url,
                 "status": status,
                 "last_error": error or None,
+                "excerpt": excerpt,
             }
         )
     kinds = {p["source_type"] for p in pages}

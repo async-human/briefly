@@ -1664,6 +1664,7 @@ export type WatchedEntity = {
       url: string;
       status: string;
       last_error?: string | null;
+      excerpt?: string | null;
     }[];
     note: string;
   } | null;

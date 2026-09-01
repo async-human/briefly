@@ -92,6 +92,27 @@ def changed_excerpt(old: str, new: str, *, limit: int = 800) -> str:
     return "\n".join(ranked)[:limit]
 
 
+def known_excerpt(extract: str, *, limit: int = 280) -> str:
+    """Last-known copy from a stored extract. Prefer prices and percents. Never invent."""
+    cleaned = canonicalize_extract(extract)
+    if not cleaned:
+        return ""
+    lines = [ln.strip() for ln in cleaned.splitlines() if ln.strip()]
+    interesting = [ln for ln in lines if _INTERESTING.search(ln)]
+    ranked = interesting + [ln for ln in lines if ln not in interesting]
+    out: list[str] = []
+    used = 0
+    for ln in ranked:
+        if used >= limit:
+            break
+        take = ln[: max(0, limit - used)]
+        if not take:
+            break
+        out.append(take)
+        used += len(take) + 1
+    return "\n".join(out).strip()[:limit]
+
+
 def evaluate_extract(
     previous_hash: str | None,
     previous_extract: str | None,

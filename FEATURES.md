@@ -4,7 +4,7 @@ Living log of what is **in the product**, mapped to [`ROADMAP.md`](ROADMAP.md), 
 
 Update this file whenever a capability ships, is reshaped, or is deliberately parked. A rising feature count is not progress unless it moves a signal, a decision, or a retained user.
 
-**Last updated:** 2026-09-01 (Pinned official-page watch)
+**Last updated:** 2026-09-01 (Your world last-known pricing)
 
 ---
 
@@ -94,7 +94,7 @@ Grouped by the decision loop, not by UI page.
 |---|---|---|
 | First three founder detectors | `services/signals/detectors.py` | Rule/keyword classify; do not add a fourth until precision holds |
 | `signals`, `signal_evidence`, `signal_impacts`, `signal_feedback` | migration `016` | |
-| Entity snapshots (last-known pricing / API / product) | `entity_snapshots`, migrations `018`–`019` | Stores extracted value/unit/effective time plus evidence text. Event and signal uniqueness protect concurrent writes. Official page diffs write snapshots; login-walled and JS-empty pages do not. |
+| Entity snapshots (last-known pricing / API / product) | `entity_snapshots`, migrations `018`–`019`; official-page `last_extract` on glance | Stores extracted value/unit plus evidence text. Your world shows last-known copy when you select a company (and a one-line excerpt on the row). Cards below stay reserved for a material change. Login-walled and JS-empty pages do not. |
 | Pinned official page change-detection | `entity_sources` hash/extract (migration `021`), `services/watch/pages.py`, `services/watch/resolve.py` | At most 3 official URLs per company. Resolver: catalog → homepage nav → sitemap → confirmed same-host `/pricing` etc. First fetch is baseline. Hash of extract. robots.txt respected. Fetch failure is not “no change.” No Playwright, no site recursion, no unconfirmed guesses |
 | Watch hits persist as market signals | `services/watch/monitor.py`, `services/signals/persist.py` | Official page hits run before RSS and skip the news relevance floor. First sighting has empty previous_state; the next real change compares against the snapshot |
 | Watching alerts pinned into **What’s new** when the URL is not already in the brief | `services/signals/attach.py` | Not a dedicated watching section |
@@ -152,6 +152,7 @@ Do not start these because the last file compiled.
 
 | Date | Commit | What shipped |
 |---|---|---|
+| 2026-09-01 | (this) | Your world inspect panel shows last-known pricing/API/product from snapshots and official-page extracts; cards remain change-only |
 | 2026-09-01 | (this) | Official-page resolver: homepage/nav/sitemap + confirm-before-watch; coverage on settings; user-pinned URLs |
 | 2026-09-01 | (this) | Pinned official-page watch: hash+diff catalog pricing/docs/changelog URLs on the existing watch job |
 | 2026-09-01 | (this) | Consolidated product docs into `ROADMAP.md`; retired MOAT/FEEDLY/PRODUCT_ROADMAP* files |

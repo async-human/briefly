@@ -165,8 +165,8 @@ export function IntelligenceHome({
           </ul>
         ) : selectedNode ? (
           <p className="intel-quiet" role="status">
-            No featured intelligence card is attached to {selectedNode.name} today. Its latest
-            monitoring signal is summarized above.
+            No material change card for {selectedNode.name} today. Last-known pricing, API, and
+            product sit in the inspect panel above — not as a feed.
           </p>
         ) : (
           !generating && !loadError && (

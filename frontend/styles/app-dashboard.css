@@ -12766,7 +12766,8 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   animation: monitor-breathe var(--app-dur-monitor) var(--app-ease) infinite;
 }
 
-.pulse-field-entity-activity {
+.pulse-field-entity-activity,
+.pulse-field-entity-known {
   width: 100%;
   font-family: var(--font-sans), system-ui, sans-serif;
   font-size: 0.625rem;
@@ -12775,6 +12776,10 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pulse-field-entity-known {
+  color: var(--app-ink-secondary);
 }
 
 .pulse-field-entity.is-on .pulse-field-entity-state,
@@ -12834,6 +12839,52 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   font-size: 0.875rem;
   line-height: 1.5;
   color: var(--app-ink-secondary);
+}
+
+.pulse-selection-coverage {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--app-muted);
+}
+
+.pulse-selection-known {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pulse-selection-known li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  align-items: baseline;
+}
+
+.pulse-selection-known-label {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--app-brand);
+}
+
+.pulse-selection-known-state,
+.pulse-selection-known-empty {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--app-ink-secondary);
+  overflow-wrap: anywhere;
+}
+
+.pulse-selection-known-empty {
+  padding-block-start: 0.2rem;
+  color: var(--app-muted);
 }
 
 .pulse-selection-actions {

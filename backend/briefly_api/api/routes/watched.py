@@ -55,6 +55,7 @@ class WatchPageOut(BaseModel):
     url: str
     status: str
     last_error: str | None = None
+    excerpt: str | None = None
 
 
 class WatchCoverageOut(BaseModel):

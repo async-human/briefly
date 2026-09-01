@@ -184,3 +184,29 @@ def test_coverage_news_only_when_no_pages():
     assert cov["status"] == "news_only"
     assert "Pin a URL" in cov["note"] or "pin" in cov["note"].lower()
 
+
+def test_coverage_includes_last_known_excerpt():
+    from types import SimpleNamespace
+
+    from briefly_api.services.watch.pages import known_excerpt
+    from briefly_api.services.watch.resolve import coverage_from_sources
+
+    extract = "GPT-4o input $2.50 / 1M tokens\nEnterprise plan 40% discount\n" + ("stable copy. " * 20)
+    snippet = known_excerpt(extract)
+    assert "$2.50" in snippet
+    assert "40%" in snippet
+    assert "stable copy" not in snippet or snippet.index("$2.50") < snippet.find("stable")
+
+    cov = coverage_from_sources([
+        SimpleNamespace(
+            source_type="pricing",
+            url="https://openai.com/api/pricing/",
+            last_error=None,
+            content_hash="abc",
+            last_extract=extract,
+        ),
+    ])
+    assert cov["status"] in {"partial", "official"}
+    assert cov["pages"][0]["excerpt"]
+    assert "$2.50" in cov["pages"][0]["excerpt"]
+
