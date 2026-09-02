@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { countPhrase, glanceKnownState, knownStateLine, shortLabel, type PulseNode } from "@/lib/intelligenceHome";
 
@@ -25,6 +25,7 @@ type MorningPulseProps = {
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
   onClearSelection: () => void;
+  children?: ReactNode;
 };
 
 const MAX_VISIBLE_NODES = 6;
@@ -50,8 +51,10 @@ export function MorningPulse({
   selectedNodeId,
   onSelectNode,
   onClearSelection,
+  children,
 }: MorningPulseProps) {
   const [now, setNow] = useState<number | null>(null);
+  const [worldOpen, setWorldOpen] = useState(false);
 
   useEffect(() => {
     setNow(Date.now());
@@ -92,10 +95,13 @@ export function MorningPulse({
         </li>
       </ul>
 
-      <article className="pulse-world">
+      {children}
+
+      <section className={`pulse-world${worldOpen ? " is-open" : ""}`} aria-labelledby="pulse-world-title">
         <header className="pulse-world-head">
           <div className="pulse-world-heading">
-            <h3 className="pulse-world-title">Your world</h3>
+            <p className="pulse-world-kicker">Supporting context</p>
+            <h3 id="pulse-world-title" className="pulse-world-title">Changes in your world</h3>
             <p
               className={`pulse-world-monitor${scanning ? " is-scanning" : ""}${scanError ? " is-error" : ""}`}
               role={scanError ? "alert" : "status"}
@@ -127,24 +133,37 @@ export function MorningPulse({
                 {scanning ? "Checking…" : scanError ? "Retry check" : "Check now"}
               </button>
             ) : null}
+            <button
+              type="button"
+              className="pulse-world-toggle"
+              aria-expanded={worldOpen}
+              aria-controls="pulse-world-detail"
+              onClick={() => setWorldOpen((current) => !current)}
+            >
+              {worldOpen ? "Hide world" : "Inspect world"}
+              <span aria-hidden>{worldOpen ? "−" : "+"}</span>
+            </button>
           </div>
         </header>
-        <PulseField
-          nodes={nodes}
-          connectionLabel={connectionLabel}
-          generating={Boolean(generating)}
-          scanning={scanning}
-          now={now}
-          onScan={onScan}
-          selectedNodeId={selectedNodeId}
-          onSelectNode={onSelectNode}
-          onClearSelection={onClearSelection}
-        />
-        <p className="pulse-world-note">
-          Last-known pricing and product state from official pages. Cards below are only for a
-          material change, not the baseline.
-        </p>
-      </article>
+        {worldOpen ? (
+          <div id="pulse-world-detail" className="pulse-world-detail">
+            <PulseField
+              nodes={nodes}
+              connectionLabel={connectionLabel}
+              generating={Boolean(generating)}
+              scanning={scanning}
+              now={now}
+              onScan={onScan}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={onSelectNode}
+              onClearSelection={onClearSelection}
+            />
+            <p className="pulse-world-note">
+              Select an entity to see what changed, the evidence behind it, and the latest source check.
+            </p>
+          </div>
+        ) : null}
+      </section>
     </header>
   );
 }

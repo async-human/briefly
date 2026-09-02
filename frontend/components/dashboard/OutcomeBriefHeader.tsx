@@ -96,7 +96,7 @@ export function SafeToIgnorePanel({
   return (
     <div className="outcome-safe-ignore">
 
-      {/* ── More from today — good-fit articles that didn't make the cut ── */}
+      {/* ── Briefing overflow — good-fit developments that didn't make the cut ── */}
       {hasBonus && (
         <div className="outcome-more-today">
           <button
@@ -106,9 +106,9 @@ export function SafeToIgnorePanel({
             aria-expanded={moreTodayOpen}
           >
             <span className="outcome-more-today-heading">
-              More from today
+              Outside today&apos;s brief
               <span className="outcome-more-today-sub">
-                {bonus.length} on-profile articles that didn&apos;t fit in today&apos;s brief
+                {bonus.length} on-profile {bonus.length === 1 ? "development" : "developments"} held outside the daily limit
                 {filteredCount > 0
                   ? ` (top ${filteredCount + bonus.length} selected)`
                   : ""}

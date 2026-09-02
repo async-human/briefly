@@ -325,6 +325,12 @@ function DashboardContent() {
         name={greeting}
         dateLabel={today}
         generating={generating}
+        intelligenceRail={(
+          <DashboardInsightsDrawer
+            intel={intel}
+            digest={digest}
+          />
+        )}
       >
       <div className="dash-feed-workbench">
         <div className="dash-feed-main">
@@ -394,12 +400,6 @@ function DashboardContent() {
           ) : (
             <CalendarConnectNudge />
           )}
-          <DashboardInsightsDrawer
-            intel={intel}
-            digest={digest}
-            streak={me.reading_streak ?? 0}
-            declaredInterests={me.profile?.interests?.map((i) => i.topic).filter(Boolean) ?? []}
-          />
         </aside>
       </div>
       </IntelligenceHome>

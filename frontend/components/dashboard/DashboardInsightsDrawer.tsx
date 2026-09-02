@@ -1,213 +1,161 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Digest, ProfileIntelligence } from "@/lib/api";
-import { BrieflyKnowsSummary } from "@/components/dashboard/BrieflyKnowsSummary";
-import { StoryThreadsRail } from "@/components/dashboard/StoryThreadsRail";
-import { SerendipityPanel } from "@/components/dashboard/SerendipityPanel";
-import { IntelligenceBriefingPanel } from "@/components/dashboard/IntelligenceBriefingPanel";
-import { WeeklyReportCard } from "@/components/dashboard/WeeklyReportCard";
-import { DashboardAccordion } from "@/components/dashboard/DashboardAccordion";
-import { getBrieflyKnowsTeaser } from "@/lib/brieflyKnows";
-import { getWeekFocusDescription, hasSubstantiveWrappedContent } from "@/lib/weekInFocus";
-
-const STORAGE_KEY = "briefly:dash-insights-open";
+import { hasSubstantiveWrappedContent } from "@/lib/weekInFocus";
 
 type Props = {
   intel: ProfileIntelligence | null;
   digest: Digest | null;
-  streak: number;
-  declaredInterests: string[];
 };
 
-function buildSummaryChips(intel: ProfileIntelligence | null, digest: Digest | null): string[] {
-  const chips: string[] = [];
-  const wrapped = digest?.meta?.wrapped;
-  if (wrapped && hasSubstantiveWrappedContent(wrapped)) {
-    chips.push("Week in focus");
-  } else if (digest) {
-    chips.push("Week in focus");
-  }
-  if ((intel?.active_threads?.length ?? 0) > 0) {
-    chips.push(`${intel!.active_threads!.length} thread${intel!.active_threads!.length === 1 ? "" : "s"}`);
-  }
-  if ((digest?.meta?.serendipity?.length ?? 0) > 0) {
-    chips.push(`${digest!.meta!.serendipity!.length} connection${digest!.meta!.serendipity!.length === 1 ? "" : "s"}`);
-  }
-  if ((digest?.meta?.calendar?.meetings?.length ?? 0) > 0) {
-    chips.push("Meetings");
-  }
-  if ((digest?.meta?.blind_spots?.length ?? 0) > 0) {
-    chips.push("Blind spots");
-  }
-  if (intel && intel.digest_day > 0) {
-    chips.push("Your patterns");
-  }
-  return chips.slice(0, 4);
+type IntelligenceObservation = {
+  id: string;
+  label: string;
+  title: string;
+  detail: string;
+};
+
+const MAX_OBSERVATIONS = 4;
+
+function clean(value: string | null | undefined, max = 150): string {
+  const text = (value || "").replace(/\s+/g, " ").trim();
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.max(1, max - 1)).replace(/\s+\S*$/, "")}…`;
 }
 
-export function DashboardInsightsDrawer({
-  intel,
-  digest,
-  streak,
-  declaredInterests,
-}: Props) {
-  const [expanded, setExpanded] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-
-  const chips = useMemo(() => buildSummaryChips(intel, digest), [intel, digest]);
+function buildObservations(
+  intel: ProfileIntelligence | null,
+  digest: Digest | null,
+): IntelligenceObservation[] {
+  const observations: IntelligenceObservation[] = [];
+  const seen = new Set<string>();
+  const add = (observation: IntelligenceObservation | null) => {
+    if (!observation || observations.length >= MAX_OBSERVATIONS) return;
+    const key = `${observation.label}:${observation.title}`.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    observations.push(observation);
+  };
 
   const wrapped = digest?.meta?.wrapped;
-  const hasThreads = (intel?.active_threads?.length ?? 0) > 0;
-  const hasConnections = (digest?.meta?.serendipity?.length ?? 0) > 0;
-  const hasMeetings = (digest?.meta?.calendar?.meetings?.length ?? 0) > 0;
-  const hasBlindSpots = (digest?.meta?.blind_spots?.length ?? 0) > 0;
-  const hasIntel = Boolean(intel && intel.digest_day > 0);
-
-  const hasContent =
-    Boolean(digest) ||
-    hasThreads ||
-    hasConnections ||
-    hasMeetings ||
-    hasBlindSpots ||
-    hasIntel;
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === "1") setExpanded(true);
-    } catch {
-      /* ignore */
-    }
-    setHydrated(true);
-  }, []);
-
-  function toggle() {
-    setExpanded((v) => {
-      const next = !v;
-      try {
-        localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
-      } catch {
-        /* ignore */
-      }
-      return next;
+  const shift = wrapped?.shifts?.[0] || wrapped?.mind_shifts?.[0];
+  if (shift) {
+    const shiftTitle = clean(
+      shift.label || [shift.topic, shift.direction].filter(Boolean).join(" "),
+      80,
+    );
+    add({
+      id: `shift:${shift.topic}`,
+      label: "What is changing",
+      title: shiftTitle || clean(shift.topic, 80),
+      detail: clean(
+        shift.detail || shift.evidence || shift.examples?.[0]?.headline || "A sustained change is forming in your reading.",
+      ),
+    });
+  } else if (wrapped && hasSubstantiveWrappedContent(wrapped)) {
+    const active = wrapped.active_topics?.[0] || wrapped.high_engagement?.[0];
+    add({
+      id: "week-focus",
+      label: "What is changing",
+      title: clean(active?.topic || wrapped.current_focus || "Your week in focus", 80),
+      detail: clean(
+        active?.detail || wrapped.synthesis || wrapped.weekly_synthesis || wrapped.lead,
+      ),
     });
   }
 
-  if (!hasContent) return null;
+  const blindSpot = digest?.meta?.blind_spots?.[0];
+  if (blindSpot) {
+    add({
+      id: `blind:${blindSpot.topic}`,
+      label: "What you may be missing",
+      title: clean(blindSpot.topic, 80),
+      detail: clean(blindSpot.counter_argument || blindSpot.counter_headline || blindSpot.consensus),
+    });
+  }
 
-  const inBriefContentIds = new Set(
-    (digest?.items ?? [])
-      .map((item) => item.content_id)
-      .filter((id): id is string => Boolean(id)),
-  );
+  const thread = intel?.active_threads?.[0];
+  if (thread) {
+    const appearances = `${thread.appearances} ${thread.appearances === 1 ? "signal" : "signals"}`;
+    const duration = thread.weeks > 0 ? ` across ${thread.weeks} ${thread.weeks === 1 ? "week" : "weeks"}` : "";
+    add({
+      id: `thread:${thread.topic}`,
+      label: "Thread progressing",
+      title: clean(thread.topic, 80),
+      detail: clean(`${appearances}${duration}. ${thread.latest}`),
+    });
+  }
 
-  const defaultFirst = true;
-  const weekDescription = getWeekFocusDescription(wrapped);
+  const connection = digest?.meta?.serendipity?.[0];
+  if (connection) {
+    add({
+      id: `connection:${connection.title}`,
+      label: "What connects",
+      title: clean(connection.title, 80),
+      detail: clean(connection.thread_update || connection.body),
+    });
+  }
+
+  const gap = wrapped?.uncovered?.[0] || wrapped?.gaps?.[0] || wrapped?.ignored?.[0];
+  if (gap) {
+    add({
+      id: `gap:${gap.topic}`,
+      label: "Coverage to reconsider",
+      title: clean(gap.topic, 80),
+      detail: clean(gap.detail || "Your recent reading leaves this area lightly covered."),
+    });
+  }
+
+  const behavioral = intel?.behavioral?.insights?.[0];
+  if (behavioral) {
+    add({
+      id: `pattern:${behavioral.type}`,
+      label: "Your reading pattern",
+      title: clean(behavioral.label, 80),
+      detail: clean(behavioral.text),
+    });
+  }
+
+  return observations;
+}
+
+export function DashboardInsightsDrawer({ intel, digest }: Props) {
+  const observations = buildObservations(intel, digest);
 
   return (
-    <section className="dash-insights-drawer" aria-label="Intelligence and connections">
-      <button
-        type="button"
-        className="dash-insights-drawer-trigger"
-        aria-expanded={expanded}
-        onClick={toggle}
-      >
-        <div className="dash-insights-drawer-trigger-main">
-          <span className="dash-insights-drawer-eyebrow">Beyond today&apos;s brief</span>
-          <span className="dash-insights-drawer-title">
-            {expanded ? "Intelligence & connections" : "Explore patterns, threads, and connections"}
-          </span>
-          {!expanded && chips.length > 0 && (
-            <span className="dash-insights-drawer-chips">
-              {chips.map((chip) => (
-                <span key={chip} className="dash-insights-drawer-chip">
-                  {chip}
-                </span>
-              ))}
-            </span>
-          )}
+    <section className="dash-intelligence-panel" aria-labelledby="dash-intelligence-title">
+      <header className="dash-intelligence-head">
+        <div>
+          <p className="dash-intelligence-kicker">Across your reading</p>
+          <h2 id="dash-intelligence-title" className="dash-intelligence-title">
+            Briefly Intelligence
+          </h2>
         </div>
-        <span className="dash-insights-drawer-chevron" aria-hidden>
-          {expanded ? "−" : "+"}
+        <span className="dash-intelligence-count" aria-label={`${observations.length} observations`}>
+          {String(observations.length).padStart(2, "0")}
         </span>
-      </button>
+      </header>
 
-      {hydrated && expanded && (
-        <div className="dash-insights-drawer-body">
-          <p className="dash-insights-drawer-intro">
-            Optional depth — your briefing above is complete. Expand a section when you want more context.
-          </p>
-
-          <DashboardAccordion
-            id="week-in-focus"
-            title="Your week in focus"
-            description={weekDescription}
-            defaultOpen={defaultFirst}
-          >
-            <WeeklyReportCard embedded intel={intel} wrapped={wrapped} />
-          </DashboardAccordion>
-
-          {hasIntel && intel && (
-            <DashboardAccordion
-              id="knows"
-              title="What Briefly knows"
-              description={getBrieflyKnowsTeaser(intel, streak)}
-              defaultOpen={false}
-            >
-              <BrieflyKnowsSummary
-                intel={intel}
-                streak={streak}
-                declaredInterests={declaredInterests}
-                variant="compact"
-              />
-            </DashboardAccordion>
-          )}
-
-          {hasThreads && intel && (
-            <DashboardAccordion
-              id="threads"
-              title="Story threads"
-              description={`${intel.active_threads!.length} active`}
-            >
-              <StoryThreadsRail threads={intel.active_threads ?? []} />
-            </DashboardAccordion>
-          )}
-
-          {hasConnections && digest && (
-            <DashboardAccordion
-              id="connections"
-              title="Connections"
-              description="How stories link across your reading"
-            >
-              <SerendipityPanel
-                connections={digest.meta!.serendipity!}
-                digestId={digest.id}
-                inBriefContentIds={inBriefContentIds}
-              />
-            </DashboardAccordion>
-          )}
-
-          {hasMeetings && digest?.meta?.calendar && (
-            <DashboardAccordion id="meetings" title="Today's meetings" description="Matched to your calendar">
-              <IntelligenceBriefingPanel calendar={digest.meta.calendar} embedded />
-            </DashboardAccordion>
-          )}
-
-          {hasBlindSpots && digest?.meta?.blind_spots && (
-            <DashboardAccordion id="blind-spots" title="Blind spots" description="Perspectives you might miss">
-              <IntelligenceBriefingPanel blindSpots={digest.meta.blind_spots} embedded />
-            </DashboardAccordion>
-          )}
-
-          <p className="dash-insights-drawer-foot">
-            <Link href="/intelligence" className="dash-insights-drawer-link">
-              Open full intelligence profile →
-            </Link>
-          </p>
-        </div>
+      {observations.length > 0 ? (
+        <ol className="dash-intelligence-list">
+          {observations.map((observation) => (
+            <li key={observation.id} className="dash-intelligence-item">
+              <p className="dash-intelligence-label">{observation.label}</p>
+              <h3 className="dash-intelligence-observation">{observation.title}</h3>
+              <p className="dash-intelligence-detail">{observation.detail}</p>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="dash-intelligence-empty">
+          No durable pattern yet. Briefly will surface shifts, blind spots, and progressing threads as evidence accumulates.
+        </p>
       )}
+
+      <Link href="/intelligence" className="dash-intelligence-open">
+        Open Intelligence <span aria-hidden>→</span>
+      </Link>
     </section>
   );
 }

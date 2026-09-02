@@ -17,14 +17,17 @@ Art Deco editorial — ivory paper, deep teal ink, restrained gold geometry. A c
 - **v7** — Workbench uses the canvas: wide briefing + sticky rail, story cards, collapsible device groups
 - **v9** — Glance hierarchy pass: pill counts, framed Your World constellation, denser Intelligence Cards, briefing recedes behind “the rest of today.”
 - **v10** — Decision loop refinement: evidence cards disclose why they rose; the read view captures a quiet, receipt-backed decision outcome; outcomes enter the existing timeline without a new surface.
+- **v11** — Decision-first dashboard: three ranked conclusions lead the first viewport; the world ledger becomes supporting disclosure; briefing content resolves into For you today, From your world, and Explore; the intelligence rail is capped at four observations.
 
 ## App macrostructure
 
 **Workbench** — sidebar navigation + primary canvas + secondary sources rail. Function carries the page; no hero enrichment.
 
-The canvas opens on a **glance layer**: greeting, pill counts, a framed Your World constellation, and at most three Intelligence Cards. The briefing, calendar, and insights recede behind **The rest of today**.
+The canvas opens on a **decision layer**: greeting, honest pill counts, and at most three ranked Intelligence Cards. These are conclusions rather than article previews: what changed, why it matters, what evidence supports it, and whether a decision may need review. The world graph follows as a compact supporting disclosure, never as the first substantive object.
 
-On wide viewports the lower canvas is a two-column workbench: today’s briefing fills the main column; meetings and optional intelligence sit in a sticky rail. Story cards are the interaction surface. Setup prompts never displace the daily brief.
+The remaining depth is progressive: **Your briefing** opens into exactly three information levels — **For you today**, **From your world**, and **Explore**. Discovery is capped at three compact items. The sticky **Briefly Intelligence** rail carries no more than four observations: a shift, a blind spot, a progressing thread, a connection, or a coverage recommendation. No repeated article-section synonyms.
+
+On wide viewports the lower canvas is a two-column workbench: today’s briefing fills the main column; the concise Intelligence panel leads a narrower sticky rail, followed by meetings. Change and event cards are the interaction surface. Setup prompts never displace the daily brief.
 
 ## Marketing macrostructure
 

@@ -8,7 +8,6 @@ import {
   SECTION_HIGHLY_RELEVANT,
   SECTION_WHATS_NEW,
   SECTION_WORTH_DISCOVERING,
-  sectionBadgeClass,
 } from "@/lib/digestSections";
 import { AddSourceForm, CopyEmailButton } from "./AddSourceForm";
 import { SourceSlotMeter } from "./SourceSlotMeter";
@@ -35,7 +34,7 @@ import { YouTubeItemBadge } from "@/components/dashboard/YouTubeItemBadge";
 import { getYouTubeBadge } from "@/lib/youtubeBadge";
 import { BrieflyLogo } from "@/components/BrieflyLogo";
 
-const PREVIEW_LIMIT = 12;
+const PREVIEW_LIMIT = 11;
 
 type SourcesSidebarProps = {
   ingestionEmail: string;
@@ -494,7 +493,13 @@ function BriefingHeroItem({
     <article className="briefing-hero-item">
       <Link href={`/dashboard/read/${digestId}?item=${item.id}`} className="briefing-hero-hit">
         <div className="briefing-hero-meta">
-          <span className="briefing-hero-badge">Top story</span>
+          <span className="briefing-hero-badge">
+            {item.contradiction_flag
+              ? "Decision signal"
+              : item.is_material_change
+                ? "Material change"
+                : "Lead development"}
+          </span>
           <YouTubeItemBadge item={item} variant="compact" />
           {item.source_name && !youtubeBadge && (
             <span className="briefing-hero-source">{item.source_name}</span>
@@ -508,6 +513,14 @@ function BriefingHeroItem({
         </h3>
         {why && (
           <p className="briefing-hero-why">{why}</p>
+        )}
+        {(item.previous_state || item.new_state) && (
+          <p className="briefing-hero-change">
+            <span>What changed</span>
+            {item.previous_state && item.new_state
+              ? `${item.previous_state} → ${item.new_state}`
+              : item.new_state || item.previous_state}
+          </p>
         )}
         {item.confidence_signal && (
           <p className="briefing-hero-confidence">◈ {item.confidence_signal}</p>
@@ -597,31 +610,62 @@ function BriefingPreviewItem({
   return <article className="briefing-preview-item">{content}</article>;
 }
 
-function sectionSubtitle(section: string): string {
-  if (section === SECTION_WHATS_NEW) return "Latest from your sources";
-  if (section === SECTION_HIGHLY_RELEVANT) return "Picked for your interests";
-  if (section === SECTION_WORTH_DISCOVERING) return "Relevant content from outside your subscriptions";
-  return "";
-}
+type BriefingTier = {
+  key: "for-you" | "world" | "explore";
+  label: string;
+  subtitle: string;
+  items: DigestItem[];
+};
 
-function sectionBadgeLabel(section: string): string {
-  if (section === SECTION_WHATS_NEW) return "From your sources";
-  if (section === SECTION_HIGHLY_RELEVANT) return "Picked for you";
-  if (section === SECTION_WORTH_DISCOVERING) return "Worth discovering";
-  return section;
-}
+function buildBriefingTiers(topItems: DigestItem[], restItems: DigestItem[]): BriefingTier[] {
+  const grouped = groupDigestItemsBySection(restItems);
+  const highlyRelevant: DigestItem[] = [];
+  const fromWorld: DigestItem[] = [];
+  const explore: DigestItem[] = [];
 
-function buildGroupedPreview(items: DigestItem[], limit: number) {
-  const groups = groupDigestItemsBySection(items);
-  let shown = 0;
-  const result: { section: string; items: DigestItem[] }[] = [];
-  for (const group of groups) {
-    const take = Math.min(group.items.length, limit - shown);
-    if (take <= 0) break;
-    result.push({ section: group.section, items: group.items.slice(0, take) });
-    shown += take;
+  for (const group of grouped) {
+    if (group.section === SECTION_HIGHLY_RELEVANT) {
+      highlyRelevant.push(...group.items);
+    } else if (group.section === SECTION_WHATS_NEW) {
+      fromWorld.push(...group.items);
+    } else if (group.section === SECTION_WORTH_DISCOVERING) {
+      explore.push(...group.items);
+    } else {
+      fromWorld.push(...group.items);
+    }
   }
-  return { groups: result, shown };
+
+  const capacities = { forYou: 4, world: 4, explore: 3 };
+  const tiers: BriefingTier[] = [
+    {
+      key: "for-you",
+      label: "For you today",
+      subtitle: "The developments most likely to change your next move",
+      items: [...topItems, ...highlyRelevant].slice(0, capacities.forYou),
+    },
+    {
+      key: "world",
+      label: "From your world",
+      subtitle: "Verified movement across the sources and entities you follow",
+      items: fromWorld.slice(0, capacities.world),
+    },
+    {
+      key: "explore",
+      label: "Explore",
+      subtitle: "Lower-priority context, available when you want the wider view",
+      items: explore.slice(0, capacities.explore),
+    },
+  ];
+
+  let shown = 0;
+  return tiers
+    .map((tier) => {
+      const remaining = Math.max(0, PREVIEW_LIMIT - shown);
+      const items = tier.items.slice(0, remaining);
+      shown += items.length;
+      return { ...tier, items };
+    })
+    .filter((tier) => tier.items.length > 0);
 }
 
 // ── Main panel ────────────────────────────────────────────────────────────────
@@ -783,8 +827,9 @@ export function BriefingPanel({
 
   const outcome = getDigestOutcome(digest);
   const { topItems, restItems } = splitTopPriorityItems(digest, outcome);
-  const restPreview = buildGroupedPreview(restItems, PREVIEW_LIMIT);
-  const remaining = restItems.length - restPreview.shown;
+  const tiers = buildBriefingTiers(topItems, restItems);
+  const shown = tiers.reduce((total, tier) => total + tier.items.length, 0);
+  const remaining = Math.max(0, digest.items.length - shown);
   let previewIndex = 0;
   const skipped = digest.meta?.skipped ?? [];
   const blocked = digest.meta?.blocked;
@@ -801,10 +846,6 @@ export function BriefingPanel({
         previewText={digest.preview_text}
       />
 
-      {topItems[0] && (
-        <BriefingHeroItem item={topItems[0]} digestId={digest.id} />
-      )}
-
       {generateWarnings.length > 0 && (
         <ul className="briefing-warnings briefing-warnings-panel">
           {generateWarnings.map((warning) => (
@@ -815,49 +856,37 @@ export function BriefingPanel({
 
       <div className="briefing-preview-list">
         <div>
-          {topItems.length > 1 && (
-            <section className="briefing-section-group briefing-section-top3">
-              <header className="briefing-section-head">
-                <span className="briefing-section-badge briefing-section-badge-top">Also priority today</span>
-              </header>
-              <div className="briefing-section-items">
-                {topItems.slice(1).map((item, index) => (
-                  <BriefingPreviewItem
-                    key={item.id}
-                    item={item}
-                    index={index + 1}
-                    digestId={digest.id}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {restPreview.shown > 0 ? (
-            restPreview.groups.map((group) => (
-              <section key={group.section} className="briefing-section-group">
+          {tiers.length > 0 ? (
+            tiers.map((tier) => {
+              const [lead, ...supporting] = tier.items;
+              if (tier.key === "for-you" && lead) previewIndex += 1;
+              return (
+              <section key={tier.key} className={`briefing-section-group briefing-section-${tier.key}`}>
                 <header className="briefing-section-head">
-                  <span className={sectionBadgeClass(group.section)}>{sectionBadgeLabel(group.section)}</span>
-                  {sectionSubtitle(group.section) && (
-                    <p className="briefing-section-sub">{sectionSubtitle(group.section)}</p>
-                  )}
+                  <h3 className="briefing-section-title">{tier.label}</h3>
+                  <p className="briefing-section-sub">{tier.subtitle}</p>
                 </header>
+                {tier.key === "for-you" && lead ? (
+                  <BriefingHeroItem item={lead} digestId={digest.id} />
+                ) : null}
                 <div className="briefing-section-items">
-                  {group.items.map((item) => {
+                  {(tier.key === "for-you" ? supporting : tier.items).map((item) => {
+                    const itemIndex = previewIndex;
                     previewIndex += 1;
                     return (
                       <BriefingPreviewItem
                         key={item.id}
                         item={item}
-                        index={topItems.length + previewIndex - 1}
+                        index={itemIndex}
                         digestId={digest.id}
                       />
                     );
                   })}
                 </div>
               </section>
-            ))
-          ) : topItems.length === 0 ? (
+              );
+            })
+          ) : (
             <div className="briefing-tab-empty">
               <p>No items in today&apos;s brief yet.</p>
               {sourcesCount > 0 && onRegenerate && (
@@ -870,7 +899,7 @@ export function BriefingPanel({
                 </button>
               )}
             </div>
-          ) : null}
+          )}
         </div>
       </div>
 

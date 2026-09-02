@@ -12,6 +12,7 @@ type IntelligenceHomeProps = {
   name: string;
   dateLabel: string;
   generating: boolean;
+  intelligenceRail?: ReactNode;
   children?: ReactNode;
 };
 
@@ -20,6 +21,7 @@ export function IntelligenceHome({
   name,
   dateLabel,
   generating,
+  intelligenceRail,
   children,
 }: IntelligenceHomeProps) {
   const [alerts, setAlerts] = useState<WatchedAlert[]>([]);
@@ -104,10 +106,7 @@ export function IntelligenceHome({
   }
 
   const model = buildMorningPulse({ digest, alerts, entities, generating });
-  const selectedNode = model.nodes.find((node) => node.id === selectedEntityId) || null;
-  const visibleCards = selectedNode
-    ? model.cards.filter((card) => selectedNode.cardIds.includes(card.id))
-    : model.cards;
+  const visibleCards = model.cards;
   const briefCount = digest?.items?.length ?? 0;
 
   useEffect(() => {
@@ -127,6 +126,7 @@ export function IntelligenceHome({
 
   return (
     <div className="intel-home">
+      <div className="intel-decision-workbench">
       <section aria-label="Today at a glance">
         <MorningPulse
           greeting={`${greeting}, ${name}`}
@@ -151,7 +151,40 @@ export function IntelligenceHome({
             setSelectedEntityId((current) => current === nodeId ? null : nodeId);
           }}
           onClearSelection={() => setSelectedEntityId(null)}
-        />
+        >
+          {visibleCards.length > 0 ? (
+            <section className="intel-decisions" aria-labelledby="intel-decisions-title">
+              <header className="intel-decisions-head">
+                <div>
+                  <p className="intel-decisions-kicker">30-second catch-up</p>
+                  <h3 id="intel-decisions-title" className="intel-decisions-title">
+                    {visibleCards.length === 1
+                      ? "1 thing that matters"
+                      : `${visibleCards.length} things that matter`}
+                  </h3>
+                </div>
+                <p className="intel-decisions-note">Open only what may change a decision.</p>
+              </header>
+              <ul id="dashboard-intelligence-list" className="intel-stack-list">
+                {visibleCards.map((obj) => (
+                  <li key={obj.id}>
+                    <IntelligenceCard object={obj} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : (
+            !generating && !loadError && (
+              <section className="intel-decisions intel-decisions--quiet" aria-labelledby="intel-decisions-title">
+                <p className="intel-decisions-kicker">30-second catch-up</p>
+                <h3 id="intel-decisions-title" className="intel-decisions-title">Nothing material moved</h3>
+                <p className="intel-quiet">
+                  Your monitored world is quiet. Open the source ledger below to verify the latest check.
+                </p>
+              </section>
+            )
+          )}
+        </MorningPulse>
 
         {model.pendingCheckCount > 0 && !scanning && !loadError ? (
           <p className="intel-pending-scan" role="status">
@@ -164,31 +197,6 @@ export function IntelligenceHome({
           </p>
         ) : null}
 
-        {visibleCards.length > 0 ? (
-          <ul
-            id="dashboard-intelligence-list"
-            className="intel-stack-list"
-            aria-label={selectedNode ? `Intelligence connected to ${selectedNode.name}` : undefined}
-          >
-            {visibleCards.map((obj) => (
-              <li key={obj.id}>
-                <IntelligenceCard object={obj} />
-              </li>
-            ))}
-          </ul>
-        ) : selectedNode ? (
-          <p className="intel-quiet" role="status">
-            No material change card for {selectedNode.name} today. Last-known pricing, API, and
-            product sit in the inspect panel above — not as a feed.
-          </p>
-        ) : (
-          !generating && !loadError && (
-            <p className="intel-quiet">
-              When something material moves in your world, it will land here — not as a feed of stories.
-            </p>
-          )
-        )}
-
         {loadError ? (
           <p className="intel-scan-error" role="alert">
             Briefly couldn’t load your monitoring data. This is not an all-clear.
@@ -199,6 +207,12 @@ export function IntelligenceHome({
         ) : null}
 
       </section>
+      {intelligenceRail ? (
+        <aside className="intel-decision-rail" aria-label="Briefly Intelligence">
+          {intelligenceRail}
+        </aside>
+      ) : null}
+      </div>
 
       {children ? (
         <details
@@ -211,10 +225,10 @@ export function IntelligenceHome({
           }}
         >
           <summary className="intel-rest-summary">
-            <span className="intel-rest-title">The rest of today</span>
+            <span className="intel-rest-title">Your briefing</span>
             {briefCount > 0 ? (
               <span className="intel-rest-count">
-                {briefCount} in the briefing
+                {briefCount} {briefCount === 1 ? "development" : "developments"} · open for context
               </span>
             ) : null}
           </summary>

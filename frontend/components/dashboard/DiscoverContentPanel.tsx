@@ -152,7 +152,8 @@ export function DiscoverContentPanel({ onSourceAdded }: DiscoverContentPanelProp
     }
   }
 
-  const visible = articles.filter((a) => !dismissed.has(a.id));
+  const available = articles.filter((a) => !dismissed.has(a.id));
+  const visible = available.slice(0, 3);
 
   if (loading) {
     return (
@@ -178,11 +179,11 @@ export function DiscoverContentPanel({ onSourceAdded }: DiscoverContentPanelProp
       <header className="discover-content-head">
         <div>
           <h2 id="discover-content-title" className="discover-content-title">
-            Worth discovering
+            Discoveries
           </h2>
           <p className="discover-content-desc">
-            Fresh, highly relevant articles from sources you haven&apos;t subscribed to — picked from
-            your interests and reading behavior.
+            {visible.length === 1 ? "1 discovery" : `${visible.length} discoveries`} beyond your subscriptions,
+            selected from your interests and reading behavior.
           </p>
         </div>
         <button
