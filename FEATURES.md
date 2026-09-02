@@ -49,7 +49,7 @@ From the Feedly analysis. Status is against the *finished* version, not a first 
 | 2 | **Intelligence missions / tracked universe** | Briefly builds monitoring strategy from operating context. Universe evolves. | `partial` | Onboarding captures company / competitors / stack / questions and seeds `watched_entities`. User still adds watches by name. No auto-generated missions, no “track Tavily?” evolution. |
 | 3 | **Event clustering + delta** | One event, many sources; brief reports only what changed since last seen | `partial` | Signal fingerprints and conservative same-observation checks merge corroborating evidence while allowing reused changelog URLs to report a new state. No full semantic event object yet. |
 | 4 | **Company impact + evidence bundle** | Fact / inference / personal impact / recommendation, all cited | `partial` | Digest items expose source, claim, passage, corroboration, contradiction, detector, confidence. Read view and watching panel can rate Useful / Noise / Duplicate / Wrong. Layers are not yet labeled fact vs inference vs impact. |
-| 5 | **Decision Threads** | Persistent question, belief, evidence for/against, confidence, open questions | `partial` | `decision_threads` + `thread_signals` + `thread_updates`. Signals link conservatively as `related`; confidence remains unscored until a grounded component explicitly verifies support or contradiction against the stated belief. No stance classifier or outcomes tables yet. |
+| 5 | **Decision Threads** | Persistent question, belief, evidence for/against, confidence, open questions | `partial` | `decision_threads` + evidence timeline + founder-confirmed `decision_outcomes`. BeliefAssessor applies threshold-gated directional stances; Ask retrieves the dated decision record alongside article evidence. Commercial usage gates remain unproven. |
 
 ---
 
@@ -59,18 +59,18 @@ From the Feedly analysis. Status is against the *finished* version, not a first 
 |---|---|---|---|
 | AI Feeds | Intelligence Missions (from company context, not a query builder) | Very high | Not started (watched entities are a precursor) |
 | Strategic Moves | Signal ontology / state changes | Very high | Partial (3 detectors, keyword-classed) |
-| Less Like This | Relevance DNA (reason + behavior + action) | Very high | Partial (dismiss reasons now capture already-known, no-impact, duplicate, or incorrect; no ranking loop yet) |
+| Less Like This | Relevance DNA (reason + behavior + action) | Very high | Partial (signal and decision-outcome feedback now feeds a bounded, inspectable priority ranker; broader cohort learning is not yet enabled) |
 | Deduplication | Event clustering + delta | Very high | Partial (article dedup only) |
 | Company Cards | Living entity memory inside brief / Ask | High | Not started (watching alerts + graph, no personal entity card) |
 | Emerging Trends | Personal weak-signal radar | High | Not started |
-| Ask AI | Temporal Ask Briefly | Very high | Partial (Ask prompt includes active Decision Threads; not retrieval over beliefs/outcomes) |
+| Ask AI | Temporal Ask Briefly | Very high | Partial (hybrid retrieval now mixes corpus evidence with dated beliefs, assessed signals, and founder-confirmed outcomes; citation correctness gate still needs live evaluation) |
 | Boards | Decision Threads | Very high | Partial (v0 object on brief/glance/settings; no board UI) |
 | AI Actions | Action compiler (preview → approve → execute → outcome) | Later | Partial precursor (email drafts with approval) |
 | Automated newsletter | Adaptive brief by audience | Team phase | Parked |
 | Company lists | Dynamic tracked universe | High | Partial (static watches + onboarding seed) |
 | Alerts | Conditional semantic watches | High | Partial (watch monitor + proactive push; not “if price drops >20%”) |
 | Citations | Evidence bundles | Very high | Partial (Sprint 3 bundles on the brief) |
-| Analytics | Decision analytics | High | Partial (`GET /api/v1/signals/eval` precision; no decision/action dashboard) |
+| Analytics | Decision analytics | High | Partial (per-user signal eval plus operator-only cross-account gate scorecard with minimum-sample enforcement; intentionally no user dashboard) |
 
 ---
 
@@ -106,7 +106,7 @@ Grouped by the decision loop, not by UI page.
 | Six-point brief: what changed, why it matters, who it affects, suggested action, memory, confidence | digest items + read view + email | Writer copy; not always signal-backed |
 | Evidence bundle on digest items (sources, claim, passage, corroboration, contradiction, previous/new) | `digest_response.py`, read view | Fact vs inference vs impact not separated in UI |
 | Memory connections / “you’ve been tracking this” | writer + read callouts | Not Decision Threads |
-| Decision Threads v0 | `decision_threads`, `thread_signals`, `thread_updates`; `/api/v1/decision-threads`; glance + settings | Related evidence does not move belief confidence. Directional confidence waits for verified belief comparison. No classifier, outcomes, or `/decisions` page yet |
+| Decision Threads v0.2 | `decision_threads`, belief assessments, outcomes, timeline; glance + settings + Ask | Directional confidence remains threshold-gated. Outcomes are explicit founder records; there is intentionally no `/decisions` page |
 | Citations and contradiction flags | citation verifier, enrichment cache | |
 | Knowledge graph | `/graph` | Parked as a priority surface; do not expand |
 
@@ -114,10 +114,10 @@ Grouped by the decision loop, not by UI page.
 
 | Feature | Where | Limit |
 |---|---|---|
-| Decision events: opened, clicked, saved, asked, tracked, dismissed, acted, decision-changed | `/api/v1/feedback`, read view | Behavioral; not outcome-labeled |
-| Signal quality labels: useful, already knew, no impact, duplicate, wrong | `/api/v1/signals/{id}/feedback`, read view + watching panel | Writes label plus reason to `signal_feedback`; no ranking loop yet |
-| Precision snapshot | `GET /api/v1/signals/eval` | Internal eval, not a user dashboard |
-| Ask Briefly with grounded citations | `/ask`, orb | Prompt includes active Decision Threads; not a retrieval hybrid over beliefs |
+| Decision events + durable outcomes | `/api/v1/feedback`, `/api/v1/decision-outcomes`, read checkpoint | Distinguishes telemetry from changed / confirmed / planned-action / acted / no-impact outcomes |
+| Feedback-aware signal priority | `signals.priority_score`, `services/signals/ranking.py` | Transparent weighted factors with Bayesian shrinkage; user feedback is bounded and cannot rewrite evidence |
+| Precision and roadmap gates | `GET /api/v1/signals/eval`, `GET /api/v1/admin/intelligence-gates` | Operator-only scorecard reports pass / fail / insufficient data with sample sizes |
+| Ask Briefly with temporal citations | `/ask`, orb | Hybrid retrieval over corpus plus decision timelines; live 95% citation-correctness gate is not yet proven |
 | Email drafts with human approval | `email_drafts` | Not the action compiler |
 | Proactive / interrupting alerts (capped) | `agents/proactive/` | Not conditional semantic watches |
 

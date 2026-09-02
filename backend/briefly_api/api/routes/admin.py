@@ -110,3 +110,17 @@ async def list_agent_runs(
             for r in rows
         ],
     }
+
+
+@router.get("/intelligence-gates")
+async def intelligence_gates(
+    days: int = Query(30, ge=7, le=120),
+    x_admin_key: str | None = Header(None, alias="X-Admin-Key"),
+    settings: Settings = Depends(get_settings),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Cross-account roadmap gate scorecard with honest sample sufficiency."""
+    _require_admin(x_admin_key, settings)
+    from briefly_api.services.intelligence_gates import build_intelligence_gate_scorecard
+
+    return await build_intelligence_gate_scorecard(db, days=days)

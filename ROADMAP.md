@@ -13,7 +13,7 @@
 | [`design.md`](design.md) | Visual design system |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Stack and agent pipeline ADR |
 
-**Last updated:** 2026-09-01
+**Last updated:** 2026-09-02
 
 ---
 
@@ -168,7 +168,7 @@ Timelines are planning ranges. **A phase starts only when the previous gate is m
 
 **Gate:** ≥75% precision top-5 signals · <15% false-positive on alerts · ≥95% evidence coverage · ≥40% D30 paid retention.
 
-**Status (see [`FEATURES.md`](FEATURES.md)):** Partial — three detectors, snapshots, threads v0, Ask Briefly, glance dashboard shipped; missions, full impact model, ranking loop not done.
+**Status (see [`FEATURES.md`](FEATURES.md)):** Partial — three detectors, snapshots, threads v0.2, feedback-aware ranking, Ask hybrid retrieval, and glance dashboard shipped. The operator scorecard now measures the gate honestly; minimum samples, paid retention, and commercial proof are still outstanding.
 
 ---
 
@@ -178,9 +178,9 @@ Timelines are planning ranges. **A phase starts only when the previous gate is m
 
 **Deliverables:** Decision Threads v1 (confidence from verified evidence), assumption invalidation inline in brief, hybrid retrieval for Ask, outcome feedback labels.
 
-**Shipped (v0.1):** `belief_assessments` table + BeliefAssessor (LLM, threshold-gated stances), `GET /decision-threads/{id}/timeline`, Settings decision history UI.
+**Shipped (v0.2):** `belief_assessments` + BeliefAssessor (LLM, threshold-gated stances), durable `decision_outcomes`, timeline retrieval in Ask, outcome-aware Settings history, and a stance-accuracy eval suite with an 85% gate.
 
-**Still open:** Ask hybrid retrieval over timeline, outcome feedback table, eval harness for stance accuracy ≥85%.
+**Still open:** run the stance suite and citation-correctness eval against production models/data, earn the Phase 1 sample gates, and validate weekly usefulness/Decision Thread adoption with paying pilots.
 
 **Gate:** ≥50% D60 retention · 40% WAU get useful historical connection/week · 25% WAU use Decision Threads · 95% citation correctness in decision Ask.
 

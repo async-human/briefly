@@ -983,6 +983,10 @@ class MarketSignal(Base):
     previous_state: Mapped[str] = mapped_column(Text, default="")
     new_state: Mapped[str] = mapped_column(Text, default="")
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    # User-specific surfacing score. Factors remain inspectable so "why now?"
+    # never becomes an opaque model verdict.
+    priority_score: Mapped[float] = mapped_column(Float, default=0.0)
+    ranking_factors: Mapped[dict] = mapped_column(JSONB, default=dict)
     status: Mapped[str] = mapped_column(String(20), default="candidate")
     # candidate | verified | discarded
     source_url: Mapped[str] = mapped_column(Text, nullable=False)
@@ -1233,6 +1237,43 @@ class SignalFeedback(Base):
     label: Mapped[str] = mapped_column(String(40), nullable=False)
     # useful | irrelevant | duplicate | incorrect | acted_on
     note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class DecisionOutcome(Base):
+    """A founder-confirmed result from a signal or decision moment.
+
+    This is intentionally separate from interaction telemetry: it records what
+    happened to the decision, not merely which button was clicked.
+    """
+
+    __tablename__ = "decision_outcomes"
+    __table_args__ = (
+        Index("ix_decision_outcomes_user_created", "user_id", "created_at"),
+        Index("ix_decision_outcomes_thread", "thread_id", "created_at"),
+        Index("ix_decision_outcomes_signal", "signal_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    thread_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("decision_threads.id", ondelete="SET NULL"), nullable=True
+    )
+    signal_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("signals.id", ondelete="SET NULL"), nullable=True
+    )
+    digest_item_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("digest_items.id", ondelete="SET NULL"), nullable=True
+    )
+    outcome: Mapped[str] = mapped_column(String(32), nullable=False)
+    # changed | confirmed | action_planned | acted | no_change
+    source: Mapped[str] = mapped_column(String(20), default="read")
+    note: Mapped[str | None] = mapped_column(Text)
+    action: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

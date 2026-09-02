@@ -115,7 +115,7 @@ class ContextChunk:
     url: str | None
     source_name: str | None
     snippet: str
-    kind: str  # article | brain_dump | brief_anchor
+    kind: str  # article | brain_dump | brief_anchor | decision_timeline
 
 
 @dataclass
@@ -976,6 +976,7 @@ You answer using ONLY the sources in the context pack, labeled [S1], [S2], etc.
 - When CONVERSATION FOCUS is set, follow-up questions like "this article", "it", or "what does it say about X" refer to that focused article. Answer from [S1] unless the user clearly names a different source.
 - Be concise, direct, and personal (use what you know about the user from the profile).
 - Connect dots across sources when relevant.
+- Decision timeline sources are the user's own dated record. Distinguish a recorded belief, an assessed signal, and a founder-confirmed outcome; never imply that an assessment was an action.
 - Never mention that you are an AI or language model.
 - Never tell the user to check external apps (Reader, email, etc.) — Briefly IS their reading system.
 - When the pack is a SAVED/UNREAD INDEX, list each item by title with a short note on why it's unread. If the index is empty, say their saved queue is clear.
@@ -1184,10 +1185,15 @@ async def _prepare_ask(
         if anchor_chunks:
             focus_title = anchor_chunks[0].title
 
+        from briefly_api.services.decisions.retrieval import retrieve_decision_chunks
+
+        decision_chunks = await retrieve_decision_chunks(
+            db, user.id, retrieval_query, limit=3
+        )
         extra: list[ContextChunk] = []
         if not focused:
             exclude = {c.content_id for c in anchor_chunks if not c.content_id.startswith("digest-item")}
-            extra_limit = _MAX_CHUNKS - len(anchor_chunks)
+            extra_limit = _MAX_CHUNKS - len(anchor_chunks) - len(decision_chunks)
             if extra_limit > 0:
                 extra = await _semantic_retrieve(
                     db,
@@ -1198,7 +1204,7 @@ async def _prepare_ask(
                     limit=extra_limit,
                 )
 
-        all_chunks = _assign_refs(anchor_chunks + extra, start_index=1)
+        all_chunks = _assign_refs(anchor_chunks + decision_chunks + extra, start_index=1)
         context_pack = _format_context_pack(all_chunks) if all_chunks else "(No matching sources in your library yet.)"
         if focused and focus_title:
             context_pack = (

@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from briefly_api.auth.deps import get_current_user
 from briefly_api.db.engine import get_db
 from briefly_api.db.models import DecisionThread, User
+from briefly_api.services.decisions.outcomes import outcome_dict, record_decision_outcome
 from briefly_api.services.decisions.timeline import get_thread_timeline
 from briefly_api.services.decisions.threads import (
     create_thread,
@@ -62,7 +63,7 @@ class TimelineEvidenceOut(BaseModel):
 
 class TimelineEventOut(BaseModel):
     at: datetime
-    type: Literal["belief_edit", "confidence_change", "signal"]
+    type: Literal["belief_edit", "confidence_change", "signal", "outcome"]
     headline: str | None = None
     belief: str | None = None
     confidence: float | None = None
@@ -72,6 +73,30 @@ class TimelineEventOut(BaseModel):
     note: str | None = None
     signal_id: str | None = None
     evidence: list[TimelineEvidenceOut] = Field(default_factory=list)
+    outcome: str | None = None
+    action: str | None = None
+
+
+class DecisionOutcomeIn(BaseModel):
+    outcome: Literal["changed", "confirmed", "action_planned", "acted", "no_change"]
+    thread_id: str | None = None
+    signal_id: str | None = None
+    digest_item_id: str | None = None
+    source: Literal["glance", "read", "ask", "timeline"] = "read"
+    note: str | None = Field(default=None, max_length=800)
+    action: str | None = Field(default=None, max_length=800)
+
+
+class DecisionOutcomeOut(BaseModel):
+    id: str
+    thread_id: str | None = None
+    signal_id: str | None = None
+    digest_item_id: str | None = None
+    outcome: str
+    source: str
+    note: str | None = None
+    action: str | None = None
+    created_at: datetime | None = None
 
 
 def _serialize(thread: DecisionThread) -> DecisionThreadOut:
@@ -174,6 +199,33 @@ async def get_decision_thread_timeline(
                 )
                 for e in (row.get("evidence") or [])
             ],
+            outcome=row.get("outcome"),
+            action=row.get("action"),
         )
         for row in rows
     ]
+
+
+@router.post("/decision-outcomes", response_model=DecisionOutcomeOut, status_code=status.HTTP_201_CREATED)
+async def post_decision_outcome(
+    body: DecisionOutcomeIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> DecisionOutcomeOut:
+    try:
+        row = await record_decision_outcome(
+            db,
+            user_id=user.id,
+            outcome=body.outcome,
+            thread_id=body.thread_id,
+            signal_id=body.signal_id,
+            digest_item_id=body.digest_item_id,
+            source=body.source,
+            note=body.note,
+            action=body.action,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await db.commit()
+    await db.refresh(row)
+    return DecisionOutcomeOut(**outcome_dict(row))

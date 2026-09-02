@@ -229,6 +229,8 @@ class DigestItemOut(BaseModel):
     is_material_change: bool = False
     is_state_change: bool = False
     signal_label: str | None = None
+    priority_score: float | None = None
+    ranking_factors: dict = Field(default_factory=dict)
     evidence: list[dict] = Field(default_factory=list)
     decision_thread_id: str | None = None
     decision_title: str | None = None

@@ -390,6 +390,8 @@ export type DigestItem = {
   is_material_change?: boolean;
   is_state_change?: boolean;
   signal_label?: string | null;
+  priority_score?: number | null;
+  ranking_factors?: { reasons?: string[]; feedback_samples?: number; [key: string]: unknown };
   evidence?: EvidencePiece[];
   decision_thread_id?: string | null;
   decision_title?: string | null;
@@ -1306,6 +1308,19 @@ export const api = {
     request<DecisionTimelineEvent[]>(
       `/api/v1/decision-threads/${encodeURIComponent(id)}/timeline?days=${days}`,
     ),
+  recordDecisionOutcome: (body: {
+    outcome: DecisionOutcomeKind;
+    thread_id?: string;
+    signal_id?: string;
+    digest_item_id?: string;
+    source?: "glance" | "read" | "ask" | "timeline";
+    note?: string;
+    action?: string;
+  }) =>
+    request<DecisionOutcome>("/api/v1/decision-outcomes", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   getCalendarUpcoming: () =>
     request<{
       connected: boolean;
@@ -1632,7 +1647,7 @@ export type DecisionThread = {
 
 export type DecisionTimelineEvent = {
   at: string;
-  type: "belief_edit" | "confidence_change" | "signal";
+  type: "belief_edit" | "confidence_change" | "signal" | "outcome";
   headline?: string | null;
   belief?: string | null;
   confidence?: number | null;
@@ -1642,6 +1657,22 @@ export type DecisionTimelineEvent = {
   note?: string | null;
   signal_id?: string | null;
   evidence?: { url: string; passage?: string; source_name?: string }[];
+  outcome?: DecisionOutcomeKind | null;
+  action?: string | null;
+};
+
+export type DecisionOutcomeKind = "changed" | "confirmed" | "action_planned" | "acted" | "no_change";
+
+export type DecisionOutcome = {
+  id: string;
+  thread_id?: string | null;
+  signal_id?: string | null;
+  digest_item_id?: string | null;
+  outcome: DecisionOutcomeKind;
+  source: string;
+  note?: string | null;
+  action?: string | null;
+  created_at?: string | null;
 };
 
 export type WatchedEntity = {
@@ -1702,6 +1733,8 @@ export type WatchedAlert = {
   is_material_change?: boolean;
   is_state_change?: boolean;
   signal_label?: string | null;
+  priority_score?: number | null;
+  ranking_factors?: { reasons?: string[]; feedback_samples?: number; [key: string]: unknown };
   evidence?: EvidencePiece[];
   created_at: string | null;
   decision_thread_id?: string | null;

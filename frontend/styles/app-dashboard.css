@@ -1897,6 +1897,12 @@
   background: #c2410c;
 }
 
+.app-shell .dash-surface-settings .settings-timeline-item.is-outcome::before {
+  border-radius: 1px;
+  transform: rotate(45deg);
+  background: var(--app-accent);
+}
+
 .app-shell .dash-surface-settings .settings-timeline-meta {
   display: flex;
   flex-wrap: wrap;
@@ -1924,6 +1930,13 @@
   font-size: 0.8125rem;
   color: var(--app-ink);
   line-height: 1.45;
+}
+
+.app-shell .dash-surface-settings .settings-timeline-outcome {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--app-ink-secondary);
 }
 
 .app-shell .dash-surface-settings .settings-timeline-rationale {
@@ -13472,6 +13485,24 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   color: var(--app-ink);
 }
 
+.glance-card-ranked {
+  margin: 0.1rem 0 0;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--app-border);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--app-muted);
+}
+
+.glance-card-ranked span {
+  margin-right: 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--app-ink-secondary);
+}
+
 .glance-card-metric {
   display: flex;
   flex-direction: column;
@@ -13571,6 +13602,20 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   transition: background var(--app-dur) var(--app-ease),
     color var(--app-dur) var(--app-ease),
     opacity var(--app-dur) var(--app-ease);
+}
+
+.glance-card-btn.is-on {
+  background: transparent;
+  border-color: var(--app-accent);
+  color: var(--app-accent);
+}
+
+.glance-card-receipt {
+  margin: 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: var(--app-muted);
 }
 
 .glance-card-btn:hover,

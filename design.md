@@ -16,6 +16,7 @@ Art Deco editorial — ivory paper, deep teal ink, restrained gold geometry. A c
 - **v6** — Dashboard priority pass: open greeting, urgent-signal restraint, briefing-first canvas, quiet utilities, optional intelligence depth
 - **v7** — Workbench uses the canvas: wide briefing + sticky rail, story cards, collapsible device groups
 - **v9** — Glance hierarchy pass: pill counts, framed Your World constellation, denser Intelligence Cards, briefing recedes behind “the rest of today.”
+- **v10** — Decision loop refinement: evidence cards disclose why they rose; the read view captures a quiet, receipt-backed decision outcome; outcomes enter the existing timeline without a new surface.
 
 ## App macrostructure
 

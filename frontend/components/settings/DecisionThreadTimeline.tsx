@@ -16,6 +16,13 @@ function fmtWhen(iso: string): string {
 }
 
 function eventLabel(event: DecisionTimelineEvent): string {
+  if (event.type === "outcome") {
+    if (event.outcome === "changed") return "Changed the decision";
+    if (event.outcome === "confirmed") return "Confirmed the direction";
+    if (event.outcome === "action_planned") return "Action planned";
+    if (event.outcome === "acted") return "Action completed";
+    return "No decision impact";
+  }
   if (event.type === "belief_edit") return "Belief updated";
   if (event.type === "signal") {
     if (event.stance === "contradicting") return "May challenge your belief";
@@ -102,6 +109,9 @@ export function DecisionThreadTimeline({ threadId, expanded }: Props) {
             ) : null}
             {event.rationale ? (
               <p className="settings-timeline-rationale">{event.rationale}</p>
+            ) : null}
+            {event.type === "outcome" && (event.action || event.note) ? (
+              <p className="settings-timeline-outcome">{event.action || event.note}</p>
             ) : null}
             {conf ? <p className="settings-timeline-conf">{conf}</p> : null}
             {event.evidence && event.evidence.length > 0 ? (

@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-09-02",
+    "scope": "app-component",
+    "target": "dashboard intelligence cards · read decision checkpoint · settings decision timeline",
+    "verb": "refine",
+    "macrostructure": "Workbench · evidence-to-outcome loop",
+    "theme": "custom Art Deco app system (design.md, locked)",
+    "theme_axes": "light / classical-serif / restrained-gold",
+    "enrichment": "none",
+    "motion": "existing card reveal only · reduced-motion preserved",
+    "brief": "Signal priority now explains why an item rose; the read surface captures a durable decision outcome with pending, success, and error receipts; outcomes enter the existing temporal history without a new page."
+  },
+  {
     "date": "2026-09-01",
     "scope": "app-component",
     "target": "frontend dashboard Your world graph",

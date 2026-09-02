@@ -58,6 +58,8 @@ async def digest_to_out(digest: Digest, db: AsyncSession) -> DigestOut:
                     "is_material_change": bool(bundle.get("is_material_change")),
                     "is_state_change": bool(bundle.get("is_state_change")),
                     "signal_label": bundle.get("label"),
+                    "priority_score": bundle.get("priority_score"),
+                    "ranking_factors": bundle.get("ranking_factors") or {},
                     "evidence": pieces,
                     **thread_fields,
                 }

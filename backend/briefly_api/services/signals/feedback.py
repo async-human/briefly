@@ -34,6 +34,12 @@ async def record_signal_feedback(
             signal.status = "verified"
         elif normalized in ("irrelevant", "duplicate", "incorrect"):
             signal.status = "discarded"
+        # Re-rank a bounded recent window immediately. The feedback changes
+        # priority, never evidence or factual state.
+        from briefly_api.services.signals.ranking import recompute_recent_priorities
+
+        await session.flush()
+        await recompute_recent_priorities(session, user_id)
     return row
 
 

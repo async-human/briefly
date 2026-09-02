@@ -37,6 +37,8 @@ export type IntelligenceObject = {
   belief?: string | null;
   previousConfidence?: number | null;
   decisionThreadId?: string | null;
+  priorityScore?: number | null;
+  surfacingReasons?: string[];
 };
 
 export type PulseKnownState = {
@@ -508,6 +510,8 @@ function fromAlert(alert: WatchedAlert, digest: Digest | null): IntelligenceObje
     belief: thread.belief,
     previousConfidence: thread.previous,
     decisionThreadId: thread.id,
+    priorityScore: alert.priority_score,
+    surfacingReasons: alert.ranking_factors?.reasons,
     metric: metricFor({
       kind,
       title: alert.title,
@@ -568,6 +572,8 @@ function fromItem(item: DigestItem, digestId: string): IntelligenceObject {
     belief: thread.belief,
     previousConfidence: thread.previous,
     decisionThreadId: thread.id,
+    priorityScore: item.priority_score,
+    surfacingReasons: item.ranking_factors?.reasons,
     metric: metricFor({
       kind,
       title: item.headline,
@@ -637,6 +643,9 @@ function pickCards(
 }
 
 function cardPriority(card: IntelligenceObject): number {
+  if (typeof card.priorityScore === "number" && card.priorityScore > 0) {
+    return Math.round(card.priorityScore * 1000);
+  }
   return (card.kind === "decision" ? 100 : card.kind === "change" ? 60 : 30)
     + (card.urgent ? 30 : 0)
     + Math.round((card.confidence || 0) * 10)

@@ -325,6 +325,38 @@
   margin-top: 0.875rem;
 }
 
+.read-shell-v2 .read-decision-checkpoint {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, oklch(80% 0.02 70));
+}
+
+.read-shell-v2 .read-decision-checkpoint-copy {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.read-shell-v2 .read-decision-checkpoint-copy p {
+  margin: 0;
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 1rem;
+  color: var(--text, inherit);
+}
+
+.read-shell-v2 .read-decision-receipt {
+  min-height: 1.2em;
+  margin: 0.6rem 0 0;
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  color: var(--text-muted, oklch(45% 0.02 70));
+}
+
+.read-shell-v2 .read-decision-receipt.is-error {
+  color: var(--error, #b42318);
+}
+
 .read-shell-v2 .read-decision-btn {
   appearance: none;
   border: 1px solid var(--border, oklch(80% 0.02 70));
@@ -597,6 +629,12 @@
 
   .read-shell-v2 .read-card-area {
     padding: 0.625rem 0.75rem;
+  }
+
+  .read-shell-v2 .read-decision-checkpoint-copy {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.3rem;
   }
 }
 

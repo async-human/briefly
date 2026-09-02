@@ -15,6 +15,7 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
   const [rating, setRating] = useState(false);
   const [ratingError, setRatingError] = useState(false);
   const [showReasons, setShowReasons] = useState(false);
+  const [impactLogged, setImpactLogged] = useState(false);
   const panelId = useId();
   const conf = object.confidence != null ? Math.round(object.confidence * 100) : null;
   const beliefMoved =
@@ -39,6 +40,26 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
     } catch {
       setRating(false);
       setRatingError(true);
+    }
+  }
+
+  async function markDecisionImpact() {
+    if ((!object.signalId && !object.decisionThreadId && !object.itemId) || rating) return;
+    setRating(true);
+    setRatingError(false);
+    try {
+      await api.recordDecisionOutcome({
+        outcome: "changed",
+        thread_id: object.decisionThreadId || undefined,
+        signal_id: object.signalId || undefined,
+        digest_item_id: object.itemId || undefined,
+        source: "glance",
+      });
+      setImpactLogged(true);
+    } catch {
+      setRatingError(true);
+    } finally {
+      setRating(false);
     }
   }
 
@@ -75,6 +96,12 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
         ) : null}
         <span className="glance-card-kicker">Why it matters</span>
         <p className="glance-card-why">{object.why}</p>
+        {object.surfacingReasons?.length ? (
+          <p className="glance-card-ranked">
+            <span>Why this rose</span>
+            {object.surfacingReasons.join(" · ")}
+          </p>
+        ) : null}
         {beliefMoved ? (
           <p className="glance-conf">
             {Math.round((object.previousConfidence as number) * 100)}% → {conf}% belief
@@ -85,6 +112,16 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
           <p className="glance-conf">{conf}% confidence</p>
         ) : null}
         <div className="glance-card-actions">
+          {object.kind === "decision" && (object.signalId || object.decisionThreadId) ? (
+            <button
+              type="button"
+              className={`glance-card-btn${impactLogged ? " is-on" : ""}`}
+              onClick={() => void markDecisionImpact()}
+              disabled={rating || impactLogged}
+            >
+              {impactLogged ? "Decision impact recorded" : "This changed my call"}
+            </button>
+          ) : null}
           {object.decisionThreadId ? (
             <Link
               href={`/settings?thread=${encodeURIComponent(object.decisionThreadId)}#decision-threads`}
@@ -135,6 +172,11 @@ export function IntelligenceCard({ object }: IntelligenceCardProps) {
         ) : null}
         {ratingError ? (
           <p className="intel-scan-error" role="alert">Couldn’t save that rating. Try again.</p>
+        ) : null}
+        {impactLogged ? (
+          <p className="glance-card-receipt" aria-live="polite">
+            Added to the decision timeline · priority learning updated
+          </p>
         ) : null}
       </div>
     </article>

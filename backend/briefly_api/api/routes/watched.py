@@ -120,6 +120,8 @@ class EntityAlertOut(BaseModel):
     is_material_change: bool = False
     is_state_change: bool = False
     signal_label: str | None = None
+    priority_score: float | None = None
+    ranking_factors: dict = Field(default_factory=dict)
     evidence: list[dict] = Field(default_factory=list)
     decision_thread_id: str | None = None
     decision_title: str | None = None
@@ -170,6 +172,8 @@ def _serialize_alert(
     is_material_change: bool = False,
     is_state_change: bool = False,
     signal_label: str | None = None,
+    priority_score: float | None = None,
+    ranking_factors: dict | None = None,
     evidence: list[dict] | None = None,
     thread: dict | None = None,
 ) -> EntityAlertOut:
@@ -202,6 +206,8 @@ def _serialize_alert(
         is_material_change=is_material_change,
         is_state_change=is_state_change,
         signal_label=signal_label,
+        priority_score=priority_score,
+        ranking_factors=dict(ranking_factors or {}),
         evidence=list(evidence or []),
         created_at=row.created_at,
         **extra,
@@ -274,6 +280,8 @@ async def _alert_signal_map(db: AsyncSession, user_id: str, alerts: list[EntityA
             event_fingerprint=signal.event_fingerprint,
             pieces=pieces_by.get(signal.id) or [],
             label=labels.get(signal.id),
+            priority_score=signal.priority_score,
+            ranking_factors=signal.ranking_factors,
         )
         if signal.alert_id:
             by_alert[signal.alert_id] = bundle
@@ -559,6 +567,8 @@ async def list_alerts(
                 is_material_change=bool(bundle.get("is_material_change")),
                 is_state_change=bool(bundle.get("is_state_change")),
                 signal_label=bundle.get("label"),
+                priority_score=bundle.get("priority_score"),
+                ranking_factors=bundle.get("ranking_factors"),
                 evidence=list(bundle.get("pieces") or []),
                 thread=snaps.get(str(sid)) if sid else None,
             )
@@ -646,6 +656,8 @@ async def scan_watched(
                 is_material_change=bool(bundle.get("is_material_change")),
                 is_state_change=bool(bundle.get("is_state_change")),
                 signal_label=bundle.get("label"),
+                priority_score=bundle.get("priority_score"),
+                ranking_factors=bundle.get("ranking_factors"),
                 evidence=list(bundle.get("pieces") or []),
                 thread=snaps.get(str(sid)) if sid else None,
             )

@@ -259,6 +259,8 @@ async def evidence_for_items(session, user_id: str, items: list[DigestItem]) -> 
                 event_fingerprint=signal.event_fingerprint,
                 pieces=pieces,
                 label=labels.get(signal.id),
+                priority_score=signal.priority_score,
+                ranking_factors=signal.ranking_factors,
             )
         else:
             out[item.id] = bundle_from_item(item)

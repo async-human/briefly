@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { api, type Digest, type DigestItem } from "@/lib/api";
+import { api, type DecisionOutcomeKind, type Digest, type DigestItem } from "@/lib/api";
 import { SourceIcon } from "@/components/SourceIcon";
 import { YouTubeItemBadge } from "@/components/dashboard/YouTubeItemBadge";
 import { getYouTubeBadge } from "@/lib/youtubeBadge";
@@ -210,8 +210,8 @@ function EvidenceBlock({
 }
 
 function ReadingCard({
-  item, mode, isSaved, isDisliked, isTracked, isRemembered, decided, acted, dismissed, monitoringNoted,
-  onSave, onDislike, onLike, onTrack, onRemember, onArticleClick, onAsk, onDecisionChanged, onAct, onDismiss, onRateSignal, onKeepMonitoring,
+  item, mode, isSaved, isDisliked, isTracked, isRemembered, outcome, outcomeSaving, outcomeError, monitoringNoted,
+  onSave, onDislike, onLike, onTrack, onRemember, onArticleClick, onAsk, onOutcome, onRateSignal, onKeepMonitoring,
   index, showMemoryCallout,
 }: {
   item: DigestItem;
@@ -220,9 +220,9 @@ function ReadingCard({
   isDisliked: boolean;
   isTracked: boolean;
   isRemembered: boolean;
-  decided: boolean;
-  acted: boolean;
-  dismissed: boolean;
+  outcome: DecisionOutcomeKind | null;
+  outcomeSaving: boolean;
+  outcomeError: boolean;
   monitoringNoted: boolean;
   onSave: () => void;
   onDislike: () => void;
@@ -231,9 +231,7 @@ function ReadingCard({
   onRemember: () => void;
   onArticleClick: () => void;
   onAsk: () => void;
-  onDecisionChanged: () => void;
-  onAct: () => void;
-  onDismiss: () => void;
+  onOutcome: (outcome: DecisionOutcomeKind) => void;
   onRateSignal: (label: string, note?: string) => void;
   onKeepMonitoring: () => void;
   index: number;
@@ -432,31 +430,38 @@ function ReadingCard({
 
         <EvidenceBlock item={item} onRate={onRateSignal} />
 
-        <div className="read-decision-row" role="group" aria-label="Decision feedback">
-          <button
-            type="button"
-            className={`read-decision-btn${decided ? " is-on" : ""}`}
-            onClick={onDecisionChanged}
-            disabled={decided}
-          >
-            {decided ? "Decision noted" : "This changed a decision"}
-          </button>
-          <button
-            type="button"
-            className={`read-decision-btn${acted ? " is-on" : ""}`}
-            onClick={onAct}
-            disabled={acted}
-          >
-            {acted ? "Action logged" : "I'll act on this"}
-          </button>
-          <button
-            type="button"
-            className={`read-decision-btn read-decision-btn--quiet${dismissed ? " is-on" : ""}`}
-            onClick={onDismiss}
-            disabled={dismissed}
-          >
-            {dismissed ? "Dismissed" : "Not decision-worthy"}
-          </button>
+        <div className="read-decision-checkpoint">
+          <div className="read-decision-checkpoint-copy">
+            <span className="read-field-label">Decision checkpoint</span>
+            <p>What did this evidence change for you?</p>
+          </div>
+          <div className="read-decision-row" role="group" aria-label="Decision outcome">
+            {([
+              ["changed", "Changed my call"],
+              ["confirmed", "Confirmed direction"],
+              ["action_planned", "Plan an action"],
+              ["no_change", "No impact"],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={`read-decision-btn${outcome === value ? " is-on" : ""}${value === "no_change" ? " read-decision-btn--quiet" : ""}`}
+                onClick={() => onOutcome(value)}
+                disabled={outcomeSaving || outcome != null}
+              >
+                {outcome === value ? "Recorded" : label}
+              </button>
+            ))}
+          </div>
+          <p className={`read-decision-receipt${outcomeError ? " is-error" : ""}`} aria-live="polite">
+            {outcomeSaving
+              ? "Saving this decision moment…"
+              : outcomeError
+                ? "That didn’t save. Try once more."
+                : outcome
+                  ? "Added to this decision’s history. Future signals will learn from it."
+                  : "Your answer tunes future priority; it never changes the evidence."}
+          </p>
         </div>
 
         {/* Confidence signal — how Briefly knows this is relevant */}
@@ -844,9 +849,9 @@ export default function ReadingPage() {
   const [disliked, setDisliked]   = useState<Set<string>>(new Set());
   const [tracked, setTracked]     = useState<Set<string>>(new Set());
   const [remembered, setRemembered] = useState<Set<string>>(new Set());
-  const [decided, setDecided]     = useState<Set<string>>(new Set());
-  const [acted, setActed]         = useState<Set<string>>(new Set());
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [outcomes, setOutcomes] = useState<Record<string, DecisionOutcomeKind>>({});
+  const [outcomeSaving, setOutcomeSaving] = useState<Set<string>>(new Set());
+  const [outcomeErrors, setOutcomeErrors] = useState<Set<string>>(new Set());
   const [monitoringNoted, setMonitoringNoted] = useState<Set<string>>(new Set());
   const [isComplete, setIsComplete] = useState(false);
   const [elapsed, setElapsed]     = useState(0);
@@ -1034,45 +1039,30 @@ export default function ReadingPage() {
     api.recordFeedback({ signal_type: "asked", digest_item_id: item.id, digest_id: digest.id }).catch(() => {});
   }, [currentIndex, items, digest]);
 
-  const markDecision = useCallback(() => {
+  const recordOutcome = useCallback((outcome: DecisionOutcomeKind) => {
     if (!digest) return;
     const item = items[currentIndex];
-    if (!item || decided.has(item.id)) return;
-    setDecided((prev) => new Set(Array.from(prev).concat(item.id)));
-    api.recordFeedback({
-      signal_type: "decision_changed",
+    if (!item || outcomes[item.id] || outcomeSaving.has(item.id)) return;
+    setOutcomeSaving((prev) => new Set(prev).add(item.id));
+    setOutcomeErrors((prev) => { const next = new Set(prev); next.delete(item.id); return next; });
+    api.recordDecisionOutcome({
+      outcome,
+      thread_id: item.decision_thread_id || undefined,
+      signal_id: item.signal_id || undefined,
       digest_item_id: item.id,
-      digest_id: digest.id,
-      meta: { headline: item.headline },
-    })
-      .then((r) => showLearned(r.learned_message))
-      .catch(() => {});
-  }, [currentIndex, items, digest, decided, showLearned]);
-
-  const markActed = useCallback(() => {
-    if (!digest) return;
-    const item = items[currentIndex];
-    if (!item || acted.has(item.id)) return;
-    setActed((prev) => new Set(Array.from(prev).concat(item.id)));
-    api.recordFeedback({
-      signal_type: "acted",
-      digest_item_id: item.id,
-      digest_id: digest.id,
-      meta: { action: item.suggested_action || item.headline },
-    })
-      .then((r) => showLearned(r.learned_message))
-      .catch(() => {});
-  }, [currentIndex, items, digest, acted, showLearned]);
-
-  const markDismissed = useCallback(() => {
-    if (!digest) return;
-    const item = items[currentIndex];
-    if (!item || dismissed.has(item.id)) return;
-    setDismissed((prev) => new Set(Array.from(prev).concat(item.id)));
-    api.recordFeedback({ signal_type: "dismissed", digest_item_id: item.id, digest_id: digest.id })
-      .then((r) => showLearned(r.learned_message))
-      .catch(() => {});
-  }, [currentIndex, items, digest, dismissed, showLearned]);
+      source: "read",
+      action: outcome === "action_planned" ? item.suggested_action || item.headline : undefined,
+    }).then(() => {
+      setOutcomes((prev) => ({ ...prev, [item.id]: outcome }));
+      const signalType = outcome === "action_planned" ? "acted" : outcome === "changed" ? "decision_changed" : "clicked";
+      void api.recordFeedback({ signal_type: signalType, digest_item_id: item.id, digest_id: digest.id, meta: { outcome } });
+      showLearned("Briefly will use this decision outcome to tune what rises next.");
+    }).catch(() => {
+      setOutcomeErrors((prev) => new Set(prev).add(item.id));
+    }).finally(() => {
+      setOutcomeSaving((prev) => { const next = new Set(prev); next.delete(item.id); return next; });
+    });
+  }, [currentIndex, items, digest, outcomes, outcomeSaving, showLearned]);
 
   const markMonitoring = useCallback(() => {
     if (!digest) return;
@@ -1269,9 +1259,9 @@ export default function ReadingPage() {
               isDisliked={disliked.has(item.id)}
               isTracked={tracked.has(guessTrackName(item).toLowerCase())}
               isRemembered={remembered.has(item.id)}
-              decided={decided.has(item.id)}
-              acted={acted.has(item.id)}
-              dismissed={dismissed.has(item.id)}
+              outcome={outcomes[item.id] || null}
+              outcomeSaving={outcomeSaving.has(item.id)}
+              outcomeError={outcomeErrors.has(item.id)}
               monitoringNoted={monitoringNoted.has(item.id)}
               onSave={toggleSave}
               onDislike={toggleDislike}
@@ -1280,9 +1270,7 @@ export default function ReadingPage() {
               onRemember={rememberCurrent}
               onArticleClick={clickCurrent}
               onAsk={askCurrent}
-              onDecisionChanged={markDecision}
-              onAct={markActed}
-              onDismiss={markDismissed}
+              onOutcome={recordOutcome}
               onKeepMonitoring={markMonitoring}
               onRateSignal={rateCurrent}
               index={currentIndex}

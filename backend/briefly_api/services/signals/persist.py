@@ -214,6 +214,26 @@ async def persist_market_signal(
         why_it_matters=why_it_matters,
     )
     fingerprint = event_fingerprint(detector.detector_type, new_state or proposed_state, source_url)
+    blob = f"{title} {what_changed} {why_it_matters}"
+    hits = questions_hit_by_text(operating_context, blob)
+    from briefly_api.services.signals.ranking import load_preference_profile, score_signal
+
+    preference = await load_preference_profile(session, user_id)
+    priority_score, ranking_factors = score_signal(
+        confidence=float(detector.confidence or 0),
+        relevance=float(relevance_score or 0),
+        evidence_count=1 + len(related_urls or []),
+        is_material_change=is_material_change,
+        is_state_change=is_state_change,
+        is_urgent=is_urgent,
+        decision_connected=bool(hits),
+        detector_type=detector.detector_type,
+        entity_id=entity_id,
+        source_url=source_url,
+        profile=preference,
+    )
+    ranking_factors["raw_relevance"] = float(relevance_score or 0)
+    ranking_factors["raw_urgent"] = bool(is_urgent)
     signal_id = str(uuid.uuid4())
     stmt = (
         pg_insert(MarketSignal)
@@ -227,6 +247,8 @@ async def persist_market_signal(
             previous_state=previous[:500],
             new_state=new_state[:500],
             confidence=float(detector.confidence or 0),
+            priority_score=priority_score,
+            ranking_factors=ranking_factors,
             status="candidate",
             source_url=source_url,
             event_fingerprint=fingerprint,
@@ -261,8 +283,6 @@ async def persist_market_signal(
         )
         return concurrent.id
 
-    blob = f"{title} {what_changed} {why_it_matters}"
-    hits = questions_hit_by_text(operating_context, blob)
     session.add(
         SignalEvidence(
             signal_id=inserted,

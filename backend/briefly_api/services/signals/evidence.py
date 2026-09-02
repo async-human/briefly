@@ -71,6 +71,8 @@ def bundle_from_signal(
     event_fingerprint: str | None = None,
     pieces: list[dict[str, Any]],
     label: str | None = None,
+    priority_score: float = 0.0,
+    ranking_factors: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     primary = next((p for p in pieces if not p.get("is_contradictory")), None)
     corroborating = [
@@ -91,6 +93,8 @@ def bundle_from_signal(
         "supporting_passage": (primary or {}).get("supporting_passage") or "",
         "corroborating_count": len(corroborating),
         "label": label,
+        "priority_score": round(float(priority_score or 0), 4),
+        "ranking_factors": dict(ranking_factors or {}),
         "pieces": pieces,
         "contradictory": contradictory,
     }
@@ -151,6 +155,8 @@ def bundle_from_item(item: Any) -> dict[str, Any]:
         "supporting_passage": summary[:800],
         "corroborating_count": max(0, len(pieces) - 1 - int(bool(explanation and getattr(item, "contradiction_flag", False)))),
         "label": None,
+        "priority_score": 0.0,
+        "ranking_factors": {},
         "pieces": pieces,
         "contradictory": [p for p in pieces if p.get("is_contradictory")],
     }

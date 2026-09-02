@@ -10,7 +10,7 @@ from typing import Any, Literal
 
 from sqlalchemy import select
 
-TimelineEventType = Literal["belief_edit", "confidence_change", "signal"]
+TimelineEventType = Literal["belief_edit", "confidence_change", "signal", "outcome"]
 
 
 def _event_type(update: Any) -> TimelineEventType:
@@ -31,6 +31,7 @@ async def get_thread_timeline(
 ) -> list[dict[str, Any]]:
     from briefly_api.db.models import (
         BeliefAssessment,
+        DecisionOutcome,
         DecisionThread,
         MarketSignal,
         SignalEvidence,
@@ -71,6 +72,15 @@ async def get_thread_timeline(
     ).all()
 
     signal_ids = [sig.id for _link, sig, _assess in link_rows]
+    outcome_rows = (
+        await session.execute(
+            select(DecisionOutcome).where(
+                DecisionOutcome.user_id == user_id,
+                DecisionOutcome.thread_id == thread_id,
+                DecisionOutcome.created_at >= since,
+            ).order_by(DecisionOutcome.created_at.asc())
+        )
+    ).scalars().all()
     evidence_by_signal: dict[str, list[dict[str, str]]] = {}
     if signal_ids:
         evidence_rows = (
@@ -125,6 +135,25 @@ async def get_thread_timeline(
                 "stance": assessment.stance if assessment else link.stance,
                 "rationale": (assessment.rationale or "").strip() if assessment else None,
                 "evidence": evidence_by_signal.get(signal.id, [])[:3],
+            }
+        )
+
+    for outcome in outcome_rows:
+        events.append(
+            {
+                "at": outcome.created_at,
+                "type": "outcome",
+                "belief": None,
+                "confidence": None,
+                "previous_confidence": None,
+                "note": outcome.note,
+                "signal_id": outcome.signal_id,
+                "headline": None,
+                "stance": None,
+                "rationale": None,
+                "evidence": [],
+                "outcome": outcome.outcome,
+                "action": outcome.action,
             }
         )
 
