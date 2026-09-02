@@ -4,7 +4,7 @@ Living log of what is **in the product**, mapped to [`ROADMAP.md`](ROADMAP.md), 
 
 Update this file whenever a capability ships, is reshaped, or is deliberately parked. A rising feature count is not progress unless it moves a signal, a decision, or a retained user.
 
-**Last updated:** 2026-09-02 (Hydrate official pages on glance)
+**Last updated:** 2026-09-02 (Structured last-known pricing on Your world)
 
 ---
 
@@ -94,7 +94,7 @@ Grouped by the decision loop, not by UI page.
 |---|---|---|
 | First three founder detectors | `services/signals/detectors.py` | Rule/keyword classify; do not add a fourth until precision holds |
 | `signals`, `signal_evidence`, `signal_impacts`, `signal_feedback` | migration `016` | |
-| Entity snapshots (last-known pricing / API / product) | `entity_snapshots`, migrations `018`–`019`; official-page `last_extract` on glance | Stores extracted value/unit plus evidence text. Your world shows last-known copy when you select a company (and a one-line excerpt on the row). Cards below stay reserved for a material change. Login-walled and JS-empty pages do not. |
+| Entity snapshots (last-known pricing / API / product) | `entity_snapshots`, migrations `018`–`019`; official-page `last_extract` on glance | Stores extracted value/unit plus evidence text. Your world shows structured last-known facts (model + in/out prices) when you select a company — not a raw extract dump. Docs curl samples and `Authorization: Bearer` lines are stripped. Cards below stay reserved for a material change. Login-walled and JS-empty pages do not. |
 | Pinned official page change-detection | `entity_sources` hash/extract (migration `021`), `services/watch/pages.py`, `services/watch/resolve.py`, `services/watch/scrape.py` | Targeted scraper: catalog → sibling developer/docs hosts → nav/footer links → sitemap (one index level) → confirmed well-known paths (`/pricing`, `/api-pricing`, `/api/docs/pricing`, …). First fetch is baseline. Hash of extract. robots.txt respected. Fetch failure and bot-walls are not “no page.” Marketing homepages that 403 (openai.com) fall through to `developers.` hosts. No Playwright, no site-wide recursion |
 | Watch hits persist as market signals | `services/watch/monitor.py`, `services/signals/persist.py` | Official page hits run before RSS and skip the news relevance floor. First sighting has empty previous_state; the next real change compares against the snapshot |
 | Watching alerts pinned into **What’s new** when the URL is not already in the brief | `services/signals/attach.py` | Not a dedicated watching section |
@@ -152,6 +152,7 @@ Do not start these because the last file compiled.
 
 | Date | Commit | What shipped |
 |---|---|---|
+| 2026-09-02 | (this) | Your world inspect panel renders last-known pricing as structured facts and strips docs auth/curl samples |
 | 2026-09-02 | (this) | Check now isolates each watch, time-boxes the request, and no longer fails the glance because one source or a proxy timeout poisoned the scan |
 | 2026-09-02 | (this) | Opening Today hydrates official pricing/docs extracts immediately; catalog companies never look like “page missed” while copy is loading |
 | 2026-09-01 | (this) | Official-page scraper: sibling developer hosts, nav/JSON links, sitemap index; OpenAI/Sarvam/NVIDIA catalog URLs that actually fetch; failing pages no longer look like “never found” |

@@ -47,6 +47,26 @@ _STAMP_LINE = re.compile(
 )
 _RELATIVE_TIME = re.compile(r"\b\d+\s+(second|minute|hour|day)s?\s+ago\b", re.I)
 _INTERESTING = re.compile(r"[$€£₹]|\d+(?:\.\d+)?\s*%|\b\d+\.\d+\b")
+_SECRET_LINE = re.compile(
+    r"authorization\s*:|\bbearer\b|\bapi[_-]?key\b|\bx-api-key\b|"
+    r"\bsk-[a-z0-9]{8,}|\bcurl\b|(?:^|[\s\"'`])-H\b|"
+    r"\$\{?(?:OPENAI|ANTHROPIC|GROQ|AZURE|GOOGLE|COHERE)_API_KEY\}?",
+    re.I,
+)
+_CODE_LINE = re.compile(
+    r"[{};]|=>|===|function\s|const\s|import\s|\"model\":|`[^`]+`|"
+    r"^(?:\$|#|>>>|from\s|import\s|-H\b)",
+)
+_TABLE_RULE = re.compile(r"^\|?\s*:?-{3,}")
+_MONEY = re.compile(r"[$€£₹]\s*\d+(?:,\d{3})*(?:\.\d+)?")
+_HEADER_CELL = re.compile(
+    r"^(model|input|output|cached|price|pricing|standard|batch|flex|priority)$",
+    re.I,
+)
+_PRODUCT_WORD = re.compile(
+    r"\b(gpt|claude|gemini|llama|mistral|model|token|price|plan|cost|credit)\b",
+    re.I,
+)
 
 _robots_cache: dict[str, tuple[float, RobotFileParser | None | str]] = {}
 
@@ -82,31 +102,140 @@ def is_thin(text: str) -> bool:
     return len(text or "") < MIN_EXTRACT_CHARS
 
 
+def _is_secret_line(line: str) -> bool:
+    return bool(_SECRET_LINE.search(line or ""))
+
+
+def _looks_like_code(line: str) -> bool:
+    text = line or ""
+    if _is_secret_line(text):
+        return True
+    return bool(_CODE_LINE.search(text))
+
+
+def _visible_lines(extract: str) -> list[str]:
+    out: list[str] = []
+    for raw in canonicalize_extract(extract).splitlines():
+        line = raw.strip()
+        if len(line) < 2 or _is_secret_line(line) or _TABLE_RULE.match(line):
+            continue
+        out.append(line)
+    return out
+
+
+def _format_table_row(line: str) -> str | None:
+    """Turn a markdown price row into 'model  $X in · $Y out'. Never invent amounts."""
+    if "|" not in (line or ""):
+        return None
+    cells = [c.strip() for c in line.strip().strip("|").split("|")]
+    cells = [c for c in cells if c and not re.fullmatch(r":?-{3,}:?", c)]
+    if not cells:
+        return None
+    moneys: list[str] = []
+    percents: list[str] = []
+    name: str | None = None
+    for cell in cells:
+        found_money = _MONEY.findall(cell)
+        if found_money:
+            moneys.extend("".join(m.split()) for m in found_money)
+            continue
+        if "%" in cell:
+            percents.append(re.sub(r"\*+$", "", cell).strip())
+            continue
+        if name is None and not _HEADER_CELL.match(cell):
+            name = cell
+    if name and _HEADER_CELL.match(name):
+        return None
+    if moneys:
+        if len(moneys) >= 4:
+            in_p, out_p = moneys[0], moneys[3]
+        elif len(moneys) >= 2:
+            in_p, out_p = moneys[0], moneys[-1]
+        else:
+            priced = moneys[0]
+            return f"{name} · {priced}".strip(" ·") if name else priced
+        body = f"{in_p} in · {out_p} out"
+        return f"{name} · {body}".strip(" ·") if name else body
+    if percents and name:
+        return f"{name} · {percents[0]}"
+    return None
+
+
 def changed_excerpt(old: str, new: str, *, limit: int = 800) -> str:
     """Lines that appeared in `new`. Prefer prices, percents, and numbers."""
     old_set = {ln.strip() for ln in (old or "").splitlines() if ln.strip()}
-    added = [ln.strip() for ln in (new or "").splitlines() if ln.strip() and ln.strip() not in old_set]
+    added = [
+        ln.strip()
+        for ln in (new or "").splitlines()
+        if ln.strip() and ln.strip() not in old_set and not _is_secret_line(ln)
+    ]
     if not added:
-        return (new or "").strip()[:limit]
+        cleaned = "\n".join(_visible_lines(new))
+        return cleaned[:limit]
     interesting = [ln for ln in added if _INTERESTING.search(ln)]
     ranked = interesting + [ln for ln in added if ln not in interesting]
     return "\n".join(ranked)[:limit]
 
 
-def known_excerpt(extract: str, *, limit: int = 280) -> str:
-    """Last-known copy from a stored extract. Prefer prices and percents. Never invent."""
-    cleaned = canonicalize_extract(extract)
-    if not cleaned:
+def known_excerpt(extract: str, *, limit: int = 280, source_type: str | None = None) -> str:
+    """Last-known copy from a stored extract. Prefer prices. Never invent. Never leak auth."""
+    lines = _visible_lines(extract)
+    if not lines:
         return ""
-    lines = [ln.strip() for ln in cleaned.splitlines() if ln.strip()]
-    interesting = [ln for ln in lines if _INTERESTING.search(ln)]
-    ranked = interesting + [ln for ln in lines if ln not in interesting]
+    facts: list[str] = []
+    seen: set[str] = set()
+
+    def add(fact: str) -> None:
+        text = " ".join((fact or "").split()).strip()
+        if len(text) < 3 or _is_secret_line(text):
+            return
+        key = text.lower()
+        if key in seen:
+            return
+        seen.add(key)
+        facts.append(text)
+
+    for ln in lines:
+        if "|" in ln:
+            continue
+        if _looks_like_code(ln):
+            continue
+        if _INTERESTING.search(ln) and _PRODUCT_WORD.search(ln):
+            add(ln)
+            if source_type in {"docs", "changelog"}:
+                break
+
+    if source_type in (None, "pricing") or not facts:
+        for ln in lines:
+            formatted = _format_table_row(ln)
+            if formatted:
+                add(formatted)
+            if len(facts) >= 3:
+                break
+
+    if not facts:
+        for ln in lines:
+            if _looks_like_code(ln) or "|" in ln:
+                continue
+            if _INTERESTING.search(ln):
+                add(ln[:180])
+            if len(facts) >= 2:
+                break
+
+    if not facts and source_type == "docs":
+        for ln in lines:
+            if _looks_like_code(ln) or len(ln) < 24:
+                continue
+            if re.search(r"\b(api|model|endpoint|sdk|version)\b", ln, re.I):
+                add(ln[:180])
+                break
+
     out: list[str] = []
     used = 0
-    for ln in ranked:
+    for fact in facts[:3]:
         if used >= limit:
             break
-        take = ln[: max(0, limit - used)]
+        take = fact[: max(0, limit - used)]
         if not take:
             break
         out.append(take)

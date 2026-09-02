@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { countPhrase, knownStateLine, knownStateValue, shortLabel, type PulseNode } from "@/lib/intelligenceHome";
+import { countPhrase, glanceKnownState, knownStateLine, shortLabel, type PulseNode } from "@/lib/intelligenceHome";
 
 type MorningPulseProps = {
   greeting: string;
@@ -141,8 +141,8 @@ export function MorningPulse({
           onClearSelection={onClearSelection}
         />
         <p className="pulse-world-note">
-          Select an entity to see last-known pricing, API, and product state. Cards below are
-          only for a material change, not the baseline.
+          Last-known pricing and product state from official pages. Cards below are only for a
+          material change, not the baseline.
         </p>
       </article>
     </header>
@@ -271,7 +271,16 @@ function PulseField({
                 {selectedNode.knownStates.map((row) => (
                   <li key={row.aspect}>
                     <span className="pulse-selection-known-label">{row.label}</span>
-                    <span className="pulse-selection-known-state">{knownStateValue(row)}</span>
+                    <ul className="pulse-selection-known-facts">
+                      {(row.facts.length ? row.facts : [knownStateLine(row)]).map((fact) => (
+                        <li
+                          key={fact}
+                          className={`pulse-selection-known-fact${/ in · | · \$/.test(fact) ? " is-rate" : ""}`}
+                        >
+                          {fact}
+                        </li>
+                      ))}
+                    </ul>
                   </li>
                 ))}
               </ul>
@@ -280,9 +289,11 @@ function PulseField({
                 {knownStateEmpty(selectedNode)}
               </p>
             )}
-            <p className="pulse-selection-reason">
-              {selectedNode.latestSignal || quietReason(selectedNode)}
-            </p>
+            {selectedNode.knownStates.length === 0 ? (
+              <p className="pulse-selection-reason">
+                {selectedNode.latestSignal || quietReason(selectedNode)}
+              </p>
+            ) : null}
           </div>
           <div className="pulse-selection-actions">
             {selectedNode.reviewHref ? (
@@ -342,6 +353,7 @@ function PulseEntity({
   onSelect: (nodeId: string) => void;
 }) {
   const monitor = entityMonitorPresentation(node, scanning, now);
+  const glance = glanceKnownState(node.knownStates);
 
   return (
     <button
@@ -350,7 +362,7 @@ function PulseEntity({
       onClick={() => onSelect(node.id)}
       disabled={disabled}
       aria-pressed={selected}
-      aria-label={`${node.name}, ${monitor.badge}${monitor.detail ? `, ${monitor.detail}` : ""}${node.knownStates[0] ? `, ${knownStateLine(node.knownStates[0])}` : ""}`}
+      aria-label={`${node.name}, ${monitor.badge}${monitor.detail ? `, ${monitor.detail}` : ""}${glance ? `, ${knownStateLine(glance)}` : ""}`}
       data-state={disabled ? "loading" : selected ? "success" : undefined}
     >
       <span className="pulse-field-entity-name">{shortLabel(node.name, 26)}</span>
@@ -361,8 +373,8 @@ function PulseEntity({
       {monitor.detail ? (
         <span className="pulse-field-entity-activity">{monitor.detail}</span>
       ) : null}
-      {node.knownStates[0] ? (
-        <span className="pulse-field-entity-known">{knownStateLine(node.knownStates[0])}</span>
+      {glance ? (
+        <span className="pulse-field-entity-known">{knownStateLine(glance)}</span>
       ) : null}
     </button>
   );

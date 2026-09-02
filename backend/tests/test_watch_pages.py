@@ -236,6 +236,52 @@ def test_coverage_includes_last_known_excerpt():
     assert "$2.50" in cov["pages"][0]["excerpt"]
 
 
+def test_known_excerpt_drops_auth_and_formats_price_table():
+    from briefly_api.services.watch.pages import known_excerpt
+
+    dump = (
+        "GPT-5.6 Sol now costs $4 per million input tokens and $20 per million output tokens.\n"
+        "| Model | Input | Cached | Output |\n"
+        "| --- | --- | --- | --- |\n"
+        "| gpt-5.6-sol | $4.00 | $0.40 | $5.00 | $20.00 | $8.00 | $0.80 | $10.00 | $30.00 |\n"
+        "-H \"Authorization: Bearer $OPENAI_API_KEY\" \\\n"
+        "curl https://api.openai.com/v1/chat/completions -H \"Authorization: Bearer sk-live-not-real\"\n"
+        "The program aims to support the development of AI startups in health.\n"
+    )
+    pricing = known_excerpt(dump, source_type="pricing")
+    assert "Bearer" not in pricing
+    assert "API_KEY" not in pricing
+    assert "sk-live" not in pricing
+    assert "Authorization" not in pricing
+    assert "gpt-5.6-sol" in pricing
+    assert "$4.00" in pricing
+    assert "$20.00" in pricing
+    assert "in ·" in pricing
+    assert "|" not in pricing
+
+    docs = known_excerpt(dump, source_type="docs")
+    assert "Bearer" not in docs
+    assert "API_KEY" not in docs
+    assert "Authorization" not in docs
+    assert "curl" not in docs.lower()
+
+
+def test_embedded_json_skips_authorization_samples():
+    from briefly_api.services.watch.scrape import extract_embedded_text
+
+    html = """
+    <html><body>
+    <script type="application/json">
+    {"curl":"-H \\"Authorization: Bearer $OPENAI_API_KEY\\"","price":"$4.00"}
+    </script>
+    </body></html>
+    """
+    text = extract_embedded_text(html)
+    assert "Bearer" not in text
+    assert "API_KEY" not in text
+    assert "Authorization" not in text
+
+
 def test_coverage_failing_page_is_not_news_only():
     from types import SimpleNamespace
 

@@ -45,6 +45,7 @@ export type PulseKnownState = {
   state: string;
   value?: string | null;
   unit?: string | null;
+  facts: string[];
 };
 
 export type PulseNode = {
@@ -98,20 +99,125 @@ export function countPhrase(n: number, singular: string, plural: string): string
   return n === 1 ? singular : plural;
 }
 
+const SECRET_LINE =
+  /authorization\s*:|\bbearer\b|\bapi[_-]?key\b|\bx-api-key\b|\bsk-[a-z0-9]{8,}|\bcurl\b|(?:^|[\s"'`])-H\b|\$\{?(?:OPENAI|ANTHROPIC|GROQ|AZURE|GOOGLE|COHERE)_API_KEY\}?/i;
+const CODE_LINE =
+  /[{};]|=>|===|function\s|const\s|import\s|"model":|`[^`]+`|^(?:\$|#|>>>|from\s|import\s|-H\b)/;
+const MONEY_RE = /[$€£₹]\s*\d+(?:,\d{3})*(?:\.\d+)?/g;
+
+function moneyAmounts(text: string): string[] {
+  return Array.from((text || "").matchAll(MONEY_RE)).map((m) => m[0].replace(/\s+/g, ""));
+}
+const PRODUCT_WORD =
+  /\b(gpt|claude|gemini|llama|mistral|model|token|price|plan|cost|credit|api|sdk|endpoint)\b/i;
+
+function isSecretNoise(text: string): boolean {
+  return SECRET_LINE.test(text || "");
+}
+
+function looksLikeCode(text: string): boolean {
+  return isSecretNoise(text) || CODE_LINE.test(text || "");
+}
+
+function formatPriceRow(line: string): string | null {
+  if (!line.includes("|")) return null;
+  const cells = line
+    .trim()
+    .replace(/^\||\|$/g, "")
+    .split("|")
+    .map((cell) => cell.trim())
+    .filter((cell) => cell && !/^:?-{3,}:?$/.test(cell));
+  if (!cells.length) return null;
+  const moneys: string[] = [];
+  const percents: string[] = [];
+  let name: string | null = null;
+  for (const cell of cells) {
+    const found = moneyAmounts(cell);
+    if (found.length) {
+      moneys.push(...found);
+      continue;
+    }
+    if (cell.includes("%")) {
+      percents.push(cell.replace(/\*+$/, "").trim());
+      continue;
+    }
+    if (!name && !/^(model|input|output|cached|price|pricing|standard|batch|flex|priority)$/i.test(cell)) {
+      name = cell;
+    }
+  }
+  if (name && /^(model|input|output|cached|price|pricing)$/i.test(name)) return null;
+  if (moneys.length) {
+    const body =
+      moneys.length >= 4
+        ? `${moneys[0]} in · ${moneys[3]} out`
+        : moneys.length >= 2
+          ? `${moneys[0]} in · ${moneys[moneys.length - 1]} out`
+          : moneys[0];
+    return name ? `${name} · ${body}` : body;
+  }
+  if (percents.length && name) return `${name} · ${percents[0]}`;
+  return null;
+}
+
+/** Structured last-known facts from a raw extract. Never invents. Drops auth samples. */
+export function presentOfficialState(text: string, sourceType?: string | null): string[] {
+  const lines = (text || "")
+    .split(/\n+/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter((line) => line.length > 1 && !isSecretNoise(line) && !/^\|?\s*:?-{3,}/.test(line));
+  const facts: string[] = [];
+  const seen = new Set<string>();
+  const add = (fact: string) => {
+    const clean = fact.replace(/\s+/g, " ").trim();
+    if (clean.length < 3 || isSecretNoise(clean) || seen.has(clean.toLowerCase())) return;
+    seen.add(clean.toLowerCase());
+    facts.push(clean);
+  };
+
+  for (const line of lines) {
+    if (line.includes("|") || looksLikeCode(line)) continue;
+    if ((moneyAmounts(line).length || /%/.test(line)) && (PRODUCT_WORD.test(line) || /[$€£₹]/.test(line))) {
+      add(line);
+      if (sourceType !== "pricing" && facts.length) break;
+    }
+  }
+
+  if (sourceType === "pricing" || sourceType === "changelog" || facts.length === 0) {
+    for (const line of lines) {
+      const formatted = formatPriceRow(line);
+      if (formatted) add(formatted);
+      if (facts.length >= 3) break;
+    }
+  }
+
+  if (!facts.length) {
+    for (const line of lines) {
+      if (looksLikeCode(line) || line.includes("|")) continue;
+      add(line.slice(0, 180));
+      if (facts.length >= 2) break;
+    }
+  }
+
+  return facts.slice(0, 3);
+}
+
 export function knownStateValue(row: {
   state: string;
   value?: string | null;
   unit?: string | null;
+  facts?: string[];
 }): string {
   const value = (row.value || "").trim();
   const unit = (row.unit || "").trim().toLowerCase();
   if (value) {
     if (unit === "percent") return `${value}%`;
     if (unit === "$" || unit === "usd") return `$${value}`;
-    if (unit) return `${value} ${unit}`;
+    if (unit && unit !== "version") return `${value} ${unit}`;
+    if (unit === "version") return value;
     return value;
   }
-  return shortLabel((row.state || "").trim(), 96);
+  if (row.facts?.[0]) return shortLabel(row.facts[0], 72);
+  return shortLabel(presentOfficialState(row.state)[0] || (row.state || "").trim(), 72);
 }
 
 export function knownStateLine(row: {
@@ -119,30 +225,57 @@ export function knownStateLine(row: {
   state: string;
   value?: string | null;
   unit?: string | null;
+  facts?: string[];
 }): string {
-  const label = (row.label || "").trim();
-  const value = knownStateValue(row);
-  if (!label) return value;
-  if (!value) return label;
-  return `${label}: ${value}`;
+  return knownStateValue(row);
 }
 
-const PAGE_ASPECT: Record<string, { aspect: string; label: string }> = {
-  pricing: { aspect: "pricing_positioning", label: "pricing" },
-  docs: { aspect: "model_api", label: "API" },
-  changelog: { aspect: "product_release", label: "product" },
+export function glanceKnownState(states: PulseKnownState[]): PulseKnownState | undefined {
+  return (
+    states.find((row) => row.aspect === "pricing_positioning")
+    || states.find((row) => row.aspect === "product_release")
+    || states[0]
+  );
+}
+
+const PAGE_ASPECT: Record<string, { aspect: string; label: string; source: string }> = {
+  pricing: { aspect: "pricing_positioning", label: "pricing", source: "pricing" },
+  docs: { aspect: "model_api", label: "API", source: "docs" },
+  changelog: { aspect: "product_release", label: "product", source: "changelog" },
 };
+
+function snapshotBelongs(row: { aspect: string; state: string; value?: string | null }): boolean {
+  const text = `${row.state || ""} ${row.value || ""}`.trim();
+  if (!text || isSecretNoise(text) || (looksLikeCode(text) && !/[$€£₹]/.test(text))) return false;
+  const blob = text.toLowerCase();
+  if (row.aspect === "model_api") {
+    return /\b(api|sdk|endpoint|model|gpt-|claude|gemini)\b/.test(blob);
+  }
+  if (row.aspect === "pricing_positioning") {
+    return /[$€£₹]|%|\b(pric|plan|cost|token|credit)\b/.test(blob);
+  }
+  if (row.aspect === "product_release") {
+    return /\b(gpt|claude|gemini|model|release|launch|version|product)\b/.test(blob) || /[$€£₹]/.test(text);
+  }
+  return true;
+}
 
 function knownStatesFor(ent: WatchedEntity): PulseKnownState[] {
   const fromSnaps: PulseKnownState[] = (ent.last_states || [])
-    .filter((row) => (row.state || "").trim() || (row.value || "").trim())
-    .map((row) => ({
-      aspect: row.aspect,
-      label: row.label,
-      state: row.state,
-      value: row.value,
-      unit: row.unit,
-    }));
+    .filter((row) => ((row.state || "").trim() || (row.value || "").trim()) && snapshotBelongs(row))
+    .map((row) => {
+      const kind = row.aspect === "pricing_positioning" ? "pricing" : undefined;
+      const facts = presentOfficialState(row.state, kind);
+      return {
+        aspect: row.aspect,
+        label: row.label,
+        state: row.state,
+        value: row.value,
+        unit: row.unit,
+        facts: facts.length ? facts : [(row.value || row.state || "").trim()].filter(Boolean),
+      };
+    })
+    .filter((row) => row.facts.length > 0);
   const seen = new Set(fromSnaps.map((row) => row.aspect));
   const fromPages: PulseKnownState[] = [];
   for (const page of ent.coverage?.pages || []) {
@@ -150,11 +283,14 @@ function knownStatesFor(ent: WatchedEntity): PulseKnownState[] {
     const excerpt = (page.excerpt || "").trim();
     if (!mapped || !excerpt || seen.has(mapped.aspect)) continue;
     if (page.status !== "watching") continue;
+    const facts = presentOfficialState(excerpt, mapped.source);
+    if (!facts.length) continue;
     seen.add(mapped.aspect);
     fromPages.push({
       aspect: mapped.aspect,
       label: mapped.label,
       state: excerpt,
+      facts,
     });
   }
   return [...fromSnaps, ...fromPages].slice(0, 3);

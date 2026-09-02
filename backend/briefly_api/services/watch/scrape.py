@@ -64,6 +64,12 @@ _CHALLENGE = re.compile(
     re.I,
 )
 _INTERESTING = re.compile(r"[$€£₹]|\d+(?:\.\d+)?\s*%")
+_SECRET_LINE = re.compile(
+    r"authorization\s*:|\bbearer\b|\bapi[_-]?key\b|\bx-api-key\b|"
+    r"\bsk-[a-z0-9]{8,}|\bcurl\b|(?:^|[\s\"'`])-H\b|"
+    r"\$\{?(?:OPENAI|ANTHROPIC|GROQ|AZURE|GOOGLE|COHERE)_API_KEY\}?",
+    re.I,
+)
 
 
 _SKIP_PATH = re.compile(
@@ -171,6 +177,8 @@ def extract_embedded_text(html: str, *, limit: int = 8_000) -> str:
             chunk = re.sub(r"\\n|\\t", " ", chunk)
         for part in re.split(r"[\n\r]+", chunk):
             cleaned = " ".join(part.replace("\\u0024", "$").split())
+            if _SECRET_LINE.search(cleaned):
+                continue
             if _INTERESTING.search(cleaned) or (
                 "price" in cleaned.lower() and re.search(r"\d", cleaned)
             ):

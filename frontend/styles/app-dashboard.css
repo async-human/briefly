@@ -12850,18 +12850,19 @@ body[data-app-theme="dark"] .upgrade-modal-error {
 
 .pulse-selection-known {
   list-style: none;
-  margin: 0.35rem 0 0;
+  margin: 0.45rem 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.7rem;
 }
 
-.pulse-selection-known li {
+.pulse-selection-known > li {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.6rem;
-  align-items: baseline;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: stretch;
+  min-width: 0;
 }
 
 .pulse-selection-known-label {
@@ -12872,14 +12873,35 @@ body[data-app-theme="dark"] .upgrade-modal-error {
   color: var(--app-brand);
 }
 
+.pulse-selection-known-facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.pulse-selection-known-fact,
 .pulse-selection-known-state,
 .pulse-selection-known-empty {
   margin: 0;
   min-width: 0;
   font-size: 0.8125rem;
-  line-height: 1.45;
+  line-height: 1.4;
   color: var(--app-ink-secondary);
   overflow-wrap: anywhere;
+}
+
+.pulse-selection-known-fact {
+  font-variant-numeric: tabular-nums;
+}
+
+.pulse-selection-known-fact.is-rate {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+  color: var(--app-ink);
 }
 
 .pulse-selection-known-empty {

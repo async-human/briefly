@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactElement } from "react";
+import { presentOfficialState, shortLabel } from "@/lib/intelligenceHome";
 import { api, type WatchedEntity } from "@/lib/api";
 
 const KINDS = [
@@ -11,9 +12,8 @@ const KINDS = [
 ];
 
 function shortKnown(text: string, max = 72): string {
-  const t = text.trim();
-  if (t.length <= max) return t;
-  return `${t.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
+  const fact = presentOfficialState(text)[0] || text.trim();
+  return shortLabel(fact, max);
 }
 
 export function WatchedEntitiesCard({ compact = false }: { compact?: boolean }) {

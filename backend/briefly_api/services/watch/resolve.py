@@ -127,7 +127,10 @@ def coverage_from_sources(sources: list[EntitySource]) -> dict:
             status = "watching"
         else:
             status = "pending"
-        excerpt = known_excerpt(getattr(src, "last_extract", None) or "") or None
+        excerpt = known_excerpt(
+            getattr(src, "last_extract", None) or "",
+            source_type=getattr(src, "source_type", None),
+        ) or None
         pages.append(
             {
                 "source_type": src.source_type,
