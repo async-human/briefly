@@ -33,6 +33,7 @@ export function IntelligenceHome({
   const [restOpen, setRestOpen] = useState(true);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const userToggledRest = useRef(false);
+  const autoScanned = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -43,8 +44,10 @@ export function IntelligenceHome({
       setAlerts(nextAlerts);
       setEntities(nextEntities);
       setLoadError(false);
+      return nextEntities;
     } catch {
       setLoadError(true);
+      return [];
     }
   }, []);
 
@@ -90,6 +93,23 @@ export function IntelligenceHome({
       setScanning(false);
     }
   }
+
+  useEffect(() => {
+    if (autoScanned.current || scanning || loadError || entities.length === 0) return;
+    const needsOfficialCopy = entities.some((entity) => {
+      if (entity.kind === "topic" || entity.kind === "person") return false;
+      const pages = entity.coverage?.pages || [];
+      const live = pages.filter((page) => page.status === "watching" || page.status === "pending");
+      if (live.length === 0) return false;
+      const hasCopy =
+        live.some((page) => (page.excerpt || "").trim())
+        || (entity.last_states || []).some((row) => (row.state || "").trim());
+      return !hasCopy;
+    });
+    if (!needsOfficialCopy) return;
+    autoScanned.current = true;
+    void scanWatching();
+  }, [entities, scanning, loadError]);
 
   const model = buildMorningPulse({ digest, alerts, entities, generating });
   const selectedNode = model.nodes.find((node) => node.id === selectedEntityId) || null;

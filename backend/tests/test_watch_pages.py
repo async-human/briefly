@@ -272,3 +272,57 @@ def test_embedded_json_prices_and_challenge_html():
     assert is_challenge_html("<html><title>Just a moment...</title><body>cf-browser-verification</body></html>")
     assert is_sitemap_index("<sitemapindex><sitemap><loc>https://acme.com/s.xml</loc></sitemap></sitemapindex>")
 
+
+def test_prefer_developer_pricing_over_blocked_marketing():
+    from types import SimpleNamespace
+
+    from briefly_api.services.watch.pages import _prefer_live_sources
+
+    old = SimpleNamespace(
+        source_type="pricing",
+        url="https://openai.com/api/pricing",
+        last_error="403",
+        content_hash=None,
+        consecutive_failures=2,
+    )
+    new = SimpleNamespace(
+        source_type="pricing",
+        url="https://developers.openai.com/api/docs/pricing",
+        last_error=None,
+        content_hash=None,
+        consecutive_failures=0,
+    )
+    picked = _prefer_live_sources([old, new])
+    assert len(picked) == 1
+    assert "developers.openai.com" in picked[0].url
+
+
+def test_ingest_stores_pricing_extract(monkeypatch):
+    import asyncio
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    from briefly_api.services.watch.pages import _ingest_source
+
+    async def fake_fetch(url, timeout=25.0):
+        body = "GPT-4o input $2.50 / 1M tokens\n" + ("Official API pricing. " * 20)
+        return url, f"<html><body>{body}</body></html>"
+
+    monkeypatch.setattr("briefly_api.services.watch.pages.fetch_html", fake_fetch)
+    monkeypatch.setattr("briefly_api.services.watch.pages.robots_status", lambda _url: "allow")
+    src = SimpleNamespace(
+        url="https://developers.openai.com/api/docs/pricing",
+        source_type="pricing",
+        content_hash=None,
+        last_extract=None,
+        last_error=None,
+        last_fetched=None,
+        consecutive_failures=0,
+    )
+    decision = asyncio.run(_ingest_source(src, "OpenAI", datetime.now(timezone.utc)))
+    assert decision is not None
+    assert decision.kind == "baseline"
+    assert src.content_hash
+    assert "$2.50" in (src.last_extract or "")
+    assert src.last_error is None
+

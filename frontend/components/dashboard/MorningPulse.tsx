@@ -286,7 +286,7 @@ function PulseField({
               <Link className="pulse-selection-action is-primary" href={selectedNode.reviewHref}>
                 Review signal
               </Link>
-            ) : !selectedNode.lastCheckedAt ? (
+            ) : selectedNode.knownStates.length === 0 ? (
               <button
                 type="button"
                 className="pulse-selection-action is-primary"
@@ -302,7 +302,7 @@ function PulseField({
                 Ask Briefly
               </Link>
             )}
-            {selectedNode.coverageStatus === "news_only" ? (
+            {selectedNode.coverageStatus === "news_only" && !scanning ? (
               <Link className="pulse-selection-action" href="/settings">
                 Pin a page
               </Link>
@@ -414,14 +414,14 @@ function entityMonitorPresentation(
 }
 
 function knownStateEmpty(node: PulseNode): string {
-  if (node.coverageStatus === "news_only" || node.coverageStatus === "skipped") {
-    return "No official pricing, docs, or changelog page confirmed yet. Pin a URL in Settings if we missed it.";
-  }
   if (node.coverageStatus === "official" || node.coverageStatus === "partial") {
-    return (
-      node.coverageLine
-      || "The first confirmed official page is stored as a baseline, not an alert. Last-known copy appears once Check now stores an extract."
-    );
+    return "Checking the official page now. Last-known pricing, API, and product copy will land here — not as a news alert.";
+  }
+  if (node.coverageStatus === "skipped") {
+    return "Topics and people stay on news and RSS.";
+  }
+  if (node.coverageStatus === "news_only") {
+    return "No official pricing page on file yet. Pin a URL in Settings if this company has one.";
   }
   return "No last-known pricing, API, or product state yet.";
 }

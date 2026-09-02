@@ -14,6 +14,7 @@ hashed; Google News, GitHub, and the user's pool remain the backstop.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -36,6 +37,7 @@ from briefly_api.db.models import (
 from briefly_api.services.watch.catalog import generate_aliases, match_terms_for, topic_terms
 
 router = APIRouter(tags=["watched"])
+log = logging.getLogger(__name__)
 
 _VALID_KINDS = {"company", "topic", "person", "product"}
 
@@ -323,6 +325,25 @@ async def _coverage_map(db: AsyncSession, rows: list[WatchedEntity]) -> dict[str
             }
         else:
             cov = coverage_from_sources(by.get(row.id) or [])
+            from briefly_api.services.watch.catalog import catalog_pages
+            from types import SimpleNamespace
+
+            extras = []
+            have = {p["source_type"] for p in cov.get("pages") or []}
+            for kind, url in catalog_pages(row.name):
+                if kind in have:
+                    continue
+                extras.append(
+                    SimpleNamespace(
+                        source_type=kind,
+                        url=url,
+                        last_error=None,
+                        content_hash=None,
+                        last_extract=None,
+                    )
+                )
+            if extras:
+                cov = coverage_from_sources(list(by.get(row.id) or []) + extras)
             disc = dict((row.monitoring_rules or {}).get("page_discovery") or {})
             if cov["status"] == "news_only" and disc.get("note"):
                 cov["note"] = str(disc["note"])
@@ -361,6 +382,13 @@ async def list_watched(
         snaps = await latest_by_entities(db, user.id, [r.id for r in rows])
     except Exception:
         snaps = {}
+    try:
+        from briefly_api.services.watch.pages import hydrate_official_pages
+
+        await hydrate_official_pages(db, list(rows))
+        await db.commit()
+    except Exception:
+        log.debug("Official-page hydrate on list skipped", exc_info=True)
     coverage = await _coverage_map(db, list(rows))
     return [
         _serialize_entity(

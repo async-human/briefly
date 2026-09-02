@@ -4,7 +4,7 @@ Living log of what is **in the product**, mapped to [`ROADMAP.md`](ROADMAP.md), 
 
 Update this file whenever a capability ships, is reshaped, or is deliberately parked. A rising feature count is not progress unless it moves a signal, a decision, or a retained user.
 
-**Last updated:** 2026-09-01 (Official-page scraper)
+**Last updated:** 2026-09-02 (Hydrate official pages on glance)
 
 ---
 
@@ -152,6 +152,7 @@ Do not start these because the last file compiled.
 
 | Date | Commit | What shipped |
 |---|---|---|
+| 2026-09-02 | (this) | Opening Today hydrates official pricing/docs extracts immediately; catalog companies never look like “page missed” while copy is loading |
 | 2026-09-01 | (this) | Official-page scraper: sibling developer hosts, nav/JSON links, sitemap index; OpenAI/Sarvam/NVIDIA catalog URLs that actually fetch; failing pages no longer look like “never found” |
 | 2026-09-01 | (this) | Your world inspect panel shows last-known pricing/API/product from snapshots and official-page extracts; cards remain change-only |
 | 2026-09-01 | (this) | Official-page resolver: homepage/nav/sitemap + confirm-before-watch; coverage on settings; user-pinned URLs |

@@ -5,6 +5,7 @@ or a URL the user pins. First successful fetch is a baseline with no alert.
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import re
@@ -262,11 +263,15 @@ def _hit_for_change(entity: WatchedEntity, src: EntitySource, decision: ExtractD
 
 
 def _prefer_live_sources(sources: list[EntitySource]) -> list[EntitySource]:
-    """One URL per kind. Prefer a stored extract over a blocked duplicate."""
+    """One URL per kind. Prefer a stored extract over a blocked marketing duplicate."""
     def rank(src: EntitySource) -> tuple[int, int, int]:
         failing = 1 if (src.last_error or "").strip() else 0
         hashed = 0 if src.content_hash else 1
-        return (failing, hashed, int(src.consecutive_failures or 0))
+        host = (urlparse(src.url or "").netloc or "").lower()
+        specific = 0 if any(
+            host.startswith(p) for p in ("developers.", "developer.", "docs.", "platform.", "api.")
+        ) else 1
+        return (failing, hashed, specific)
 
     best: dict[str, EntitySource] = {}
     for src in sources:
@@ -274,6 +279,93 @@ def _prefer_live_sources(sources: list[EntitySource]) -> list[EntitySource]:
         if cur is None or rank(src) < rank(cur):
             best[src.source_type] = src
     return [best[kind] for kind in ("pricing", "docs", "changelog") if kind in best]
+
+
+async def _ingest_source(
+    src: EntitySource,
+    entity_name: str,
+    now: datetime,
+    *,
+    timeout: float = 25.0,
+) -> ExtractDecision | None:
+    """Fetch one official page and store extract. None means not stored."""
+    from briefly_api.services.watch.scrape import is_challenge_html
+
+    status = robots_status(src.url)
+    if status == "disallow":
+        _mark_error(src, now, "robots.txt disallows this URL", count_failure=False)
+        return None
+    if status == "unreachable":
+        _mark_error(src, now, "robots.txt unreachable", count_failure=True)
+        return None
+    try:
+        _final_url, html = await fetch_html(src.url, timeout=timeout)
+        if is_challenge_html(html):
+            _mark_error(src, now, "bot challenge page (Cloudflare or similar)", count_failure=True)
+            return None
+        raw = extract_visible_text(html, src.url)
+    except UrlFetchError as exc:
+        _mark_error(src, now, str(exc)[:500], count_failure=True)
+        log.debug("Watch page fetch failed %s (%s): %s", entity_name, src.source_type, exc)
+        return None
+    except Exception as exc:
+        _mark_error(src, now, f"fetch failed: {exc}"[:500], count_failure=True)
+        log.debug("Watch page fetch failed %s (%s): %s", entity_name, src.source_type, exc)
+        return None
+
+    decision = evaluate_extract(src.content_hash, src.last_extract, raw)
+    if decision.kind == "thin":
+        _mark_error(src, now, decision.error or "extract too thin", count_failure=True)
+        return None
+    _mark_ok(src, now, decision.digest, decision.extract)
+    return decision
+
+
+async def hydrate_official_pages(session, entities: list, *, limit: int = 9) -> int:
+    """Seed catalog URLs and fetch last-known copy now. No alerts. For the glance."""
+    from briefly_api.services.watch.sources import seed_sources
+
+    now = datetime.now(timezone.utc)
+    for entity in entities:
+        if getattr(entity, "kind", None) not in {"company", "product"}:
+            continue
+        try:
+            await seed_sources(session, entity)
+        except Exception:
+            log.debug("Watch seed skipped for %s", getattr(entity, "name", "?"), exc_info=True)
+    await session.flush()
+
+    need: list[tuple[str, EntitySource]] = []
+    for entity in entities:
+        if getattr(entity, "kind", None) not in {"company", "product"}:
+            continue
+        rows = (
+            await session.execute(
+                select(EntitySource).where(
+                    EntitySource.entity_id == entity.id,
+                    EntitySource.is_active.is_(True),
+                    EntitySource.source_type.in_(tuple(PAGE_SOURCE_TYPES)),
+                )
+            )
+        ).scalars().all()
+        for src in _prefer_live_sources(rows):
+            if src.content_hash and src.last_extract and not (src.last_error or "").strip():
+                continue
+            need.append((entity.name, src))
+    need.sort(key=lambda item: (0 if item[1].source_type == "pricing" else 1, item[0].lower()))
+    batch = need[:limit]
+    if not batch:
+        return 0
+
+    async def one(name: str, src: EntitySource) -> bool:
+        decision = await _ingest_source(src, name, now, timeout=12.0)
+        return bool(decision)
+
+    results = await asyncio.gather(*(one(name, src) for name, src in batch), return_exceptions=True)
+    stored = sum(1 for item in results if item is True)
+    if stored:
+        log.info("Hydrated %d official pages for glance", stored)
+    return stored
 
 
 async def check_entity_pages(
@@ -307,31 +399,9 @@ async def check_entity_pages(
             if lf > cutoff:
                 continue
         checked += 1
-        status = robots_status(src.url)
-        if status == "disallow":
-            _mark_error(src, now, "robots.txt disallows this URL", count_failure=False)
-            log.info("Watch page skipped (robots): %s %s", entity.name, src.url)
+        decision = await _ingest_source(src, entity.name, now)
+        if decision is None:
             continue
-        if status == "unreachable":
-            _mark_error(src, now, "robots.txt unreachable", count_failure=True)
-            continue
-        try:
-            _final_url, html = await fetch_html(src.url)
-            raw = extract_visible_text(html, src.url)
-        except UrlFetchError as exc:
-            _mark_error(src, now, str(exc)[:500], count_failure=True)
-            log.debug("Watch page fetch failed %s (%s): %s", entity.name, src.source_type, exc)
-            continue
-        except Exception as exc:
-            _mark_error(src, now, f"fetch failed: {exc}"[:500], count_failure=True)
-            log.debug("Watch page fetch failed %s (%s): %s", entity.name, src.source_type, exc)
-            continue
-
-        decision = evaluate_extract(src.content_hash, src.last_extract, raw)
-        if decision.kind == "thin":
-            _mark_error(src, now, decision.error or "extract too thin", count_failure=True)
-            continue
-        _mark_ok(src, now, decision.digest, decision.extract)
         if decision.kind == "changed":
             hits.append(_hit_for_change(entity, src, decision, now))
             log.info("Watch page changed: %s %s", entity.name, src.source_type)

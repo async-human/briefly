@@ -57,13 +57,13 @@ def _friendly_status_error(url: str, status: int) -> UrlFetchError:
     return UrlFetchError(f"{host} returned HTTP {status}.")
 
 
-def _fetch_page_sync(url: str) -> tuple[str, str]:
+def _fetch_page_sync(url: str, timeout: float = 25.0) -> tuple[str, str]:
     last_error: Exception | None = None
     for referer in (url, "https://www.google.com/"):
         headers = _browser_headers(url)
         headers["Referer"] = referer
         try:
-            with httpx.Client(timeout=25.0, follow_redirects=True, headers=headers) as client:
+            with httpx.Client(timeout=timeout, follow_redirects=True, headers=headers) as client:
                 resp = client.get(url)
                 if resp.status_code == 403 and referer != "https://www.google.com/":
                     continue
@@ -161,9 +161,9 @@ async def probe_url(url: str) -> None:
     await asyncio.to_thread(_probe_url_sync, url)
 
 
-async def fetch_html(url: str) -> tuple[str, str]:
+async def fetch_html(url: str, timeout: float = 25.0) -> tuple[str, str]:
     """Return (final_url, html). Raises UrlFetchError."""
-    return await asyncio.to_thread(_fetch_page_sync, url)
+    return await asyncio.to_thread(_fetch_page_sync, url, timeout)
 
 
 async def scrape_url(url: str) -> list[NormalizedContent]:
