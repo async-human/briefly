@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -12,6 +13,7 @@ from briefly_api.config import get_settings
 from briefly_api.db.engine import SessionLocal
 from briefly_api.db.models import (
     EntityAlert,
+    EntitySource,
     ProactiveSurfacingEvent,
     RawContent,
     UserProfile,
@@ -129,7 +131,13 @@ def _should_skip(entity: WatchedEntity, now: datetime, min_minutes: int) -> bool
     return now - last < timedelta(minutes=interval)
 
 
-async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False) -> int:
+async def monitor_entity(
+    session,
+    entity: WatchedEntity,
+    *,
+    force: bool = False,
+    refresh_pages: bool | None = None,
+) -> int:
     s = get_settings()
     if not s.watch_monitor_enabled or not entity.is_active:
         return 0
@@ -137,14 +145,31 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
     now = datetime.now(timezone.utc)
     if not force and _should_skip(entity, now, s.watch_rss_min_interval_minutes):
         return 0
+    if refresh_pages is None:
+        refresh_pages = force
 
     await seed_sources(session, entity)
     try:
         await maybe_discover_blog(session, entity)
     except Exception:
         log.debug("Watch discover skipped for %s", entity.name, exc_info=True)
+
+    existing_pages = (
+        await session.execute(
+            select(func.count())
+            .select_from(EntitySource)
+            .where(
+                EntitySource.entity_id == entity.id,
+                EntitySource.source_type.in_(tuple(PAGE_SOURCE_TYPES)),
+            )
+        )
+    ).scalar_one()
     try:
-        await maybe_discover_pages(session, entity, force=force)
+        await maybe_discover_pages(
+            session,
+            entity,
+            force=bool(force) and int(existing_pages or 0) == 0,
+        )
     except Exception:
         log.debug("Watch page resolve skipped for %s", entity.name, exc_info=True)
 
@@ -152,7 +177,7 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
         session,
         entity,
         min_interval_minutes=s.watch_rss_min_interval_minutes,
-        force=force,
+        force=refresh_pages,
     )
 
     unread_capped = await _unread_count(session, entity.id) >= s.watch_max_unread_per_entity
@@ -336,7 +361,14 @@ async def monitor_entity(session, entity: WatchedEntity, *, force: bool = False)
     return created
 
 
-async def run_for_user(session, user_id: str, *, force: bool = False) -> dict:
+async def run_for_user(
+    session,
+    user_id: str,
+    *,
+    force: bool = False,
+    time_budget_seconds: float | None = None,
+    refresh_pages: bool | None = None,
+) -> dict:
     s = get_settings()
     if not s.watch_monitor_enabled:
         return {"skipped": True}
@@ -356,12 +388,32 @@ async def run_for_user(session, user_id: str, *, force: bool = False) -> dict:
         )
     ).scalars().all()
     created = 0
-    for ent in entities:
+    checked = 0
+    started = time.monotonic()
+    ids = [ent.id for ent in entities]
+    for entity_id in ids:
+        if time_budget_seconds is not None and (time.monotonic() - started) >= time_budget_seconds:
+            log.warning("Watch scan hit time budget after %d/%d entities", checked, len(ids))
+            break
         try:
-            created += await monitor_entity(session, ent, force=force)
+            ent = await session.get(WatchedEntity, entity_id)
+            if not ent or not ent.is_active:
+                continue
+            created += await monitor_entity(
+                session,
+                ent,
+                force=force,
+                refresh_pages=refresh_pages,
+            )
+            await session.commit()
+            checked += 1
         except Exception:
-            log.exception("Watch monitor failed for entity %s", ent.id)
-    return {"entities": len(entities), "alerts": created}
+            log.exception("Watch monitor failed for entity %s", entity_id)
+            try:
+                await session.rollback()
+            except Exception:
+                log.exception("Watch monitor rollback failed for entity %s", entity_id)
+    return {"entities": checked, "alerts": created, "watched": len(ids)}
 
 
 async def run_watch_scan_job(payload: dict | None = None) -> None:

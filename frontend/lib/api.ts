@@ -1270,7 +1270,13 @@ export const api = {
       `/api/v1/watched-alerts${unreadOnly ? "?unread_only=true" : ""}`,
     ),
   scanWatchedEntities: () =>
-    request<{ entities: number; new_alerts: number; alerts: WatchedAlert[] }>(
+    request<{
+      entities: number;
+      new_alerts: number;
+      alerts: WatchedAlert[];
+      error?: string | null;
+      partial?: boolean;
+    }>(
       "/api/v1/watched-entities/scan",
       { method: "POST" },
       90000,

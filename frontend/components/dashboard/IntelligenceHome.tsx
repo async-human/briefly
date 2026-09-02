@@ -27,13 +27,13 @@ export function IntelligenceHome({
   const [greeting] = useState(() => getTimeGreeting().label);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState(false);
+  const [scanErrorDetail, setScanErrorDetail] = useState("");
   const [scanResult, setScanResult] = useState<{ entities: number; newAlerts: number } | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [setupWarning, setSetupWarning] = useState("");
   const [restOpen, setRestOpen] = useState(true);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const userToggledRest = useRef(false);
-  const autoScanned = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -64,6 +64,7 @@ export function IntelligenceHome({
     if (scanning || entities.length === 0) return;
     setScanning(true);
     setScanError(false);
+    setScanErrorDetail("");
     setScanResult(null);
     try {
       const result = await api.scanWatchedEntities();
@@ -87,29 +88,20 @@ export function IntelligenceHome({
         })));
       }
       setScanResult({ entities: result.entities, newAlerts: result.new_alerts });
-    } catch {
+      if (result.error) {
+        setScanError(true);
+        setScanErrorDetail(result.error);
+      } else {
+        setScanErrorDetail("");
+      }
+    } catch (err) {
       setScanError(true);
+      setScanErrorDetail(err instanceof Error ? err.message : "Source check failed.");
+      await refresh();
     } finally {
       setScanning(false);
     }
   }
-
-  useEffect(() => {
-    if (autoScanned.current || scanning || loadError || entities.length === 0) return;
-    const needsOfficialCopy = entities.some((entity) => {
-      if (entity.kind === "topic" || entity.kind === "person") return false;
-      const pages = entity.coverage?.pages || [];
-      const live = pages.filter((page) => page.status === "watching" || page.status === "pending");
-      if (live.length === 0) return false;
-      const hasCopy =
-        live.some((page) => (page.excerpt || "").trim())
-        || (entity.last_states || []).some((row) => (row.state || "").trim());
-      return !hasCopy;
-    });
-    if (!needsOfficialCopy) return;
-    autoScanned.current = true;
-    void scanWatching();
-  }, [entities, scanning, loadError]);
 
   const model = buildMorningPulse({ digest, alerts, entities, generating });
   const selectedNode = model.nodes.find((node) => node.id === selectedEntityId) || null;
@@ -151,6 +143,7 @@ export function IntelligenceHome({
           generating={generating}
           scanning={scanning}
           scanError={scanError}
+          scanErrorDetail={scanErrorDetail}
           scanResult={scanResult}
           onScan={() => void scanWatching()}
           selectedNodeId={selectedEntityId}

@@ -19,6 +19,7 @@ type MorningPulseProps = {
   generating?: boolean;
   scanning: boolean;
   scanError: boolean;
+  scanErrorDetail?: string;
   scanResult: { entities: number; newAlerts: number } | null;
   onScan: () => void;
   selectedNodeId: string | null;
@@ -43,6 +44,7 @@ export function MorningPulse({
   generating,
   scanning,
   scanError,
+  scanErrorDetail,
   scanResult,
   onScan,
   selectedNodeId,
@@ -105,6 +107,7 @@ export function MorningPulse({
                 lastCheckedAt,
                 scanning,
                 scanError,
+                scanErrorDetail,
                 scanResult,
                 now,
               })}
@@ -479,6 +482,7 @@ function monitoringOverview({
   lastCheckedAt,
   scanning,
   scanError,
+  scanErrorDetail,
   scanResult,
   now,
 }: {
@@ -487,10 +491,20 @@ function monitoringOverview({
   lastCheckedAt: string | null;
   scanning: boolean;
   scanError: boolean;
+  scanErrorDetail?: string;
   scanResult: { entities: number; newAlerts: number } | null;
   now: number | null;
 }): string {
-  if (scanError) return "Source check failed · retry available";
+  if (scanError) {
+    const detail = (scanErrorDetail || "").trim();
+    if (/timed out|timeout|408/i.test(detail)) {
+      return "Check took too long · retry — official pages already fetched are kept";
+    }
+    if (detail && !/^source check failed/i.test(detail)) {
+      return detail.length > 88 ? `${detail.slice(0, 85)}…` : detail;
+    }
+    return "Source check failed · retry available";
+  }
   if (scanning) {
     return countPhrase(watchCount, "Checking 1 active watch…", `Checking ${watchCount} active watches…`);
   }

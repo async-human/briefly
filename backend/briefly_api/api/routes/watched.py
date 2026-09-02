@@ -570,6 +570,8 @@ class WatchScanOut(BaseModel):
     entities: int
     new_alerts: int
     alerts: list[EntityAlertOut]
+    error: str | None = None
+    partial: bool = False
 
 
 @router.post("/watched-entities/scan", response_model=WatchScanOut)
@@ -579,9 +581,44 @@ async def scan_watched(
 ) -> WatchScanOut:
     """Run a watch scan now (does not wait for the 15-minute worker)."""
     from briefly_api.services.watch.monitor import run_for_user
+    from briefly_api.services.watch.pages import hydrate_official_pages
 
-    result = await run_for_user(db, user.id, force=True)
-    await db.commit()
+    error: str | None = None
+    result: dict = {"entities": 0, "alerts": 0, "watched": 0}
+    try:
+        rows = (
+            await db.execute(
+                select(WatchedEntity).where(
+                    WatchedEntity.user_id == user.id,
+                    WatchedEntity.is_active.is_(True),
+                )
+            )
+        ).scalars().all()
+        try:
+            await hydrate_official_pages(db, list(rows))
+            await db.commit()
+        except Exception:
+            log.exception("Official-page hydrate during scan failed")
+            await db.rollback()
+        result = await run_for_user(
+            db,
+            user.id,
+            force=True,
+            time_budget_seconds=40,
+            refresh_pages=False,
+        )
+        await db.commit()
+        watched = int(result.get("watched") or result.get("entities") or 0)
+        checked = int(result.get("entities") or 0)
+        if watched and checked < watched:
+            error = "Checked some watches before the time budget. Retry to finish the rest."
+    except Exception:
+        log.exception("Watch scan failed for user %s", user.id)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        error = "Source check hit an error. Retry — companies already checked are saved."
 
     rows = (
         await db.execute(
@@ -617,6 +654,8 @@ async def scan_watched(
         entities=int(result.get("entities") or 0),
         new_alerts=int(result.get("alerts") or 0),
         alerts=serialized,
+        error=error,
+        partial=bool(error),
     )
 
 

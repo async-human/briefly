@@ -152,6 +152,7 @@ Do not start these because the last file compiled.
 
 | Date | Commit | What shipped |
 |---|---|---|
+| 2026-09-02 | (this) | Check now isolates each watch, time-boxes the request, and no longer fails the glance because one source or a proxy timeout poisoned the scan |
 | 2026-09-02 | (this) | Opening Today hydrates official pricing/docs extracts immediately; catalog companies never look like “page missed” while copy is loading |
 | 2026-09-01 | (this) | Official-page scraper: sibling developer hosts, nav/JSON links, sitemap index; OpenAI/Sarvam/NVIDIA catalog URLs that actually fetch; failing pages no longer look like “never found” |
 | 2026-09-01 | (this) | Your world inspect panel shows last-known pricing/API/product from snapshots and official-page extracts; cards remain change-only |
